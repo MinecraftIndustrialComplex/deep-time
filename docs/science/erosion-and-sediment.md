@@ -21,6 +21,7 @@ Through the whole history, rivers cut into rising land (the stream power law: er
 | [ERO](ledger/ERO.md) | the erosion law against measured rates | ERO-179 to ERO-182 (4) |
 | [ERO](ledger/ERO.md) | surface numerics: the diffusion solve, the parallel flood | ERO-183 to ERO-184 (2) |
 | [ERO](ledger/ERO.md) | pelagic and periplatform carbonate, photic diagnostics, euxinic veto | ERO-191 to ERO-197 (7) |
+| [ERO](ledger/ERO.md) | chemical denudation: the dissolved load of the carbon cycle's silicate weathering | ERO-205 to ERO-207 (3) |
 
 Rows by status (2026-10-18, `tools/review/claims_counts.py`): `verified` 10, `cited-unverified` 82, `from-memory` 2, `abstract-only` 4, `calibrated` 8, `game-choice` 11, `uncited` 56.
 
@@ -906,3 +907,116 @@ fans (inferred from the shares, not measured cell by cell). Carbonate burial is
 not tied to the carbon budget (the ocean does not lose the carbon the surface stage buries). The
 periplatform tracer follows the diffusion solve's change; the slope failure's runout, which moves
 material further than one face, carries carbonate only as the share of what fails off a cell.
+
+## Chemical denudation (M5 lane, 2026-10-25)
+
+**Why.** The surface stage took rock off the land only mechanically: rivers, hillslopes, slope
+failure. The rock the silicate weathering dissolved stayed in place, although the carbon cycle
+counted it as weathered (CLM-152 to CLM-157). On base13 the low-relief land (window relief under
+100 m, 57 % of the land's window-time) eroded at 5.6 m/Myr net, against Montgomery & Brandon's
+eq. 2 at 22.5, whose intercept E0 of 10 m/Myr is their mean chemical denudation of the largest
+rivers (ERO-004's note; build log 2026-10-25, M5 lane). The term is approved as a missing sourced
+process, not as a lever on any V1 number (the coordinator's call, 2026-10-25).
+
+**The law (ERO-205).** The dissolved load is the mass the carbon cycle already weathers, and no
+new rate:
+
+- the clock adds up each EBM band's land weathering over the climate step, mol of Ca + Mg, at the
+  implicit carbon step's own CO2 (so the sum is the carbon the reservoirs lost beyond the
+  degassing);
+- at the step's end, each band's mol goes on its land cells that are not under ice, by each
+  cell's own supply-limited flux S (1 - e^(-K/S)) (West, Galy & Bickle 2005's two regimes: the
+  supply limits slow-eroding ground, the kinetics fast-eroding ground);
+- a cell loses dissolved_kg_per_mol (ERO-206) of rock per mol, over rho_rock and its true area;
+- the surface stage takes that thickness off the ground before the step's net change: the
+  regolith first, then the strata log, with the isostatic response of any denudation;
+- the erosion field the surface hands back to the climate stays mechanical. Counting the
+  dissolved part in it would raise the next step's supply, and so the dissolved load, on itself.
+
+**The constant (ERO-206).** 0.26 kg of rock per mol of Ca + Mg: the upper crust's Ca + Mg + Na +
+K weight fraction (0.1, West et al.'s figure) times the cratons' dissolved silicate load over its
+cations, (SCDR + SiO2) / SCDR, whose median over West et al.'s five cratons is 3.31 (1.72 to
+5.24), over the rock's 1.26 mol of Ca + Mg per kg (CLM-153). Dixon & von Blanckenburg 2012's
+"<= 50%" mass loss of fully weathered granite gives 0.40, the top of the cratons' span.
+
+**Against measured cratons (ERO-207).** West et al.'s Table 2 gives each craton's silicate
+chemical denudation, (SCDR + SiO2) / 2.7 t/m3, with its temperature, runoff and total
+denudation. The model, run on one cell per craton at 280 ppm with the default parameters:
+
+| Craton | T (degC) | runoff (mm/yr) | total denudation (m/Myr) | West, chemical (m/Myr) | model, eroding at the total (m/Myr) | model, flat (m/Myr) |
+|---|---|---|---|---|---|---|
+| Slave | 4.0 | 100 | 1.2 | 0.16 | 0.32 | 0.32 |
+| Siberia | 2.0 | 270 | 5.6 | 0.88 | 0.75 | 0.62 |
+| Africa | 24.1 | 250 | 3.7 | 1.39 | 2.19 | 1.29 |
+| Grenville | 4.5 | 580 | 4.8 | 1.40 | 1.61 | 1.07 |
+| Guyana | 25.0 | 1,680 | 13.0 | 4.66 | 8.43 | 1.31 |
+
+Each is within a factor of 2.5 of its craton (the unit test's bound), and flat ground that does
+not erode (the supply's least denudation of 2 m/Myr, CLM-155) sinks at 0.3 to 1.3 m/Myr, inside
+the cratons' 0.16 to 4.66. The task's "2 to 10 m/Myr" for a craton (CLM-155's comment) is total
+denudation, not its chemical part: West et al.'s cratons denude 1.2 to 13 m/Myr in all, and
+neither paper states 2 to 10 m/Myr. A flat craton thus sinks by about 0.3 to 1.3 km per Gyr from
+the dissolved load alone, less its Airy rebound (about 0.14 of the crust lost, build log
+2026-10-25, M5 lane).
+
+**Tests.** The weathering by band adds up to the carbon cycle's flux to the bit; the placed load
+is the band's weathered mass to 1e-12, on land only and not under ice while the band has free
+land; the clock's dissolved mol equals the carbon the reservoirs lost beyond the degassing to
+1e-9, also when a stretch runs in two parts; the switch off leaves the clock unchanged to the
+bit and writes no field; the surface stage's mass residual stays under 1e-6 of its erosion with
+the dissolved load in it.
+
+**Limits.**
+
+- The supply's x2 (CLM-156) was set when the grid carried 9.5 Gt/yr; on base13 it carries about
+  23 Gt/yr. With it, a fully supply-limited cell can lose rock in solution at up to 0.66 of its
+  erosion, above the largest depletion fraction Riebe, Kirchner & Finkel 2004 measured (0.61).
+- The dissolved load leaves the planet's mass budget. On Earth it returns to the sea floor as
+  carbonate and silica; here the carbon cycle lays only its drawdown beyond the degassing as cap
+  carbonate, and the surface stage's carbonate rules are not tied to the carbon budget (above).
+  Checked for a sink to send it to (the coordinator's question, 2026-10-25): none carries it.
+  The cap carbonate (`climate/mod.rs`, CAP_CARBONATE_GLOBAL) is the carbon the reservoirs lost
+  beyond the degassing, so at the balance (weathering equal to degassing) it lays nothing, while
+  the weathering's own carbonate (Urey's reaction) is not laid at all; the neritic, pelagic and
+  periplatform rules are production laws (light, warmth, clarity, a fixed pelagic rain over a
+  fixed CCD) that take nothing from the ocean. Routing the dissolved mass into either would lay
+  the cations' carbonate a second time beside the production laws, which stand for Earth's
+  measured accumulation, so it is not done. On `m5-chemden` supercontinent seed 1 the last step
+  dissolved 9.65e18 mol of Ca + Mg (4.8e12 mol/yr, 1.26 Gt/yr of rock, 0.91 m/Myr spread over
+  the planet, 2.85 m/Myr over its land), while the surface stage laid carbonate, chalk and
+  evaporite at 0.46 m/Myr spread over the planet over the run (3.56e6 km3 on the bake's
+  7.74e6 km2) and the last step's cap carbonate was 0.02 m over the floor above the CCD. By
+  ERO-206's median, about 70 % of the dissolved mass is silica and 30 % cations. A
+  mass-conserving return is a supply-limited ocean (the cations' input buried as carbonate, the
+  pelagic share taking the rest by the CCD's depth, the silica as biogenic silica): a sourced
+  mechanism, but a change to the surface stage's carbonate rules, not a redirect, and not built.
+- Carbonate rock's own dissolution is not modelled: the carbon cycle weathers silicate only.
+- At Earth's balance the land weathers about 5.3e12 mol/yr (degassing 6.65e12 less the seafloor's
+  0.2), so the dissolved silicate load is about 1.4 Gt/yr. Earth's rivers carry about 0.37 Gt/yr
+  of dissolved silica (6.2 Tmol/yr, Tréguer et al. 2021) plus the silicate cations; a secondary
+  source puts the silicate Ca + Mg at 1.6 to 2.8e12 mol/yr (a 2023 GMD preprint citing Gaillardet
+  et al. 1999, whose primary was not read), half the model's. Not checked further.
+
+**Measured.** Pool arm `m5-chemden` (`earthlike_quick_16k`, 1000 Myr, both starts, seeds 1 to 4,
+the switch on) against base14 (24 runs, the switch off), medians with the two-sided Mann-Whitney p:
+
+| measure | base14 | chemical denudation | p |
+|---|---|---|---|
+| land | 0.319 | 0.310 | 0.14 |
+| largest landmass | 0.205 | 0.228 | 0.81 |
+| continental crust under the sea | 0.202 | 0.193 | 0.69 |
+| land above 2 km | 0.085 | 0.095 | 0.81 |
+| coast with high ground | 0.201 | 0.224 | 0.22 |
+| land under ice | 0.099 | 0.075 | 0.27 |
+| collisions per 100 Myr | 1.70 | 1.60 | 0.68 |
+| continental crust's net change | -0.043 | -0.053 | 0.094 |
+| criteria met per run (median, mean) | 5, 5.42 | 5, 5.12 | 0.21 |
+| sea over the datum after 100 Myr / at the end, m | 277 / 409 | 235 / 278 | |
+| the surface guard's worst, m from the sea | 10,109 | 9,887 | 0.24 |
+
+No measure moved at p < 0.05, every run reached the end, and the guard stayed where base14 has
+it, so the term is on by default since 2026-10-25 (the rule for built physics). The off switch
+is bit-identical to base14 (a one-run arm, `m5-chemden-off`, supercontinent seed 1: the same
+state hash). The sea's lower stand at the end (278 m against 409, untested) goes with the
+dissolved load leaving the mass budget (Limits) and the slightly larger loss of continental
+crust.

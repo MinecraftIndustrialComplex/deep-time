@@ -614,6 +614,50 @@ fn the_coupled_pipeline_runs_and_resumes() {
     }
 }
 
+/// Chemical denudation in the coupled pipeline (`climate.chemical_denudation`, ERO-205). Off: no
+/// field, no globals, nothing dissolved. On: the climate places its weathered Ca + Mg on land as a
+/// thickness of rock every step, the surface takes it off (its dissolved total grows and the mass
+/// residual still closes with it), and the planet differs.
+#[test]
+fn chemical_denudation_takes_the_weathered_rock_away() {
+    let run = |on: bool, name: &str| {
+        let mut v: serde_json::Value = serde_json::from_str(&pipeline_json(3000, 30.0, 7)).unwrap();
+        v["climate"]["chemical_denudation"] = serde_json::json!(on);
+        let dir = temp_dir(name);
+        let s = session(&v.to_string(), &dir);
+        finish(&s);
+        let world = s.checkpoint().unwrap().world;
+        let _ = std::fs::remove_dir_all(dir);
+        world
+    };
+    let off = run(false, "chem-off");
+    let on = run(true, "chem-on");
+    let (a, c) = (off.surface.as_ref().unwrap(), on.surface.as_ref().unwrap());
+    assert!(!off.fields.contains_key(crate::climate::field::DISSOLVED));
+    assert!(
+        !off.globals
+            .contains_key(crate::climate::DISSOLVED_MOL_GLOBAL)
+    );
+    assert_eq!(a.totals.dissolved_km3, 0.0);
+    assert!(c.totals.dissolved_km3 > 0.0);
+    assert!(on.globals[crate::climate::DISSOLVED_MOL_GLOBAL] > 0.0);
+    let moved = c.totals.eroded_km3.max(1.0);
+    assert!(
+        c.totals.mass_residual_km3.abs() < 1e-6 * moved,
+        "residual {} of {moved} km³",
+        c.totals.mass_residual_km3
+    );
+    // The last step's dissolved rock: on part of the planet (its land), m per 2-Myr step at
+    // the pace of weathering (m/Myr), not of a landslide.
+    let dz = &on.fields[crate::climate::field::DISSOLVED].data;
+    assert!(dz.iter().all(|x| x.is_finite() && *x >= 0.0));
+    let wet: Vec<f32> = dz.iter().copied().filter(|&x| x > 0.0).collect();
+    assert!(!wet.is_empty() && wet.len() < dz.len());
+    let mean_m_myr = wet.iter().map(|&x| f64::from(x)).sum::<f64>() / wet.len() as f64 / 2.0;
+    assert!((0.01..20.0).contains(&mean_m_myr), "{mean_m_myr} m/Myr");
+    assert_ne!(a.elevation_m, c.elevation_m);
+}
+
 /// Flexure in the coupled pipeline (`flexure.rs`). With `flexure.strength` 0 the stage is the one
 /// it was: no state, no fields, and the same planet as a preset without the section. With it on,
 /// every step is solved and converges, the plate carries loads its cells did not make (basins and

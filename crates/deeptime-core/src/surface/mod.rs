@@ -37,9 +37,11 @@
 //!    their mouths (`marine.rs`); carbonate production (`carbonate.rs`) and evaporites in
 //!    restricted arid seas and closed arid lakes; one implicit diffusion over land (hillslope κ
 //!    from the surface rock) and sea (Landlab's depth-dependent D).
-//! 4. The net change of every cell goes into the strata log with its facies (`facies.rs`,
-//!    `strata_log.rs`) or erodes regolith, then the log; weathering makes regolith
-//!    (`weathering.rs`); buried regolith becomes a log layer (a palaeosol).
+//! 4. With the climate's chemical denudation on, the rock its silicate weathering took into
+//!    solution (`climate/dissolved_m`) leaves the ground. The net change of every cell goes into
+//!    the strata log with its facies (`facies.rs`, `strata_log.rs`) or erodes regolith, then the
+//!    log; weathering makes regolith (`weathering.rs`); buried regolith becomes a log layer (a
+//!    palaeosol).
 //! 5. Local isostasy: the load change, smoothed over `isostasy_radius_km`, is compensated by
 //!    `isostasy` (0.7 of it under water).
 //!    Then crust that stands higher than its strength holds spreads sideways (`spread.rs`:
@@ -51,8 +53,9 @@
 //!    frame, the events (`events.rs`).
 //!
 //! Mass: routing, stream power, the mouth fill and diffusion conserve material exactly (to
-//! round-off); carbonate and evaporite are added from the sea. `notes.surface.mass_residual_km3`
-//! reports Σ(Δh)·a − (carbonate + evaporite) for the whole run.
+//! round-off); carbonate, chalk and evaporite are added from the sea, and the dissolved load
+//! leaves in solution. `notes.surface.mass_residual_km3` reports Σ(Δh)·a + dissolved −
+//! (carbonate + chalk + evaporite) for the whole run.
 
 pub mod advect;
 pub mod amplify;
@@ -228,11 +231,16 @@ pub struct Totals {
     pub evaporite_km3: f64,
     pub to_sea_km3: f64,
     pub weathered_km3: f64,
+    /// Rock the land's silicate weathering took away in solution (the climate stage's
+    /// chemical denudation, `climate.chemical_denudation`), km³.
+    #[serde(default)]
+    pub dissolved_km3: f64,
     pub isostasy_km3: f64,
     /// Sediment moved down submarine slopes by slope failure (`marine::slope_failure`).
     #[serde(default)]
     pub slope_failure_km3: f64,
-    /// Σ(Δh)·a − (carbonate + evaporite): what the processes created or lost, km³.
+    /// Σ(Δh)·a + dissolved − (carbonate + pelagic + evaporite): what the processes created or
+    /// lost, km³.
     pub mass_residual_km3: f64,
     pub steps: u64,
     pub spl_iterations: u64,
@@ -1022,6 +1030,13 @@ impl SurfaceStage {
             .copied()
             .filter(|x| x.is_finite() && *x > 0.0)
             .unwrap_or(0.0);
+        // The rock the climate stage's weathering took into solution this step (its chemical
+        // denudation), m: taken off with the step's net change.
+        let dissolved: Option<Vec<f64>> = world
+            .fields
+            .get(crate::climate::field::DISSOLVED)
+            .filter(|f| f.data.len() == n)
+            .map(|f| f.data.iter().map(|&x| f64::from(x).max(0.0)).collect());
         let lat_of = |j: usize| fields::row_lat(&grid, j);
         // The glaciers' climate (`glacial.rs`): the ELA of the climate stage; none without it.
         // The deep-time surface is physics: glaciers as wide as they are (the valley width is the
@@ -1898,6 +1913,16 @@ impl SurfaceStage {
                 }
             })
             .collect();
+        // Chemical denudation (the climate's dissolved load): the weathered rock leaves in solution,
+        // from the regolith first and then the log as any loss is taken below, and the isostasy
+        // answers its load as it does the erosion's.
+        let mut dissolved_m = 0.0; // ledger: ERO-205
+        if let Some(dz) = &dissolved {
+            for (z, &x) in sc.h.iter_mut().zip(dz) {
+                *z -= x;
+            }
+            dissolved_m = dz.iter().sum::<f64>();
+        }
         let net: Vec<f64> = (0..n)
             .into_par_iter()
             .map(|c| sc.h[c] - h_start[c])
@@ -2283,6 +2308,7 @@ impl SurfaceStage {
         t.evaporite_km3 += evap * km3;
         t.to_sea_km3 += to_sea / 1.0e9;
         t.weathered_km3 += weathered * km3;
+        t.dissolved_km3 += dissolved_m * km3;
         t.isostasy_km3 += iso * km3;
         t.slope_failure_km3 += failed_m_cells * km3;
         // In order, as every float total here (the thread count must not change it).
@@ -2291,7 +2317,11 @@ impl SurfaceStage {
             .map(|c| net[c].max(0.0))
             .sum::<f64>()
             * km3;
-        t.mass_residual_km3 += (sum_net - carb - pel - evap) * km3;
+        t.mass_residual_km3 += if dissolved.is_some() {
+            (sum_net + dissolved_m - carb - pel - evap) * km3
+        } else {
+            (sum_net - carb - pel - evap) * km3
+        };
         t.steps += 1;
         t.spl_iterations += iterations;
         t.diffusion_iterations += cg_iterations;
@@ -2299,10 +2329,20 @@ impl SurfaceStage {
 
         let m_per_block_v = self.preset.scale.m_per_block_v;
         let sea_y = f64::from(self.preset.scale.sea_level_y);
-        let erosion: Vec<f32> = (0..n)
-            .into_par_iter()
-            .map(|c| ((-net[c]).max(0.0) / dt_myr) as f32)
-            .collect();
+        // The mechanical erosion: the dissolved load stays out of it, so the weathering's supply
+        // (the climate reads this field) is the rock the rivers and slopes expose. Fed back, the
+        // supply-limited dissolution d = q·(E + d), q = mol/kg × kg/mol × supply scale × the
+        // runoff factor (up to 10), would run away wherever q reached 1.
+        let erosion: Vec<f32> = match &dissolved {
+            Some(dz) => (0..n)
+                .into_par_iter()
+                .map(|c| ((-(net[c] + dz[c])).max(0.0) / dt_myr) as f32)
+                .collect(),
+            None => (0..n)
+                .into_par_iter()
+                .map(|c| ((-net[c]).max(0.0) / dt_myr) as f32)
+                .collect(),
+        };
         let deposition: Vec<f32> = (0..n)
             .into_par_iter()
             .map(|c| (net[c].max(0.0) / dt_myr) as f32)

@@ -28,6 +28,12 @@ The sheet here is collapse.rs's: eps = dU / (4 eta L_s), L_s 100 km (FRC-010), d
 (forces::column_energy, FRC-014) at its Airy height over the sea less the normal column's (room_column_m,
 PLT-412/413: T_n + 7.02 S within [T_n/2, 41.1 km]), the Airy height z_0 + (T - T_n) / 7.02 less the eclogite
 drop with the mafic pools taken as the normal column's share (0.128 of T; pools are not dumped).
+
+Census caveat (the coordinator's call, 2026-10-25: noted, the census left as it is): lower-crustal flow
+(PLT-300) does not restamp the orogeny, so a margin column that flow from a held neighbour keeps thick counts
+here as a belt 10 to 50 Myr past its stamp, where Earth's accounting would call it active orogen (eastern
+Tibet, thickened by channel flow while India converges; Clark & Royden 2000). M4 is a height measure, so the
+label does not change it; the (i-b) group reads as convergence-held high ground, not as an old belt.
 Needs numpy only."""
 import json
 import math

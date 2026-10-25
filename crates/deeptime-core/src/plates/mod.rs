@@ -742,8 +742,8 @@ impl PlatesStage {
         cut_trace::mark(st, &cache.geo, "forces");
         let mut causes: BTreeMap<u32, EventId> = BTreeMap::new();
         let mut sutured = false;
-        // Plates whose motion a weld or a healed rift set this step (the balance takes over at
-        // the next step).
+        // Plates whose motion a weld, a transfer or a healed rift set this step (the balance
+        // takes over at the next step); a deferred collision sets none (`motion_set_by`).
         let mut merged: Vec<u32> = Vec::new();
         for f in &fired {
             let (under, over) = (st.contacts[f.contact].under, st.contacts[f.contact].over);
@@ -772,7 +772,7 @@ impl PlatesStage {
                 cut_trace::mark_pair(st, &cache.geo, what, under, over);
             }
             sutured |= done.sutured;
-            merged.extend([under, over]);
+            merged.extend(motion_set_by(&done, under, over).into_iter().flatten());
         }
         book(st, gap_budget::Part::Collision);
         cut_trace::mark(st, &cache.geo, "collision");
@@ -1544,6 +1544,18 @@ fn surface(st: &mut PlateState, geo: &Geo, env: &Env<'_>, held_floor: &[f32], se
         s.pools[pool::SEDIMENT] += m;
         s.thickness_m += m;
     }
+}
+
+/// The two plates whose motion a collision's end set this step (`collision::collide`), which
+/// skip the step's relaxation towards the balance (PLT-191) so the balance takes over at the
+/// next step: a weld's (one rotation now, the area-weighted mean) and a transfer's (the
+/// receiving plate took the terrane's momentum; ledger PLT-080). A deferred collision (a
+/// continent converging that has not stalled) set nothing: its two plates go on relaxing
+/// towards the balance, whose collision resistance is what slows and stalls them (force-balance
+/// design, task 7). Until 2026-10-25 they were skipped too, so every continental collision past
+/// `collision_threshold_km` held both plates' rotations until it stalled (the M5 lane's fix).
+fn motion_set_by(done: &collision::Collided, under: u32, over: u32) -> Option<[u32; 2]> {
+    (!done.deferred).then_some([under, over])
 }
 
 /// Adds one pass of the thickening limit (`rate.rs`) to the run's globals, km³.
