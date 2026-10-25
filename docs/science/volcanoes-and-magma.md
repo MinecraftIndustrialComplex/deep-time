@@ -108,7 +108,9 @@ shows hundreds of flows and a wet one few or none. Measured on the q1 planet: th
 (44 mm of rain a year at its driest) shows 256 flows on 10,224 columns, 5 % of its base; cones at
 about 280 mm show 100 to 150 flows on 3 to 6 %. The pack's own dark stripes in the volcanic biomes
 (Terralith draws them as contours of a noise) are left out of Deep Time levels, so the dark lines on
-a cone are its flows. Ice and snow lie over flows. The paint changes no block's height.
+a cone are its flows. Ice and snow lie over flows. A flow that reaches a salt flat (a playa in a
+closed basin) lies over the salt, as a real flow metres thick stands above the flat's seasonal
+flood (VOL-162). The paint changes no block's height.
 
 **Lava elsewhere.** The random lava lakes and springs of vanilla Minecraft and of Terralith are
 removed. The only other lava is a layer at the very bottom of the world (below y -502 in the default

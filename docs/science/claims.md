@@ -34,7 +34,7 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [GLA](ledger/GLA.md) | glacial erosion and landforms | 74 | 0 | 25 | 1 | 0 | 1 | 28 | 19 | 0 | 0 | 2 |
 | [HNT](ledger/HNT.md) | editor hint texts | 122 | 18 | 13 | 3 | 4 | 8 | 62 | 14 | 0 | 0 | 2 |
 | [HYD](ledger/HYD.md) | rivers, lakes, runoff | 136 | 18 | 12 | 4 | 3 | 1 | 75 | 23 | 0 | 1 | 1 |
-| [HYP](ledger/HYP.md) | hypsometry and calibration targets | 42 | 3 | 16 | 0 | 2 | 16 | 1 | 4 | 0 | 0 | 2 |
+| [HYP](ledger/HYP.md) | hypsometry and calibration targets | 42 | 4 | 16 | 0 | 2 | 15 | 1 | 4 | 0 | 0 | 2 |
 | [IMP](ledger/IMP.md) | meteor impacts | 137 | 43 | 9 | 6 | 6 | 1 | 57 | 15 | 0 | 0 | 6 |
 | [ISO](ledger/ISO.md) | isostasy, flexure, subsidence, height limit, sea level | 92 | 11 | 12 | 0 | 11 | 4 | 29 | 25 | 0 | 0 | 8 |
 | [MAG](ledger/MAG.md) | magma and lava | 57 | 2 | 1 | 0 | 1 | 0 | 52 | 1 | 0 | 0 | 0 |
@@ -51,7 +51,7 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [STR](ledger/STR.md) | strata, traps, hosts | 53 | 1 | 0 | 0 | 1 | 2 | 49 | 0 | 0 | 0 | 4 |
 | [VOL](ledger/VOL.md) | volcanoes | 109 | 7 | 0 | 3 | 3 | 2 | 70 | 24 | 0 | 0 | 0 |
 | [YNG](ledger/YNG.md) | the young landscape | 21 | 0 | 0 | 0 | 0 | 1 | 10 | 10 | 0 | 0 | 2 |
-| **all** | | **2,920** | **389** | **347** | **67** | **127** | **86** | **1,394** | **510** | **330** | **11** | **273** |
+| **all** | | **2,920** | **390** | **347** | **67** | **127** | **85** | **1,394** | **510** | **330** | **11** | **273** |
 
 72 rows are `verified` (counted from the ledger files after WP-2 merged WP-15/16 and the plate-check boundary mix, 2026-10-02, WP-13a, the volcano decisions and WP-8): PLT-213 and PLT-218 (plate-check boundary mix and arc heights), ISO-041, ISO-042
 and ISO-048 (the flexure agent), MAG-028 and MAG-029 (WP-2), one GEO row and thirteen HNT rows (WP-15, WP-16, WP-2 and the volcano decisions),
@@ -202,7 +202,7 @@ verifying package settles it:
 | GLA-034 | ERO-016 | GLA-034 carried `game-choice` with provenance; ERO-016 is `uncited`. |
 | ERO-151, ERO-152 | IMP-085, IMP-086, IMP-089, IMP-090 | ERO rows cited the four-paper scheme (Sklar and Dietrich 2001; Stock and Montgomery 1999; Roering et al. 1999; Heimsath et al. 1997) as `cited-unverified`; the IMP rows call the value `uncited`. |
 | RCK-005, RCK-007, RCK-009, RCK-011, RCK-012 | ERO-101 to ERO-163 | RCK rows said `uncited` ("judgment, relative to granite"); the ERO per-class rows carry the scheme citations as `cited-unverified`, and ERO-102 and ERO-139 call the reference 1.0 a normalisation (`game-choice`). |
-| PLT-034 | HYP-015 | PLT-034 cites Cortial (r_s 1,800 km) for the default; HYP-015 says none cited. |
+| PLT-034 | HYP-015 | PLT-034 cites Cortial (r_s 1,800 km) for the default; HYP-015 said none cited. Since 2026-10-25 HYP-015 cites Currie & Hyndman 2006 for the preset's 800 km (the heated back-arc's width) and calls the Central Andes figure unsourced. |
 | PLT-123 | ISO-020 | PLT-123 listed design references that exist only in the build log; the owner's "none cited" stays true for the code. |
 
 ## Verification plan for stage 2
