@@ -9661,3 +9661,53 @@ interiors take a quarter to a third of Earth's two cases, and the 1-D strip alre
 interior's largest share. The law has no free value to close that gap, and none was looked for. On
 by default since this arm: the law is built and tested against its sources, it conserves crust, and
 the guard is clean (the rule of 2026-10-23: the V1 numbers are realism checks, not a gate).
+
+## The sea floor's age and the initiation's polarity (2026-10-25)
+
+The floor-age diagnosis (build log 2026-10-25, "Front lane: why floor older than 180 Myr does not go
+under on base15") found 0.24 of base15's ocean older than 180 Myr late in the runs (Earth 0.006), from
+two causes of about equal weight: slow turnover, and consumption blind to age. Where the old floor sat
+could not be read from the cache, and in about three initiations of four the trench took the opposite
+polarity to the slab planted under the fracture. The coordinator's order (2026-10-25): an age map
+first, then the polarity, then the sourced constants, then a design for propagation.
+
+### The age map (measurement only)
+
+With `DEEPTIME_CRUST_BUDGET_MAPS` set, every crust-budget snapshot also writes `maps/age/t<Myr>.bin`:
+one little-endian f32 per record of the snapshot's map (`maps/t<Myr>.bin`, the visible samples in
+order), the floor's age at the snapshot (`Sample::age_myr`) on oceanic crust and NaN on continental
+crust (`crust_budget.rs`, `write_ages` and `age_records`; the test
+`the_age_records_are_the_ocean_ages`: the oceanic records, sorted, are `dynamics::ocean_ages`, which
+the dynamics record's age quantiles read). Nothing reads it in the model.
+`tools/review/floorage/floorage_age.py` reads it with the map and `maps/plate/`.
+
+### Law 1: the older side of the fracture goes under (PLT-655)
+
+An initiation (PLT-062 to PLT-067, PLT-503) splits the old floor off its plate and plants a slab under
+the fracture (PLT-270), always on the split. The trench that formed a few steps later took its
+polarity from the rule of a new contact, which reads the overlap's crust and ages, and on base15 it
+put the parent under in 1,494 of the 1,998 such contacts the records hold, at a median 6 Myr after the
+split: the planted slab and the trench's slab then pulled against each other. Gurnis, Hall & Lavier
+2004 settle which side goes down at a fracture zone in compression: "the older plate is thrust beneath
+the younger" ([60]), and with an asymmetry in age "the weak zone overlies the thicker plate or where
+the negative buoyancy is localized" ([78]).
+
+With `tectonics.initiation_polarity_by_age` (on by default):
+
+- **The fracture's sides.** The visible samples of the parent with a lattice neighbour of the same
+  rigid group, visible, on the other side of the split: one spacing each side (about 180 km on the
+  quick lattice), the nearest floor the lattice resolves.
+- **Which goes under.** A side whose fracture samples are half or more continental crust does not
+  (the rule of a new contact's reading of an overlap); otherwise the side whose fracture floor is
+  older on the mean, the split on a tie, with both sides continental, or with no fracture found.
+- **The slab and the trench agree.** The planted slab hangs from that side, the split's or the
+  parent's. The contact the two plates form later takes the planted slab's polarity
+  (`subduction::planted_polarity`: a new contact between a plate and its parent with a slab one way
+  between them), not the overlap's.
+
+No value of its own. Tests: `the_older_side_of_the_fracture_goes_under` (`rifting.rs`: a plate of old
+floor split at x = 0, the slab hangs from the parent where its side is older, from the split where the
+split's is, on a tie, or where the parent's side of the fracture is continental; off, from the split)
+and `an_initiations_contact_takes_its_planted_slab` (`plates/tests.rs`: two oceanic plates, the
+older turned under the younger; with the younger's slab planted under the older and the older split
+from it, the contact puts the younger under; off, with no split, or with no slab, the older).
