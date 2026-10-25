@@ -43,7 +43,8 @@ D_EDGES = [0.0, 100.0, 200.0, 400.0, 800.0, 1500.0]
 SIDES = ("over", "under", "other")
 GKEYS = ("crossed", "kept", "crossed_km2", "front_km_myr", "crossed_above", "crossed_recent", "kept_wedge",
          "crossed_restack", "noroom_sliver", "noroom_capped", "noroom_clipped", "taper_toe", "collapse_moved",
-         "collapse_held", "collapse_unplaced", "channel_flow", "foundered", "settle_rise", "settle_fall")
+         "collapse_held", "collapse_unplaced", "channel_flow", "foundered", "settle_rise", "settle_fall",
+         "upper", "upper_km2", "upper_most_km2")
 
 
 def summary_part(run):
