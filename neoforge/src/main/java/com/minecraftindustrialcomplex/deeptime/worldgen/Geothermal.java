@@ -143,8 +143,8 @@ public final class Geothermal {
         double meanC(int x, int z);
 
         /**
-         * The half-extent of the world in z, blocks: the poles of a Lambert world (R), the turning
-         * edges of a Petroff–Guyou one (b/2); NaN to take the Lambert poles of the circumference.
+         * The half-extent of the world in z, blocks: the cube net's 3s/2, or the poles R = C/2π of a
+         * Lambert-frame world; NaN to take the Lambert frame's poles of the circumference.
          */
         default double zHalf() {
             return Double.NaN;
@@ -469,8 +469,8 @@ public final class Geothermal {
     }
 
     /**
-     * The fields on hot continental ground. The world (circumference x pole to pole, the planet's
-     * projection: 2R = C/π on the Lambert map, where every block has the same area) is cut into cells
+     * The fields on hot continental ground. The world (its period by its z extent, {@link Env#zHalf}) is
+     * cut into cells
      * of {@link #HEAT_FIELD_AREA_KM2} / {@code geothermal_heat_density} square km; each cell, from its
      * own seed, tries {@link #HEAT_DRAWS} random points and takes the first where the baked heat flow
      * reaches the setting and the ground is dry land clear of ice. Fields so placed are kinds of the
@@ -506,7 +506,7 @@ public final class Geothermal {
                 return null;
             double side = Math.sqrt(HEAT_FIELD_AREA_KM2 / c.rules.heatDensity()) * 1000.0 / c.mH;   // blocks
             double pole = Double.isNaN(c.env.zHalf())
-                    ? com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c.circumference) : c.env.zHalf();
+                    ? com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection.Lambert.radius(c.circumference) : c.env.zHalf();
             int nx = Math.max(1, (int) Math.round(c.circumference / side)), nz = Math.max(1, (int) Math.round(2 * pole / side));
             return new HeatGrid(nx, nz, (double) c.circumference / nx, 2 * pole / nz, -pole);
         }

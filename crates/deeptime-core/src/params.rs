@@ -120,17 +120,15 @@ pub const PLANET_KEYS: [&str; 18] = [
 ];
 
 /// The `scale` keys a planet preset may carry (the header reads `circumference_blocks`).
-pub const SCALE_KEYS: [&str; 12] = [
+pub const SCALE_KEYS: [&str; 10] = [
     "circumference_blocks",
     "m_per_block_h",
     "m_per_block_v",
     "min_y",
     "max_y",
     "sea_level_y",
-    "pole_cap_deg",
     "feature_scale",
     "build_limit_band_blocks",
-    "projection",
     "lambda_c_deg",
     "edge_border",
 ];
@@ -189,31 +187,26 @@ fn d_max_y() -> i32 {
 fn d_sea_level_y() -> i32 {
     63
 }
-fn d_pole_cap_deg() -> f64 {
-    // ledger: POL-003 (game-choice, Ben 2026-10-03: the storm band from 70°, so the band stays
-    // 118 blocks wide at 16k on the Lambert map instead of 49).
-    70.0
-}
 fn d_build_limit_band() -> f64 {
     48.0
 }
 fn d_lambda_c_deg() -> f64 {
-    // −1: the bake chooses λc for the planet (the cone points in open sea).
+    // −1: the bake's turn search turns the cube for the planet (`bake::cube_turn`).
     LAMBDA_C_AUTO
 }
 
-/// `scale.lambda_c_deg`'s "choose it for this planet" value.
+/// `scale.lambda_c_deg`'s "turn the cube for this planet" value.
 pub const LAMBDA_C_AUTO: f64 = -1.0;
 
-/// What the game does at the world's north and south edges until the wrap engine joins them
-/// (`scale.edge_border`; FORMAT.md "The world's layout", `border`).
+/// What the game does at the cube world's open edges until the wrap engine joins them
+/// (`scale.edge_border`; FORMAT.md "The cube world's layout", `border`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum EdgeBorder {
     /// Players, their vehicles and Sable ships stop a block inside the edge (the default).
     #[default]
     Stop,
-    /// No border: the folded terrain continues past the edge, but nothing joins it.
+    /// No border: nothing stops a player at an open edge, and nothing joins it.
     None,
 }
 
@@ -278,8 +271,6 @@ pub struct ScaleParams {
     pub max_y: i32,
     #[serde(default = "d_sea_level_y")]
     pub sea_level_y: i32,
-    #[serde(default = "d_pole_cap_deg")]
-    pub pole_cap_deg: f64,
     /// How big the world's features are drawn in blocks, relative to their real size at the
     /// block scale (the editor's "feature scale" settings); 1 everywhere is the calibrated world.
     #[serde(default)]
@@ -289,17 +280,14 @@ pub struct ScaleParams {
     /// as simulated.
     #[serde(default = "d_build_limit_band")]
     pub build_limit_band_blocks: f64,
-    /// The world's projection (Ben, decisions log 2026-10-04: Petroff–Guyou, the seamless world;
-    /// `lambert` keeps the cylinder with pole caps, which he may swap back to). The simulation keeps
-    /// its own grid either way; the bake projects the world ("Bake only", 2026-10-03).
-    #[serde(default)]
-    pub projection: deeptime_format::projection::ProjectionKind,
-    /// The longitude of the western hemisphere square's centre, degrees in [0, 360), or −1
-    /// ([`LAMBDA_C_AUTO`], the default): the bake chooses it so the four cone points lie in open
-    /// sea. Petroff–Guyou only.
+    /// The cube's polar turn, λ0 in degrees in [0, 360) (`CubeTurn::polar`,
+    /// `bake::cube_turn::pinned`), or −1 ([`LAMBDA_C_AUTO`], the default): the bake's turn search
+    /// turns the cube so its corners lie as far from land as it finds. A planet is always the cube
+    /// world (Ben, decisions log 2026-10-24: "Cube only"); the simulation keeps its own grid and
+    /// the bake projects the world ("Bake only", 2026-10-03).
     #[serde(default = "d_lambda_c_deg")]
     pub lambda_c_deg: f64,
-    /// The temporary border at the north and south edges (Petroff–Guyou only).
+    /// The temporary border at the cube world's open edges.
     #[serde(default)]
     pub edge_border: EdgeBorder,
 }
@@ -362,21 +350,10 @@ impl ScaleParams {
     }
 
     /// The world's east–west period in blocks, what the world data's
-    /// `scale.circumference_blocks` and Toroidal World's loop hold: C on a Lambert world, 2b on a
-    /// Petroff–Guyou one (b = [`deeptime_format::projection::PetroffGuyou::hemisphere_for`]).
+    /// `scale.circumference_blocks` and Toroidal World's loop hold: the cube's loop, four faces
+    /// of side `face_for(C)` (FORMAT.md "The cube world's layout", Scale).
     pub fn world_circumference(&self) -> u32 {
-        use deeptime_format::projection::{PetroffGuyou, ProjectionKind};
-        match self.projection {
-            ProjectionKind::Lambert => self.circumference_blocks,
-            ProjectionKind::PetroffGuyou => {
-                2 * PetroffGuyou::hemisphere_for(self.circumference_blocks)
-            }
-            // The cube's loop: four faces of side `face_for(C)` (FORMAT.md "The cube world's
-            // layout", Scale).
-            ProjectionKind::Cube => {
-                4 * deeptime_format::projection::face_for(self.circumference_blocks)
-            }
-        }
+        4 * deeptime_format::projection::face_for(self.circumference_blocks)
     }
 }
 
@@ -1427,7 +1404,7 @@ impl PlanetPreset {
             s.lambda_c_deg == LAMBDA_C_AUTO
                 || (s.lambda_c_deg.is_finite() && (0.0..360.0).contains(&s.lambda_c_deg)),
             "$.scale.lambda_c_deg",
-            "must be -1 (choose for the planet) or in [0, 360)",
+            "must be -1 (turn the cube for the planet) or in [0, 360)",
         )?;
         check(
             s.build_limit_band_blocks.is_finite() && s.build_limit_band_blocks >= 8.0,

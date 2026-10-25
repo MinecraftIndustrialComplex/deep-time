@@ -17,7 +17,7 @@ import java.time.Clock;
 /**
  * Deep Time's client entry point (plan §7.12, P1-11), constructed only on the physical client, so
  * no screen class is ever loaded by a dedicated server: registers the planet editor as the preset
- * editor of {@code deeptime:planet} (and {@code planet_32k}), guards the Create button, and removes
+ * editor of {@code deeptime:planet_cube} (and {@code planet_cube_32k}), guards the Create button, and removes
  * abandoned staging folders in the background. Also starts the first background free-memory
  * reading the setup page shows ({@link MachineInfo#prime()}).
  */
@@ -26,8 +26,6 @@ public final class ClientSetup {
 
     public ClientSetup(IEventBus modBus) {
         modBus.addListener(RegisterPresetEditorsEvent.class, e -> {
-            e.register(PlanetGenerators.PLANET, PlanetEditorScreen::create);
-            e.register(PlanetGenerators.PLANET_32K, PlanetEditorScreen::create);
             e.register(PlanetGenerators.PLANET_CUBE, PlanetEditorScreen::create);
             e.register(PlanetGenerators.PLANET_CUBE_32K, PlanetEditorScreen::create);
         });

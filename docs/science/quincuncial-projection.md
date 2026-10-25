@@ -1,5 +1,9 @@
 # Quincuncial projections (prototype only)
 
+> **Retired 2026-10-24** (cube plan §7.4, 2026-10-24; Ben, decisions log 2026-10-24: "Cube only (Recommended)"). The prototype is deleted: the dev-only crate
+> `crates/deeptime-quincuncial` and the scripts `tools/proto/quincuncial/`. SCL-070 to SCL-077 are
+> retired (`merged`, the text kept). The page is kept as the record of the comparison.
+
 Status of this page: `stage 1 (written with the prototype, 2026-10-03; nothing read in its primary
 source except Wikipedia's Guyou page)`. The shipped world uses Lambert's cylindrical equal-area
 projection (decisions log 2026-10-02); this page describes the dev-only prototype of

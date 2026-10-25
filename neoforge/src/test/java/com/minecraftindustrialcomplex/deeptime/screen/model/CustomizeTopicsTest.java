@@ -29,7 +29,6 @@ class CustomizeTopicsTest {
     @Test
     void topicsReadAsAPlayerWould() {
         assertEquals(Topic.PLANET, CustomizeTopics.of(EditorFields.byId("gravity")));
-        assertEquals(Topic.PLANET, CustomizeTopics.of(EditorFields.byId("projection")));
         assertEquals(Topic.PLATES, CustomizeTopics.of(EditorFields.byId("plate_count")));
         assertEquals(Topic.CLIMATE, CustomizeTopics.of(EditorFields.byId("steering")));
         assertEquals(Topic.CLIMATE, CustomizeTopics.of(EditorFields.byId("biome_temperature")));

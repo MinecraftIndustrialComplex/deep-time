@@ -42,7 +42,6 @@ use std::time::Instant;
 
 use deeptime_format::detail::{BAKE_NOTES, DetailSpec};
 use deeptime_format::fsutil::write_atomic;
-use deeptime_format::projection::ProjectionKind;
 use deeptime_format::tilepack::{check_cells, stored_tile, write_tile_pack_tiles};
 use deeptime_format::{
     Cell, Codec, DType, FileEntry, GridDesc, LayerDesc, LayerEntry, LoadedLayer, Manifest, Raster,
@@ -321,15 +320,8 @@ pub const WATER_BYTES_PER_CELL: u64 = 33;
 /// distributaries' u32 step count to the open sea). An estimate of the memory model (deltas,
 /// 2026-10-23), not yet measured. Beside it the second
 /// network's output stays held (its water layers, [`project::WATER_LAYER_BYTES_PER_CELL`] a
-/// drained cell) and, on a Lambert world, the horizon stacks loaded whole with two f64 maxima a
-/// stack cell ([`DELTA_STACK_BYTES_PER_L1_CELL`] plus [`HORIZON_RECORD_BYTES`] a horizon).
+/// drained cell).
 pub const DELTA_BYTES_PER_L3_CELL: u64 = 14;
-
-/// Bytes per L1 cell `project::raise_world_tops` holds beside the stacks (two f64 maxima).
-pub const DELTA_STACK_BYTES_PER_L1_CELL: u64 = 16;
-
-/// Bytes of one horizon of a `strata/horizons` stack (FORMAT.md: 7K bytes a cell).
-pub const HORIZON_RECORD_BYTES: u64 = 7;
 
 /// Bytes per L1 cell of the climate the water part loads whole beside the network (the mean
 /// temperature and precipitation, the 12 monthly sea-level temperatures and their seasons, the
@@ -340,7 +332,7 @@ pub const WATER_BYTES_PER_L1_CELL: u64 = 80;
 /// largest of its parts' (they run one after another, each freeing what it held): the strata on
 /// L1 ([`STRATA_BYTES_PER_HORIZON_CELL`]), the water on the hydrology's grid (the whole L3
 /// elevation loaded first, halved beside it, then [`WATER_BYTES_PER_CELL`] on the grid it drains
-/// and [`WATER_BYTES_PER_L1_CELL`] for the climate) and the projection pass ([`project::estimate_bytes`], the second figure; 0 for Lambert). The
+/// and [`WATER_BYTES_PER_L1_CELL`] for the climate) and the projection pass ([`project::estimate_bytes`], the second figure). The
 /// other parts hold less. amp-est, 2026-10-23: before this the bake's figure was the projection
 /// pass alone, under the strata and the water on a Lambert world and under the pass itself on a
 /// Petroff-Guyou one (1,279 MB listed, 1,658 MB held on quick 16k at 50 Myr).
@@ -358,12 +350,7 @@ pub fn estimate_bytes(p: &PlanetPreset) -> (u64, u64) {
             full
         };
         let laid = if p.hydro.unwrap_or_default().deltas {
-            let stacks = if p.scale.projection == ProjectionKind::Lambert {
-                l1 * (u64::from(k) * HORIZON_RECORD_BYTES + DELTA_STACK_BYTES_PER_L1_CELL)
-            } else {
-                0
-            };
-            full * DELTA_BYTES_PER_L3_CELL + drained * project::WATER_LAYER_BYTES_PER_CELL + stacks
+            full * DELTA_BYTES_PER_L3_CELL + drained * project::WATER_LAYER_BYTES_PER_CELL
         } else {
             0
         };

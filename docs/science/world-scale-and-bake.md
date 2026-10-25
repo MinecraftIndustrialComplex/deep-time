@@ -284,8 +284,8 @@ BAK-048, BAK-050, BAK-065 and BAK-067) are game choices about how far terrain st
   surface rule cut a black beach east of the seam from y 65 to 67 down to 62 (BIO-156). The seam
   can lie in the sea, as it did on the planet of 2026-10-18 (its four fixed rows held 3 dry
   columns west of the seam and 15 east), so the test adds up to eight rows, searched up to 7/8 of
-  the way to the world's z edge (the poles on a Lambert world, the turning edges on a Petroff–Guyou
-  one), chosen for the dry ground each side still lacks, and asserts that each side compares at least 16 dry columns and holds their ground
+  the way to the world's z edge (then the poles on a Lambert world or the turning edges on a Petroff–Guyou
+  one, both gone since 2026-10-24; on the cube world the window's z edge), chosen for the dry ground each side still lacks, and asserts that each side compares at least 16 dry columns and holds their ground
   within a block in nine of ten (BAK-042). Until 2026-10-19 it took four rows within C/8 of the
   equator, which on that day's planet held only 14 dry columns east of the seam; the wider search
   found 24. A side whose rows hold fewer than 16 dry columns must compare every one of them: on

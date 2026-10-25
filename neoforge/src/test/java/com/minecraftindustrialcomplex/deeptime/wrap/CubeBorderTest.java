@@ -79,7 +79,7 @@ class CubeBorderTest {
         assertEquals(Math.sqrt(2) * H, B.distanceToSegment(0, 0), 1e-9);
     }
 
-    /** The four corners of the box [x0, x1] × [z0, z1], as SablePoleCap's footprint gives them. */
+    /** The four corners of the box [x0, x1] × [z0, z1], as SableBorder's footprint gives them. */
     private static double[] box(double x0, double z0, double x1, double z1) {
         return new double[]{x0, z0, x1, z0, x0, z1, x1, z1};
     }
@@ -123,15 +123,15 @@ class CubeBorderTest {
         assertTrue(two[0] > 0 && two[1] < 0 && Math.abs(Math.hypot(two[0], two[1]) - 1) < 1e-12, java.util.Arrays.toString(two));
 
         // The velocity: outward speed taken away, the push added inward; inward speed kept.
-        double[] dv = CubeBorder.stopVelocity(60, 5, e, PoleCapCurve.WIND_MAX);
-        assertEquals(-60 - PoleCapCurve.WIND_MAX, dv[0], 1e-12);
+        double[] dv = CubeBorder.stopVelocity(60, 5, e, EdgeBorder.SABLE_PUSH);
+        assertEquals(-60 - EdgeBorder.SABLE_PUSH, dv[0], 1e-12);
         assertEquals(0.0, dv[1], 1e-12);
-        double[] back = CubeBorder.stopVelocity(-3, 5, e, PoleCapCurve.WIND_MAX);
-        assertEquals(-PoleCapCurve.WIND_MAX, back[0], 1e-12);
+        double[] back = CubeBorder.stopVelocity(-3, 5, e, EdgeBorder.SABLE_PUSH);
+        assertEquals(-EdgeBorder.SABLE_PUSH, back[0], 1e-12);
         assertEquals(0.0, back[1], 1e-12);
-        double[] diag = CubeBorder.stopVelocity(30, -30, c, PoleCapCurve.WIND_MAX);
-        assertEquals(-30 - PoleCapCurve.WIND_MAX * Math.sqrt(0.5), diag[0], 1e-9);
-        assertEquals(30 + PoleCapCurve.WIND_MAX * Math.sqrt(0.5), diag[1], 1e-9);
+        double[] diag = CubeBorder.stopVelocity(30, -30, c, EdgeBorder.SABLE_PUSH);
+        assertEquals(-30 - EdgeBorder.SABLE_PUSH * Math.sqrt(0.5), diag[0], 1e-9);
+        assertEquals(30 + EdgeBorder.SABLE_PUSH * Math.sqrt(0.5), diag[1], 1e-9);
     }
 
     @Test

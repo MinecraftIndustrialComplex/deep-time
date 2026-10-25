@@ -49,7 +49,7 @@ description = '''${mod_description}'''
     ordering     = "AFTER"
     side         = "BOTH"
 
-# Sable ships get the pole cap's wind (compat/sable/SablePoleCap, P1-18; plan §7.15). Optional:
+# Sable ships are pushed back at the cube world's temporary border (compat/sable/SableBorder). Optional:
 # without Sable none of that code loads.
 [[dependencies.${mod_id}]]
     modId        = "sable"

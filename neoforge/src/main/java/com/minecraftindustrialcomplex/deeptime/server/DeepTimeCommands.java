@@ -18,8 +18,6 @@ import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
 import com.minecraftindustrialcomplex.deeptime.wrap.CubeBorder;
 import com.minecraftindustrialcomplex.deeptime.wrap.EdgeBorder;
-import com.minecraftindustrialcomplex.deeptime.wrap.PoleCap;
-import com.minecraftindustrialcomplex.deeptime.wrap.PoleCapCurve;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
@@ -217,8 +215,8 @@ public final class DeepTimeCommands {
 
     /**
      * {@code /deeptime probe tw}'s answer: Toroidal World's shape of the level, and on a planet the
-     * generator's east-west period beside it ({@code periodBlocks}: C on Lambert, 2b on Petroff–Guyou,
-     * 4s on a cube) with {@code widthIsPeriod}, whether Toroidal World wraps at it.
+     * generator's east-west period beside it ({@code periodBlocks}: 4s on a cube, C on a
+     * Lambert-frame test level) with {@code widthIsPeriod}, whether Toroidal World wraps at it.
      */
     public static JsonObject twJson(ServerLevel level) {
         JsonObject o = new JsonObject();
@@ -349,9 +347,8 @@ public final class DeepTimeCommands {
     }
 
     /**
-     * {@code /deeptime probe pole [z]}'s answer: the pole cap (plan §7.11) of the level at block z
-     * (default: the source's own z), the lines, the latitude and what the cap does there; the edge
-     * border of a Petroff–Guyou world. On a cube world (cube plan G11) the poles lie inside N and S:
+     * {@code /deeptime probe pole [z]}'s answer (z defaults to the source's own): whether the level is
+     * a Deep Time planet. On a cube world (cube plan G11) the poles lie inside N and S:
      * each pole's face and block, its latitude, whether the border lets a player reach it, and from
      * the source's (x, z) the planet distance to it (km, through the map) and the walk under the
      * border (blocks); the source's own latitude, longitude, north and scale, and its border zone.
@@ -360,33 +357,7 @@ public final class DeepTimeCommands {
         JsonObject o = new JsonObject();
         o.addProperty("probe", "pole");
         o.addProperty("level", level.dimension().location().toString());
-        PoleCapCurve cap = PoleCap.capOf(level);
-        o.addProperty("planet", cap != null);
-        if (cap != null) {
-            o.addProperty("circumference", cap.circumference());
-            o.addProperty("capDeg", cap.capDeg());
-            o.addProperty("stopDeg", cap.stopDeg());
-            o.addProperty("capZ", cap.capZ());
-            o.addProperty("stopZ", cap.stopZ());
-            o.addProperty("z", z);
-            o.addProperty("latitude", cap.latitudeDeg(z));
-            o.addProperty("zone", cap.zone(z).name());
-            o.addProperty("depth", cap.depth(z));
-            o.addProperty("storm", cap.storm(z));
-            o.addProperty("push", cap.push(z));
-            o.addProperty("wind", cap.wind(z));
-        }
-        // A Petroff–Guyou world has no pole cap: its temporary edge border instead (NaN: none now).
-        if (level.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g && g.dataRef().petroffGuyou()) {
-            double stop = com.minecraftindustrialcomplex.deeptime.wrap.EdgeBorder.stopZ(level);
-            o.addProperty("projection", g.dataRef().projection());
-            o.addProperty("edgeBorder", !Double.isNaN(stop));
-            if (!Double.isNaN(stop)) {
-                o.addProperty("edgeStopZ", stop);
-                o.addProperty("z", z);
-                o.addProperty("edgeZone", com.minecraftindustrialcomplex.deeptime.wrap.EdgeBorder.zone(stop, z));
-            }
-        }
+        o.addProperty("planet", level.getChunkSource().getGenerator() instanceof GeologicChunkGenerator);
         if (level.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g && g.dataRef().cube()
                 && g.terrain() instanceof WorldDataTerrain t && t.data().projection() instanceof WorldProjection.Cube wp) {
             CubeLayout cube = wp.cube();

@@ -1,7 +1,6 @@
 {
   "replace": false,
   "values": [
-    "deeptime:planet",
     "deeptime:planet_cube"
   ]
 }

@@ -730,7 +730,9 @@ world's sea and none held ore, and the SEDEX held none either. Three causes, thr
 change to the world data format (the guaranteed sites are known from the event log, the rest are
 manifest notes):
 
-- **The regions were the simulation's** (DEP-220). A 16k world is 13,312 by 6,657 blocks, so its
+- **The regions were the simulation's** (DEP-220; written for the Petroff–Guyou world, deleted
+  2026-10-24: on the cube world the regions are squares of the net's window and the stage forecasts
+  the cube's turn search, SCL-129). A 16k world is 13,312 by 6,657 blocks, so its
   4,096-block regions are 4 by 2 with the last column 1,024 wide and the rows split at z = 768, and
   its 8,192-block regions 2 by 1; which land falls in which depends on λc, which the projection
   chooses on the baked land (SCL-087: the four cone points as far from land as possible), after the
@@ -872,7 +874,7 @@ copper (spawn 1,985, access p50 104) and gold (1,379) needed no guarantee and di
   the forecast's regions and the inland rule. Lead and zinc with ore exist within reach on all
   six quick planets (four on master) and came nearer on scattered 3 (4,760 to 3,340); coal,
   copper and gold did not move.
-- **λc and the cone points.** The projection keeps master's rule (SCL-087) on the baked land, so
+- **λc and the cone points** (the Petroff–Guyou world's, deleted 2026-10-24). The projection kept master's rule (SCL-087) on the baked land, so
   λc and the cone points' least distance from land are master's on all seven planets: quick
   supercontinent 1 to 3, 10.75 degrees (cones 3.50 degrees from land), 19.50 (5.10), 129.50
   (4.60); quick scattered continents 1 to 3, 140.25 (0.10), 156.50 (4.50), 255.25 (6.30); full

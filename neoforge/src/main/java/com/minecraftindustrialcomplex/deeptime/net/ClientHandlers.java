@@ -17,8 +17,4 @@ public final class ClientHandlers {
     public static void onWorldInfo(WorldInfoPayload payload, IPayloadContext context) {
         ClientPlanetState.setWorldInfo(payload);
     }
-
-    public static void onPoleStorm(PoleStormPayload payload, IPayloadContext context) {
-        ClientPlanetState.setStorm(payload);
-    }
 }

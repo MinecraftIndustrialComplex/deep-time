@@ -7,7 +7,6 @@ import com.minecraftindustrialcomplex.deeptime.worlddata.Manifest;
 import com.minecraftindustrialcomplex.deeptime.worldgen.ActiveWorldData;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataRef;
-import com.minecraftindustrialcomplex.deeptime.wrap.PoleCapCurve;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -16,7 +15,8 @@ import net.minecraft.server.level.ServerLevel;
 
 /**
  * What the client knows about the planet it is on (plan §7.15), sent when a player logs in, changes
- * dimension or respawns: the pole storm, the F3 latitude/longitude line and, later, maps read it.
+ * dimension or respawns: the F3 latitude/longitude line, Distant Horizons' curvature and, later, maps
+ * read it.
  * A player in a level that is not a Deep Time planet gets {@code planet = false} (the Nether, the
  * End, a vanilla overworld), so the client never shows stale numbers.
  *
@@ -26,36 +26,24 @@ import net.minecraft.server.level.ServerLevel;
  * @param circumference C in blocks (0 when {@code planet} is false)
  * @param mPerBlockH    horizontal scale, metres per block (plan §5.1)
  * @param mPerBlockV    vertical scale, metres per block
- * @param poleCapDeg    where the pole storm starts
- * @param poleStopDeg   the hard stop
  * @param planetName    the preset or synthetic kind the world came from
- * @param projection    the world's projection, {@code lambert}, {@code petroff_guyou} (format 0.5;
- *                      {@code circumference} is then the x period 2b) or {@code cube} (format 0.7;
- *                      {@code circumference} is the period 4s)
- * @param lambdaCDeg    λc of a Petroff–Guyou world (its manifest's); 0 otherwise
+ * @param projection    the world's projection, {@code cube} (format 0.7; {@code circumference} is the
+ *                      period 4s) or {@code lambert} (the Lambert-frame test worlds and test terrains)
  * @param cubeMap       a cube world's map table by name (its manifest's {@code map.name}); "" otherwise
  * @param cubeMapSha256 that table's sha256 (lowercase hex): the client draws latitude and longitude only
  *                      when its jar ships the same table ("" otherwise)
  * @param cubeTurn      a cube world's rotation planet to cube, its 9 numbers row by row; empty otherwise
  */
 public record WorldInfoPayload(boolean planet, String dimension, String formatVersion, int circumference,
-                               double mPerBlockH, double mPerBlockV, float poleCapDeg, float poleStopDeg,
-                               String planetName, String projection, double lambdaCDeg, String cubeMap,
-                               String cubeMapSha256, java.util.List<Double> cubeTurn) implements CustomPacketPayload {
+                               double mPerBlockH, double mPerBlockV, String planetName, String projection,
+                               String cubeMap, String cubeMapSha256, java.util.List<Double> cubeTurn)
+        implements CustomPacketPayload {
 
-    /** A polar planet's info (Lambert or Petroff–Guyou: no cube fields). */
+    /** A Lambert-frame planet's info (the tests and the analytic test terrains: no cube fields). */
     public WorldInfoPayload(boolean planet, String dimension, String formatVersion, int circumference, double mPerBlockH,
-                            double mPerBlockV, float poleCapDeg, float poleStopDeg, String planetName, String projection,
-                            double lambdaCDeg) {
-        this(planet, dimension, formatVersion, circumference, mPerBlockH, mPerBlockV, poleCapDeg, poleStopDeg, planetName,
-                projection, lambdaCDeg, "", "", java.util.List.of());
-    }
-
-    /** A Lambert planet's info (the tests and the analytic test terrains). */
-    public WorldInfoPayload(boolean planet, String dimension, String formatVersion, int circumference, double mPerBlockH,
-                            double mPerBlockV, float poleCapDeg, float poleStopDeg, String planetName) {
-        this(planet, dimension, formatVersion, circumference, mPerBlockH, mPerBlockV, poleCapDeg, poleStopDeg, planetName,
-                WorldDataRef.LAMBERT, 0.0);
+                            double mPerBlockV, String planetName) {
+        this(planet, dimension, formatVersion, circumference, mPerBlockH, mPerBlockV, planetName, WorldDataRef.LAMBERT,
+                "", "", java.util.List.of());
     }
 
     public static final Type<WorldInfoPayload> TYPE =
@@ -71,16 +59,10 @@ public record WorldInfoPayload(boolean planet, String dimension, String formatVe
         dimension = cut(dimension);
         formatVersion = cut(formatVersion);
         planetName = cut(planetName);
-        projection = WorldDataRef.PETROFF_GUYOU.equals(projection) ? WorldDataRef.PETROFF_GUYOU
-                : WorldDataRef.CUBE.equals(projection) ? WorldDataRef.CUBE : WorldDataRef.LAMBERT;
+        projection = WorldDataRef.CUBE.equals(projection) ? WorldDataRef.CUBE : WorldDataRef.LAMBERT;
         cubeMap = cut(cubeMap);
         cubeMapSha256 = cut(cubeMapSha256);
         cubeTurn = cubeTurn == null || cubeTurn.size() != 9 ? java.util.List.of() : java.util.List.copyOf(cubeTurn);
-    }
-
-    /** Whether the planet is a seamless Petroff–Guyou world. */
-    public boolean petroffGuyou() {
-        return WorldDataRef.PETROFF_GUYOU.equals(projection);
     }
 
     /** Whether the planet is a cube world (format 0.7). */
@@ -97,8 +79,7 @@ public record WorldInfoPayload(boolean planet, String dimension, String formatVe
             return null;
         if (cube())
             return cubeProjection();
-        return petroffGuyou() ? new com.minecraftindustrialcomplex.deeptime.worlddata.PetroffGuyou(circumference / 2, lambdaCDeg)
-                : new com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection.Lambert(circumference);
+        return new com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection.Lambert(circumference);
     }
 
     /**
@@ -136,11 +117,8 @@ public record WorldInfoPayload(boolean planet, String dimension, String formatVe
         buf.writeVarInt(circumference);
         buf.writeDouble(mPerBlockH);
         buf.writeDouble(mPerBlockV);
-        buf.writeFloat(poleCapDeg);
-        buf.writeFloat(poleStopDeg);
         buf.writeUtf(planetName, MAX_STRING);
         buf.writeUtf(projection, MAX_STRING);
-        buf.writeDouble(lambdaCDeg);
         buf.writeUtf(cubeMap, MAX_STRING);
         buf.writeUtf(cubeMapSha256, MAX_STRING);
         buf.writeVarInt(cubeTurn.size());
@@ -153,9 +131,7 @@ public record WorldInfoPayload(boolean planet, String dimension, String formatVe
         String dimension = buf.readUtf(MAX_STRING), format = buf.readUtf(MAX_STRING);
         int c = buf.readVarInt();
         double h = buf.readDouble(), v = buf.readDouble();
-        float cap = buf.readFloat(), stop = buf.readFloat();
         String name = buf.readUtf(MAX_STRING), projection = buf.readUtf(MAX_STRING);
-        double lambdaC = buf.readDouble();
         String map = buf.readUtf(MAX_STRING), sha = buf.readUtf(MAX_STRING);
         int n = buf.readVarInt();
         if (n != 0 && n != 9)
@@ -163,7 +139,7 @@ public record WorldInfoPayload(boolean planet, String dimension, String formatVe
         java.util.List<Double> turn = new java.util.ArrayList<>(n);
         for (int i = 0; i < n; i++)
             turn.add(buf.readDouble());
-        return new WorldInfoPayload(planet, dimension, format, c, h, v, cap, stop, name, projection, lambdaC, map, sha, turn);
+        return new WorldInfoPayload(planet, dimension, format, c, h, v, name, projection, map, sha, turn);
     }
 
     @Override
@@ -171,16 +147,9 @@ public record WorldInfoPayload(boolean planet, String dimension, String formatVe
         return TYPE;
     }
 
-    /** The pole cap this info describes, or null when it is not a planet, a Petroff–Guyou or cube world (no pole cap) or the numbers are unusable. */
-    public PoleCapCurve poleCap() {
-        if (!planet || circumference <= 0 || petroffGuyou() || cube() || !(poleCapDeg > 0 && poleCapDeg < poleStopDeg && poleStopDeg <= 90))
-            return null;
-        return new PoleCapCurve(circumference, poleCapDeg, poleStopDeg);
-    }
-
     /** The info for a level that is not a planet. */
     public static WorldInfoPayload notAPlanet(String dimension) {
-        return new WorldInfoPayload(false, dimension, FormatVersion.CURRENT, 0, 0, 0, 0, 0, "");
+        return new WorldInfoPayload(false, dimension, FormatVersion.CURRENT, 0, 0, 0, "");
     }
 
     /** The info for {@code level}: its generator's world-data reference plus the bound manifest. */
@@ -192,7 +161,6 @@ public record WorldInfoPayload(boolean planet, String dimension, String formatVe
         String format = FormatVersion.CURRENT;
         double h = Manifest.DEFAULT_M_PER_BLOCK_H, v = Manifest.DEFAULT_M_PER_BLOCK_V;
         String name;
-        double lambdaC = 0.0;
         String cubeMap = "", cubeSha = "";
         java.util.List<Double> cubeTurn = java.util.List.of();
         var testTerrain = ref.effectiveTestTerrain();
@@ -204,8 +172,6 @@ public record WorldInfoPayload(boolean planet, String dimension, String formatVe
             h = m.mPerBlockH();
             v = m.mPerBlockV();
             name = m.planetName();
-            if (m.layout() != null)
-                lambdaC = m.layout().lambdaCDeg();
             if (m.layout() != null && m.layout().cube() != null) {
                 var spec = m.layout().cube();
                 cubeMap = spec.mapName();
@@ -219,7 +185,7 @@ public record WorldInfoPayload(boolean planet, String dimension, String formatVe
         } else {
             name = ref.folder();
         }
-        return new WorldInfoPayload(true, dim, format, ref.circumferenceBlocks(), h, v,
-                (float) ref.poleCapDeg(), (float) ref.poleStopDeg(), name, ref.projection(), lambdaC, cubeMap, cubeSha, cubeTurn);
+        return new WorldInfoPayload(true, dim, format, ref.circumferenceBlocks(), h, v, name, ref.projection(), cubeMap, cubeSha,
+                cubeTurn);
     }
 }

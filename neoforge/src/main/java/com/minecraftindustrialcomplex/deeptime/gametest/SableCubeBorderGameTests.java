@@ -82,7 +82,7 @@ public final class SableCubeBorderGameTests {
         return hull;
     }
 
-    /** The footprint {@code SablePoleCap.footprint} reads: the bounds' four corners, or the pose when the bounds look unset. */
+    /** The footprint {@code SableBorder.footprint} reads: the bounds' four corners, or the pose when the bounds look unset. */
     static double[] footprint(AABB b, Vec3 p) {
         if (b == null || !(b.maxX >= b.minX) || !(b.maxZ >= b.minZ) || b.maxX - b.minX > 4096 || b.maxZ - b.minZ > 4096
                 || p.x < b.minX - 1 || p.x > b.maxX + 1 || p.z < b.minZ - 1 || p.z > b.maxZ + 1)
