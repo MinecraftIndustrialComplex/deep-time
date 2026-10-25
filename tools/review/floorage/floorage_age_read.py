@@ -63,6 +63,16 @@ def show(name, runs, names):
             labels = BANDS if key.endswith("_age") else DIST
             m = max(sum(tot_k), 1)
             print(f"{key}: " + ", ".join(f"{lab} {x / m:.3f}" for lab, x in zip(labels, tot_k)) + f" (n {sum(tot_k)})")
+    tm = [s for r in runs for s in r["snaps"] if "plates_trench_and_margin" in s]
+    if tm:
+        mf = [0] * len(BANDS)
+        for s in tm:
+            mf = [a + b for a, b in zip(mf, s["margin_floor_touching"])]
+        print(f"plates with a trench and a margin zone {sum(s['plates_trench_and_margin'] for s in tm) / len(tm):.2f}, "
+              f"whose trench touches the margin zone (1.5 spacings) {sum(s['plates_trench_touches_margin'] for s in tm) / len(tm):.2f} "
+              f"per snapshot; the margin floor it touches by age band: " +
+              ", ".join(f"{lab} {x / max(oc[b], 1):.3f}" for b, (lab, x) in enumerate(zip(BANDS, mf))) +
+              " (of the band's ocean)")
     for g in GATES:
         s = st[g]
         m = max(sum(s), 1)
