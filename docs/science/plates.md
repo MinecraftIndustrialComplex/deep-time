@@ -9119,6 +9119,27 @@ new law on planets grown under the old one; why a planet grown under the new law
 measured. The guard binds too seldom to explain it (3 to 15 of a run's 500 steps), but on a few
 small plates in every run, which is enough to keep the switch off by CLAUDE.md's rule.
 
+**Again on the front on the current geometry** (`sp-fu2`, the same arm with `--set
+tectonics.forsyth_uyeda_balance=true` on the merge of master 05a60997, whose PLT-582 judges fronts on
+the current geometry and drops the stale fronts read through hidden neighbours; key faf1a3, argkey
+f7a070a5). Its control is the front lane's arm `fl-n2th` (PLT-581 and PLT-582 on, the switch off),
+since base13 does not exist yet:
+
+| Measure | base12 (24) | fl-n2th (8) | sp-fu2 (8) | p, sp-fu2 against fl-n2th |
+|---|---|---|---|---|
+| RMS plate speed, mm/yr | 27.2 | 27.5 | 31.9 | 0.001 |
+| plates with a slab, mm/yr | 49.0 | 49.7 | 50.8 | 0.10 |
+| plates without one, mm/yr | 21.2 | 22.9 | 27.9 | 0.002 |
+| collisions per 100 Myr | 1.60 | 1.60 | 1.30 | (0.042 against base12) |
+| collision duration p90, Myr | 177.6 | 196.2 | 158.9 | |
+| land above 2 km (census) | 0.128 | 0.114 | 0.120 | |
+| speed guard, steps that bind | 0 in all 24 | 0 in all 8 | 0 to 16, in 7 of 8 (9, 13, 16, 5; 10, 0, 4, 6) | |
+
+The census against base12: no measure at p < 0.05 but the collisions per 100 Myr, 1.60 to 1.30 (p
+0.042); coast with high ground 0.229 to 0.195 (p 0.24), continental crust under the sea 0.190 to
+0.160 (p 0.31). The current-geometry fronts do not clear the guard: it binds in 7 of the 8 runs, so
+the switch stays off on the merged head too.
+
 **The boundaries by the 60 degree rule** (a VM-only probe at PLT-585's fixed point on the same two
 planets as above, not committed). Of the planet's boundary, 0.28 to 0.29 is transform, 0.56 to 0.58
 converging and 0.13 to 0.15 diverging; Earth's by Table 1 is 30 % transform, 34 % convergent and 35 %
