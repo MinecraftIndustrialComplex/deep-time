@@ -539,6 +539,17 @@ the hot desert's already are, so the BW check measures the climate mapping only 
 hot and cool deserts both ruled, the BW check's remaining columns fall under the check's minimum of 40 and it is
 logged, not asserted (BiomeGameTests). That is the design of the census, not a tuned floor: no floor was moved.
 
+Measured: `./gametest.sh -PwithEe` on master e87dbfae plus this rule (the VM, 2026-10-25, 4k test planet `test_planet_real`,
+step 16, 3,819 land columns): 117 of 117 required tests passed, `climateconsistent` among them. The cool desert decided
+13 columns (cold_plains 9, highland_plains 4), the hot desert 259, the polar desert none; `BWk:cold_not_sand` 0 of 49
+columns. The BW and BW:desert checks counted 4 columns each, all misses (two `cool_stony_peaks` and one vanilla
+`stony_peaks`, which the rules keep as peaks, and one chaparral on a column the rule's L2 class and the census's class
+read differently), a share of 0 of 4, which is below the 40-column minimum, so the checks are logged and not
+asserted. A same-planet count of the columns before the rule was not taken (the one GameTest run of the task is the
+fixed one; the 57 columns of the red gate were on master e6d69d82's planet). So on Expanded Ecosphere the BW checks
+no longer assert anything on a small planet: they stay meaningful for a pack with no desert rule (Terralith's
+table), and on a planet large enough to leave 40 or more BW columns no rule decided.
+
 **Measured** on one `earthlike_quick_16k` planet (scattered continents, 500 Myr, seed 1, test machine, 2026-10-04;
 `tools/review/ee-biomes.sh`, `tools/review/profile_shares.py`), the same world data through each profile's biome
 source, `/deeptime probe biomes 16`, 93,727 land columns. Before (master's jar with EE): no Deep Time overworld at
