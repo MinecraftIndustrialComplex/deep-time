@@ -1,5 +1,10 @@
 # A wrap engine of Deep Time's own: half-turn and quarter-turn seams without portals
 
+> **Update (2026-10-24, cube plan 7.4).** The seams this was designed for were the Petroff-Guyou world's,
+> which is deleted. The cube's quarter-turn and half-turn edges are the engine's cases now
+> (`docs/design/cube-game.md`, the band E3); the text below is the 2026-10-03 design, with its
+> Petroff-Guyou level type and tools gone.
+
 **Status (2026-10-03).** A design and a dev-only spike, on branch `dev/wrap-engine-spike`. Ben asked
 for it in the decisions log on 2026-10-03: "Immersive portals, begin custom wrap engine concurrently."
 The production seamless world uses Immersive Portals first ([`seamless-wrapping.md`](seamless-wrapping.md)).
