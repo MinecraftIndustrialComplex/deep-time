@@ -984,9 +984,10 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // welding seeds pass, and seed 2 welds twice; seed 4 since the collapse's thermal reading and
     // the front on the current geometry went on by default, PLT-581 and PLT-582, 2026-10-25, when
     // seed 2 no longer welds: seed 4 is the first welding seed after seed 1, which the weld test
-    // above takes; the critical-taper belt, PLT-600, on by default the same day, chose seed 4 on
-    // its own too, and seed 4 welds with all three).
-    let p = preset(8000, 300.0, "scattered_continents", 4);
+    // above takes; seed 2 again since the critical-taper belt went on by default with them,
+    // PLT-600, the same day, when seed 4 no longer welds: the sweep's welding seeds 1, 2, 6, 7,
+    // 11, 14, 15, 16, 22 and 24, seed 2 again the first after seed 1).
+    let p = preset(8000, 300.0, "scattered_continents", 2);
     let total = PlatesStage::new(p.clone()).total_steps();
     let mut checked = 0u64;
     let mut life = CollisionLives::default();
