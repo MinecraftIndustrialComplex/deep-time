@@ -1278,8 +1278,7 @@ fn balance_step(
                 }
                 for i in 0..usize::from(e.n_others) {
                     let q = e.others[i];
-                    if seen & (1 << i) == 0 || Some(q) == front_q || active.contains_key(&(pv, q))
-                    {
+                    if seen & (1 << i) == 0 || Some(q) == front_q || active.contains_key(&(pv, q)) {
                         continue;
                     }
                     let normal =

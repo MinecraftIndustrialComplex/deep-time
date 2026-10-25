@@ -534,13 +534,14 @@ fn sutures_and_initiations_keep_continents_whole() {
     // 3, 14 and 4, 15 and 5, 21 and 6, 23 and 10, 24 and 14).
     for (start, seed) in [("supercontinent", 4), ("scattered_continents", 1)] {
         let mut p = preset(8000, 300.0, start, seed);
-        // The old law (PLT-585 off): under Forsyth & Uyeda's balance on this small planet, whose
-        // ridge push is several times Earth's (`plates_quick_16k`, ridge -1,000 m, floor
-        // -10,000 m), the speed guard binds on every welding seed of 1 to 24 but supercontinent
-        // 11 (`weld_seed_sweep`, 2026-10-25: 10 scattered and 10 supercontinent seeds weld, the
-        // guard holding 3 to 90 plate-steps in 300 Myr), and these two seeds weld no more. A
-        // suture is the same under either law.
+        // The old law (PLT-585 off, PLT-540 on): under Forsyth & Uyeda's balance on this small
+        // planet, whose ridge push is several times Earth's (`plates_quick_16k`, ridge -1,000 m,
+        // floor -10,000 m), the speed guard binds on every welding seed of 1 to 24 but
+        // supercontinent 11 (`weld_seed_sweep`, 2026-10-25: 10 scattered and 10 supercontinent
+        // seeds weld, the guard holding 3 to 90 plate-steps in 300 Myr), and these two seeds weld
+        // no more. A suture is the same under either law.
         p.tectonics.forsyth_uyeda_balance = false;
+        p.tectonics.suction_saturates = true;
         let mut seen = 0usize;
         let world = run_stage(&p, |stage, world, st| {
             assert!(stats::summary(st).partition_ok);
@@ -833,13 +834,14 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // recording test still weld and pass, so they stay; from the supercontinent 6, 10, 15, 18, 19
     // and 20, seed 15 three times).
     let mut p = preset(8000, 300.0, "scattered_continents", 1);
-    // The old law (PLT-585 off): under Forsyth & Uyeda's balance on this small planet, whose
-    // ridge push is several times Earth's (`plates_quick_16k`, ridge -1,000 m, floor -10,000 m),
-    // the speed guard binds on every welding seed of 1 to 24 but supercontinent 11
-    // (`weld_seed_sweep`, 2026-10-25: 10 scattered and 10 supercontinent seeds weld, the guard
+    // The old law (PLT-585 off, PLT-540 on): under Forsyth & Uyeda's balance on this small
+    // planet, whose ridge push is several times Earth's (`plates_quick_16k`, ridge -1,000 m,
+    // floor -10,000 m), the speed guard binds on every welding seed of 1 to 24 but supercontinent
+    // 11 (`weld_seed_sweep`, 2026-10-25: 10 scattered and 10 supercontinent seeds weld, the guard
     // holding 3 to 90 plate-steps in 300 Myr), and this seed welds no more. A collision's life
     // cycle is the same under either law.
     p.tectonics.forsyth_uyeda_balance = false;
+    p.tectonics.suction_saturates = true;
     let mut life = CollisionLives::default();
     let world = run_stage(&p, |_, _, st| {
         assert!(stats::summary(st).partition_ok);
@@ -912,7 +914,11 @@ fn weld_seed_sweep() {
                         .iter()
                         .map(|s| s.plates.iter().filter(|q| q.guard).count())
                         .sum();
-                    (seed, d.collisions.iter().filter(|c| c.sutured).count(), guarded)
+                    (
+                        seed,
+                        d.collisions.iter().filter(|c| c.sutured).count(),
+                        guarded,
+                    )
                 })
                 .collect()
         });
@@ -923,7 +929,9 @@ fn weld_seed_sweep() {
             .map(|w| w.0)
             .collect();
         println!("{start}: (seed, welds, guarded plate-steps) {welds:?}");
-        println!("{start}: seeds that weld {welding:?}; of them the guard never binds on {quiet:?}");
+        println!(
+            "{start}: seeds that weld {welding:?}; of them the guard never binds on {quiet:?}"
+        );
     }
 }
 
@@ -1005,12 +1013,13 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // fronts went on by default, PLT-560, the same day, when seed 20 no longer welds: all 13
     // welding seeds pass, and seed 2 welds twice).
     let mut p = preset(8000, 300.0, "scattered_continents", 2);
-    // The old law (PLT-585 off): the guard asserted below binds under Forsyth & Uyeda's balance
-    // on every welding seed of 1 to 24 of this small planet but supercontinent 11, whose ridge
-    // push is several times Earth's (`plates_quick_16k`, ridge -1,000 m, floor -10,000 m;
-    // `weld_seed_sweep`, 2026-10-25: 7 plate-steps in 300 Myr on this seed). The record is
-    // measurement only under either law.
+    // The old law (PLT-585 off, PLT-540 on): the guard asserted below binds under Forsyth &
+    // Uyeda's balance on every welding seed of 1 to 24 of this small planet but supercontinent
+    // 11, whose ridge push is several times Earth's (`plates_quick_16k`, ridge -1,000 m, floor
+    // -10,000 m; `weld_seed_sweep`, 2026-10-25: 7 plate-steps in 300 Myr on this seed). The
+    // record is measurement only under either law.
     p.tectonics.forsyth_uyeda_balance = false;
+    p.tectonics.suction_saturates = true;
     let total = PlatesStage::new(p.clone()).total_steps();
     let mut checked = 0u64;
     let mut life = CollisionLives::default();
@@ -3718,7 +3727,8 @@ fn what_sets_the_planets_plate_speed() {
                         continue;
                     }
                     let size = vis[id] / (total / 14.0);
-                    let bin = usize::from(size >= 0.1) + usize::from(size >= 0.5)
+                    let bin = usize::from(size >= 0.1)
+                        + usize::from(size >= 0.5)
                         + 3 * usize::from(cont[id] > 0.5 * vis[id]);
                     bins[v][bin][0] += vis[id] * speed_of(w, id).powi(2) / acc[2].max(1e-30);
                     bins[v][bin][1] += vis[id] / total;
