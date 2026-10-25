@@ -352,6 +352,9 @@ struct Moved {
     prev_held_offset: Option<Vec<f32>>,
     newborn: Vec<bool>,
     known_plates: usize,
+    /// A collision belt's foreland (`flexure::belt_reach`): each cell, the plate that bends it
+    /// and its source had it moved with the belt (ISO-133, `flexure::FlexState::carry_frame`).
+    frame_src: Vec<(usize, f32, [f64; 2])>,
 }
 
 impl Moved {
@@ -541,6 +544,12 @@ struct PlateFields {
     /// age (`plates::l1::THERMAL_AGE_FIELD`, written only with `tectonics.thermal_strength`) gives
     /// one (ledger: ISO-112). `None`: the orogeny's age throughout.
     te_age: Option<Vec<f32>>,
+    /// The plate carrying a collision's footprint and its lithosphere's thermal age
+    /// (`plates::l1::CARRIER_PLATE_FIELD`, `CARRIER_AGE_FIELD`, written only with
+    /// `tectonics.collision_underthrust`; ledger: PLT-546, ISO-131). `None`: every cell on its own
+    /// plate.
+    carrier_plate_id: Option<Vec<f32>>,
+    carrier_age: Option<Vec<f32>>,
 }
 
 impl PlateFields {
@@ -586,6 +595,8 @@ impl PlateFields {
             gap: get(crate::plates::l1::GAP_FIELD).ok(),
             crust_uplift: get(crate::plates::l1::CRUST_UPLIFT_FIELD).ok(),
             te_age,
+            carrier_plate_id: get(crate::plates::l1::CARRIER_PLATE_FIELD).ok(),
+            carrier_age: get(crate::plates::l1::CARRIER_AGE_FIELD).ok(),
         })
     }
 }
@@ -870,6 +881,26 @@ impl SurfaceStage {
                     .map(|f| f.data.as_slice());
                 let mut src = advect::sources(&grid, &pf.plate_id, &omega, dt);
                 advect::hold_gaps(w, &mut src, prev_gap);
+                // ledger: ISO-133
+                let frame_src = match (&pf.carrier_plate_id, p.flexure.active()) {
+                    (Some(car), true) => {
+                        let cell_m =
+                            std::f64::consts::TAU * self.preset.tectonics.model_radius_km * 1000.0
+                                / w as f64;
+                        let reach = (p.flexure.belt_reach_m(self.preset.planet.gravity_m_s2)
+                            / cell_m)
+                            .ceil() as usize;
+                        let near = flexure::belt_reach(w, hgt, &pf.plate_id, car, reach);
+                        let cells: Vec<(usize, f32)> =
+                            near.iter().map(|&(c, _, belt)| (c, belt)).collect();
+                        let to = advect::sources_with(&grid, &cells, &omega, dt);
+                        near.into_iter()
+                            .zip(to)
+                            .map(|((c, bends, _), s)| (c, bends, s))
+                            .collect()
+                    }
+                    _ => Vec::new(),
+                };
                 let mut m = Moved {
                     src,
                     // Back in the state once the flexure carry has read it (below).
@@ -888,6 +919,7 @@ impl SurfaceStage {
                     },
                     newborn: Vec::new(),
                     known_plates: st.omega.len(),
+                    frame_src,
                 };
                 // The elevation moves with its own crust and takes the plate model's uplift
                 // (`advect::carried_elevation`); the offset is what stands over the plate model's
@@ -1023,9 +1055,10 @@ impl SurfaceStage {
                     let carry = m.carry(world, &pf, &parents, (w, hgt), dt, blur_ref);
                     // The plate's load and deflection move with the same crust.
                     if p.flexure.active() {
-                        st.flexure
-                            .get_or_insert_default()
-                            .carry(&carry, &m.prev_elevation);
+                        let fs = st.flexure.get_or_insert_default();
+                        // ledger: ISO-133
+                        fs.carry_frame(w, hgt, &m.frame_src, carry.prev_plate);
+                        fs.carry(&carry, &m.prev_elevation);
                     } else {
                         st.flexure = None;
                     }
@@ -2092,6 +2125,8 @@ impl SurfaceStage {
                 orogeny_age_myr: pf.te_age.as_deref().unwrap_or(&pf.orogeny_age),
                 regime: &pf.regime,
                 plate_id: &pf.plate_id,
+                carrier_plate_id: pf.carrier_plate_id.as_deref(),
+                carrier_age_myr: pf.carrier_age.as_deref(),
                 ice_m: ice,
                 rock_share: p.isostasy,
                 parts: budget,
