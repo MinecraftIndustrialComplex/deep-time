@@ -168,6 +168,55 @@ pub fn slab_weight(age_myr: f64) -> f64 {
     }
 }
 
+/// Incipient subduction (`tectonics.incipient_subduction`, PLT-610): a front whose contact's slab
+/// is shorter than this, km, is not yet self-sustaining. Gurnis, Hall & Lavier 2004: "Cumulative
+/// convergence, not the rate of convergence, is the dominant control", the critical convergence
+/// "only varies between 100 and 130 km (Table 3)"; Hall et al. 2003: "approximately 100 km of
+/// convergence". The slab's length is its front's cumulative oceanic convergence (FRC-020), so
+/// the bottom of the range is taken, as PLT-518's.
+pub const INCIPIENT_SLAB_KM: f64 = 100.0; // ledger: PLT-611
+/// The resistance of an incipient front to its convergence, N per metre of front at Earth's
+/// gravity: the plate bending into the new trench. Gurnis et al. 2004: "rapid growth in resisting
+/// force as the plate begins bending, reaching a maximum value dependent on plate thickness, but
+/// typically ranging from 2 to 3 × 10^12 N/m for cases that become self-sustaining"; the middle
+/// of the range. Plastic (a force whatever the speed), it enters the solve as a collision's
+/// resistance does, over max(convergence, [`COLLISION_FLOOR_MM_YR`]).
+pub const INCIPIENT_RESISTANCE_N_M: f64 = 2.5e12; // ledger: PLT-612
+/// … where the floor going under is younger than [`SLAB_BUOYANT_MYR`], a ridge put under
+/// compression: "The entire initial hump in resisting force is eliminated when lithosphere with a
+/// typical thermal model of a spreading center is subject to compression", and the ridge's
+/// "additional topography accounts for an additional 5 × 10^11 N/m which must be overcome to
+/// compress the plates" (Gurnis et al. 2004).
+pub const INCIPIENT_RIDGE_N_M: f64 = 5.0e11; // ledger: PLT-613
+
+/// The slab length below which a front is incipient, km: [`INCIPIENT_SLAB_KM`] with
+/// `incipient_subduction` on, else 0 (no front is). ledger: PLT-610
+pub fn incipient_km(k: &TectonicParams) -> f64 {
+    if k.incipient_subduction {
+        INCIPIENT_SLAB_KM
+    } else {
+        0.0
+    }
+}
+
+/// Whether a front whose contact's slab is `slab_km` long, before this step's growth, is
+/// incipient (PLT-610): it resists its convergence ([`incipient_resistance_n_m`]), builds no arc
+/// (`subduction::fronts_finish`), and the boundary mix counts it as converging, not subducting.
+pub fn incipient(k: &TectonicParams, slab_km: f64) -> bool {
+    slab_km < incipient_km(k)
+}
+
+/// An incipient front's resistance, N per metre of front, where the floor going under is
+/// `age_myr` old, at gravity `g`: scaled with gravity as the slab pull is (FRC-002).
+pub fn incipient_resistance_n_m(age_myr: f64, g: f64) -> f64 {
+    let f = if age_myr < SLAB_BUOYANT_MYR {
+        INCIPIENT_RIDGE_N_M // ledger: PLT-613
+    } else {
+        INCIPIENT_RESISTANCE_N_M // ledger: PLT-612
+    };
+    f * g / G_EARTH
+}
+
 /// The ridge-push coefficient `C` of the sea floor's potential energy, N/m³: a floor `d` metres
 /// below the ridge crest has `C d²` less than the crest (Turcotte & Schubert's ridge push in
 /// terms of the subsidence; ledger FRC-012). About 3.3 × 10⁵ at Earth's gravity.
@@ -836,6 +885,9 @@ pub struct Answer {
     /// over the front (design §3.4). Read by transference (`collision::transference_due`, ledger
     /// PLT-516). Never stored.
     pub collision_n: BTreeMap<usize, f64>,
+    /// Each incipient front's resistance this step, N (by contact index): its plastic force
+    /// before linearisation, summed over the front (PLT-610, PLT-612). Never stored.
+    pub incipient_n: BTreeMap<usize, f64>,
     pub solved: bool,
     pub recorded: Option<Recorded>,
     /// Measurement only: the oceanic fronts the slab pull acts along this step, km
@@ -903,6 +955,7 @@ pub fn step(
         omega,
         stress_mpa,
         collision_n,
+        incipient_n,
         solved,
         out,
         slab_front_km,
@@ -933,6 +986,7 @@ pub fn step(
         omega,
         stress_mpa,
         collision_n,
+        incipient_n,
         solved,
         recorded,
         slab_front_km,
@@ -945,6 +999,7 @@ struct Balanced {
     omega: Vec<Option<DVec3>>,
     stress_mpa: Vec<Option<f64>>,
     collision_n: BTreeMap<usize, f64>,
+    incipient_n: BTreeMap<usize, f64>,
     solved: bool,
     out: Recorded,
     slab_front_km: [f64; 3],
@@ -1146,6 +1201,9 @@ fn balance_step(
     // Slabs with a front this step (fed when it is partly oceanic).
     let mut fronted: BTreeSet<(u32, u32)> = BTreeSet::new();
     let mut fed: BTreeSet<(u32, u32)> = BTreeSet::new();
+    // Incipient fronts (PLT-610), by their slab before this step's growth, as the arcs and the
+    // boundary mix read it.
+    let mut young: BTreeSet<usize> = BTreeSet::new();
     for (&ci, f) in &fronts {
         let c = &st.contacts[ci];
         let key = (c.under, c.over);
@@ -1157,6 +1215,9 @@ fn balance_step(
         });
         // A split's copy holds the slab from its first front on (ledger: PLT-534).
         s.latent = false;
+        if incipient(k, s.km) {
+            young.insert(ci);
+        }
         if grow_slab(s, f, env.dt_myr, k.slab_depth_km, k.slab_breakoff_myr) {
             breakoffs += 1;
         }
@@ -1234,6 +1295,7 @@ fn balance_step(
     // under it, so a held collision stalls).
     let floor = COLLISION_FLOOR_MM_YR.min(k.weld_speed_mm_yr); // ledger: FRC-011
     let mut collision_n: BTreeMap<usize, f64> = BTreeMap::new();
+    let mut incipient_n: BTreeMap<usize, f64> = BTreeMap::new();
     for e in &edges {
         let v = e.v as usize;
         let sv = &samples[v];
@@ -1279,6 +1341,23 @@ fn balance_step(
                     }
                     None
                 } else {
+                    // An incipient front resists its convergence with the bending's plastic
+                    // force until its slab sinks by itself (PLT-610), linearised as the
+                    // collision's; booked with the collision resistance.
+                    if young.contains(&ci) {
+                        let force =
+                            incipient_resistance_n_m(su.age_myr(env.t_myr), env.gravity) * sf.len_m;
+                        let speed = sf.conv.max(floor) * 1.0e-3 / YEAR_S;
+                        *incipient_n.entry(ci).or_default() += force;
+                        bal.add_link(Link {
+                            a: under,
+                            b: p,
+                            x,
+                            n: Some(-sf.dir),
+                            k: force / speed,
+                            term: Resist::Collision,
+                        });
+                    }
                     let km = slab_km.get(&ci).copied().unwrap_or(0.0);
                     Some((under, u, sf.dir, sf.len_m, km))
                 }
@@ -1387,6 +1466,7 @@ fn balance_step(
         omega: out,
         stress_mpa: stress,
         collision_n,
+        incipient_n,
         solved,
         out: Recorded {
             forces,
