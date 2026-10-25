@@ -1611,12 +1611,8 @@ fn an_initiations_contact_takes_its_planted_slab() {
         p.tectonics.initiation_polarity_by_age = on;
         let stage = PlatesStage::new(p.clone());
         let env = stage.env(&p.tectonics, 1);
-        let (mut st, geo) = plates_unresolved(
-            &p,
-            &env,
-            glam::DQuat::from_rotation_x(0.1),
-            |q| q.z > 0.0,
-        );
+        let (mut st, geo) =
+            plates_unresolved(&p, &env, glam::DQuat::from_rotation_x(0.1), |q| q.z > 0.0);
         for s in st.samples.iter_mut() {
             let age = if s.group == 0 { 100.0 } else { 200.0 };
             s.kind = OCEANIC;

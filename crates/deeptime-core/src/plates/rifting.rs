@@ -1230,8 +1230,16 @@ pub(in crate::plates) mod tests {
             assert_eq!(st.slabs.len(), 1, "one planted slab");
             (st.slabs[0].under, st.slabs[0].over)
         };
-        assert_eq!(plant(true, 200.0, 300.0, false), (0, 1), "the parent's is older");
-        assert_eq!(plant(true, 300.0, 200.0, false), (1, 0), "the split's is older");
+        assert_eq!(
+            plant(true, 200.0, 300.0, false),
+            (0, 1),
+            "the parent's is older"
+        );
+        assert_eq!(
+            plant(true, 300.0, 200.0, false),
+            (1, 0),
+            "the split's is older"
+        );
         assert_eq!(plant(true, 250.0, 250.0, false), (1, 0), "a tie: the split");
         assert_eq!(
             plant(true, 200.0, 300.0, true),
