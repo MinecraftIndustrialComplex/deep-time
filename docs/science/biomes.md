@@ -496,10 +496,59 @@ EE's volcanoes after Terralith's and Biomes O' Plenty's biomes, and the peatland
 | Tibesti, hot desert (BIO-123) | BWh above 1,500 m; BW with a mean above 10 °C | tibesti_mountains (exclusive); EE's deserts and badlands | game choice |
 | tundra (BIO-124) | ET with a warmest month of 5 °C or more; colder ET | tundra; snowy_tundra | CAVM subzone C edge (Walker et al. 2005, from memory) |
 | polar desert (BIO-125) | EF off the ice, BWk at or below 0 °C | snowy_tundra | game choice |
+| cool desert (BIO-195) | BWk above 0 and under 10 °C (by the column's own mean) | cold_plains, highland_plains, stony_canyon, cool_stony_canyons | game choice; the Gobi, Great Basin and Patagonia read in Wikipedia, 2026-10-25 |
 | dry tropical forest (BIO-126) | Aw, As with 1,000 mm or more | dry_tropical_forest | Holdridge's dry forest band (from memory) |
 | temperate rainforest (BIO-127) | Cfb, Cfc with 1,400 mm or more and a mean of 4 to 12 °C | temperate_rainforest, its crags, its flooded form (exclusive) | Alaback 1991 (from memory) |
 | Mediterranean scrub, cold steppe (BIO-128) | Csa, Csb with 800 mm or less; BSk | chaparral; cold_plains, highland_plains, subtropical_grassland | game choice |
 | boreal peatland (BIO-129; every pack) | cold wetland | `#deeptime:peatland`: fen, berry_bog, snowy_bog, snowy_fen | game choice (Ben, 2026-10-03, "peatland if present") |
+
+**The cool desert (BIO-195).** The BWk class has three parts by the column's mean (BIO-101): above 10 °C the hot desert
+(BIO-123), from 0 to 10 °C the cool desert, at or below 0 °C the polar desert (BIO-125). The first and last had a
+rule; the middle had none, so what Expanded Ecosphere's own search answered there stood. That showed in the BW census
+of `-PwithEe` (the BW check, the biomes of BW columns warmer than the cold band's top, which the census reads from the
+baked temperature raster): the placement table draws a BWk column under 10 °C on the cold-desert ramp (ramp
+coordinate 1.05 to 1.95, a temperature parameter under -0.15) and one over 10 °C on the hot-desert ramp (4.23 and up,
+about 0.65), and the bake's bilinear resampling blends the two across the switch, so a column whose own mean is under
+10 °C can carry a parameter between -0.15 and 0.65. EE's list puts its temperate and warm dry biomes there
+(sunflower plains, harvest fields, dry savanna, savanna, plains, autumnal flower forest: 57 columns on the 2026-10-24
+test planet, after the hot-desert rule had taken 194), and they carry none of the desert, badlands, dry or sandy
+tags, so the check read BW at 0.228 (99 % upper bound 0.377) against its 0.46 floor and BW:desert at 0.088 (0.214)
+against 0.37. The rule reads the column's own mean (the same fact the hot and polar rules read, the lapsed month
+means at the column's height) rather than the blended parameter, so the three parts partition BWk with no gap.
+
+What a cool desert is, by Koppen's BWk and the three deserts that are one (all read in Wikipedia on 2026-10-25, a
+secondary source): the Gobi "is overall a cold desert, with frost and occasionally snow occurring on its dunes", "much
+of the Gobi is not sandy, instead resembling exposed bare rock", its commonest plants "shrubs adapted to drought" and
+"low grasses such as needle grass and bridlegrass"; the Great Basin Desert is Koppen "cold desert (BWk) and cold
+semi-arid (BSk)", "a temperate desert with hot, dry summers and snowy winters", mostly sagebrush and shadscale
+shrubland over valley floors, playas and salt flats; the Patagonian desert is "mainly composed of gravel plains and
+plateaus with sandstone canyons", "dominated by shrubby and herbaceous plant species", with a mean around 3 °C and
+frost. So a cool desert is treeless, shrub and tuft-grass ground over gravel or bare rock, with plateaus and canyons,
+and no sand sea. EE has no biome for it (no gravel desert, no sagebrush; its 189 biomes read from the 3.4.7 jar).
+The rule takes the four nearest in what they place: `cold_plains` and `highland_plains` (sparse-vegetation,
+treeless plains whose only plants are grass patches), `stony_canyon` and `cool_stony_canyons` (stone cliffs, no
+trees, no crops; the first has EE's one stone-and-gravel surface rule in the cool band). The pack's search picks
+among them by the six climate parameters, so flat ground takes the plains and the steep erosion band the canyons.
+Left out: `tundra` and `crimson_tundra` (trees and berries; a tundra is ET, not a desert), `highlands` (a peak and snow
+tag), `cool_plains` (marsh grass), badlands (Ben, 2026-10-02: no badlands or sand in the cold deserts, the census's
+`BWk:cold_not_sand` forbid) and every desert and dune biome. `cool_stony_canyons` is named `cool_stony_canyon` in
+EE's surface rule (stone, gravel under water), so the biome as shipped does not get that gravel surface; this is EE's
+slip, not something the rule can mend. The 10 °C and 0 °C edges are the placement's (BIO-101), a game choice.
+The rule is also what the census sets aside: a column a rule decided is counted apart (`rule_decided_set_aside`), as
+the hot desert's already are, so the BW check measures the climate mapping only where no rule decides; with the
+hot and cool deserts both ruled, the BW check's remaining columns fall under the check's minimum of 40 and it is
+logged, not asserted (BiomeGameTests). That is the design of the census, not a tuned floor: no floor was moved.
+
+Measured: `./gametest.sh -PwithEe` on master e87dbfae plus this rule (the VM, 2026-10-25, 4k test planet `test_planet_real`,
+step 16, 3,819 land columns): 117 of 117 required tests passed, `climateconsistent` among them. The cool desert decided
+13 columns (cold_plains 9, highland_plains 4), the hot desert 259, the polar desert none; `BWk:cold_not_sand` 0 of 49
+columns. The BW and BW:desert checks counted 4 columns each, all misses (two `cool_stony_peaks` and one vanilla
+`stony_peaks`, which the rules keep as peaks, and one chaparral on a column the rule's L2 class and the census's class
+read differently), a share of 0 of 4, which is below the 40-column minimum, so the checks are logged and not
+asserted. A same-planet count of the columns before the rule was not taken (the one GameTest run of the task is the
+fixed one; the 57 columns of the red gate were on master e6d69d82's planet). So on Expanded Ecosphere the BW checks
+no longer assert anything on a small planet: they stay meaningful for a pack with no desert rule (Terralith's
+table), and on a planet large enough to leave 40 or more BW columns no rule decided.
 
 **Measured** on one `earthlike_quick_16k` planet (scattered continents, 500 Myr, seed 1, test machine, 2026-10-04;
 `tools/review/ee-biomes.sh`, `tools/review/profile_shares.py`), the same world data through each profile's biome
