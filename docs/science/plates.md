@@ -9567,3 +9567,97 @@ balance's resistance and the plates' motion are as before; only where the crust 
 are stamped as a collision orogeny (fold along the front), so the collapse, the root removal and
 the erosion treat them as such, but they stay out of the belt's record (its height, width and
 footprint are the front's).
+
+### On the pool (arm fl-upper-unfreeze, 2026-10-25): on by default
+
+The arm ran on the M4 lane's motion fix and chemical denudation (PLT-191, ERO-205 to ERO-207; merged
+as master 16db742d): `pool.sh combine` of this branch and 4d5cf4dd, key 4040677e7800, 8 runs
+(supercontinent and scattered_continents, seeds 1 to 4, earthlike_quick_16k, 1,000 Myr, 2 threads),
+`--set tectonics.collision_upper_plate_shortening=true` and the crust budget's two envs. The base for
+the census and the guard is m5-unfreeze (67edbe8a8914, the fix alone, no envs). The base for the
+front's budget and maps is its twin fl-off-env8: the same combination with the switch off and the
+envs on. All 8 of its runs match m5-unfreeze's final world state and dynamics record bit for bit
+(state_sha256 and rec_sha256, 109 state files). So the switch off changes nothing, and the envs only
+measure.
+
+| v1census, medians of 8 (Mann-Whitney p) | target | m5-unfreeze | fl-upper-unfreeze |
+|---|---|---|---|
+| land | 0.13 to 0.36 | 0.193 | 0.191 (0.96) |
+| largest landmass | ≥ 0.06 | 0.0549 | 0.0597 (0.96) |
+| continental crust under the sea | ≤ 0.56 | 0.566 | 0.552 (0.65) |
+| land above 2 km (M4; Earth 0.047) | ≤ 0.07 | 0.016 | 0.026 (0.050) |
+| coast with high ground | ≤ 0.11 | 0.091 | 0.129 (0.44) |
+| land under ice | ≤ 0.32 | 0.059 | 0.073 (0.44) |
+| collisions per 100 Myr | ≤ 6 | 5.6 | 5.0 (0.49) |
+| continental share of the planet | | 0.402 | 0.384 (0.010) |
+| continental crust's net change (area) | | −0.021 | −0.039 (0.015) |
+| sea over the datum, after 100 Myr / end, m | | 469 / 687 | 486 / 710 (0.57 / 0.28) |
+| criteria met per run, median and mean | of 7 | 6, 5.38 | 5.5, 5.38 (0.78) |
+
+The guard stays clean. Its worst is 10,103 m against 10,251 (p 0.65). No step goes beyond two Earth
+reliefs, and no continental plate cell stands 5 km over its Airy height. The largest excess over Airy
+is 2,322 m against 2,403, the highest plate elevation 5,097 m against 5,321 (p 0.23).
+
+The interior shortens, so the continents lose area to thickness. In the final fields the median
+continental area falls 4.5 % (0.402 to 0.384 of the planet), the mean thickness rises from 35.7 to
+36.1 km, and the volume, as km of crust spread over the planet, falls 2.2 % (14.21 to 13.90). The
+switch's own step creates and removes nothing: `kept` includes the interior's `upper`, and no-room
+losses fall. The volume goes afterwards. More high ground erodes, and more of that sediment goes
+down the trenches: sediment subducted rises 8.0 × 10⁷ km³ over the run (median, 9.70 × 10⁸ to
+1.05 × 10⁹), the slab's crust 6.5 × 10⁷ (its sediment counted in both), and the mafic pools dropped
+at accretion 2.7 × 10⁷.
+
+At the front (collfront, twin against arm; medians of runs over the whole run, per km of front over
+the last 50 Myr):
+
+| | twin (switch off) | arm | Earth | base14 |
+|---|---|---|---|---|
+| kept / crossed | 0.757 | 0.792 | | 0.89 |
+| kept at the front | 0.757 | 0.664 | | |
+| the interiors (`upper` / crossed; by crossed area) | 0 | 0.131; 0.126 | | |
+| crossed area at fronts whose interior took half or more | 0 | 0.076 | | |
+| lost to no room at a capped front / crossed | 0.136 | 0.111 | | |
+| excess over the planet's continental median within 800 km, km³/km | 7,497 | 9,707 | 7,970 | 14,400 |
+| crust 45 km or thicker within 800 km, km²/km | 241 | 405 | 289 | 599 |
+| crust 55 km or thicker within 800 km, km²/km | 62 | 115 | 123 | 344 |
+| land above 2 km within 800 km, km²/km | 98 | 193 | 185 | 512 |
+| collision front, last 50 Myr, km | 7,281 | 9,540 | | |
+
+Behind the belt, the overriding side's mean thickness rises from 41.1 to 43.1 km at 200 to 400 km,
+from 36.8 to 39.1 at 400 to 800 km, and from 35.9 to 36.5 at 800 to 1,500 km. The belt also gives
+less crust back to its lowland: over the run the collapse moved 1.7 × 10⁸ km³ less and the channel
+flow 2.5 × 10⁸ less, and the collapse held 5.4 × 10⁸ more. The thickened interior lowers the
+contrast those two laws run on (the budget's reading, not traced column by column). The front's
+55 km tail doubles to Earth's, and so does its high ground. The collisions' timing barely moves
+(m4decay section A, m5-unfreeze against arm):
+
+- trains: 2,945 against 2,985;
+- duration p50 10 and 10 Myr, p90 50 and 52, max 144 and 146;
+- by the longest front p50 32 and 32 Myr, p90 68 and 72;
+- front-time in trains over 110 Myr 0.02 and 0.04, over 200 Myr 0 and 0.
+
+| land in each crust-thickness band (share of the land; m4split, mean of 8) | Earth (HYP-040) | m5-unfreeze | fl-upper-unfreeze |
+|---|---|---|---|
+| under 30 km | | 0.046 | 0.055 |
+| 30 to 35 km | 0.197 | 0.044 | 0.056 |
+| 35 to 40 km | 0.367 | 0.686 | 0.671 |
+| 40 to 45 km | 0.274 | 0.171 | 0.154 |
+| 45 to 55 km | 0.097 | 0.041 | 0.047 |
+| 55 to 70 km | 0.019 | 0.0063 | 0.0150 |
+| over 70 km | 0.006 | 0.0000 | 0.0002 |
+
+M4 rises from 0.016 to 0.026 (p50; Earth 0.047). Most of the gain is young collision belts (0.0053 to
+0.0131 of the land, mean) and belts 10 to 50 Myr old (0.0049 to 0.0083). The share of the high
+ground under ice rises from 0.20 to 0.47. The interior's stamped columns enter the collision class:
+its land share rises from 0.011 to 0.074 for the young belts and from 0.21 to 0.35 for the older
+ones. The pooled collision-belt samples triple (194,000 to 583,000), at a median T of 39 km at the
+stamp against 57.
+
+Validation readouts, not fitted (no value was chosen to reach them): the interiors take 0.13 of the
+crust crossed (0.126 of the convergence by crossed area), and fronts whose interior took half or more
+carry 0.076 of the crossed area. Earth's Arabia put 52 % behind the Zagros (Mouthereau 2011), and
+Asia took 0.40 to 0.70 of India's shortening (van Hinsbergen et al. 2011, Tectonics). So the model's
+interiors take a quarter to a third of Earth's two cases, and the 1-D strip already gives the
+interior's largest share. The law has no free value to close that gap, and none was looked for. On
+by default since this arm: the law is built and tested against its sources, it conserves crust, and
+the guard is clean (the rule of 2026-10-23: the V1 numbers are realism checks, not a gate).
