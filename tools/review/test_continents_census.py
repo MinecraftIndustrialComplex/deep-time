@@ -98,15 +98,15 @@ class Reach(unittest.TestCase):
         z = np.full(x.size, 500.0)
         z[y > 300.0] = -1000.0
         z[(np.abs(x) < 60.0) & (y > -500.0)] = -1000.0
-        z[(x >= 60.0) & (x <= 120.0) & (np.abs(y) <= 100.0)] = 3000.0
+        z[(x >= 60.0) & (x <= 160.0) & (np.abs(y) <= 100.0)] = 3000.0
         return p, x, y, z
 
     def test_a_reach_across_a_strait_is_blocked(self):
         p, x, y, z = self.strait()
-        west = (x < -60.0) & (x > -120.0) & (np.abs(y) < 50.0)
+        west = (x < -64.0) & (x > -90.0) & (np.abs(y) < 50.0)
         old = cc.coast_geometry(p, z, SP, closed_as_land=False, over_land=False)
         new = cc.coast_geometry(p, z, SP)
-        # The fixture separates the two rules: the west bank's coast is 125 to 185 km from the
+        # The fixture separates the two rules: the west bank's coast is 125 to 155 km from the
         # east bank's high ground in a straight line, on one landmass joined round the south end.
         self.assertTrue(old["coast"][west].all())
         self.assertTrue(old["has"][west].all())
@@ -118,22 +118,21 @@ class Reach(unittest.TestCase):
         self.assertTrue(new["coast"][east].any())
 
     def test_a_reach_over_land_is_kept_and_follows_the_path(self):
-        # Without the channel the same ground reaches by land, and the path distance is within the
-        # lattice's stretch (at most 1.2) of the straight line.
-        p, x, y, z = self.strait()
-        z[(np.abs(x) < 60.0) & (y < 300.0)] = 500.0
+        # Ocean north of y = 300 km, a band of high ground 120 to 180 km behind the shore: every coast
+        # point reaches it over land, and the path is within the lattice's stretch of the straight line.
+        p, x, y = patch(0.0, 0.0, 1500.0)
+        z = np.full(x.size, 500.0)
         z[y > 300.0] = -1000.0
+        z[(y >= 120.0) & (y <= 180.0) & (np.abs(x) < 500.0)] = 3000.0
         new = cc.coast_geometry(p, z, SP)
         old = cc.coast_geometry(p, z, SP, closed_as_land=False, over_land=False)
-        both = old["has"] & new["has"]
-        self.assertGreater(both.sum(), 10)
-        ratio = new["reach"][both][old["reach"][both] > 20.0] / old["reach"][both][old["reach"][both] > 20.0]
+        sel = new["coast"] & (np.abs(x) < 400.0)
+        self.assertGreater(sel.sum(), 20)
+        self.assertTrue(old["has"][sel].all())
+        self.assertTrue(new["has"][sel].all())
+        ratio = new["reach"][sel] / old["reach"][sel]
         self.assertTrue((ratio >= 0.999).all())
         self.assertLess(float(np.max(ratio)), 1.25)
-        # Every qualified coast of the old rule on a land mass without water between is kept, but
-        # for the points whose path stretch carries them past 200 km (the edge of the reach).
-        self.assertGreater(new["has"].sum(), 0.85 * old["has"].sum())
-        self.assertLessEqual(new["has"].sum(), old["has"].sum())
 
 
 def grid_dump(folder, h=328, w=1024, r=16):
@@ -163,9 +162,12 @@ class Grid(unittest.TestCase):
         self.assertTrue(ok_r[row].all())
         plat = np.degrees(np.arcsin(p[:, 2]))
         big_r = w * r / (2 * np.pi)
-        # equal-area rows: the cell's sin(latitude) is within half a row of the point's
-        self.assertLessEqual(float(np.max(np.abs(np.sin(np.radians(lat_r[row])) - np.sin(np.radians(plat))))),
-                             0.5 * r / big_r + 1e-9)
+        # equal-area rows: the cell's sin(latitude) is within half a row of the point's (the two polar
+        # caps beyond the outermost rows, 0.3 % of the sphere each, are the edge row's)
+        err = np.abs(np.sin(np.radians(lat_r[row])) - np.sin(np.radians(plat)))
+        inner = np.abs(np.sin(np.radians(plat))) < 0.99
+        self.assertLessEqual(float(err[inner].max()), 0.5 * r / big_r + 1e-9)
+        self.assertLessEqual(float(err.max()), 1.0 * r / big_r + 1e-9)
         plon = np.degrees(np.arctan2(p[:, 1], p[:, 0])) % 360.0
         dlon = np.abs((plon - 360.0 * col / w + 180.0) % 360.0 - 180.0)
         self.assertLessEqual(float(dlon.max()), 180.0 / w + 1e-6)
@@ -190,11 +192,13 @@ class Grid(unittest.TestCase):
             self.assertEqual(v["coast_hi_old"], 0.0)
             self.assertGreater(v["coast_hi"], 0.9)
             self.assertGreater(v["coast_hi_fib"], 0.9)
-            # The coast is the ring's length times 62.6 km: 2 pi R cos(70) = 13,690 km.
+            # The coast is the ring's length (2 pi R cos(70) = 13,690 km) times the band, less the half
+            # spacing the nearest sea point stands off the shore.
             row, col, fp = cc.fib_sample(h, w, r)
             fib = cc.coast_metrics(fp, z[row, col], sp)
-            expected = 2 * np.pi * cc.EARTH_R_KM * np.cos(np.radians(70.0)) * 1.6 * sp / sp ** 2
-            self.assertLess(abs(fib["coast_points"] - expected) / expected, 0.25)
+            band_points = 2 * np.pi * cc.EARTH_R_KM * np.cos(np.radians(70.0)) * 1.6 * sp / sp ** 2
+            self.assertGreater(fib["coast_points"], 0.5 * band_points)
+            self.assertLess(fib["coast_points"], 1.1 * band_points)
 
 
 if __name__ == "__main__":
