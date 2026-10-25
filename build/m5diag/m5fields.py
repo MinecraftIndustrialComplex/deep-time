@@ -176,6 +176,18 @@ def one(run):
                                   "m5_in": float((qual & (ctype == i)).sum() / max((ctype == i).sum(), 1)),
                                   "m5_part": float((qual & (ctype == i)).sum() / C)}
                              for i, nm in enumerate(("sub200", "coll200", "neither"))}
+    # The same with the trench cells alone (regime 2, the plate boundary itself: the like of
+    # PB2002's SUB steps for Earth), then collision cells, then neither; and each setting's part
+    # of M5 by the class of the qualifying high ground.
+    tr = reg == 2
+    d_tr = cc.arc_km(cKDTree(p[tr]).query(p[ci])[0]) if tr.any() else np.full(C, np.inf)
+    ctype2 = np.where(d_tr <= 200, 0, np.where(dfr["coll"] <= 200, 1, 2))
+    out["coast_by_setting"] = {nm: {"coast_share": float((ctype2 == i).sum() / C),
+                                    "m5_in": float((qual & (ctype2 == i)).sum() / max((ctype2 == i).sum(), 1)),
+                                    "m5_part": float((qual & (ctype2 == i)).sum() / C),
+                                    "by_class": {k: float((qual & (ctype2 == i) & (near_cls == j)).sum() / C)
+                                                 for j, k in enumerate(CLASSES)}}
+                               for i, nm in enumerate(("trench200", "coll200", "neither"))}
     # The qualifying high point's own setting, per class: its regime and whether it is on an
     # active collision (plates/collision_mm_yr > 0).
     coll_v = np.nan_to_num(f["plates/collision_mm_yr"])[ok] if "plates/collision_mm_yr" in f else np.full(z.size, np.nan)

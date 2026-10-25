@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+from scipy.spatial import cKDTree
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import m5lib  # noqa: E402
@@ -47,6 +48,46 @@ def sheets_of(lat, lon):
     return (lat < -60.0) | ((lat > 59.5) & (lon > -74.0) & (lon < -10.0) & ~((lat < 66.7) & (lon > -25.0)))
 
 
+def load_steps(path):
+    """PB2002_steps.dat (Bird 2003): each digitisation step's two ends and its class (SUB, CCB,
+    OCB, ...); returns {class: unit vectors of the ends and the midpoint}."""
+    out = {}
+    for line in Path(path).read_text().splitlines():
+        t = line.split()
+        if len(t) < 10:
+            continue
+        lo1, la1, lo2, la2 = (float(x) for x in t[2:6])
+        k = t[-1].strip(":*")
+        a, b = cc.xyz(np.array([la1, la2]), np.array([lo1, lo2]))
+        m = (a + b) / np.linalg.norm(a + b)
+        out.setdefault(k, []).extend([a, b, m])
+    return {k: np.array(v) for k, v in out.items()}
+
+
+STEPS = None
+
+
+def by_setting(p, det, keep, qual):
+    """The coast by the PB2002 boundary nearest to it: within 200 km of a subduction step (SUB),
+    else of a convergent non-subduction step (CCB, OCB: the Alps, Zagros, Himalaya, Taiwan ...),
+    else neither; the coast's share, M5 inside and the part of M5."""
+    if STEPS is None:
+        return None
+    ci = det["ci"]
+    kc = keep[ci]
+    d = {}
+    for nm, ks in (("sub", ("SUB",)), ("conv", ("CCB", "OCB"))):
+        pts = np.concatenate([STEPS[k] for k in ks if k in STEPS])
+        dd, _ = cKDTree(pts).query(p[ci])
+        d[nm] = cc.arc_km(dd)
+    ctype = np.where(d["sub"] <= 200, 0, np.where(d["conv"] <= 200, 1, 2))
+    C = max(kc.sum(), 1)
+    return {nm: {"coast_share": float((kc & (ctype == i)).sum() / C),
+                 "m5_in": float((kc & qual & (ctype == i)).sum() / max((kc & (ctype == i)).sum(), 1)),
+                 "m5_part": float((kc & qual & (ctype == i)).sum() / C)}
+            for i, nm in enumerate(("trench200", "conv200", "neither"))}
+
+
 def metrics(p, z, sp, lat, sheets, grid_lab=None):
     out = {}
     for name, keep in (("no_sheets", ~sheets), ("all", np.ones(z.size, bool))):
@@ -55,6 +96,7 @@ def metrics(p, z, sp, lat, sheets, grid_lab=None):
              "factors": m5lib.factors(det)}
         dmin = det["D"].min(1)
         kc = keep[det["ci"]]
+        o["coast_by_setting"] = by_setting(p, det, keep, np.isfinite(dmin))
         o["dist_hist"] = m5lib.dist_hist(np.where(kc, dmin, np.inf))
         o["curve"] = m5lib.m5_curve(p, z, sp, det["comp"], det["d_sea"], TARGETS, keep=keep)
         o["curve_levels"] = {f"{lev:g}": m5lib.m5_of(m5lib.coast_detail(p, z, sp, level=lev, comp=det["comp"],
@@ -89,6 +131,9 @@ def metrics(p, z, sp, lat, sheets, grid_lab=None):
 
 
 def main():
+    global STEPS
+    if len(sys.argv) > 3:
+        STEPS = load_steps(sys.argv[3])
     zg, la, lo = load(sys.argv[1])
     res = {}
     # The census's grid.
