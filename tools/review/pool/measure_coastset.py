@@ -6,7 +6,11 @@ folder's final fields, printed as a JSON object on stdout.
 
     python3 -I measure_coastset.py <run folder> [--fields DIR] [--radius-km 150]
 
-The coast and the high ground are v1census's `coast_hi` (continents_census.coast_metrics): coast cells
+The coast and the high ground are v1census **version 1's** `coast_hi` (the rule of 2026-10-21 on the
+census's grid cells: any cell at or below the sea is sea, the 200 km a straight line within one landmass;
+version 2 of v1census, 2026-10-25, RLC-055, samples Fibonacci points of the world ocean and measures over
+land, so this measure's `coast_hi` no longer equals v1census's; `coast_hi_old` in v1census2 is the value
+that does). Coast cells
 are land within 1.6 cell spacings of the sea, and a coast cell has high ground when land above 2 km of
 the same landmass lies within 200 km. Each coast cell gets a setting from the `regime` codes of the
 cells (land and sea) within `--radius-km` of it (Earth-normalized km), the first that holds of:
@@ -22,7 +26,7 @@ and the high ground it counts gets an origin from the nearest cell above 2 km: `
 orogeny), `and` (an Andean one) or `none`.
 
 Keys (shares are of the coast with high ground unless named otherwise):
-  coast_hi                the share of the coast with high ground (equals v1census's)
+  coast_hi                the share of the coast with high ground (equals v1census version 1's, and v1census2's coast_hi_old)
   hi_<set>                share of the coast with high ground in each setting (they sum to 1)
   coast_<set>             share of the coast in each setting
   rate_<set>              the coast with high ground among the coast of that setting
