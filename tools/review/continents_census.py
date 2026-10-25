@@ -202,10 +202,13 @@ def coast_geometry(p, z, spacing_km, level=2000.0, closed_as_land=True, over_lan
       d_sea     km from each ground point to the nearest ocean point (great circle; 0 elsewhere)
       coast     ground within 1.6 spacings of the ocean
       hi        land above `level`
-      reach     km from each ground point to the nearest high point, inf beyond 200 km; with
-                `over_land` along the ground (the shortest path over points joined within 1.6
-                spacings, which a strait wider than that blocks), else the straight line within
-                the same landmass (the first version, which crosses a bay)
+      reach     km from each coast point to the nearest high point, inf beyond 200 km; with
+                `over_land` the distance over the ground: the great circle when the straight run
+                stays on ground (no sea at nine points along it), else the shortest path over ground
+                points joined within 1.6 spacings (which a strait wider than that blocks, a bay
+                allows by its land way round); else the straight line within the same landmass (the
+                first version, which crosses a bay). The path alone would add the lattice's stretch
+                (up to 1.15) to every reach, so the straight run counts when it is clear.
       has       coast with high ground within the reach
 
     `closed_as_land=False, over_land=False` is the census as it read until 2026-10-25."""
@@ -232,6 +235,25 @@ def coast_geometry(p, z, spacing_km, level=2000.0, closed_as_land=True, over_lan
             wt = arc_km(np.linalg.norm(pg[pairs[:, 0]] - pg[pairs[:, 1]], axis=1))
             g = coo_matrix((wt, (pairs[:, 0], pairs[:, 1])), shape=(gi.size, gi.size)).tocsr()
             reach[gi] = dijkstra(g, directed=False, indices=hl, limit=200.0, min_only=True)
+            # The straight runs over ground, which the path would stretch.
+            ci, hidx = np.nonzero(coast)[0], np.nonzero(hi)[0]
+            near = cKDTree(p[hidx]).query_ball_point(p[ci], chord(200.0))
+            counts = np.fromiter((len(q) for q in near), np.int64, ci.size)
+            if counts.sum():
+                pa_i = np.repeat(ci, counts)
+                pb_i = hidx[np.concatenate([np.asarray(q, np.int64) for q in near if len(q)])]
+                tree = cKDTree(p)
+                for lo in range(0, pa_i.size, 400_000):
+                    a, b = pa_i[lo:lo + 400_000], pb_i[lo:lo + 400_000]
+                    pa, pb = p[a], p[b]
+                    clear = np.ones(a.size, bool)
+                    for t in np.linspace(0.1, 0.9, 9):
+                        m = pa * (1 - t) + pb * t
+                        m /= np.linalg.norm(m, axis=1)[:, None]
+                        clear &= ground[tree.query(m)[1]]
+                    d = arc_km(np.linalg.norm(pa - pb, axis=1))
+                    keep_ = clear & (d <= 200.0)
+                    np.minimum.at(reach, a[keep_], d[keep_])
     else:
         comp = components(p, ground, spacing_km)
         for c in np.unique(comp[hi]):

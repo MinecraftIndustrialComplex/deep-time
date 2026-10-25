@@ -117,9 +117,10 @@ class Reach(unittest.TestCase):
         self.assertTrue(new["has"][east & new["coast"]].all())
         self.assertTrue(new["coast"][east].any())
 
-    def test_a_reach_over_land_is_kept_and_follows_the_path(self):
+    def test_a_reach_over_land_is_kept_and_is_the_straight_run(self):
         # Ocean north of y = 300 km, a band of high ground 120 to 180 km behind the shore: every coast
-        # point reaches it over land, and the path is within the lattice's stretch of the straight line.
+        # point reaches it over land, by the straight run, so the lattice's path stretch does not
+        # shorten the reach (the path alone would add up to 15 % to every distance).
         p, x, y = patch(0.0, 0.0, 1500.0)
         z = np.full(x.size, 500.0)
         z[y > 300.0] = -1000.0
@@ -130,9 +131,22 @@ class Reach(unittest.TestCase):
         self.assertGreater(sel.sum(), 20)
         self.assertTrue(old["has"][sel].all())
         self.assertTrue(new["has"][sel].all())
-        ratio = new["reach"][sel] / old["reach"][sel]
-        self.assertTrue((ratio >= 0.999).all())
-        self.assertLess(float(np.max(ratio)), 1.25)
+        np.testing.assert_allclose(new["reach"][sel], old["reach"][sel], rtol=1e-9)
+
+    def test_a_bay_with_a_way_round_over_land_is_not_a_wall(self):
+        # A notch of sea 80 km wide and 45 km deep in the shore: the coast on its west side has high ground
+        # across it 110 km away in a straight line over the water, and 150 km round the notch over land.
+        p, x, y = patch(0.0, 0.0, 1500.0)
+        z = np.full(x.size, 500.0)
+        z[y > 300.0] = -1000.0
+        z[(np.abs(x) < 40.0) & (y > 255.0)] = -1000.0
+        z[(x >= 46.0) & (x <= 150.0) & (y >= 200.0) & (y <= 330.0)] = 3000.0
+        new = cc.coast_geometry(p, z, SP)
+        west = (x < -46.0) & (x > -80.0) & (y > 272.0) & (y < 295.0)
+        self.assertTrue(new["coast"][west].all())
+        self.assertGreater(west.sum(), 5)
+        self.assertTrue(new["has"][west].all())
+        self.assertTrue((new["reach"][west] > 110.0).all())
 
 
 def grid_dump(folder, h=328, w=1024, r=16):
