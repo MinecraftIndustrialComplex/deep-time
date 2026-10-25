@@ -3308,8 +3308,7 @@ fn the_reference_plate_on_the_lattice_term_by_term() {
     // Boundary resistance all round the rim against the full relative velocity:
     // b R³ sin r ∮ (I − x xᵀ) dβ; slab resistance along the trench's normal n:
     // s R³ sin r ∫ (x × n)(x × n)ᵀ dβ; the pull: F R² sin r ∫ x × n dβ.
-    let (mut d_bnd, mut d_slab, mut t_pull) =
-        (glam::DMat3::ZERO, glam::DMat3::ZERO, DVec3::ZERO);
+    let (mut d_bnd, mut d_slab, mut t_pull) = (glam::DMat3::ZERO, glam::DMat3::ZERO, DVec3::ZERO);
     let nr = 8000;
     for j in 0..nr {
         let beta = tau * ((j as f64 + 0.5) / nr as f64 - 0.5);
@@ -3422,7 +3421,10 @@ fn the_reference_plate_on_the_lattice_term_by_term() {
         "boundary {bnd}, its metres {}",
         bnd_m / rim_len
     );
-    assert!(speed > cap_speed, "the lattice {speed}, the cap {cap_speed}");
+    assert!(
+        speed > cap_speed,
+        "the lattice {speed}, the cap {cap_speed}"
+    );
 }
 
 /// What sets the planet's plate speed (the plate speed lane, 2026-10-25; plates.md, "Plate
@@ -3508,8 +3510,12 @@ fn what_sets_the_planets_plate_speed() {
         ("speed scale x1.5 (c_b / 1.5)", |k| {
             k.plate_speed_scale_mm_yr *= 1.5;
         }),
-        ("F&U Table 6's ratios and terminal velocity", |k| fu(k, false)),
-        ("F&U Table 6's ratios, the speed scale kept", |k| fu(k, true)),
+        ("F&U Table 6's ratios and terminal velocity", |k| {
+            fu(k, false)
+        }),
+        ("F&U Table 6's ratios, the speed scale kept", |k| {
+            fu(k, true)
+        }),
     ];
     for (start, seed) in [("supercontinent", 1), ("scattered_continents", 2)] {
         let p = builtin_preset(&name, n, myr, start, seed);
