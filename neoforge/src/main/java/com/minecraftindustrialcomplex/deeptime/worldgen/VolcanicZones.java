@@ -260,6 +260,27 @@ public final class VolcanicZones {
      */
     public static VolcanicZones build(List<Volcanoes.Volcano> volcanoes, List<Geothermal.Site> sites, List<Magma.Body> bodies,
                                       VolcanicBiomeRules rules, double mH, int circumference, WorldProjection projection) {
+        return build(volcanoes, sites, bodies, rules, mH, circumference, projection, null);
+    }
+
+    /**
+     * What an oceanic volcano's zones are sized on: the world's ground at its vent and the sea.
+     *
+     * @param heights  the terrain height H(x, z), blocks (the generator's ground)
+     * @param seaLevel the sea level, blocks
+     * @param mV       metres per block up
+     */
+    public record Ground(Magma.Heights heights, int seaLevel, double mV) {}
+
+    /**
+     * As {@link #build(List, List, List, VolcanicBiomeRules, double, int, WorldProjection)} with the world's ground
+     * given.
+     *
+     * @param ground the ground an oceanic volcano's zones are sized on (null: its basal radius, as before)
+     */
+    public static VolcanicZones build(List<Volcanoes.Volcano> volcanoes, List<Geothermal.Site> sites, List<Magma.Body> bodies,
+                                      VolcanicBiomeRules rules, double mH, int circumference, WorldProjection projection,
+                                      Ground ground) {
         if (rules.off())
             return new VolcanicZones(List.of(), circumference);
         double reach = rules.reach();
