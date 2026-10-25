@@ -824,7 +824,11 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // `weld_seed_sweep`: 1, 2, 6, 9, 10, 12, 16, 20, 21 and 23, seed 1 three times, seeds 6, 10,
     // 12 and 16 twice, seeds 3, 4, 5, 14, 15, 18 and 24 no more; seed 1 here and seed 2 in the
     // recording test still weld and pass, so they stay; from the supercontinent 6, 10, 15, 18, 19
-    // and 20, seed 15 three times).
+    // and 20, seed 15 three times; 11 of seeds 1 to 24 with the collapse's thermal reading and the
+    // front on the current geometry on by default, PLT-581 and PLT-582, 2026-10-25: 1, 4, 7, 8,
+    // 10, 11, 16 to 18, 21 and 23, seed 23 twice, seeds 2, 6, 9, 12 and 20 no more; seed 1 here
+    // still welds and passes, the recording test goes to seed 4; from the supercontinent 5, 7, 8,
+    // 11 and 17).
     let p = preset(8000, 300.0, "scattered_continents", 1);
     let mut life = CollisionLives::default();
     let world = run_stage(&p, |_, _, st| {
@@ -977,8 +981,11 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // seed 20 again since the contact carry went on by default, PLT-550, the same day, when seed
     // 19 no longer welds: all 12 welding seeds pass; seed 2 since the slab pull at the arcs'
     // fronts went on by default, PLT-560, the same day, when seed 20 no longer welds: all 13
-    // welding seeds pass, and seed 2 welds twice).
-    let p = preset(8000, 300.0, "scattered_continents", 2);
+    // welding seeds pass, and seed 2 welds twice; seed 4 since the collapse's thermal reading and
+    // the front on the current geometry went on by default, PLT-581 and PLT-582, 2026-10-25, when
+    // seed 2 no longer welds: seed 4 is the first welding seed after seed 1, which the weld test
+    // above takes).
+    let p = preset(8000, 300.0, "scattered_continents", 4);
     let total = PlatesStage::new(p.clone()).total_steps();
     let mut checked = 0u64;
     let mut life = CollisionLives::default();
