@@ -3,8 +3,8 @@
 Status of this page: `stage 2 (constants checked against sources on 2026-10-02)` for the sources
 the project's library holds; the rest is marked `from-memory` in the ledger.
 
-Ledger ids on this page: `FRC-001` to `FRC-030`, `PLT-181` to `PLT-191`, `PLT-022`, `PLT-037`,
-`PLT-270` to `PLT-273` and `PLT-275` (see [claims.md](claims.md)).
+Ledger ids on this page: `FRC-001` to `FRC-030`, `FRC-033` to `FRC-035`, `PLT-181` to `PLT-191`,
+`PLT-022`, `PLT-037`, `PLT-270` to `PLT-273`, `PLT-275` and `PLT-585` (see [claims.md](claims.md)).
 
 ## What you see in the world
 
@@ -51,9 +51,14 @@ front), and then sums the forces:
    the weight of the mountain belt (set by its height), and the buoyancy of the continental
    lithosphere the collision has already dragged down the trench, which grows as the collision
    shortens (continental lithosphere is lighter than the mantle, Cloos 1993; `collision_buoyancy`).
+   Under Forsyth & Uyeda's balance (`forsyth_uyeda_balance`, PLT-585, built 2026-10-25 and off by
+   default, since the speed guard binds with it on the pool) the plates rub
+   only along transform faults and colliding boundaries, trenches and collision fronts alike, with
+   a force that does not depend on how fast they slide (Forsyth & Uyeda 1975), and every force's
+   size is from their fit (Table 6).
 4. **The balance.** A plate has no inertia, so all torques on it add up to zero. Every resisting
-   force grows in proportion to the plates' speeds (the collision's is linearised at the step's
-   convergence), so the balance of all plates together is one linear system, solved exactly each
+   force grows in proportion to the plates' speeds (the collision's and Forsyth & Uyeda's friction
+   are linearised at the step's motion), so the balance of all plates together is one linear system, solved exactly each
    step.
 5. **The motion.** Each plate's rotation moves the share 1 − e^(−δt/τ) of the way towards the
    balance's answer each step, τ = `motion_relax_myr`: a stand-in for the time slabs and mantle
@@ -129,6 +134,37 @@ c_b fixed by the speed scale: (1 + slab_resistance + boundary_resistance) c_b A 
 L_ref a straight 3,000 km trench along its normal, which is how the pull counts its fronts since
 PLT-560 (see "The drag's calibration on the pull's count" below).
 
+**Forsyth & Uyeda's balance** (`tectonics.forsyth_uyeda_balance`, PLT-585, the plate speed lane,
+phase 2, 2026-10-25; off by default, since on the pool the speed guard binds in every run with it).
+Every size is Table 6's (Forsyth & Uyeda 1975, p. 190, FRC-033) against the reference pull F_sp,
+which stands for their 6.43 per km (FRC-034); the speed scale, `slab_resistance`,
+`boundary_resistance`, `keel_drag`, `slab_suction_share` and `suction_saturates` are not read:
+
+    v_t = F_SP / F_SR = 6.43 / 0.89 cm/yr = 72.2 mm/yr       the slab's terminal velocity
+    slab resistance  = F_sp / v_t per metre of trench, on the subducting plate only
+    c_b              = (F_sp / v_t) · F_DF / F_SR per m²  (≈ 1.2 × 10¹⁴ Pa s/m at Earth's gravity)
+    keel factor      = (F_DF + F_CD) / F_DF = (0.82 + 5.65) / 0.82 = 7.89
+    suction          = F_SU / F_SP = 0.50 / 6.43 = 0.078 of the pull, whatever the speed (PLT-540 not read)
+    transform        = F_sp · 0.36 / 6.43 per metre, against the relative motion
+    colliding        = F_sp · 0.16 / 6.43 per metre, against the relative motion
+    no viscous boundary resistance (PLT-189 not read)
+
+The two frictions are links between the plates at each boundary sample, along their relative
+velocity, of coefficient F / max(|Δv|, 1 mm/yr) (FRC-011's floor, `Balance::add_friction`):
+plastic, as the collision link, so at the fixed point the motion relaxes to they resist with their force
+whatever the speed, and a boundary whose drive is smaller slips under the floor. A boundary segment
+is a transform where the relative motion lies more than 60 degrees from its normal, Forsyth &
+Uyeda's own dividing rule (p. 183, FRC-035); colliding where the plates converge across it
+otherwise; nothing where they part. A trench's friction is counted once, at the overriding sample's
+front, over the front's metres (PLT-560); other boundaries count from both sides, half each. An
+incipient contact (the front lane's incipient subduction, its own switch) takes its incipient
+resistance alone and no PLT-585 friction, from either side, until it is mature (plates.md, "With
+incipient subduction"). c_b
+here is half the old law's 2.5 × 10¹⁴: 0.31 MPa at 8 cm/yr against Forsyth & Uyeda's "roughly 5
+bars", an asthenosphere of 1.2 × 10¹⁹ Pa s over 100 km. The column energy, the collision link and the
+speed guard are kept. What the balance does on the planet: [plates.md](plates.md), "Plate speed,
+phase 2".
+
 **Mean in-plane stress** of a plate: σ = (Σ r·f + ∫ r·b dA) / (2 A h), r a point's offset from the
 plate's centroid, f the edge forces at the balance's answer, b the basal drag, h 100 km.
 
@@ -160,6 +196,10 @@ plate's centroid, f the edge forces at the balance's answer, b the basal drag, h
 | FRC-029 | Crust thickness of that figure (buoyancy in proportion to thickness) | 30 | km | Cloos 1993 (abstract, read); the proportion is a game choice | `abstract-only` |
 | FRC-030, PLT-275 | Collision buoyancy law and strength `collision_buoyancy` | 1 | relative | Cloos 1993 (abstract): continental lithosphere "resists subduction" | `game-choice` (the law's form) |
 | PLT-191 | Relaxation time (used from the switch on) | 6 | Myr | the design | `game-choice` |
+| PLT-585 | Forsyth & Uyeda's balance, `forsyth_uyeda_balance` (PLT-181, PLT-185, PLT-186, PLT-188, PLT-189 and PLT-540 not read under it) | off (the speed guard binds on the pool) | switch | Forsyth & Uyeda 1975, Table 6 and pp. 169-171, 183, 189-190 (read 2026-10-25) | `verified` |
+| FRC-033 | Table 6's strengths: F_SP, F_SU, F_TF, F_CR; F_SR; F_DF, F_CD | 6.43, 0.50, 0.36, 0.16; 0.89; 0.82 × 10⁻⁵, 5.65 × 10⁻⁵ | per km; per km per cm/yr; per km² per cm/yr | Forsyth & Uyeda 1975, Table 6 (read) | `verified` |
+| FRC-034 | Their coefficients: v_t, slab resistance, c_b, keel, suction, frictions | 72.2 mm/yr; F_sp / v_t; 1.2 × 10¹⁴ Pa s/m; 7.89; 0.078; 1.68 × 10¹², 7.47 × 10¹¹ N/m | as stated | computed from FRC-033 (the paper's v_t 7.0 cm/yr, p. 189) | `verified` |
+| FRC-035 | The friction links and the 60 degree rule | F / max(\|Δv\|, 1 mm/yr); φ = 60° | N s/m; degrees | the rule and the law: Forsyth & Uyeda 1975 pp. 169-170, 183 (read); the linearisation and where it is counted: game choices | `game-choice` (the form) |
 
 Two checks of the formulas against the design's figures (unit test
 `the_column_energy_gives_ridge_push_and_plateau_weight_of_earths_size`): a ridge crest 3.5 km above
@@ -292,14 +332,27 @@ diagnosis of its own, not traced here.
 - The mantle flow's shape: two antipodal upwellings, fixed for the run, axis from the seed (FRC-015;
   the term itself is Ben's choice, decisions log 2026-10-02).
 - A slab's trench counts as blocked when continental crust holds half its front (FRC-019).
-- The collision drag's floor of 1 mm/yr (FRC-011), under the weld speed so that held collisions weld.
+- The collision drag's floor of 1 mm/yr (FRC-011), under the weld speed so that held collisions weld;
+  the same floor for Forsyth & Uyeda's friction links (FRC-035).
+- Forsyth & Uyeda's frictions as links linearised about the step's motion, a trench's counted at its
+  overriding front and the rest half from each side (FRC-035; agent, build log 2026-10-25). The 60
+  degree rule that divides transforms from colliding boundaries is theirs (p. 183), so the friction
+  does not use V1 gap 2's Bird's 20 degrees (PLT-311). With incipient subduction on as well, an
+  incipient contact takes no PLT-585 friction, so its front's resistance is counted once (agent,
+  2026-10-25; built by the front lane, `an_incipient_front_takes_no_forsyth_uyeda_friction`; a
+  continental sample at the front keeps its friction, since it takes the collision's resistance,
+  not the incipient one).
 
 ## Open questions
 
 - Slab pull's size (3 × 10¹³ N/m) and the √age law are textbook values from memory; the library
   has neither Turcotte & Schubert nor Schellart 2004.
-- Forsyth & Uyeda's own fit has suction at about 0.08 of slab pull per length (Table 6); the code
-  uses the design's 0.3 (Conrad & Lithgow-Bertelloni, from abstracts).
+- Forsyth & Uyeda's own fit has suction at about 0.08 of slab pull per length (Table 6); the old law
+  uses the design's 0.3 (Conrad & Lithgow-Bertelloni, from abstracts). Forsyth & Uyeda's balance
+  takes 0.078 (PLT-585). Their suction is the term they understood least ("The least understood part
+  of our model is the nature of this suction force", p. 193): it draws a small overriding oceanic
+  plate, which their Earth barely had, with nothing but the basal drag to hold it (plates.md "Plate
+  speed, phase 2").
 - Slab tracking restarts a slab at zero when its contact is new, reversed or reopened; that is the
   main source of the step-to-step noise and of the weaker slab correlation (variants in
   `docs/design/plate-check-baseline.md`). Task 7 should keep a slab across a contact's flicker.
@@ -310,7 +363,9 @@ diagnosis of its own, not traced here.
 ## Sources
 
 - ForsythUyeda1975: full text in the library, read 2026-10-02 by a sub-agent (quotes with line
-  numbers in the ledger).
+  numbers in the ledger); read again 2026-10-25 by the plate speed lane (Tables 1 and 6, pp. 169-171,
+  178, 183, 189-190, 193, 195; the publisher's free PDF, downloaded again and put back in the
+  library on the test VM, which had lost it in its rebuild).
 - LithgowBertelloniRichards1998: full text in the library, read 2026-10-02.
 - ConradLB2006: full text in the library, read 2026-10-02.
 - Zahirovic2015: full text in the library, read 2026-10-02.

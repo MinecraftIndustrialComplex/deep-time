@@ -958,7 +958,8 @@ fn band_of(x: f64, edges: &[f64; BANDS]) -> usize {
 /// ([`mix`]`::OCEAN_OCEAN`, then `OCEAN_CONTINENT`) by the length of its contact's slab
 /// (`PlateState::slabs`), by the convergence across it and by its contact's age, km in the bands
 /// of [`SLAB_BANDS_KM`], [`NORMAL_BANDS_MM_YR`] and [`AGE_BANDS_MYR`]; and the boundary of class
-/// `OTHER` that converges across it (no contact yet), km.
+/// `OTHER` that converges across it (no contact yet; the incipient fronts are `incipient`'s),
+/// km.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct FrontBands {
     pub slab: [[f64; BANDS]; 2],
@@ -979,7 +980,26 @@ pub struct FrontBands {
     pub oo_coast: [f64; BANDS],
     #[serde(default)]
     pub oo_pair: [f64; 3],
+    /// The ocean-ocean and ocean-continent fronts (by the crust the arc would stand on), km, that
+    /// are incipient (PLT-610, PLT-614): counted as `OTHER` in the mix's lengths, as converging
+    /// boundary with no subduction zone yet (Bird 2003's oceanic convergent boundary), and in
+    /// none of the bands above.
+    #[serde(default)]
+    pub incipient: [f64; 2],
+    /// Measurement only (the front lane, 2026-10-25): the subducting fronts above whose slab
+    /// reaches [`BENIOFF_DEPTH_KM`] under their arc, km: a slab at least
+    /// hypot(`arc_distance_km`, [`BENIOFF_DEPTH_KM`]) long, as a straight slab from the trench to
+    /// that depth under the arc's axis (Bird 2003's subduction zone has "a Benioff zone of
+    /// intermediate to deep earthquakes and/or a parallel volcanic arc"). ledger: PLT-615
+    #[serde(default)]
+    pub benioff: [f64; 2],
 }
+
+/// The depth of the slab under the arc a subducting front's slab must reach for
+/// [`FrontBands::benioff`], km: Crameri et al. 2020, "The progression from no subduction to
+/// subduction, marked by a slab reaching around 100 km depth"; Syracuse & Abers 2006 (abstract)
+/// find the slab under the arcs' volcanoes at a global average of 105 km. ledger: PLT-615
+pub const BENIOFF_DEPTH_KM: f64 = 100.0;
 
 /// The lower edges of [`FrontBands::oo_over_cont`]'s and `oo_under_cont`'s bands: a plate's
 /// continental share. These bands and the two below are measurement bins, not physics
@@ -1011,6 +1031,8 @@ struct MixUnits {
     other_converging: u64,
     oo: [[u64; BANDS]; 3],
     oo_pair: [u64; 3],
+    incipient: [u64; 2],
+    benioff: [u64; 2],
 }
 
 impl MixUnits {
@@ -1025,6 +1047,14 @@ impl MixUnits {
         }
         for (x, y) in self.oo_pair.iter_mut().zip(b.oo_pair) {
             *x += y;
+        }
+        for (mine, theirs) in [
+            (&mut self.incipient, b.incipient),
+            (&mut self.benioff, b.benioff),
+        ] {
+            for (x, y) in mine.iter_mut().zip(theirs) {
+                *x += y;
+            }
         }
         for (mine, theirs) in [
             (&mut self.slab, b.slab),
@@ -1157,6 +1187,10 @@ pub fn boundary_mix(
     // of it, through that plate, builds its arc on that crust: a continental arc, the class
     // Stern & Scholl (2010) split the world's arcs by (the crust the arc stands on), so it counts
     // as ocean-continent. Lattice steps, so the distance is an upper bound. ledger: PLT-370
+    // The slab below which a front is incipient (PLT-610; 0 with the switch off), and the slab
+    // that reaches the depth under the arc (PLT-615).
+    let young_km = super::forces::incipient_km(env.k);
+    let benioff_km = env.k.arc_distance_km.hypot(BENIOFF_DEPTH_KM);
     let arc_on_continent = |v: usize| {
         coast_steps[v] != u32::MAX
             && f64::from(coast_steps[v]) * spacing_km <= env.k.arc_distance_km
@@ -1236,20 +1270,35 @@ pub fn boundary_mix(
                 } else {
                     class
                 };
-                if let Some(c) = classes {
-                    c[v].store(class as u8 + 1, std::sync::atomic::Ordering::Relaxed);
-                }
-                acc.km[class] += u64::from(half);
                 let setting = match class {
                     mix::OCEAN_OCEAN => Some(0),
                     mix::OCEAN_CONTINENT => Some(1),
                     _ => None,
                 };
-                if let (Some(k), Some(f)) = (setting, front_index(&buf[..n])) {
+                let front = setting.zip(front_index(&buf[..n])).map(|(k, f)| {
                     let (km, age) = contact_of
                         .get(&(plate_buf[f], pv))
                         .copied()
                         .unwrap_or((0.0, 0.0));
+                    (k, f, km, age)
+                });
+                // An incipient front (PLT-610) is no subduction zone yet: a converging boundary
+                // with no slab sunk and no arc (ledger: PLT-614).
+                let young = front.is_some_and(|(_, _, km, _)| km < young_km);
+                let class = if young { mix::OTHER } else { class };
+                if let Some(c) = classes {
+                    c[v].store(class as u8 + 1, std::sync::atomic::Ordering::Relaxed);
+                }
+                acc.km[class] += u64::from(half);
+                if let Some((k, f, km, age)) = front {
+                    if young {
+                        acc.incipient[k] += u64::from(half);
+                        return acc;
+                    }
+                    // ledger: PLT-615 (measurement only)
+                    if km >= benioff_km {
+                        acc.benioff[k] += u64::from(half);
+                    }
                     acc.slab[k][band_of(km, &SLAB_BANDS_KM)] += u64::from(half);
                     acc.normal[k][band_of(-buf[f].normal, &NORMAL_BANDS_MM_YR)] += u64::from(half);
                     acc.age[k][band_of(age, &AGE_BANDS_MYR)] += u64::from(half);
@@ -1288,6 +1337,8 @@ pub fn boundary_mix(
             oo_under_cont: units.oo[1].map(km),
             oo_coast: units.oo[2].map(km),
             oo_pair: units.oo_pair.map(km),
+            incipient: units.incipient.map(km),
+            benioff: units.benioff.map(km),
         },
     }
 }

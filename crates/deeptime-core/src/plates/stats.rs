@@ -228,14 +228,17 @@ pub mod margin_class {
 }
 
 /// The continental margins of `state` now (see [`Margins`]). `pos` are the samples' current
-/// positions; `initiated(plate)` says whether a plate was split off by a subduction initiation.
+/// positions; `initiated(plate)` says whether a plate was split off by a subduction initiation;
+/// a contact whose slab is shorter than `incipient_km` is no subduction zone yet
+/// (`forces::incipient_km`, PLT-614).
 pub fn margins(
     state: &PlateState,
     pos: &[DVec3],
     norm: &Norm,
     initiated: &(dyn Fn(u32) -> bool + Sync),
+    incipient_km: f64,
 ) -> Margins {
-    margin_classes(state, pos, norm, initiated).0
+    margin_classes(state, pos, norm, initiated, incipient_km).0
 }
 
 /// [`margins`] and every sample's [`margin_class`].
@@ -244,6 +247,7 @@ pub fn margin_classes(
     pos: &[DVec3],
     norm: &Norm,
     initiated: &(dyn Fn(u32) -> bool + Sync),
+    incipient_km: f64,
 ) -> (Margins, Vec<u8>) {
     let t = state.t_myr;
     let samples = &state.samples;
@@ -254,12 +258,18 @@ pub fn margin_classes(
     let vis = Tree::over(pos, |i| !samples[i].is_hidden());
     let adjacent = MARGIN_ADJACENT_SPACINGS * norm.spacing_rad();
     // Confirmed subduction zones seen in the last step or carried through a resampling (ledger:
-    // PLT-550).
+    // PLT-550), past their incipient stage (PLT-614).
+    let slab_km: std::collections::BTreeMap<(u32, u32), f64> = state
+        .slabs
+        .iter()
+        .map(|s| ((s.under, s.over), s.km))
+        .collect();
     let live: Vec<(u32, u32)> = state
         .contacts
         .iter()
         .filter(|c| c.onset_event.is_some() && (c.carried || c.last_step + 1 >= state.step))
         .map(|c| (c.under, c.over))
+        .filter(|key| slab_km.get(key).copied().unwrap_or(0.0) >= incipient_km)
         .collect();
     let omega: Vec<DVec3> = state
         .plates
