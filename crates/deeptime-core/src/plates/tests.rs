@@ -2478,14 +2478,24 @@ fn a_front_of_known_length(
 fn the_arcs_band_stops_at_the_slabs_ends() {
     let base = preset(40_000, 20.0, "supercontinent", 5);
     let wrap = std::f64::consts::PI * base.tectonics.arc_distance_km;
+    // Every case is printed before the test fails on any.
+    let mut failed: Vec<String> = Vec::new();
+    let mut check = |ok: bool, what: String| {
+        if !ok {
+            failed.push(what);
+        }
+    };
     for (name, frame) in [
         ("equator", glam::DQuat::IDENTITY),
         ("tilted", glam::DQuat::from_rotation_y(60f64.to_radians())),
     ] {
         let to_frame = frame.inverse();
         for lon_deg in [10.0_f64, 20.0, 40.0, 60.0] {
-            // Off, then on: the band's parts, km, and each sample's arc magma, m.
+            // Off, then on: the band's parts, km, the farthest sample given arc magma past the
+            // meridians, spacings, and each sample's arc magma, m.
             let mut parts = [[0.0_f64; 4]; 2];
+            let mut farthest = [0.0_f64; 2];
+            let mut spacing_km = 0.0;
             let mut magma: [Vec<f32>; 2] = Default::default();
             let mut inside: Vec<bool> = Vec::new();
             for (j, on) in [false, true].into_iter().enumerate() {
@@ -2497,6 +2507,7 @@ fn the_arcs_band_stops_at_the_slabs_ends() {
                 let per_sample =
                     env.norm.sample_area_km2() / (std::f64::consts::PI.sqrt() * k.arc_width_km);
                 let spacing_deg = env.norm.spacing_rad().to_degrees();
+                spacing_km = env.norm.km(env.norm.spacing_rad());
                 let (mut st, geo, pos) =
                     a_front_of_known_length(&p, &env, frame, lon_deg, 15.0, 0.02, 50.0);
                 let length = env.norm.km(lon_deg.to_radians());
@@ -2528,6 +2539,8 @@ fn the_arcs_band_stops_at_the_slabs_ends() {
                         along += w;
                     } else {
                         ends += w;
+                        let past = (-lon).max(lon - lon_deg) / spacing_deg;
+                        farthest[j] = farthest[j].max(past);
                     }
                 }
                 magma[j] = st
@@ -2540,20 +2553,25 @@ fn the_arcs_band_stops_at_the_slabs_ends() {
                     "{name}, front of {lon_deg} degrees, {length:.0} km, arc_slab_ends {on}: \
                      straight {straight:.0} km ({:.3}), band {band:.0} km ({:.3} of the straight \
                      front): along the front {along:.0} km ({:.3} of the straight front), past \
-                     its ends {ends:.0} km ({:.2} of pi times the arc's distance)",
+                     its ends {ends:.0} km ({:.2} of pi times the arc's distance, {:.2} spacings \
+                     of {spacing_km:.0} km), the farthest arc {:.2} spacings past them",
                     straight / length,
                     band / straight,
                     along / straight,
                     ends / wrap,
+                    ends / spacing_km,
+                    farthest[j],
                 );
-                assert!(
+                check(
                     (straight / length - 1.0).abs() < 0.05,
-                    "{name}: the straight front {straight:.0} km of {length:.0}"
+                    format!("{name}: the straight front {straight:.0} km of {length:.0}"),
                 );
                 // The split is the measure's band.
-                assert!(
+                check(
                     ((along + ends) / band - 1.0).abs() < 0.01,
-                    "{name}, {lon_deg} degrees, {on}: {along:.0} + {ends:.0} km against {band:.0}"
+                    format!(
+                        "{name}, {lon_deg} degrees, {on}: {along:.0} + {ends:.0} km against {band:.0}"
+                    ),
                 );
             }
             let [[_, _, along_off, ends_off], [_, _, along_on, ends_on]] = parts;
@@ -2562,34 +2580,46 @@ fn the_arcs_band_stops_at_the_slabs_ends() {
             // front ends within a spacing of the meridians the split is made at, which moves up
             // to about a spacing of band at each end (0.15 of the wrap at 40,000 samples) from
             // one part to the other.
-            assert!(
+            check(
                 (0.45..1.2).contains(&(ends_off / wrap)),
-                "{name}, {lon_deg} degrees: past the ends {ends_off:.0} km"
+                format!("{name}, {lon_deg} degrees: past the ends {ends_off:.0} km"),
             );
             // Along the front: no more than its length, and no less than a hexagonal lattice's
             // longest path across allows, less that spacing at each end.
-            assert!(
+            check(
                 (0.75..1.03).contains(&(along_off / straight)),
-                "{name}, {lon_deg} degrees: along the front {along_off:.0} km"
+                format!("{name}, {lon_deg} degrees: along the front {along_off:.0} km"),
             );
-            // On, past the ends: only what the lattice's front reaches past the meridians.
-            assert!(
-                ends_on / wrap < 0.2,
-                "{name}, {lon_deg} degrees: past the ends {ends_on:.0} km with the slab's ends"
+            // On, past the ends: only what the lattice's front reaches past the meridians, at
+            // each end up to a spacing (the end sample within half a spacing of its meridian, and
+            // its half share of the front beyond it), and no arc further out.
+            check(
+                ends_on < 2.0 * spacing_km && farthest[1] < 1.25,
+                format!(
+                    "{name}, {lon_deg} degrees: past the ends {ends_on:.0} km with the slab's ends, \
+                 the farthest {:.2} spacings",
+                    farthest[1]
+                ),
             );
             // Along the front: the band it was, less what lies within that spacing of the ends.
-            assert!(
+            check(
                 along_on <= along_off && along_off - along_on < 0.1 * wrap,
-                "{name}, {lon_deg} degrees: along the front {along_on:.0} km against \
+                format!(
+                    "{name}, {lon_deg} degrees: along the front {along_on:.0} km against \
                  {along_off:.0}"
+                ),
             );
             // A spacing or more inside the meridians, every sample makes the magma it made off.
             let changed = (0..inside.len())
                 .filter(|&i| inside[i] && magma[0][i] != magma[1][i])
                 .count();
-            assert_eq!(changed, 0, "{name}, {lon_deg} degrees: samples inside changed");
+            check(
+                changed == 0,
+                format!("{name}, {lon_deg} degrees: {changed} samples inside changed"),
+            );
         }
     }
+    assert!(failed.is_empty(), "{failed:#?}");
 }
 
 /// The slab pull at the arcs' fronts (`tectonics.front_pull`, PLT-560; plates.md, "Step 9"), on
