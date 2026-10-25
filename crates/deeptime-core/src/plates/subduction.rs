@@ -1040,6 +1040,22 @@ fn normal_convergence() -> bool {
     *M.get_or_init(|| std::env::var(NORMAL_CONVERGENCE_ENV).is_ok_and(|v| v == "1"))
 }
 
+/// The convergence normal to the front at `s` from what its front stamped, mm/yr: PLT-312's
+/// component of the relative motion along the boundary's normal, Clift & Vannucchi (2004)'s
+/// orthogonal rate. With `DEEPTIME_ARC_NORMAL=1` the stamped convergence is that component;
+/// otherwise it is the whole relative speed, and the obliquity is measured from the normal, so
+/// the component is the speed times its cosine (0 where the plates part along the normal). No
+/// field of its own: a plate sample's 4 B more would take full 16k's memory estimate past its
+/// 5 GiB cap. ledger: PLT-660
+pub(super) fn orthogonal_convergence_mm_yr(s: &super::state::Sample) -> f64 {
+    let v = f64::from(s.convergence_mm_yr);
+    if normal_convergence() {
+        v
+    } else {
+        (v * f64::from(s.obliquity_deg).to_radians().cos()).max(0.0)
+    }
+}
+
 /// The first part of [`fronts_and_uplift`]: what it reads of the plates, their groups, the
 /// hidden flags, the positions, the motions and the contacts, none of which the belts' stacking
 /// (`belts::stack`) changes, so the arcs' distance field ([`fronts_reach`]) can run beside it
@@ -1409,7 +1425,7 @@ pub fn fronts_finish(
     let (mut loss_km3, mut loss_continental, mut loss_front) = (Vec::new(), Vec::new(), Vec::new());
     let mut loss_km = Vec::new();
     for (v, b) in boundary.iter().enumerate() {
-        if let Some((u, c, rel, out)) = b.front {
+        if let Some((u, c, rel, _)) = b.front {
             let su = state.samples[u as usize];
             let speed = rel.length();
             // The convergence normal to the boundary, mm/yr: the other plate's motion towards
@@ -1444,13 +1460,14 @@ pub fn fronts_finish(
                     g_continental_km_myr[1] += len_km * env.dt_myr * (across / v0).min(1.0);
                 }
             }
-            let (conv, facing) = if by_normal {
-                (across, normal)
-            } else {
-                (speed, out)
-            };
+            let conv = if by_normal { across } else { speed };
+            // The obliquity is the angle between the convergence and the boundary's normal
+            // (PLT-312), whichever rate the arcs read, so the orthogonal rate is the stamped speed
+            // times its cosine ([`orthogonal_convergence_mm_yr`], PLT-660). Until 2026-10-25 it
+            // was measured from the lattice edge to the converging neighbour unless
+            // `DEEPTIME_ARC_NORMAL=1`, an edge that zigzags about the normal.
             let obliquity = if speed > 0.0 {
-                (rel.dot(-facing) / speed)
+                (rel.dot(-normal) / speed)
                     .clamp(-1.0, 1.0)
                     .acos()
                     .to_degrees()

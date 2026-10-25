@@ -9721,11 +9721,12 @@ the zone turns, none with the rain alone, none on the subducting plate, and over
 and heights equal the switch-off run's) and `spread_continental_rock_is_continental_at_once_with_the_margin_switch`
 for (a). deeptime-core's tests pass (1,079).
 
-One deviation from the source: PLT-660 reads the top sample's `convergence_mm_yr`, which subduction.rs
-stamps as the plates' whole relative speed at the front (the normal component only with
-`DEEPTIME_ARC_NORMAL=1`). Clift & Vannucchi's 76 mm/yr is an orthogonal rate, so an oblique margin
-reads faster and its pile goes down whole where the normal component alone would accrete 17 % of it.
-Stamping the normal component would change the source key, so it was left for the coordinator.
+One deviation from the source, on the first arm: PLT-660 read the top sample's `convergence_mm_yr`,
+which subduction.rs stamps as the plates' whole relative speed at the front (the normal component
+only with `DEEPTIME_ARC_NORMAL=1`). Clift & Vannucchi's 76 mm/yr is an orthogonal rate, so an oblique
+margin read faster and its pile went down whole where the normal component alone would accrete 17 %
+of it. Fixed for the second arm ("The blend closed (PLT-663)" below): the front stamps the normal
+component as its own field and PLT-660 reads it.
 
 ### Where the stock lies (the ring split, before the arm)
 
@@ -9903,3 +9904,54 @@ since it acts on oceanic floor only, and the margins (a) turned continental now 
 - The next step proposed to the coordinator: close the blend, so that a resampling blends a continental
   sample's pools within its class (hyper-extended or not) and a converted margin stays one, tested on a
   resampling first; then one (a)+(b) arm against base15.
+
+### The blend closed (PLT-663) and the orthogonal rate (2026-10-25)
+
+The coordinator approved both: close the blend, with or without the switches, and read PLT-660 on the
+orthogonal convergence; then one cumulative arm (the blend fix, the orthogonal rate, (a) and (b))
+against base15, with no arm of (b) alone.
+
+**The class blend** (PLT-663, `ridges::interpolate`). A resampling blends a continental sample's rock
+pools and its basement over the corners of its own class only: hyper-extended (under 10 km of its own
+crystalline crust, PLT-661's line from Brune et al. 2014) or not, the class of its major corner, as
+the kind already is (PLT-293). A column's own crystalline crust is its crystalline pools less its
+basement, both blended with the same weights, so a blend over one class is a convex mean of columns
+on one side of the 10 km line and stays there. The sediment pool still blends over all three corners,
+the heat flow over the kind. There is no switch: with the switches off it keeps an old arc's thin
+continental crust apart from the thick crust beside it too.
+
+The unit test `a_resampling_keeps_a_converted_margin_apart_from_its_core` (written first, failing on
+the old blend) puts a continent (z > 0) and its own ocean floor out to z = −0.3 under 2,500 m of its
+sediment on one plate. The first transition step turns 271 columns of the zone and a second turns
+none. Then:
+
+| | old blend | class blend |
+|---|---|---|
+| hyper-extended columns after one resampling (6 lattices; 271 before) | 213 to 224 | 265 to 280 |
+| columns mixing the classes (a basement under 10 km or more of own crust) | 177 to 194 | 0 |
+| the core after six resamplings in a row, each followed by a step (9,998 before) | 10,117 (+1.2 %) | 10,002 (+0.04 %) |
+| mixed columns after the six | 975 | 0 |
+| columns turned at the step after each of the six | 69, 32, 43, 25, 10, 20 | 40, 29, 27, 31, 14, 29 |
+
+The last row is the lattice's noise on the class blend: a new sample inside the zone whose nearest
+old one lay outside it comes out oceanic and turns again, so the zone's edge is refilled while the
+zone, and the core it is measured from, stay where they were.
+
+**The orthogonal rate** (PLT-660). Clift & Vannucchi's 76 mm/yr is an orthogonal rate, so the
+resampling's share now reads the convergence normal to the boundary (PLT-312's `across`):
+`subduction::orthogonal_convergence_mm_yr`, the stamped speed times the cosine of the stamped
+obliquity. For that the front now measures the obliquity from the boundary's normal whatever
+`DEEPTIME_ARC_NORMAL` sets; until now, with the switch off, it was measured from the lattice edge to
+the converging neighbour, which zigzags about the normal. A field of its own was tried first and
+dropped: 4 B more on every plate sample took full 16k's memory estimate to 5,370,649,280 B, 1.85 MiB
+past its 5 GiB cap (`the_estimate_covers_the_measured_hold_closely`). The unit test
+`a_front_stamps_its_orthogonal_convergence`: an ocean coming in at 50 mm/yr on a straight 40-degree
+front gives a median normal over whole rate of 0.998 head-on and 0.557 turned 60 degrees towards the
+front (cos 60° = 0.5; 0.48 at the front's ends).
+
+The arcs, the uplift and the losses do not read the obliquity, so the plates' state is unchanged by
+it; what changes is the obliquity the samples carry out of the plate stage: the L1 field
+`plates/obliquity_deg`, which the structure stage's strike-slip shear (DEF-029, above 30°) and the
+porphyry deposits' obliquity curve (ORE-033, peak near 15°) read. Both now get the angle CRE-018 and
+the deposit field's description (`deeptime:obliquity_deg`, "convergence obliquity to the trench
+normal") already said they got.

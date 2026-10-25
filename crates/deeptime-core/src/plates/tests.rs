@@ -4885,6 +4885,190 @@ fn a_resampling_subducts_sediment_by_the_margins_type() {
     }
 }
 
+/// Sediment subduction by margin type reads the orthogonal convergence (PLT-660; Clift &
+/// Vannucchi 2004's 76 mm/yr is an orthogonal rate): a front stamps the samples behind it with
+/// the relative speed and its obliquity measured from the boundary's normal (PLT-312), so
+/// [`subduction::orthogonal_convergence_mm_yr`] is the component normal to the boundary. On a
+/// straight front of known length, the ocean coming in at 50 mm/yr head-on and turned 60 degrees
+/// towards the front: the normal rate is the whole one head-on and half of it turned, within the
+/// lattice's boundary normals; never more than the whole.
+#[test]
+fn a_front_stamps_its_orthogonal_convergence() {
+    let lon_deg = 40.0_f64;
+    let half = 0.5 * lon_deg.to_radians();
+    let mut p = preset(40_000, 20.0, "supercontinent", 5);
+    p.tectonics.incipient_subduction = false;
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    for (theta, want) in [(0.0_f64, 1.0), (60.0, 0.5)] {
+        let frame = glam::DQuat::IDENTITY;
+        let (mut st, geo, pos) =
+            a_front_of_known_length(&p, &env, frame, lon_deg, 15.0, 0.02, 50.0);
+        let t = theta.to_radians();
+        let axis = DVec3::new(half.sin(), -half.cos(), 0.0) * t.cos() + DVec3::Z * t.sin();
+        st.plates[1].omega = (axis * env.norm.omega_of_speed(50.0)).to_array();
+        let mut cones = vec![[0.0; 2]; st.samples.len()];
+        subduction::fronts_and_uplift(&mut st, &geo, &pos, &env, &mut cones, 0.0);
+        let mut ratios: Vec<f64> = st
+            .samples
+            .iter()
+            .filter(|s| !s.is_hidden() && s.convergence_mm_yr > 1.0)
+            .map(|s| {
+                let whole = f64::from(s.convergence_mm_yr);
+                let normal = subduction::orthogonal_convergence_mm_yr(s);
+                assert!(normal <= whole + 1e-3);
+                normal / whole
+            })
+            .collect();
+        assert!(ratios.len() > 50, "θ {theta}: {} stamped", ratios.len());
+        ratios.sort_by(f64::total_cmp);
+        let median = ratios[ratios.len() / 2];
+        eprintln!(
+            "θ {theta}: {} stamped, normal / whole median {median:.3}",
+            ratios.len()
+        );
+        assert!(
+            (median - want).abs() < 0.12,
+            "θ {theta}: the median {median}"
+        );
+    }
+}
+
+/// The ratchet (the M5 lane, 2026-10-25; arm m5-margins, plates.md "The ratchet"): a resampling
+/// blended a continental sample's rock and basement over all its continental corners, so a column
+/// of a converted margin (PLT-661: hyper-extended, under 10 km of its own crystalline crust)
+/// beside its continent's core took a share of the core's crust, stopped being hyper-extended and
+/// became the taper's continental side, and at the next step the ring beyond it, which holds the
+/// continents' sediment, was in the zone and turned: the boundary moved out at every resampling.
+/// The blend keeps the two classes apart (PLT-663). One plate holds a continent (z > 0) and its own
+/// ocean floor out to z = −0.3 under 2,500 m of the continents' sediment. A first transition step
+/// turns the zone's ocean side continental and a second turns nothing (the side rule); then on six
+/// lattices a resampling must keep the hyper-extended columns' count within the lattice's noise
+/// and make no column that mixes the classes (a basement under 10 km or more of its own crust),
+/// and six resamplings in a row, each followed by a step, must leave the continent's core (its
+/// columns that are not hyper-extended) as it was. Measured (2026-10-25): on the old blend one
+/// resampling took the 271 hyper-extended columns to 213 to 224 and made 177 to 194 mixed ones,
+/// and six in a row grew the core from 9,998 columns to 10,117 (+1.2 %) and the mixed ones to
+/// 975; on the class blend the count stays 265 to 280, no column mixes, and the core ends at
+/// 10,002 (+0.04 %). The lattice's noise still turns 14 to 40 columns at the step after each
+/// resampling: the zone's edge refilled, the zone where it was.
+#[test]
+fn a_resampling_keeps_a_converted_margin_apart_from_its_core() {
+    let mut p = preset(20_000, 20.0, "supercontinent", 5);
+    p.tectonics.margin_sediment_continental = true;
+    p.tectonics.transition_ocean_crust = true;
+    p.tectonics.pelagic_m_per_myr = 5.0;
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (mut st, geo, pos) = plates_split(&p, &env, 0.0, |q| q.z > -0.3);
+    let pts = geo.points();
+    for (i, s) in st.samples.iter_mut().enumerate() {
+        if s.group == 0 && pts[i].z < 0.0 {
+            s.kind = state::OCEANIC;
+            s.pools = pools::oceanic_column();
+            s.pools[state::pool::SEDIMENTARY] = 2500.0;
+            s.elevation_m = -4000.0;
+            s.formed_myr = (env.t_myr - 60.0) as f32;
+            s.thickness_m = pools::thickness(&s.pools);
+        }
+    }
+    let first = transition::step(&mut st, &geo, &pos, &env);
+    assert!(
+        first.margins > 50,
+        "the zone's ocean side turns: {}",
+        first.margins
+    );
+    let second = transition::step(&mut st, &geo, &pos, &env);
+    assert_eq!(
+        second.margins, 0,
+        "a converted ring is not the next ring's margin"
+    );
+    let hyper = |st: &PlateState| {
+        st.samples
+            .iter()
+            .filter(|s| !s.is_hidden() && transition::hyper_extended(s))
+            .count()
+    };
+    let mixed = |st: &PlateState| {
+        st.samples
+            .iter()
+            .filter(|s| {
+                !s.is_hidden()
+                    && s.kind == CONTINENTAL
+                    && s.basement() > 0.0
+                    && !transition::hyper_extended(s)
+            })
+            .count()
+    };
+    // The continent's core: continental columns that are not hyper-extended.
+    let core = |st: &PlateState| {
+        st.samples
+            .iter()
+            .filter(|s| !s.is_hidden() && s.kind == CONTINENTAL && !transition::hyper_extended(s))
+            .count()
+    };
+    let resampled = |st: &PlateState, geo: &Geo, pos: &[DVec3], k: u64| {
+        let mut s2 = st.clone();
+        s2.rng = crate::sphere::SplitMix64::new(1000 + k);
+        let mut world = WorldState::new(1, 16_384, p.t_start_years());
+        let geo2 = ridges::resample(
+            &mut s2,
+            &mut world,
+            pos,
+            &Tree::over(pos, |_| true),
+            geo,
+            &env,
+        )
+        .unwrap();
+        let pos2 = geometry::positions(&s2, &geo2);
+        s2.recount(&pos2);
+        (s2, geo2, pos2)
+    };
+    let (before, core0) = (hyper(&st), core(&st));
+    assert!(before >= first.margins as usize && mixed(&st) == 0);
+    // One resampling on six lattices.
+    let (mut kept, mut mixes) = (Vec::new(), Vec::new());
+    for k in 0..6 {
+        let (s2, _, _) = resampled(&st, &geo, &pos, k);
+        kept.push(hyper(&s2) as f64);
+        mixes.push(mixed(&s2));
+    }
+    // Six resamplings in a row, each followed by a transition step, as a run has them: the
+    // ratchet grows the core at each, where the lattice's noise only refills the zone's edge
+    // (a new sample inside the zone whose nearest old one lay outside it comes out oceanic and
+    // turns again), which leaves the core as it was.
+    let (mut cores, mut turned) = (Vec::new(), Vec::new());
+    let mut chain = resampled(&st, &geo, &pos, 100);
+    for k in 1..=6 {
+        let (s2, geo2, pos2) = &mut chain;
+        mixes.push(mixed(s2));
+        turned.push(transition::step(s2, geo2, pos2, &env).margins);
+        cores.push(core(s2));
+        if k < 6 {
+            chain = resampled(&chain.0, &chain.1, &chain.2, 100 + k);
+        }
+    }
+    let mean = |v: &[f64]| v.iter().sum::<f64>() / v.len() as f64;
+    eprintln!(
+        "first step turned {}, hyper-extended {before}, core {core0}; after one resampling: \
+         hyper-extended {kept:?}; six in a row: core {cores:?}, turned {turned:?}; mixed {mixes:?}",
+        first.margins
+    );
+    let change = mean(&kept) / before as f64 - 1.0;
+    assert!(
+        change.abs() < 0.05,
+        "the hyper-extended columns {before} → {kept:?} ({:+.1} %)",
+        change * 100.0
+    );
+    assert!(mixes.iter().all(|&m| m == 0), "mixed columns {mixes:?}");
+    let grown = cores[5] as f64 / core0 as f64 - 1.0;
+    assert!(
+        grown.abs() < 0.005,
+        "the core {core0} → {cores:?} ({:+.2} %) over six resamplings",
+        grown * 100.0
+    );
+}
+
 /// Plate task 8 (the gap budget's recommendation 1): continental crust a resampling accretes
 /// raises the surface by its Airy height, never past the column's, and the surface gets the rise
 /// as uplift; crust a collision already stacked is consumed and raises far less.
