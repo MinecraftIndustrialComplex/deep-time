@@ -839,32 +839,35 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     );
 }
 
-/// The sweep behind the seeds of the two tests that need a weld (this one and
-/// `recording_does_not_change_the_world_and_matches_the_run`): seeds 1 to 24 from scattered
-/// continents at 8000 samples over 300 Myr and each one's welds. Run it when a default changes
-/// the planet: `cargo test -p deeptime-core --release -- --ignored --nocapture weld_seed_sweep`.
+/// The sweep behind the seeds of the three tests that need a weld (this one,
+/// `recording_does_not_change_the_world_and_matches_the_run` and
+/// `sutures_and_initiations_keep_continents_whole`): seeds 1 to 24 from each start at 8000
+/// samples over 300 Myr and each one's welds. Run it when a default changes the planet:
+/// `cargo test -p deeptime-core --release -- --ignored --nocapture weld_seed_sweep`.
 #[test]
 #[ignore]
 fn weld_seed_sweep() {
     use rayon::prelude::*;
     let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(4)
+        .num_threads(8)
         .build()
         .unwrap();
-    let welds: Vec<(u64, usize)> = pool.install(|| {
-        (1..=24u64)
-            .into_par_iter()
-            .map(|seed| {
-                let p = preset(8000, 300.0, "scattered_continents", seed);
-                let world = run_stage(&p, |_, _, _| {});
-                let d = world.plates.as_ref().unwrap().dynamics.as_ref().unwrap();
-                (seed, d.collisions.iter().filter(|c| c.sutured).count())
-            })
-            .collect()
-    });
-    let welding: Vec<u64> = welds.iter().filter(|w| w.1 > 0).map(|w| w.0).collect();
-    println!("welds per seed {welds:?}");
-    println!("seeds that weld {welding:?}");
+    for start in ["scattered_continents", "supercontinent"] {
+        let welds: Vec<(u64, usize)> = pool.install(|| {
+            (1..=24u64)
+                .into_par_iter()
+                .map(|seed| {
+                    let p = preset(8000, 300.0, start, seed);
+                    let world = run_stage(&p, |_, _, _| {});
+                    let d = world.plates.as_ref().unwrap().dynamics.as_ref().unwrap();
+                    (seed, d.collisions.iter().filter(|c| c.sutured).count())
+                })
+                .collect()
+        });
+        let welding: Vec<u64> = welds.iter().filter(|w| w.1 > 0).map(|w| w.0).collect();
+        println!("{start}: welds per seed {welds:?}");
+        println!("{start}: seeds that weld {welding:?}");
+    }
 }
 
 /// Plate task 6: a collision's footprint (`Sample::collision_mm_yr`, `shortening_km` and the
