@@ -8811,17 +8811,20 @@ plate check's speed measures, medians, Mann-Whitney p):
 | plates without one, mm/yr | 21.2 | 24.4 | |
 | collisions per 100 Myr | 1.60 | 1.55 | 0.71 |
 | collision duration p90, Myr | 177.6 | 204 | |
-| land above 2 km (share of land) | 0.128 | 0.126 | 0.98 |
+| land above 2 km (census) | 0.128 | 0.126 | 0.98 |
 | speed guard, steps that bind | 0 in all 24 | 3 to 15 in all 8 (5, 15, 6, 5; 8, 3, 9, 9) | |
 
 The census moves at no measure with p < 0.05: land 0.312 to 0.329 (p 0.11), the largest landmass
 0.189 to 0.245 (p 0.22), continental crust under the sea 0.190 to 0.175 (p 0.24), coast with high
 ground 0.229 to 0.236 (p 0.98), land under ice 0.107 to 0.085 (p 0.25), the continental crust's net
-change −0.069 to −0.059 (p 0.19), criteria met 5 of 7 in both (means 5.04 and 5.12). Over a whole run the plates move at 31.5 mm/yr, not
-the one-step balance's 44 to 50: the guard holds the fastest, and the plates without a slab are
-24.4 against 21.2, so the contrast of the one-step balance is not reversed over a run, but the
-level is 0.67 of Earth's 47 (PLT-181). The guard binds 3 to 15 steps a run, on a few small plates,
-which is enough to keep the switch off by CLAUDE.md's rule.
+change −0.069 to −0.059 (p 0.19), criteria met 5 of 7 in both (means 5.04 and 5.12).
+
+Over a whole run the plates move at 31.5 mm/yr, 0.67 of Earth's 47 (PLT-181), not the one-step
+balance's 44 to 50, and the plates with a slab move at twice the speed of the others (50.5 against
+24.4), so the one-step balance's reversed contrast does not last a run. The one-step looks put the
+new law on planets grown under the old one; why a planet grown under the new law is slower was not
+measured. The guard binds too seldom to explain it (3 to 15 of a run's 500 steps), but on a few
+small plates in every run, which is enough to keep the switch off by CLAUDE.md's rule.
 
 **The boundaries by the 60 degree rule** (a VM-only probe at PLT-585's fixed point on the same two
 planets as above, not committed). Of the planet's boundary, 0.28 to 0.29 is transform, 0.56 to 0.58
