@@ -1303,9 +1303,52 @@ beach is where the waves rework the sediment, and peat builds up only where wate
 the peatland rule keeps a column the search made a beach (`"keeps": ["#minecraft:is_beach", "#c:is_beach"]`), and the
 census counts a cold-wetland column on a beach apart, as `cold_wetland_shore` with its decisions.
 
-A world finding stays open (see "Open questions"): an oceanic shield's cone zone is sized on its record's basal
-radius, measured on the sea floor, so it can cover the whole island down to its coast. Cone zones held 1,722 of the
-planet's 7,504 land columns (23 %).
+A world finding followed: an oceanic shield's cone zone was sized on its record's basal radius, measured on the sea
+floor, so it could cover the whole island down to its coast (cone zones held 1,722 of that planet's 7,504 land
+columns, 23 %). It is resolved below ("Oceanic volcanoes' zones stand on the island", BIO-198).
+
+## Oceanic volcanoes' zones stand on the island (2026-10-25, BIO-198)
+
+**What was wrong.** An active volcano's biome zones are shares of its record's basal radius (BIO-106: the cone zone
+0.45 of it; BIO-107: the ash and lava fields 1.0). The record's `radius_m` is the foot of the edifice, and an oceanic
+volcano's foot lies on the sea floor, tens to hundreds of blocks under the sea, so the zones could reach well past the
+island the world draws: shield 228 of the 2026-10-24 test planet stands 10.8 blocks above the sea at its vent, its
+foot radius is 220 blocks, and its cone zone (99 blocks) covered the whole island down to its coast, 96 to 112 blocks
+out. The coastal flat took the icy volcano's cone role.
+
+**The rule** (BIO-198, game-choice). A volcano whose record is `oceanic` has its cone zone and its ash or lava field
+sized on the radius of the part of the edifice above the sea, `VolcanicZones.subaerialShare` times the basal radius.
+The share comes from what the record and the world already say, with no new constant. The edifice's radial profile is
+the simulation's (`Shape::profile`; VOL-016 to VOL-018: stratovolcano (1 - rho)^1.5, shield (1 - rho^2)^1.5, caldera
+complex (1 - rho^2)^2, rho the distance over the basal radius, 1 at the summit, 0 at the foot), scaled to the record's
+height H (`height_m`, over mV the blocks it stands over its foot). The vent is the summit, and its height h over the
+sea is the world's ground at the vent less the sea level, so the sea cuts the profile at f = (H - h) / H, and the
+subaerial share is the profile inverted at f: 1 - f^(2/3) (stratovolcano), sqrt(1 - f^(2/3)) (shield),
+sqrt(1 - sqrt f) (caldera complex). A vent no higher than the sea has no subaerial part (share 0, and the zones fall
+to the 8-block minimum of BIO-105, a cone zone only where it passes the crater's); a vent at or over H gets the whole
+basal radius. The crater's bowl, which truncates the summit, is left out, so with a crater the share errs small.
+Craters, calderas, hot-spring fields and thermal caves keep their sizes. A continental volcano stands on land and its
+zones are as before (the code tells the two by the record's `oceanic` flag; a build without the world's ground sizes
+every volcano on its basal radius, as before). Shield 228's numbers give a coast where the profile falls to the sea:
+for a 3,000 m shield (86 blocks at 35 m a block) over a 220-block foot with the vent 10.8 blocks up, 64 blocks out
+(0.29 of the radius), so a cone zone of 29 blocks and a lava field out to the coast; the unit test
+(`VolcanicZonesTest.anOceanicShieldsConeZoneLiesInsideItsCoast`) checks that profile and the cone zone inside it.
+
+**Measured** (`volcanicBiomesOnlyAtVolcanoes`'s census, 4k test planet of master f5026cfb, 15,538 land columns on the
+census's 8-block grid, Expanded Ecosphere set; `land_in_zone` in its JSON, new):
+
+| Zones | Before | After |
+|---|---|---|
+| cone zones laid | 10 | 4 |
+| land columns in a cone zone | 803 (5.2 %) | 695 (4.5 %) |
+| land columns in a lava field | 2,266 (14.6 %) | 2,244 (14.4 %) |
+| volcanic-biome columns | 1,034 (6.7 %) | 917 (5.9 %) |
+
+This planet has no shield like 228: of its 8 oceanic volcanoes, 6 have their vents under the sea (their cone zones
+fall to the minimum and are dropped inside their craters or left in the sea), shield 280 stands whole on land
+(share 1.0) and shield 210 keeps 0.871 of its radius. So the planet shows the rule leaving the island zones alone
+where the island is the edifice, and taking the sea out of the zones of the drowned ones. The shield-228 case it was
+made for is the unit test's.
 
 ## The snow line (2026-10-22, BIO-180, BIO-181)
 
@@ -1502,11 +1545,6 @@ coordinator's call (2026-10-24, the -PwithEe gate on master 7d16c5a7).
   thick enough to rest on the sea floor (up to 10 blocks of cover over about 50 m of water on the 2026-10-23 gate
   planet). Drawing it needs the ice pass to build ice up from a sea floor under the sea's water: a game-side feature,
   not taken.
-- An oceanic shield's volcanic zones are sized on its record's basal radius (BIO-106), measured on the sea floor, not
-  on the island the world draws above the sea. On the 2026-10-24 test planet shield 228's cone zone (99 blocks)
-  covers its whole island, coastal flat included, and cone zones hold 23 % of the land ("The peatland share on the
-  cold wetland the rules decide"). Sizing the zones on the world's ground (the subaerial radius) would leave the coast
-  to the climate's own biome; a change to the volcanic biomes' design, not taken.
 - The Holdridge biotemperature upper cut-off at 30 °C (HYD-030) is missing from the hydrology code.
   Confirmed in Holdridge's text (see the sources) and left to the rivers and lakes package, which
   owns that row.
