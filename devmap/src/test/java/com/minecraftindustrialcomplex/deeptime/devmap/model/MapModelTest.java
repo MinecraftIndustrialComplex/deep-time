@@ -3,7 +3,7 @@ package com.minecraftindustrialcomplex.deeptime.devmap.model;
 
 import com.minecraftindustrialcomplex.deeptime.screen.model.Ramps;
 import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
-import com.minecraftindustrialcomplex.deeptime.worlddata.Projection;
+import com.minecraftindustrialcomplex.deeptime.worlddata.MapPicture;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
 import org.junit.jupiter.api.Test;
 
@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Random;
 
 import static com.minecraftindustrialcomplex.deeptime.devmap.model.PlanetGeometryTest.LAMBERT;
-import static com.minecraftindustrialcomplex.deeptime.devmap.model.PlanetGeometryTest.PG;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -26,6 +25,12 @@ import static org.junit.jupiter.api.Assertions.fail;
  * among them) and the graticule is cut only at the turning seams.
  */
 class MapModelTest {
+
+    /** x wrapped into [−period/2, period/2). */
+    static double wrap(double period, double x) {
+        double t = x - period * Math.floor(x / period + 0.5);
+        return t >= period / 2 ? t - period : t;
+    }
 
     @Test
     void viewTransformRoundTripAndZoomKeepsThePointUnderTheMouse() {
@@ -42,7 +47,7 @@ class MapModelTest {
         v.zoomAt(650, 90, 1.25, 0.01, 8);
         assertEquals(0.3125, v.scale(), 1e-12);
         // The centre wraps, so the block under the mouse is the same modulo the period.
-        assertEquals(0.0, PG.wrapX(v.blockX(650) - bx), 1e-6);
+        assertEquals(0.0, wrap(13312, v.blockX(650) - bx), 1e-6);
         assertEquals(bz, v.blockZ(90), 1e-6);
         v.zoomAt(650, 90, 1e9, 0.01, 8);
         assertEquals(8.0, v.scale());
@@ -50,7 +55,7 @@ class MapModelTest {
         v.centre(6650, 0);
         v.pan(-8 * 8, 0);
         assertEquals(-6654.0, v.cx(), 1e-9);
-        assertEquals(0.0, PG.wrapX(v.cx() - 6658), 1e-9);
+        assertEquals(0.0, wrap(13312, v.cx() - 6658), 1e-9);
         v.centre(0, 5000);
         v.clampZ(-3328, 3328);
         assertEquals(3328.0, v.cz());
@@ -104,28 +109,28 @@ class MapModelTest {
     void baseImageSamplesTheCanonicalPointOfEachPixel() {
         // A synthetic planet: land (height 100) where latitude > 0, sea (height 20) south of it, a
         // lake (water at 150 over height 120) in a box: the image must follow the projection.
-        MapFrame f = MapFrame.of(PG, 256);
+        MapFrame f = MapFrame.of(LAMBERT, 512);
         double sea = 63;
         Ramps.Ramp land = new Ramps.Ramp(new double[]{0, 200}, new int[]{0x000000, 0xffffff});
         Ramps.Ramp lake = new Ramps.Ramp(new double[]{0, 200}, new int[]{0x0000ff, 0x0000ff});
-        int[] px = BaseImage.render(f, PG,
-                (x, z) -> inLake(x, z) ? 120 : PG.latLon(x, z)[0] > 0 ? 100 : 20,
+        int[] px = BaseImage.render(f, LAMBERT,
+                (x, z) -> inLake(x, z) ? 120 : LAMBERT.latLon(x, z)[0] > 0 ? 100 : 20,
                 (x, z) -> inLake(x, z) ? 150 : Double.NaN, sea, land, lake);
         int landC = land.abgr(100), seaC = land.abgr(20), lakeC = lake.abgr(150);
         int wrong = 0;
         for (int j = 0; j < f.h(); j++)
             for (int i = 0; i < f.w(); i++) {
                 double x = f.blockX(i + 0.5), z = f.blockZ(j + 0.5);
-                int want = inLake(x, z) ? lakeC : PG.latLon(x, z)[0] > 0 ? landC : seaC;
+                int want = inLake(x, z) ? lakeC : LAMBERT.latLon(x, z)[0] > 0 ? landC : seaC;
                 if (px[j * f.w() + i] != want)
                     wrong++;
             }
         assertEquals(0, wrong);
         // sample() reads the pixel of a block, with x wrapping.
-        double[] north = PG.blockOf(60, 146);
+        double[] north = LAMBERT.blockOf(60, 146);
         assertEquals(landC, f.sample(px, north[0], north[1]));
-        assertEquals(landC, f.sample(px, north[0] + 13312, north[1]));
-        double[] south = PG.blockOf(-60, 146);
+        assertEquals(landC, f.sample(px, north[0] + 16384, north[1]));
+        double[] south = LAMBERT.blockOf(-60, 146);
         assertEquals(seaC, f.sample(px, south[0], south[1]));
         assertEquals(lakeC, f.sample(px, 1050, 1050));
     }
@@ -134,11 +139,11 @@ class MapModelTest {
     void aClosedBasinBelowSeaLevelIsDrawnAsLandOrItsLake() {
         // Sea everywhere (height 20 under sea level 63) but a closed box (HYD-100): its dry ground
         // is drawn as the land ramp at sea level, its lake (water at 40 over 30) by the lake ramp.
-        MapFrame f = MapFrame.of(PG, 256);
+        MapFrame f = MapFrame.of(LAMBERT, 512);
         double sea = 63;
         Ramps.Ramp land = new Ramps.Ramp(new double[]{0, 200}, new int[]{0x000000, 0xffffff});
         Ramps.Ramp lake = new Ramps.Ramp(new double[]{0, 200}, new int[]{0x0000ff, 0x00ffff});
-        int[] px = BaseImage.render(f, PG,
+        int[] px = BaseImage.render(f, LAMBERT,
                 (x, z) -> inLake(x, z) ? 30 : 20,
                 (x, z) -> inLake(x, z) && x < 1050 ? 40 : Double.NaN,
                 (x, z) -> inLake(x, z) ? 1.0 : 0.0, sea, land, lake);
@@ -162,26 +167,26 @@ class MapModelTest {
 
     @Test
     void latLonPictureAgreesWithTheBlockImage() {
-        MapFrame f = MapFrame.of(PG, 512);
+        MapFrame f = MapFrame.of(LAMBERT, 512);
         int[] block = new int[f.w() * f.h()];
         for (int j = 0; j < f.h(); j++)
             for (int i = 0; i < f.w(); i++) {
-                double[] ll = PG.latLon(f.blockX(i + 0.5), f.blockZ(j + 0.5));
+                double[] ll = LAMBERT.latLon(f.blockX(i + 0.5), f.blockZ(j + 0.5));
                 // Northern hemisphere east of the central meridian: red; the rest: green.
                 double d = ll[1] - 146;
                 d -= 360 * Math.round(d / 360);
                 block[j * f.w() + i] = ll[0] > 0 && d > 0 ? 0xff0000ff : 0xff00ff00;
             }
-        int w = 360, h = Projection.pictureHeight(w);
-        int[] pic = BaseImage.latLonPicture(block, f, PG, w, h);
+        int w = 360, h = MapPicture.height(w);
+        int[] pic = BaseImage.latLonPicture(block, f, LAMBERT, w, h);
         int wrong = 0, n = 0;
         for (int y = 0; y < h; y++) {
-            double lat = Projection.pictureLatitudeDeg(y, h);
+            double lat = MapPicture.latitudeDeg(y, h);
             for (int x = 0; x < w; x++) {
-                double lon = Projection.pictureLongitudeDeg(x, w);
+                double lon = MapPicture.longitudeDeg(x, w);
                 double d = lon - 146;
                 d -= 360 * Math.round(d / 360);
-                // Skip the boundaries, where a 13-block pixel straddles the colour change.
+                // Skip the boundaries, where a 32-block pixel straddles the colour change.
                 if (Math.abs(lat) < 1.5 || Math.abs(d) < 1.5 || Math.abs(Math.abs(d) - 180) < 1.5 || Math.abs(lat) > 88)
                     continue;
                 int want = lat > 0 && d > 0 ? 0xff0000ff : 0xff00ff00;
@@ -195,8 +200,8 @@ class MapModelTest {
     }
 
     @Test
-    void graticuleLiesOnItsLatitudeOrLongitudeAndBreaksAtTheEdges() {
-        for (WorldProjection p : List.of(PG, LAMBERT)) {
+    void graticuleLiesOnItsLatitudeOrLongitude() {
+        for (WorldProjection p : List.of(LAMBERT)) {
             List<Graticule.Line> lines = Graticule.lines(p, 15.0, 0.5);
             int meridians = 0, parallels = 0;
             for (Graticule.Line l : lines) {
@@ -222,14 +227,10 @@ class MapModelTest {
             }
             assertTrue(meridians >= 24, p.kind() + " meridians " + meridians);
             assertTrue(parallels >= 11, p.kind() + " parallels " + parallels);
-            if (p == LAMBERT) {
-                // Straight lines: one piece each, meridians vertical, parallels horizontal.
-                assertEquals(24, meridians);
-                assertEquals(11, parallels);
-            } else {
-                // Petroff-Guyou: the lines break where they cross an edge (the half-turn).
-                assertTrue(meridians + parallels > 35, "pieces " + (meridians + parallels));
-            }
+            // Straight lines on the Lambert frame: one piece each, meridians vertical, parallels
+            // horizontal (the cube's breaks at its turning seams have their own test below).
+            assertEquals(24, meridians);
+            assertEquals(11, parallels);
         }
     }
 
@@ -281,15 +282,15 @@ class MapModelTest {
         BaseImage.maskVoid(sat, f, c);
         for (int k = 0; k < sat.length; k++)
             assertEquals(px[k] == 0, sat[k] == 0, "pixel " + k);
-        // Nothing to mask on a polar world.
-        MapFrame pf = MapFrame.of(PG, 64);
+        // Nothing to mask on a Lambert-frame level.
+        MapFrame pf = MapFrame.of(LAMBERT, 64);
         int[] all = new int[pf.w() * pf.h()];
         java.util.Arrays.fill(all, 7);
-        BaseImage.maskVoid(all, pf, PG);
+        BaseImage.maskVoid(all, pf, LAMBERT);
         for (int v : all)
             assertEquals(7, v);
         // The latitude/longitude picture finds a face for every pixel.
-        int w = 360, hh = Projection.pictureHeight(w);
+        int w = 360, hh = MapPicture.height(w);
         int[] pic = BaseImage.latLonPicture(px, f, c, w, hh);
         int holes = 0;
         for (int v : pic)

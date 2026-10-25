@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use deeptime_format::{ColumnWorld, CUBE_FORMAT_VERSION, DetailSpec, Manifest, Noise, RasterRead};
+use deeptime_format::{CUBE_FORMAT_VERSION, ColumnWorld, DetailSpec, Manifest, Noise, RasterRead};
 use serde_json::{Value, json};
 
 use crate::params::planet_builtin;
