@@ -533,7 +533,15 @@ fn sutures_and_initiations_keep_continents_whole() {
     // supercontinent 4 and scattered 1; this test passes on the pairs 4 and 1, 7 and 2, 11 and
     // 3, 14 and 4, 15 and 5, 21 and 6, 23 and 10, 24 and 14).
     for (start, seed) in [("supercontinent", 4), ("scattered_continents", 1)] {
-        let p = preset(8000, 300.0, start, seed);
+        let mut p = preset(8000, 300.0, start, seed);
+        // The old law (PLT-585 off, PLT-540 on): under Forsyth & Uyeda's balance on this small
+        // planet, whose ridge push is several times Earth's (`plates_quick_16k`, ridge -1,000 m,
+        // floor -10,000 m), the speed guard binds on every welding seed of 1 to 24 but
+        // supercontinent 11 (`weld_seed_sweep`, 2026-10-25: 10 scattered and 10 supercontinent
+        // seeds weld, the guard holding 3 to 90 plate-steps in 300 Myr), and these two seeds weld
+        // no more. A suture is the same under either law.
+        p.tectonics.forsyth_uyeda_balance = false;
+        p.tectonics.suction_saturates = true;
         let mut seen = 0usize;
         let world = run_stage(&p, |stage, world, st| {
             assert!(stats::summary(st).partition_ok);
@@ -829,7 +837,15 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // 10, 11, 16 to 18, 21 and 23, seed 23 twice, seeds 2, 6, 9, 12 and 20 no more; seed 1 here
     // still welds and passes, the recording test goes to seed 4; from the supercontinent 5, 7, 8,
     // 11 and 17).
-    let p = preset(8000, 300.0, "scattered_continents", 1);
+    let mut p = preset(8000, 300.0, "scattered_continents", 1);
+    // The old law (PLT-585 off, PLT-540 on), whatever the defaults: under Forsyth & Uyeda's
+    // balance on this small planet, whose ridge push is several times Earth's
+    // (`plates_quick_16k`, ridge -1,000 m, floor -10,000 m), the speed guard bound on every
+    // welding seed of 1 to 24 but supercontinent 11 (`weld_seed_sweep`, 2026-10-25, before
+    // PLT-582: 10 scattered and 10 supercontinent seeds welded, the guard holding 3 to 90
+    // plate-steps in 300 Myr). A collision's life cycle is the same under either law.
+    p.tectonics.forsyth_uyeda_balance = false;
+    p.tectonics.suction_saturates = true;
     let mut life = CollisionLives::default();
     let world = run_stage(&p, |_, _, st| {
         assert!(stats::summary(st).partition_ok);
@@ -888,20 +904,38 @@ fn weld_seed_sweep() {
         .build()
         .unwrap();
     for start in ["scattered_continents", "supercontinent"] {
-        let welds: Vec<(u64, usize)> = pool.install(|| {
+        // Per seed: its welds and the plate-steps the speed guard held (the recording test needs
+        // a welding seed where the guard never binds).
+        let welds: Vec<(u64, usize, usize)> = pool.install(|| {
             (1..=24u64)
                 .into_par_iter()
                 .map(|seed| {
                     let p = preset(8000, 300.0, start, seed);
                     let world = run_stage(&p, |_, _, _| {});
                     let d = world.plates.as_ref().unwrap().dynamics.as_ref().unwrap();
-                    (seed, d.collisions.iter().filter(|c| c.sutured).count())
+                    let guarded = d
+                        .steps
+                        .iter()
+                        .map(|s| s.plates.iter().filter(|q| q.guard).count())
+                        .sum();
+                    (
+                        seed,
+                        d.collisions.iter().filter(|c| c.sutured).count(),
+                        guarded,
+                    )
                 })
                 .collect()
         });
         let welding: Vec<u64> = welds.iter().filter(|w| w.1 > 0).map(|w| w.0).collect();
-        println!("{start}: welds per seed {welds:?}");
-        println!("{start}: seeds that weld {welding:?}");
+        let quiet: Vec<u64> = welds
+            .iter()
+            .filter(|w| w.1 > 0 && w.2 == 0)
+            .map(|w| w.0)
+            .collect();
+        println!("{start}: (seed, welds, guarded plate-steps) {welds:?}");
+        println!(
+            "{start}: seeds that weld {welding:?}; of them the guard never binds on {quiet:?}"
+        );
     }
 }
 
@@ -987,7 +1021,14 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // above takes; seed 2 again since the critical-taper belt went on by default with them,
     // PLT-600, the same day, when seed 4 no longer welds: the sweep's welding seeds 1, 2, 6, 7,
     // 11, 14, 15, 16, 22 and 24, seed 2 again the first after seed 1).
-    let p = preset(8000, 300.0, "scattered_continents", 2);
+    let mut p = preset(8000, 300.0, "scattered_continents", 2);
+    // The old law (PLT-585 off, PLT-540 on), whatever the defaults: the guard asserted below
+    // bound under Forsyth & Uyeda's balance on every welding seed of 1 to 24 of this small planet
+    // but supercontinent 11, whose ridge push is several times Earth's (`plates_quick_16k`, ridge
+    // -1,000 m, floor -10,000 m; `weld_seed_sweep`, 2026-10-25, before PLT-582). The record is
+    // measurement only under either law.
+    p.tectonics.forsyth_uyeda_balance = false;
+    p.tectonics.suction_saturates = true;
     let total = PlatesStage::new(p.clone()).total_steps();
     let mut checked = 0u64;
     let mut life = CollisionLives::default();
@@ -3200,6 +3241,9 @@ fn the_reference_plate_on_the_lattice_moves_at_the_speed_scale() {
         let mut p = preset(40_000, 20.0, "supercontinent", 5);
         scale = p.tectonics.plate_speed_scale_mm_yr;
         p.tectonics.front_pull = on;
+        // The speed scale's own law (PLT-585 off), with the suction it was measured with.
+        p.tectonics.forsyth_uyeda_balance = false;
+        p.tectonics.suction_saturates = true;
         p.tectonics.mantle_flow_mm_yr = 0.0;
         p.tectonics.keel_drag = 1.0e4;
         let stage = PlatesStage::new(p.clone());
@@ -3347,6 +3391,9 @@ fn outer(x: DVec3) -> glam::DMat3 {
 fn the_reference_plate_on_the_lattice_term_by_term() {
     let mut p = preset(40_000, 20.0, "supercontinent", 5);
     p.tectonics.front_pull = true;
+    // The speed scale's own law (PLT-585 off), with the suction it was measured with.
+    p.tectonics.forsyth_uyeda_balance = false;
+    p.tectonics.suction_saturates = true;
     p.tectonics.mantle_flow_mm_yr = 0.0;
     p.tectonics.keel_drag = 1.0e4;
     let stage = PlatesStage::new(p.clone());
@@ -3539,6 +3586,15 @@ fn the_reference_plate_on_the_lattice_term_by_term() {
 /// ridge and floor (-1,000 and -10,000 m) give a ridge push several times Earth's, so it is no
 /// guide to the pool's planet (the motion 39.2 and 40.8 at 100,000 samples, 29.7 and 32.8 without
 /// the edge energy).
+///
+/// Phase 2 (2026-10-25, the same planets and looks; the defaults row now PLT-585 off): the old
+/// law 26.7 and 28.5 (the rest 19.5 and 15.5); Forsyth & Uyeda's balance with its friction links
+/// (PLT-585, by their 60 degree rule, a trench's friction at its front) 50.2 and 44.2, pulled 36.4
+/// and 38.3, the rest 97.0 and 68.7; at Table 6's own ridge push (0.36 of 6.43, the edge energy
+/// scaled to it) 41.2 and 33.1, the rest 69.6 and 21.9. The rest's RMS² is mostly oceanic plates
+/// of 0.1 to 0.5 starting plates (0.65 and 0.51 of it): plates over a trench whose suction (0.50
+/// per km) outweighs the trench's colliding resistance (0.16) and their transforms', so that only
+/// the basal drag, by area, holds them.
 #[test]
 #[ignore = "diagnosis: 600 Myr at 100k samples, two planets; run with --release -- --ignored --nocapture"]
 fn what_sets_the_planets_plate_speed() {
@@ -3569,9 +3625,17 @@ fn what_sets_the_planets_plate_speed() {
         k.slab_suction_share = 0.50 / 6.43;
         k.suction_saturates = false;
     }
+    // Forsyth & Uyeda's balance as built (PLT-585): the friction is linearised about the motion,
+    // so these rows solve again from their own answer until it settles (`ITERATED` solves),
+    // the fixed point the plates' motion relaxes to.
+    fn balance(k: &mut TectonicParams) {
+        k.forsyth_uyeda_balance = true;
+        k.suction_saturates = false;
+    }
+    const ITERATED: usize = 16;
     // c_b ∝ 1/((1 + s + b) v): a resistance set to 0 with the speed scale raised to match keeps it.
-    let variants: [(&str, Tweak); 12] = [
-        ("defaults", |_| {}),
+    let variants: [(&str, Tweak); 14] = [
+        ("defaults (the old law, PLT-585 off)", |_| {}),
         ("suction unsaturated (PLT-540 off)", |k| {
             k.suction_saturates = false;
         }),
@@ -3603,13 +3667,32 @@ fn what_sets_the_planets_plate_speed() {
         ("F&U Table 6's ratios, the speed scale kept", |k| {
             fu(k, true)
         }),
+        ("F&U's balance with friction (PLT-585), iterated", balance),
+        ("PLT-585 at Table 6's ridge push, iterated", |k| {
+            balance(k);
+            // Table 6's ridge push is 0.36 / 6.43 of the pull; the column energy's at the
+            // preset's ridge and old floor is C d² (FRC-012).
+            let d = k.ridge_elevation_m - k.oceanic_floor_elevation_m;
+            let push = forces::ridge_coefficient(forces::G_EARTH) * d * d;
+            k.edge_energy *= 0.36 / 6.43 * forces::SLAB_PULL_N_M / push;
+        }),
     ];
     for (start, seed) in [("supercontinent", 1), ("scattered_continents", 2)] {
-        let p = builtin_preset(&name, n, myr, start, seed);
+        let mut p = builtin_preset(&name, n, myr, start, seed);
+        // The planet of the old law (as the diagnosis measured it, 2026-10-25), each row's
+        // change made on one step of it.
+        p.tectonics.forsyth_uyeda_balance = false;
+        p.tectonics.suction_saturates = true;
         let t0 = p.t_start_years() / 1.0e6;
         let mut boundary_km = 0.0;
         // Per variant: Σ RMS² over the planet, the pulled plates and the rest, Σ pulled share.
         let mut sums = vec![[0.0f64; 4]; variants.len()];
+        // Per variant, the plates without a slab: Σ torque by term (suction, edge energy, the
+        // mantle flow; basal drag, slab, boundary and collision resistance), and their share of
+        // the rest's RMS² and of the planet's area by size (under 0.1, 0.1 to 0.5, over 0.5 of
+        // the starting plate's area) and crust (oceanic, then continental, by the majority).
+        let mut terms = vec![[0.0f64; 7]; variants.len()];
+        let mut bins = vec![[[0.0f64; 2]; 6]; variants.len()];
         let mut motion = 0.0;
         let mut looks = 0usize;
         let mut next = 100.0;
@@ -3634,9 +3717,13 @@ fn what_sets_the_planets_plate_speed() {
             base.dynamics = Some(dynamics::Dynamics::default());
             let np = base.plates.len();
             let mut vis = vec![0.0f64; np];
+            let mut cont = vec![0.0f64; np];
             for (i, s) in base.samples.iter().enumerate() {
                 if !s.is_hidden() {
                     vis[base.plate_of(i) as usize] += 1.0;
+                    if s.kind == CONTINENTAL {
+                        cont[base.plate_of(i) as usize] += 1.0;
+                    }
                 }
             }
             let total: f64 = vis.iter().sum();
@@ -3667,8 +3754,24 @@ fn what_sets_the_planets_plate_speed() {
                 let mut kv = p.tectonics.clone();
                 tweak(&mut kv);
                 let env = stage.env(&kv, base.step);
-                let mut s2 = base.clone();
-                let ans = forces::step(&mut s2, geo, &pos, &env, forces::flow_axis(p.seed), sea);
+                let solves = if kv.forsyth_uyeda_balance {
+                    ITERATED
+                } else {
+                    1
+                };
+                let mut cur = base.clone();
+                let mut ans = None;
+                for _ in 0..solves {
+                    let mut s2 = cur.clone();
+                    let a = forces::step(&mut s2, geo, &pos, &env, forces::flow_axis(p.seed), sea);
+                    for (id, w) in a.omega.iter().enumerate() {
+                        if let Some(w) = w {
+                            cur.plates[id].omega = w.to_array();
+                        }
+                    }
+                    ans = Some(a);
+                }
+                let ans = ans.expect("a solve");
                 if v == 0 {
                     for f in &ans.recorded.as_ref().expect("the record").forces {
                         pulled[f.id as usize] = f.slab_pull > 0.0;
@@ -3687,6 +3790,35 @@ fn what_sets_the_planets_plate_speed() {
                         acc[2] += v2;
                         w_free += vis[id];
                     }
+                }
+                for f in &ans.recorded.as_ref().expect("the record").forces {
+                    if pulled[f.id as usize] {
+                        continue;
+                    }
+                    let t = [
+                        f.slab_suction,
+                        f.edge_energy,
+                        f.mantle_flow,
+                        f.basal_drag,
+                        f.slab_resistance,
+                        f.boundary_resistance,
+                        f.collision_resistance,
+                    ];
+                    for (a, b) in terms[v].iter_mut().zip(t) {
+                        *a += b;
+                    }
+                }
+                for (id, w) in ans.omega.iter().enumerate() {
+                    let Some(w) = *w else { continue };
+                    if pulled[id] {
+                        continue;
+                    }
+                    let size = vis[id] / (total / 14.0);
+                    let bin = usize::from(size >= 0.1)
+                        + usize::from(size >= 0.5)
+                        + 3 * usize::from(cont[id] > 0.5 * vis[id]);
+                    bins[v][bin][0] += vis[id] * speed_of(w, id).powi(2) / acc[2].max(1e-30);
+                    bins[v][bin][1] += vis[id] / total;
                 }
                 let s = &mut sums[v];
                 s[0] += (acc[0] / total).sqrt();
@@ -3711,6 +3843,30 @@ fn what_sets_the_planets_plate_speed() {
                 s[2] / m,
                 s[3] / m
             );
+            let t = terms[v];
+            eprintln!(
+                "    the rest by term (10^24 N m, summed): suction {:.2} edge {:.2} flow {:.2} | \
+                 drag {:.2} slab {:.2} boundary {:.2} collision {:.2}",
+                t[0] / m,
+                t[1] / m,
+                t[2] / m,
+                t[3] / m,
+                t[4] / m,
+                t[5] / m,
+                t[6] / m
+            );
+            let b = bins[v];
+            let cell = |i: usize| format!("{:.2} ({:.3})", b[i][0] / m, b[i][1] / m);
+            eprintln!(
+                "    the rest's RMS² (area) by size <0.1/0.1-0.5/>0.5 A0: oceanic {} {} {}; \
+                 continental {} {} {}",
+                cell(0),
+                cell(1),
+                cell(2),
+                cell(3),
+                cell(4),
+                cell(5)
+            );
         }
     }
 }
@@ -3718,6 +3874,88 @@ fn what_sets_the_planets_plate_speed() {
 /// A class's row of [`the_margin_as_the_mix_sees_it`]: samples, normals over 70 degrees off, their
 /// mean angle (degrees), samples beside hidden crust.
 type MarginRow = (usize, usize, f64, usize);
+
+/// The plate speed lane (PLT-585): where the speed guard binds, plate by plate (its size in
+/// starting plates, its crust, fronts and boundary, and its force record). `GUARD_DIAG` lists
+/// `start:seed` pairs (default the recording test's and the suture test's planets);
+/// `GUARD_DIAG_PRESET` a built-in preset instead of the 8k test planet; `GUARD_DIAG_OLD` the old
+/// law.
+#[test]
+#[ignore = "diagnosis: prints where the speed guard binds; run with --release -- --ignored --nocapture"]
+fn where_the_speed_guard_binds() {
+    let var = |k: &str| std::env::var(k).ok();
+    let pairs: Vec<(String, u64)> = var("GUARD_DIAG").map_or_else(
+        || {
+            vec![
+                ("scattered_continents".to_owned(), 2),
+                ("supercontinent".to_owned(), 4),
+                ("scattered_continents".to_owned(), 1),
+            ]
+        },
+        |x| {
+            x.split(',')
+                .map(|p| {
+                    let (a, b) = p.split_once(':').expect("start:seed");
+                    (a.to_owned(), b.parse().expect("a seed"))
+                })
+                .collect()
+        },
+    );
+    for (start, seed) in pairs {
+        let mut p = match var("GUARD_DIAG_PRESET") {
+            Some(name) => builtin_preset(&name, 8000, 300.0, &start, seed),
+            None => preset(8000, 300.0, &start, seed),
+        };
+        if var("GUARD_DIAG_OLD").is_some() {
+            p.tectonics.forsyth_uyeda_balance = false;
+            p.tectonics.suction_saturates = true;
+        }
+        let mut bound = 0usize;
+        let mut welds = 0usize;
+        let world = run_stage(&p, |_, _, st| {
+            let d = st.dynamics.as_ref().expect("the record");
+            let Some(step) = d.steps.last() else { return };
+            let a0 = f64::from(step.visible) / 14.0;
+            for ps in step.plates.iter().filter(|q| q.guard) {
+                bound += 1;
+                let f = step.forces.iter().find(|f| f.id == ps.id);
+                eprintln!(
+                    "{start} {seed} t {:.1}: plate {} of {:.3} A0 ({:.2} continental), speed \
+                     {:.1} mm/yr, front {:.0} km, boundary {:.0} km, pole inside {}, spinning {}",
+                    step.t,
+                    ps.id,
+                    f64::from(ps.visible) / a0,
+                    f64::from(ps.continental) / f64::from(ps.visible.max(1)),
+                    ps.speed_mm_yr,
+                    ps.front_km,
+                    ps.boundary_km,
+                    ps.pole_inside,
+                    ps.spinning
+                );
+                if let Some(f) = f {
+                    eprintln!(
+                        "    drive: pull {:.3} suction {:.3} edge {:.3} flow {:.3} | resist: drag \
+                         {:.3} slab {:.3} boundary {:.3} collision {:.3} | answer {:.1} (RMS {:.1})",
+                        f.slab_pull,
+                        f.slab_suction,
+                        f.edge_energy,
+                        f.mantle_flow,
+                        f.basal_drag,
+                        f.slab_resistance,
+                        f.boundary_resistance,
+                        f.collision_resistance,
+                        f.speed_mm_yr,
+                        f.rms_mm_yr
+                    );
+                }
+            }
+        });
+        if let Some(d) = world.plates.as_ref().and_then(|s| s.dynamics.as_ref()) {
+            welds = d.collisions.iter().filter(|c| c.sutured).count();
+        }
+        eprintln!("{start} seed {seed}: the guard bound {bound} plate-steps; {welds} welds");
+    }
+}
 
 /// The continent's margin towards plate 1 as the boundary mix sees it (`dynamics::boundary_mix`),
 /// on the converging half (y > 0.2, away from the rotation's poles at ±x): per class (the mix's
