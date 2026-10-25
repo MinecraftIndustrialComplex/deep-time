@@ -167,6 +167,66 @@ pub fn thermal_age_myr(l_km: f64) -> f64 {
     }
 }
 
+/// The lithosphere a thermal age stands for, km: the cooling law's depth after `age_myr` from
+/// L_hot, L_cold − (L_cold − L_hot) e^(−t/τ_c), the inverse of [`thermal_age_myr`] (L_hot at or
+/// under 0, NaN for NaN).
+// ledger: ISO-112, PLT-465
+pub fn lithosphere_km_of_age(age_myr: f64) -> f64 {
+    if age_myr.is_nan() {
+        f64::NAN
+    } else if age_myr <= 0.0 {
+        L_HOT_KM
+    } else {
+        L_COLD_KM - (L_COLD_KM - L_HOT_KM) * (-age_myr / cooling_myr()).exp()
+    }
+}
+
+/// The mantle's temperature at the base of the thermal lithosphere, °C: "T(a,t)=Tm=1350°C" at
+/// the thermal bottom (Burov & Diament 1995, appendix).
+pub const MANTLE_C: f64 = 1350.0; // ledger: ISO-138
+
+/// The depth scale of the crust's radiogenic heat production, km: "hr≈10 km is the depth scale
+/// for the decrease in radiogenic heat production" (Burov & Diament 1995, appendix).
+pub const RADIOGENIC_DEPTH_KM: f64 = 10.0; // ledger: ISO-138
+
+/// The steady conductive geotherm of a continental lithosphere `l_km` deep, as the plate model's
+/// heat flow makes it, as a share of T_m at depth `z_km` (0 at the surface, 1 at L): the crust's
+/// heat q_c ([`CRUST_HEAT_MW_M2`]) from sources decaying as e^(−z/h_r), the mantle's q_m = B / L
+/// ([`MANTLE_HEAT_MW_M2_KM`]) through the whole lithosphere, and T_m at its base, so
+/// T(z) / T_m = (q_m z + q_c h_r (1 − e^(−z/h_r))) / (q_m L + q_c h_r (1 − e^(−L/h_r))). The
+/// conductivity this implies, (q_m L + q_c h_r (1 − e^(−L/h_r))) / T_m, is 2.69 W/m/K at every
+/// L from L_hot on (q_m L is B whatever L is), within the 2.0 to 3.5 of Burov & Diament's
+/// appendix (lower crust, mantle).
+// ledger: ISO-138, PLT-467
+pub fn geotherm_share(l_km: f64, z_km: f64) -> f64 {
+    let l = l_km.max(1.0);
+    let qm = MANTLE_HEAT_MW_M2_KM / l;
+    let hr = RADIOGENIC_DEPTH_KM;
+    let heat = |z: f64| qm * z + CRUST_HEAT_MW_M2 * hr * (1.0 - (-z / hr).exp());
+    heat(z_km) / heat(l)
+}
+
+/// The depth of the isotherm `t_c` (°C, from 0 to T_m) in that geotherm, km. Newton's method from
+/// the depth the surface heat flow's gradient gives, which is never deeper than it (the geotherm
+/// is concave), so every step stays on the shallow side and the depths rise to it.
+// ledger: ISO-138
+pub fn isotherm_km(l_km: f64, t_c: f64) -> f64 {
+    let l = l_km.max(1.0);
+    let qm = MANTLE_HEAT_MW_M2_KM / l;
+    let (qc, hr) = (CRUST_HEAT_MW_M2, RADIOGENIC_DEPTH_KM);
+    let heat = |z: f64| qm * z + qc * hr * (1.0 - (-z / hr).exp());
+    let target = (t_c / MANTLE_C).clamp(0.0, 1.0) * heat(l);
+    let mut z = target / (qm + qc);
+    for _ in 0..60 {
+        let step = (target - heat(z)) / (qm + qc * (-z / hr).exp());
+        z += step;
+        if step.abs() < 1.0e-9 {
+            break;
+        }
+    }
+    z
+}
+
 /// Whether a continental sample with these flags is heated, and whether by a rift (which thins a
 /// keel too) rather than by convection under it.
 fn heating(flags: u8) -> Option<bool> {
