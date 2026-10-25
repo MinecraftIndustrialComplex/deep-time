@@ -506,6 +506,8 @@ pub fn report(
             "mean_strain": counts.arc_strain_sum / counts.arc_cell_steps.max(1) as f64,
         },
         "saturated": counts.saturated,
+        // Drawn past a pole, in a grid row beyond it, and not started (DEF-081).
+        "past_pole": counts.past_pole,
         "overprinted": counts.overprinted,
         "subducted": counts.subducted,
         "median": {

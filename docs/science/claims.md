@@ -26,7 +26,7 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [CHK](ledger/CHK.md) | plate-check target ranges | 60 | 19 | 3 | 1 | 7 | 0 | 12 | 18 | 3 | 1 | 0 |
 | [CLM](ledger/CLM.md) | climate physics | 185 | 34 | 32 | 6 | 3 | 20 | 39 | 51 | 112 | 1 | 16 |
 | [CRE](ledger/CRE.md) | core engine: plate geometry, noise, plate state, deformation lattice | 35 | 0 | 8 | 0 | 0 | 0 | 0 | 27 | 1 | 0 | 0 |
-| [DEF](ledger/DEF.md) | folds, faults, intrusions | 79 | 18 | 0 | 0 | 1 | 0 | 60 | 0 | 0 | 0 | 0 |
+| [DEF](ledger/DEF.md) | folds, faults, intrusions | 80 | 18 | 0 | 0 | 1 | 0 | 61 | 0 | 0 | 0 | 0 |
 | [DEP](ledger/DEP.md) | deposit models, counts, sizes | 177 | 55 | 2 | 0 | 20 | 0 | 73 | 27 | 0 | 0 | 40 |
 | [ERO](ledger/ERO.md) | erosion, sediment, facies | 185 | 14 | 82 | 4 | 5 | 8 | 16 | 56 | 0 | 0 | 11 |
 | [FRC](ledger/FRC.md) | plate forces (the force balance, recorded) | 33 | 5 | 0 | 10 | 3 | 0 | 15 | 0 | 0 | 0 | 0 |
