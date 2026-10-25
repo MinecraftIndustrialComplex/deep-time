@@ -30,6 +30,23 @@ fn preset_json(n: u32, myr: f64, start: &str, seed: u64) -> String {
     v.to_string()
 }
 
+/// A built-in planet preset (the game's or a plate preset) at `n` samples (keyframes as
+/// [`preset_json`]'s).
+fn builtin_preset(name: &str, n: u32, myr: f64, start: &str, seed: u64) -> PlanetPreset {
+    let json = crate::preset::builtin(name)
+        .or_else(|| plates_builtin(name))
+        .unwrap_or_else(|| panic!("no built-in preset {name}"));
+    let json = with_timeline(json, Some(start), Some(myr)).unwrap();
+    let mut v: serde_json::Value = serde_json::from_str(&json).unwrap();
+    v["resolution"]["l0_samples"] = serde_json::json!(n);
+    v["keyframes"]["every_myr"] = serde_json::json!(20.0);
+    v["seed"] = serde_json::json!(seed);
+    match Preset::from_json(&v.to_string()).unwrap().body {
+        PresetBody::Planet(p) => *p,
+        other => panic!("not a planet preset: {other:?}"),
+    }
+}
+
 fn preset(n: u32, myr: f64, start: &str, seed: u64) -> PlanetPreset {
     match Preset::from_json(&preset_json(n, myr, start, seed))
         .unwrap()
@@ -3173,7 +3190,9 @@ fn the_reference_plate_on_the_lattice_term_by_term() {
 }
 
 /// What sets the planet's plate speed (the plate speed lane, 2026-10-25; plates.md, "Plate
-/// speed"): two planets of the quick preset's defaults, and every 50 Myr after the first 100 the
+/// speed"): two planets of a preset's plate stage (`SPEED_DIAG_PRESET`, default the pool's
+/// `earthlike_quick_16k`; `SPEED_DIAG_N` samples, default 100,000; `SPEED_DIAG_MYR`, default 600;
+/// the plate stage alone, so no erosion and the datum's sea), and every 50 Myr after the first 100 the
 /// force balance solved again on the step's state with one term changed at a time, the basal drag
 /// coefficient c_b kept unless the row says otherwise. A diagnosis of the speed level CHK-020
 /// reads, not a check, and one step's response only (the motion relaxes towards the balance; the
@@ -3181,8 +3200,12 @@ fn the_reference_plate_on_the_lattice_term_by_term() {
 /// the balance's RMS speed over the planet (visible samples' weight, the plates' centroid speeds,
 /// as CHK-020), over the plates with a slab pull and over the rest, and the area share pulled.
 #[test]
-#[ignore = "diagnosis: 400 Myr at 40k samples, two planets; run with --release -- --ignored --nocapture"]
+#[ignore = "diagnosis: 600 Myr at 100k samples, two planets; run with --release -- --ignored --nocapture"]
 fn what_sets_the_planets_plate_speed() {
+    let var = |k: &str| std::env::var(k).ok();
+    let name = var("SPEED_DIAG_PRESET").unwrap_or_else(|| "earthlike_quick_16k".to_owned());
+    let n: u32 = var("SPEED_DIAG_N").map_or(100_000, |x| x.parse().unwrap());
+    let myr: f64 = var("SPEED_DIAG_MYR").map_or(600.0, |x| x.parse().unwrap());
     type Tweak = fn(&mut TectonicParams);
     // c_b ∝ 1/((1 + s + b) v): a resistance set to 0 with the speed scale raised to match keeps it.
     let variants: [(&str, Tweak); 10] = [
@@ -3214,8 +3237,9 @@ fn what_sets_the_planets_plate_speed() {
         }),
     ];
     for (start, seed) in [("supercontinent", 1), ("scattered_continents", 2)] {
-        let p = preset(40_000, 400.0, start, seed);
+        let p = builtin_preset(&name, n, myr, start, seed);
         let t0 = p.t_start_years() / 1.0e6;
+        let mut boundary_km = 0.0;
         // Per variant: Σ RMS² over the planet, the pulled plates and the rest, Σ pulled share.
         let mut sums = vec![[0.0f64; 4]; variants.len()];
         let mut motion = 0.0;
@@ -3249,6 +3273,18 @@ fn what_sets_the_planets_plate_speed() {
             }
             let total: f64 = vis.iter().sum();
             let norm = stage.norm();
+            // The boundary as the boundary resistance counts it: half a spacing per visible
+            // sample beside another plate, from each side.
+            let half = 0.5 * norm.km(norm.spacing_rad());
+            boundary_km += (0..base.samples.len())
+                .filter(|&i| {
+                    !base.samples[i].is_hidden()
+                        && geo
+                            .edges(i as u32)
+                            .any(|(u, _)| base.plate_of(u as usize) != base.plate_of(i))
+                })
+                .count() as f64
+                * half;
             let speed_of = |w: DVec3, id: usize| {
                 norm.velocity_mm_yr(w, DVec3::from_array(base.plates[id].centroid))
                     .length()
@@ -3293,8 +3329,10 @@ fn what_sets_the_planets_plate_speed() {
         });
         let m = looks.max(1) as f64;
         eprintln!(
-            "{start} seed {seed}: {looks} looks; the motion's RMS {:.1} mm/yr",
-            (motion / m).sqrt()
+            "{name} {n} samples, {start} seed {seed}: {looks} looks; the motion's RMS {:.1} mm/yr; \
+             the boundary {:.0} km",
+            (motion / m).sqrt(),
+            boundary_km / m
         );
         for (v, (name, _)) in variants.iter().enumerate() {
             let s = sums[v];
