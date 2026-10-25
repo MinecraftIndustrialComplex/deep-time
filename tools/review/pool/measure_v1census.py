@@ -13,8 +13,14 @@ tools/review/continents_census.py's `fields` report, read as numbers (its helper
   largest      the largest landmass (8-connected, joined over the x seam), a share of the planet
   under_sea    continental crust under the sea, a share of the continental crust
   above_2km    land above 2 km, a share of the land
-  coast_hi     coast cells (land within 1.6 cell spacings of the sea) with land above 2 km on the same
-               landmass within 200 km inland, a share of the coast
+  coast_hi     coast cells (land within 1.6 point spacings of the sea) with land above 2 km within 200 km
+               inland, a share of the coast. Version 2 (RLC-055, M5 diagnosis 2026-10-25): measured on
+               Fibonacci points of the grid's count (nearest cell; the grid's north-south step is wider
+               than the coast band above about 51 degrees), the sea is the world ocean (a closed body of
+               sea is land), and the 200 km are over land (a strait wider than 1.6 spacings blocks them).
+               coast_hi_old, coast_hi_fib and coast_hi_ocean are the version-1 rule on the grid's cells,
+               on the Fibonacci points, and on the Fibonacci points with the closed bodies as land
+               (what each fix does); closed_sea is the closed bodies' share of the sea's area
   under_ice    land with 1 m of glacier ice or more, a share of the land
   collisions   continental collisions per 100 Myr (the plate check's collisions_per_100myr)
   crust_net    continental crust's net change over the run, a share of the planet (the record's last step
@@ -23,7 +29,7 @@ tools/review/continents_census.py's `fields` report, read as numbers (its helper
                the sea over the datum: the median of the record's sea_m after the first 100 Myr, and the
                last step's, metres
 
-Needs numpy and scipy (the pool resolves them with nix). Version 1: a change to these definitions
+Needs numpy and scipy (the pool resolves them with nix). Version 2: a change to these definitions
 bumps `version` in measures.json, and the pool recomputes the measure over the cached folders.
 """
 import argparse
@@ -58,8 +64,16 @@ def census(fields_dir):
     lab = cc.label_wrap(land)
     sizes = np.bincount(lab.ravel())
     sizes[0] = 0
+    sp = np.sqrt(cell_km2)
+    frow, fcol, fp = cc.fib_sample(h, w, r)
+    zf = z[frow, fcol]
     with contextlib.redirect_stdout(io.StringIO()):  # coast_metrics also prints a line of its own
-        coast = cc.coast_metrics(cc.xyz(lat[ok], lon[ok]), z[ok], np.sqrt(cell_km2))
+        coast = cc.coast_metrics(fp, zf, sp)
+        old = cc.coast_metrics(cc.xyz(lat[ok], lon[ok]), z[ok], sp, closed_as_land=False, over_land=False)
+        fib_old = cc.coast_metrics(fp, zf, sp, closed_as_land=False, over_land=False)
+        fib_ocean = cc.coast_metrics(fp, zf, sp, over_land=False)
+    sea_f = zf <= 0
+    closed_sea = float((sea_f & ~cc.world_ocean(fp, sea_f, sp)).sum() / max(int(sea_f.sum()), 1))
     n_land = max(int(land.sum()), 1)
     return {
         "land": land.sum() / ncell,
@@ -67,6 +81,10 @@ def census(fields_dir):
         "under_sea": wet_cont.sum() / max(int(cont.sum()), 1),
         "above_2km": float((z[land] > 2000).mean()) if land.any() else 0.0,
         "coast_hi": float(coast["coast_with_hi"]),
+        "coast_hi_old": float(old["coast_with_hi"]),
+        "coast_hi_fib": float(fib_old["coast_with_hi"]),
+        "coast_hi_ocean": float(fib_ocean["coast_with_hi"]),
+        "closed_sea": closed_sea,
         "under_ice": float((land & (ice >= cc.ICE_MIN_M)).sum()) / n_land,
         "cont": cont.sum() / ncell,
         "cells": ncell,
