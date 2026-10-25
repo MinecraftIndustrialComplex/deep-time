@@ -1544,4 +1544,72 @@ mod tests {
         }
         assert!(bands.iter().all(|b| b.class == index("hornfels")));
     }
+
+    /// A pluton drawn past a pole is not emplaced (DEF-082). The grid's rows run on past the pole
+    /// R = C / 2π to ±Zo (651.9 and 704 blocks on this 4,096-block planet, rows of 16), the row
+    /// that straddles the pole weighs in by its share of the planet (`GridDesc::area_share`), and a
+    /// pluton is placed at a random point of its cell, so most of the straddling row's draws lay
+    /// past the pole, where the cube bake's Jacobian is singular.
+    #[test]
+    fn no_pluton_is_emplaced_past_the_poles() {
+        let c = 4096;
+        let grid = GridDesc::for_planet("L1", c, 16).unwrap();
+        let pole = deeptime_format::Projection::new(c).pole_z();
+        assert!(
+            (0..grid.h).any(|j| {
+                let s = grid.area_share(j);
+                s > 0.0 && s < 1.0 && grid.block_z(i64::from(j)) as f64 > 0.0
+            }) && (0..grid.h).any(|j| grid.area_share(j) == 0.0),
+            "the fixture's grid has a row straddling the pole and rows wholly past it"
+        );
+        let n = grid.cells();
+        let flags = vec![f32::from(ARC); n];
+        let convergence = vec![80.0f32; n];
+        let crust = vec![f32::from(CONTINENTAL); n];
+        let regime_f = vec![0.0f32; n];
+        let plate = vec![0.0f32; n];
+        let x = ArcInputs {
+            flags: &flags,
+            convergence: &convergence,
+            crust_type: &crust,
+            regime: &regime_f,
+            plate_id: &plate,
+        };
+        let p = StructureParams {
+            pluton_rate_km2_myr: 1.0e-4,
+            ..StructureParams::default()
+        };
+        let t = Tables::get();
+        let (mut total, mut near) = (0usize, 0usize);
+        for seed in 0..120 {
+            let (mut rng, mut next) = (Rng::new(seed), 0u32);
+            let out = emplace(
+                &grid,
+                300.0,
+                &x,
+                &p,
+                &t,
+                1.0,
+                0.0,
+                &mut rng,
+                &mut next,
+                |_, _| None,
+            );
+            total += out.len();
+            for pl in &out {
+                near += usize::from(pl.z.abs() > pole - 8.0);
+                assert!(
+                    pl.z.abs() < pole,
+                    "pluton {} at z {} (pole {pole})",
+                    pl.id,
+                    pl.z
+                );
+            }
+        }
+        // Plutons do form in the row beside the pole's, so the test is not empty.
+        assert!(
+            total > 1000 && near > 0,
+            "{total} plutons, {near} near a pole"
+        );
+    }
 }
