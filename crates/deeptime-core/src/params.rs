@@ -523,6 +523,15 @@ pub struct TectonicParams {
     /// towards the front at this slope up to the belt's height there (a critical wedge keeps
     /// its shape as it grows; the Lesser Himalayan wedge's surface slope is 1–1.6°).
     pub wedge_slope_deg: f64,
+    /// The collision belt's surface from critical taper (`plates/belts.rs`, `fill_taper`): the
+    /// front is the toe of the orogenic wedge (the plate boundary surfaces at the deformation
+    /// front), and the belt's surface rises from it at `wedge_slope_deg` up to the strength
+    /// height, where it widens into a plateau. Each step's stacked crust fills the ground under
+    /// that surface nearest the front first; once the belt is full to `collision_belt_km` the
+    /// toe advances (the surface rises in place). The step's crust and the share a narrow
+    /// overriding plate keeps are unchanged: only where the thickening lands moves. `false`: the
+    /// profile `1 − (d/W)²`, highest at the front (ledger PLT-243). ledger: PLT-600, PLT-601
+    pub collision_belt_taper: bool,
     /// Two plates in collision weld into one when the convergence across their front has stayed
     /// below this, mm/yr …
     pub weld_speed_mm_yr: f64,
@@ -1074,6 +1083,7 @@ impl Default for TectonicParams {
             collision_stacking_share: 0.95,   // ledger: PLT-242
             collision_restack_whole: true,    // ledger: PLT-400 (game-choice; on since 2026-10-22)
             wedge_slope_deg: 1.5,             // ledger: PLT-192
+            collision_belt_taper: false,      // ledger: PLT-600, PLT-601
             weld_speed_mm_yr: 5.0,            // ledger: PLT-246
             weld_after_myr: 10.0,             // ledger: PLT-246
             reversal_by_arc_crust: true,      // ledger: PLT-371 (on since 2026-10-23)

@@ -608,16 +608,33 @@ fn stack_front(
             .iter()
             .map(|&(i, _)| f64::from(samples[i].elevation_m))
             .collect();
-        let given = fill_belt(&belt, &z_of, belt_rise_km2_m, belt_weight, area, cap_m);
-        // What was left over, and whether any sample still had room (measurement only).
-        let left =
-            (belt_rise_km2_m - given.iter().sum::<f64>() * area).max(0.0) * COLUMN_ISOSTATIC_FACTOR;
-        let room = cap_m <= 0.0 || z_of.iter().zip(&given).any(|(z, g)| cap_m - z - g > 1e-6);
-        if room {
-            sliver_km2_m = left;
+        let given = if k.collision_belt_taper {
+            // ledger: PLT-600 (the surface from critical taper), PLT-601 (the toe advances once
+            // the belt is full). The share a narrow overriding plate keeps is PLT-243's, as it
+            // was (its profile measures the room behind the front): only where the kept crust
+            // lands changes.
+            let keep = (belt.iter().map(|&(_, w)| w).sum::<f64>() * area / belt_weight).min(1.0);
+            let d_km: Vec<f64> = belt_d.iter().map(|&(_, _, d)| norm.km(d)).collect();
+            let kept_km2_m = keep * belt_rise_km2_m;
+            let given = fill_taper(&d_km, &z_of, z_front, tan, kept_km2_m, area, cap_m);
+            sliver_km2_m = (belt_rise_km2_m - kept_km2_m) * COLUMN_ISOSTATIC_FACTOR;
+            capped_km2_m = (kept_km2_m - given.iter().sum::<f64>() * area).max(0.0)
+                * COLUMN_ISOSTATIC_FACTOR;
+            given
         } else {
-            capped_km2_m = left;
-        }
+            let given = fill_belt(&belt, &z_of, belt_rise_km2_m, belt_weight, area, cap_m);
+            // What was left over, and whether any sample still had room (measurement only).
+            let left = (belt_rise_km2_m - given.iter().sum::<f64>() * area).max(0.0)
+                * COLUMN_ISOSTATIC_FACTOR;
+            let room =
+                cap_m <= 0.0 || z_of.iter().zip(&given).any(|(z, g)| cap_m - z - g > 1e-6);
+            if room {
+                sliver_km2_m = left;
+            } else {
+                capped_km2_m = left;
+            }
+            given
+        };
         rises.extend(
             belt_d
                 .iter()
@@ -846,6 +863,21 @@ fn fill_belt(
         }
     }
     given
+}
+
+/// The belt's fill under the critical taper (`collision_belt_taper`). Not yet built: the test
+/// comes first.
+// ledger: PLT-600, PLT-601.
+fn fill_taper(
+    d_km: &[f64],
+    _z: &[f64],
+    _z_front: f64,
+    _tan: f64,
+    _rise_km2_m: f64,
+    _area: f64,
+    _cap_m: f64,
+) -> Vec<f64> {
+    vec![0.0; d_km.len()]
 }
 
 /// Distance (rad) to km and the bin width of the foreland's profile.
@@ -1443,12 +1475,14 @@ mod tests {
     /// is untouched by the stacking. This is PLT-242's share alone, so `collision_restack_whole`
     /// (PLT-400, on by default since 2026-10-22: the collision's own wedge crosses whole and the
     /// volume added is more than the share of what crossed) is off here; the switch has its own
-    /// test, `a_collisions_own_wedge_crosses_whole_with_the_switch`.
+    /// test, `a_collisions_own_wedge_crosses_whole_with_the_switch`. Under either belt profile
+    /// (PLT-243's, the critical taper's PLT-600): only where the crust lands differs.
     #[test]
     fn stacking_moves_crust_and_creates_none() {
-        for share in [1.0, 0.5] {
+        for (taper, share) in [(false, 1.0), (false, 0.5), (true, 1.0), (true, 0.5)] {
             let mut fx = Fixture::new();
             fx.preset.tectonics.collision_threshold_km = 1.0e9;
+            fx.preset.tectonics.collision_belt_taper = taper;
             fx.preset.tectonics.collision_stacking_share = share;
             fx.preset.tectonics.collision_restack_whole = false;
             // A crust strong enough that the strength height (PLT-253) never binds here.
@@ -1642,6 +1676,122 @@ mod tests {
             fill_belt(&belt, &full, 150_000.0, weight, area, 5000.0)
                 .iter()
                 .all(|&x| x == 0.0)
+        );
+    }
+
+    /// PLT-600 and PLT-601: under the critical taper the belt's surface rises from the front at
+    /// the wedge's surface slope, and the step's crust is all placed. It fills the ground under
+    /// `z_front + d tan α` nearest the front first, the strength height a plateau behind; with
+    /// the belt full to its width the surface rises in place (the toe advances); what the belt
+    /// cannot hold at the strength height is left over.
+    #[test]
+    fn the_taper_belt_rises_from_the_front_at_the_slope_and_keeps_the_volume() {
+        let tan = 1.6f64.to_radians().tan();
+        let (z0, cap, area) = (300.0, 5200.0, 25.0);
+        // A line of samples every 5 km behind the front, out to the belt's 400 km.
+        let d: Vec<f64> = (0..=80).map(|j| 5.0 * f64::from(j)).collect();
+        let flat = vec![z0; d.len()];
+        let surface = |h: f64, d: f64| (h + 1000.0 * d * tan).min(cap);
+        let placed = |g: &[f64]| g.iter().sum::<f64>() * area;
+        let close = |a: f64, b: f64| (a - b).abs() < 1e-6 * b.abs().max(1.0);
+
+        // 1. Part of the ramp: the surface rises from the front's height at the slope out to the
+        //    last sample filled (that one in part); nothing beyond it rises.
+        let rise = 600_000.0;
+        let g = fill_taper(&d, &flat, z0, tan, rise, area, cap);
+        assert!(close(placed(&g), rise), "{} placed of {rise}", placed(&g));
+        let last = g.iter().rposition(|&x| x > 0.0).unwrap();
+        assert!(last > 5 && last < 30, "{last}");
+        assert_eq!(g[0], 0.0, "the front stands at its own height, the toe's");
+        for j in 1..last {
+            assert!(close(z0 + g[j], surface(z0, d[j])), "{j}: {}", z0 + g[j]);
+            let slope = (g[j] - g[j - 1]) / (1000.0 * (d[j] - d[j - 1]));
+            assert!((slope - tan).abs() < 1e-9, "{j}: slope {slope} for {tan}");
+        }
+        assert!(g[last] <= surface(z0, d[last]) - z0 + 1e-9);
+        assert!(g[last + 1..].iter().all(|&x| x == 0.0));
+
+        // 2. Past the strength height: a ramp from the front, then a plateau at the limit.
+        let rise = 4_000_000.0;
+        let g = fill_taper(&d, &flat, z0, tan, rise, area, cap);
+        assert!(close(placed(&g), rise), "{} placed of {rise}", placed(&g));
+        let last = g.iter().rposition(|&x| x > 0.0).unwrap();
+        let toe_to_cap = (cap - z0) / (1000.0 * tan);
+        assert!(d[last] > toe_to_cap && last < 80, "{last}");
+        for j in 0..last {
+            assert!(close(z0 + g[j], surface(z0, d[j])), "{j}: {}", z0 + g[j]);
+        }
+
+        // 3. The belt full to its width: the toe advances, the whole surface rising in place at
+        //    the same slope; all of it placed.
+        let full_width: f64 = d.iter().map(|&x| surface(z0, x) - z0).sum::<f64>() * area;
+        let rise = full_width + 500_000.0;
+        let g = fill_taper(&d, &flat, z0, tan, rise, area, cap);
+        assert!(close(placed(&g), rise), "{} placed of {rise}", placed(&g));
+        let h = z0 + g[0];
+        assert!(h > z0 + 1.0, "the toe advanced: the front rose {}", g[0]);
+        for j in 0..d.len() {
+            assert!(close(z0 + g[j], surface(h, d[j])), "{j}: {}", z0 + g[j]);
+        }
+
+        // 4. More than the belt holds at the strength height: every sample at the limit, the
+        //    rest left over (the caller sends it down with the slab).
+        let g = fill_taper(&d, &flat, z0, tan, 2.0e7, area, cap);
+        assert!(g.iter().all(|&x| close(z0 + x, cap)), "{g:?}");
+        assert!(close(placed(&g), (cap - z0) * area * d.len() as f64));
+
+        // 5. Ground already above the surface takes nothing and the fill passes it; samples at
+        //    the same distance share the last of it alike.
+        let mut z = flat.clone();
+        z[4] = 4000.0;
+        let g = fill_taper(&d, &z, z0, tan, 600_000.0, area, cap);
+        assert_eq!(g[4], 0.0);
+        assert!(close(z0 + g[5], surface(z0, d[5])));
+        assert!(close(placed(&g), 600_000.0));
+        let d2 = [0.0, 10.0, 10.0, 20.0];
+        let g = fill_taper(&d2, &[z0; 4], z0, tan, 0.5 * 1000.0 * 10.0 * tan * area, area, cap);
+        assert!(g[1] > 0.0 && close(g[1], g[2]) && g[3] == 0.0, "{g:?}");
+    }
+
+    /// PLT-600 on a head-on collision: the belt's ground rises behind the front, not at it (the
+    /// front is the toe), and the step keeps the crust the old profile kept.
+    #[test]
+    fn the_taper_belt_is_lowest_at_the_front_and_keeps_the_steps_crust() {
+        let mut kept = Vec::new();
+        for taper in [false, true] {
+            let mut fx = Fixture::new();
+            fx.preset.tectonics.collision_threshold_km = 1.0e9;
+            fx.preset.tectonics.collision_belt_taper = taper;
+            let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
+            let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
+            let (stacked, _) = fx.step(&mut st, 1, None);
+            let s = &stacked[&0];
+            kept.push(s.belt_km2_m + s.wedge_km2_m + s.sliver_km2_m + s.capped_km2_m);
+            // The overriding plate's rises: on its edge at the front (a neighbour on the incoming
+            // plate) and behind it, away from the cap's corners.
+            let pts = fx.geo.points();
+            let (mut near, mut all) = (0.0f64, 0.0f64);
+            for (i, s) in st.samples.iter().enumerate() {
+                let p = pts[i];
+                if !arc(p) || p.y < 0.95 || p.x >= 0.0 {
+                    continue;
+                }
+                let dz = f64::from(s.elevation_m - z0[i]);
+                all = all.max(dz);
+                if fx.geo.edges(i as u32).any(|(v, _)| pts[v as usize].x >= 0.0) {
+                    near = near.max(dz);
+                }
+            }
+            assert!(all > 100.0, "taper {taper}: the belt rose {all} m");
+            if taper {
+                assert!(near < 0.5 * all, "the front rose {near} m, the belt {all} m");
+            } else {
+                assert!(near > 0.9 * all, "the old profile: {near} m at the front, {all} m");
+            }
+        }
+        assert!(
+            (kept[1] - kept[0]).abs() < 1e-6 * kept[0],
+            "the crust kept or sent down: {kept:?}"
         );
     }
 
