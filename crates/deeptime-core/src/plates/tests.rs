@@ -533,7 +533,14 @@ fn sutures_and_initiations_keep_continents_whole() {
     // supercontinent 4 and scattered 1; this test passes on the pairs 4 and 1, 7 and 2, 11 and
     // 3, 14 and 4, 15 and 5, 21 and 6, 23 and 10, 24 and 14).
     for (start, seed) in [("supercontinent", 4), ("scattered_continents", 1)] {
-        let p = preset(8000, 300.0, start, seed);
+        let mut p = preset(8000, 300.0, start, seed);
+        // The old law (PLT-585 off): under Forsyth & Uyeda's balance on this small planet, whose
+        // ridge push is several times Earth's (`plates_quick_16k`, ridge -1,000 m, floor
+        // -10,000 m), the speed guard binds on every welding seed of 1 to 24 but supercontinent
+        // 11 (`weld_seed_sweep`, 2026-10-25: 10 scattered and 10 supercontinent seeds weld, the
+        // guard holding 3 to 90 plate-steps in 300 Myr), and these two seeds weld no more. A
+        // suture is the same under either law.
+        p.tectonics.forsyth_uyeda_balance = false;
         let mut seen = 0usize;
         let world = run_stage(&p, |stage, world, st| {
             assert!(stats::summary(st).partition_ok);
@@ -825,7 +832,14 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // 12 and 16 twice, seeds 3, 4, 5, 14, 15, 18 and 24 no more; seed 1 here and seed 2 in the
     // recording test still weld and pass, so they stay; from the supercontinent 6, 10, 15, 18, 19
     // and 20, seed 15 three times).
-    let p = preset(8000, 300.0, "scattered_continents", 1);
+    let mut p = preset(8000, 300.0, "scattered_continents", 1);
+    // The old law (PLT-585 off): under Forsyth & Uyeda's balance on this small planet, whose
+    // ridge push is several times Earth's (`plates_quick_16k`, ridge -1,000 m, floor -10,000 m),
+    // the speed guard binds on every welding seed of 1 to 24 but supercontinent 11
+    // (`weld_seed_sweep`, 2026-10-25: 10 scattered and 10 supercontinent seeds weld, the guard
+    // holding 3 to 90 plate-steps in 300 Myr), and this seed welds no more. A collision's life
+    // cycle is the same under either law.
+    p.tectonics.forsyth_uyeda_balance = false;
     let mut life = CollisionLives::default();
     let world = run_stage(&p, |_, _, st| {
         assert!(stats::summary(st).partition_ok);
@@ -990,7 +1004,13 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // 19 no longer welds: all 12 welding seeds pass; seed 2 since the slab pull at the arcs'
     // fronts went on by default, PLT-560, the same day, when seed 20 no longer welds: all 13
     // welding seeds pass, and seed 2 welds twice).
-    let p = preset(8000, 300.0, "scattered_continents", 2);
+    let mut p = preset(8000, 300.0, "scattered_continents", 2);
+    // The old law (PLT-585 off): the guard asserted below binds under Forsyth & Uyeda's balance
+    // on every welding seed of 1 to 24 of this small planet but supercontinent 11, whose ridge
+    // push is several times Earth's (`plates_quick_16k`, ridge -1,000 m, floor -10,000 m;
+    // `weld_seed_sweep`, 2026-10-25: 7 plate-steps in 300 Myr on this seed). The record is
+    // measurement only under either law.
+    p.tectonics.forsyth_uyeda_balance = false;
     let total = PlatesStage::new(p.clone()).total_steps();
     let mut checked = 0u64;
     let mut life = CollisionLives::default();
@@ -3470,6 +3490,15 @@ fn the_reference_plate_on_the_lattice_term_by_term() {
 /// ridge and floor (-1,000 and -10,000 m) give a ridge push several times Earth's, so it is no
 /// guide to the pool's planet (the motion 39.2 and 40.8 at 100,000 samples, 29.7 and 32.8 without
 /// the edge energy).
+///
+/// Phase 2 (2026-10-25, the same planets and looks; the defaults row now PLT-585 off): the old
+/// law 26.7 and 28.5 (the rest 19.5 and 15.5); Forsyth & Uyeda's balance with its friction links
+/// (PLT-585, by their 60 degree rule, a trench's friction at its front) 50.2 and 44.2, pulled 36.4
+/// and 38.3, the rest 97.0 and 68.7; at Table 6's own ridge push (0.36 of 6.43, the edge energy
+/// scaled to it) 41.2 and 33.1, the rest 69.6 and 21.9. The rest's RMS² is mostly oceanic plates
+/// of 0.1 to 0.5 starting plates (0.65 and 0.51 of it): plates over a trench whose suction (0.50
+/// per km) outweighs the trench's colliding resistance (0.16) and their transforms', so that only
+/// the basal drag, by area, holds them.
 #[test]
 #[ignore = "diagnosis: 600 Myr at 100k samples, two planets; run with --release -- --ignored --nocapture"]
 fn what_sets_the_planets_plate_speed() {
