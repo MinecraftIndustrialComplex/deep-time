@@ -981,4 +981,26 @@ the dissolved load in it.
   source puts the silicate Ca + Mg at 1.6 to 2.8e12 mol/yr (a 2023 GMD preprint citing Gaillardet
   et al. 1999, whose primary was not read), half the model's. Not checked further.
 
-**Measured.** The 8-run arm against base14 is in the build log (pool arm `m5-chemden`).
+**Measured.** Pool arm `m5-chemden` (`earthlike_quick_16k`, 1000 Myr, both starts, seeds 1 to 4,
+the switch on) against base14 (24 runs, the switch off), medians with the two-sided Mann-Whitney p:
+
+| measure | base14 | chemical denudation | p |
+|---|---|---|---|
+| land | 0.319 | 0.310 | 0.14 |
+| largest landmass | 0.205 | 0.228 | 0.81 |
+| continental crust under the sea | 0.202 | 0.193 | 0.69 |
+| land above 2 km | 0.085 | 0.095 | 0.81 |
+| coast with high ground | 0.201 | 0.224 | 0.22 |
+| land under ice | 0.099 | 0.075 | 0.27 |
+| collisions per 100 Myr | 1.70 | 1.60 | 0.68 |
+| continental crust's net change | -0.043 | -0.053 | 0.094 |
+| criteria met per run (median, mean) | 5, 5.42 | 5, 5.12 | 0.21 |
+| sea over the datum after 100 Myr / at the end, m | 277 / 409 | 235 / 278 | |
+| the surface guard's worst, m from the sea | 10,109 | 9,887 | 0.24 |
+
+No measure moved at p < 0.05, every run reached the end, and the guard stayed where base14 has
+it, so the term is on by default since 2026-10-25 (the rule for built physics). The off switch
+is bit-identical to base14 (a one-run arm, `m5-chemden-off`, supercontinent seed 1: the same
+state hash). The sea's lower stand at the end (278 m against 409, untested) goes with the
+dissolved load leaving the mass budget (Limits) and the slightly larger loss of continental
+crust.

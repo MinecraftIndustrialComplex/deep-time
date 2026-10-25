@@ -307,7 +307,7 @@
     "weathering_rock_mol_kg": 1.26,
     "weathering_min_denudation_m_myr": 2.0,
     "weathering_supply_scale": 2.0,
-    "chemical_denudation": false,
+    "chemical_denudation": true,
     "dissolved_kg_per_mol": 0.26,
     "seafloor_weathering_share": 0.2,
     "solar_brightening": true,

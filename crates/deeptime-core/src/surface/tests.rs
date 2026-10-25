@@ -634,7 +634,10 @@ fn chemical_denudation_takes_the_weathered_rock_away() {
     let on = run(true, "chem-on");
     let (a, c) = (off.surface.as_ref().unwrap(), on.surface.as_ref().unwrap());
     assert!(!off.fields.contains_key(crate::climate::field::DISSOLVED));
-    assert!(!off.globals.contains_key(crate::climate::DISSOLVED_MOL_GLOBAL));
+    assert!(
+        !off.globals
+            .contains_key(crate::climate::DISSOLVED_MOL_GLOBAL)
+    );
     assert_eq!(a.totals.dissolved_km3, 0.0);
     assert!(c.totals.dissolved_km3 > 0.0);
     assert!(on.globals[crate::climate::DISSOLVED_MOL_GLOBAL] > 0.0);

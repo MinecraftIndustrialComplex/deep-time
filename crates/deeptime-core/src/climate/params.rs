@@ -519,7 +519,7 @@ impl Default for ClimateParams {
             weathering_rock_mol_kg: 1.26,         // ledger: CLM-153
             weathering_min_denudation_m_myr: 2.0, // ledger: CLM-155
             weathering_supply_scale: 2.0,         // ledger: CLM-156
-            chemical_denudation: false,           // ledger: ERO-205
+            chemical_denudation: true,            // ledger: ERO-205 (on since 2026-10-25)
             dissolved_kg_per_mol: 0.26,           // ledger: ERO-206
             seafloor_weathering_share: 0.2,       // ledger: CLM-158
             solar_brightening: true,
