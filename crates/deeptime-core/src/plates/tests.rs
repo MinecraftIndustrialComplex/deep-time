@@ -4855,21 +4855,20 @@ fn a_resampling_subducts_sediment_by_the_margins_type() {
         (100.0, 400.0, 0.0, true, 1.0),
         (100.0, 1400.0, 50.0, true, 0.83),
     ] {
+        // Every sample holds the pile and the convergence, so the resampling's blends of a
+        // hidden sample with its visible neighbours (the pile it reads) and of the top's corners
+        // (the convergence) see the case's values.
         let mut st = st0.clone();
         for s in st.samples.iter_mut() {
-            if s.is_hidden() {
-                s.pools[state::pool::SEDIMENT] = sed;
-                s.pools[state::pool::SEDIMENTARY] = sedr;
-                s.thickness_m = pools::thickness(&s.pools);
-            } else {
-                s.convergence_mm_yr = conv;
-                if oceanic_top && s.kind == CONTINENTAL {
-                    s.kind = state::OCEANIC;
-                    s.pools = pools::oceanic_column();
-                    s.thickness_m = pools::thickness(&s.pools);
-                    s.basement_m = 0.0;
-                }
+            if oceanic_top && !s.is_hidden() && s.kind == CONTINENTAL {
+                s.kind = state::OCEANIC;
+                s.pools = pools::oceanic_column();
+                s.basement_m = 0.0;
             }
+            s.pools[state::pool::SEDIMENT] = sed;
+            s.pools[state::pool::SEDIMENTARY] = sedr;
+            s.thickness_m = pools::thickness(&s.pools);
+            s.convergence_mm_yr = conv;
         }
         p.tectonics.sediment_subduction_sourced = false;
         p.tectonics.sediment_subduction_share = 1.0;
