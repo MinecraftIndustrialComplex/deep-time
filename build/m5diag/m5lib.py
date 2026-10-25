@@ -103,15 +103,34 @@ def factors(det):
 
 def m5_curve(p, z, sp, comp, d_sea, targets, keep=None):
     """M5 when the high-ground level is set so that the land above it is each target share of the
-    land (the same planet with its high ground at Earth's extent): [(target, level m, M5)]."""
+    land (the same planet with its high ground at Earth's extent):
+    [(target, level m, M5, f_near, s)]."""
     k = np.ones(z.size, bool) if keep is None else keep
     zl = z[(z > 0) & k]
     out = []
     for t in targets:
         lev = float(np.quantile(zl, 1.0 - t))
         det = coast_detail(p, z, sp, level=lev, comp=comp, d_sea=d_sea, keep=keep)
-        out.append((t, lev, m5_of(det)))
+        fa = factors(det)
+        out.append((t, lev, m5_of(det), float(fa["f_near"]), float(fa["s"])))
     return out
+
+
+def crossing(p, land, ci, jn, qual):
+    """The share of the qualified coast points whose straight line to their nearest qualifying
+    high point passes over the sea (9 interior points, each the nearest point's land or sea)."""
+    qi = np.nonzero(qual)[0]
+    if qi.size == 0:
+        return np.zeros(0, bool), qi
+    a0, b0 = p[ci[qi]], p[jn[qi]]
+    tree = cKDTree(p)
+    crosses = np.zeros(qi.size, bool)
+    for t in np.linspace(0.1, 0.9, 9):
+        m = a0 * (1 - t) + b0 * t
+        m /= np.linalg.norm(m, axis=1)[:, None]
+        _, jm = tree.query(m)
+        crosses |= ~land[jm]
+    return crosses, qi
 
 
 def dist_hist(dmin, edges=(0.0, 50.0, 100.0, 150.0, 200.0)):

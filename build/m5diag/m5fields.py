@@ -154,8 +154,37 @@ def one(run):
     out["u_Tc_hi_regime"] = {str(k): float((utc & hi & (reg == k)).sum() / max((utc & hi).sum(), 1))
                              for k in range(10)}
     out["u_Tc_hi_sz"] = float((utc & hi & ((m_flags & F_SZ) != 0)).sum() / max((utc & hi).sum(), 1))
-    # Distances.
+    # The young collision class by the age of its stamp, and its high ground on a front.
     jn = J[np.arange(C), near_cls]
+    cy = qual & (near_cls == CLASSES.index("coll_young"))
+    out["coll_young_by_age"] = {f"{a_:g}-{b_:g}": float((cy & (m_age[np.maximum(jn, 0)] >= a_)
+                                                         & (m_age[np.maximum(jn, 0)] < b_)).sum() / C)
+                                for a_, b_ in ((-1e9, 2), (2, 5), (5, 10))}
+    # The coast by the plate front nearest to it (the map's front flags 256 subduction, 512
+    # collision): within 200 km of a subduction front, else of a collision front, else neither.
+    fl_all = a[:, 10].astype(np.int64)
+    dfr = {}
+    for nm, bit in (("sub", 256), ("coll", 512)):
+        sel = (fl_all & bit) != 0
+        if sel.any():
+            d_, _ = cKDTree(q[sel]).query(p[ci])
+            dfr[nm] = cc.arc_km(d_)
+        else:
+            dfr[nm] = np.full(C, np.inf)
+    ctype = np.where(dfr["sub"] <= 200, 0, np.where(dfr["coll"] <= 200, 1, 2))
+    out["coast_by_front"] = {nm: {"coast_share": float((ctype == i).sum() / C),
+                                  "m5_in": float((qual & (ctype == i)).sum() / max((ctype == i).sum(), 1)),
+                                  "m5_part": float((qual & (ctype == i)).sum() / C)}
+                             for i, nm in enumerate(("sub200", "coll200", "neither"))}
+    # Iced land kept out of the shares (the stand-in for Earth's by-rock figure without the
+    # two ice sheets).
+    ice_c = np.nan_to_num(f["climate/ice_thickness_m"][ok])
+    for lim in (1.0, 100.0):
+        kp = ~(land & (ice_c >= lim))
+        dk = m5lib.coast_detail(p, z, sp, comp=comp, d_sea=d_sea, keep=kp)
+        out[f"m5_ice_lt{lim:g}_kept_out"] = m5lib.m5_of(dk)
+        out[f"m4_ice_lt{lim:g}_kept_out"] = float((z[land & kp] > 2000).mean())
+    # Distances.
     out["dist_hist"] = m5lib.dist_hist(dmin)
     out["dist_hist_by"] = {k: m5lib.dist_hist(np.where(near_cls == i, dmin, np.inf))
                            for i, k in enumerate(CLASSES)}
@@ -260,6 +289,15 @@ def one(run):
     per_col = colc.sum(0)
     chk["seam_coast_col0_over_mean"] = float(per_col[0] / max(per_col.mean(), 1e-9))
     chk["seam_coast_colw_over_mean"] = float(per_col[-1] / max(per_col.mean(), 1e-9))
+    landc = np.zeros((h, w), bool)
+    landc[ok] = land
+    per_land = landc.sum(0)
+    cols = [0, 1, 2, 3, w // 2, w - 4, w - 3, w - 2, w - 1]
+    chk["seam_cols"] = {str(c_): {"coast_over_mean": float(per_col[c_] / max(per_col.mean(), 1e-9)),
+                                  "land_over_mean": float(per_land[c_] / max(per_land.mean(), 1e-9))} for c_ in cols}
+    # Column-to-column change of the land mask across the seam against inside the grid.
+    flips = (landc[:, 1:] != landc[:, :-1]).sum(0)
+    chk["seam_land_flips_over_mean"] = float((landc[:, 0] != landc[:, -1]).sum() / max(flips.mean(), 1e-9))
     # (g) The straight line from a qualified coast point to its high point: across the sea?
     qi = np.nonzero(qual)[0]
     a0, b0 = p[ci[qi]], p[jn[qi]]
