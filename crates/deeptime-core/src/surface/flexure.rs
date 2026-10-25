@@ -4265,7 +4265,9 @@ mod tests {
         let n = w * h;
         let mut s = FlexState::fresh(n);
         s.water_m = vec![0.0; n];
-        let prev_plate: Vec<f32> = (0..n).map(|c| if c / w >= 128 { 1.0 } else { 0.0 }).collect();
+        let prev_plate: Vec<f32> = (0..n)
+            .map(|c| if c / w >= 128 { 1.0 } else { 0.0 })
+            .collect();
         s.belt_m = (0..n)
             .map(|c| match c / w {
                 118..128 => 16_000.0,
