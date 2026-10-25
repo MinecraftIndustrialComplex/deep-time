@@ -134,6 +134,141 @@ section "Tasks 3 and 4").
 - The folds and faults of the structure stage follow the belt and wedge through the `collision`
   regime; they do not yet read the real shortening or the flexural basin (task 6 of the design).
 
+### The belt from critical taper (2026-10-25)
+
+Ledger PLT-600 (new, `verified`) and PLT-601 (new, `game-choice`); rows changed: PLT-192,
+PLT-243, PLT-244, PLT-401. On by default since 2026-10-25 (`tectonics.collision_belt_taper`). It
+replaces step 3's profile above, `1 - (d/W)^2` highest at the front (PLT-243, an agent's choice
+with no source), and leaves how much crust stays untouched.
+
+**What happens on Earth.** In a collision the plate boundary reaches the surface at the
+deformation front (the Himalaya's Main Frontal Thrust), and the orogenic wedge sits on its hanging
+wall: the Lesser Himalaya is Indian crust above the décollement. Its surface rises from the toe at
+a nearly constant slope, 1 to 1.6° in the Nepal Himalaya (DeCelles & Carrapa 2021, section 2.4.1;
+PLT-192). A critical wedge grows self-similarly, its width as the square root of the material it
+has taken in, W = [2hVt / tan(α + β)]^½ (Dahlen 1990, eq. 3, p. 60). It cannot rise without limit:
+"it is thus the existence of a brittle-plastic transition at 10-15 km depth that ultimately limits
+the height of very wide fold-and-thrust belts and accretionary wedges. This provides a natural
+explanation for the break in topographic slope of the Higher Himalaya at the edge of the Tibetan
+Plateau" (Dahlen 1990, p. 96). DeCelles & Carrapa limit their taper analysis to the southernmost
+~80 km, since farther north the décollement lies deeper than 18 km and brittle behaviour is
+unlikely. So the high ground of a collision belt is not at the front: the front is the toe, the
+surface climbs from it, and behind the slope stands a plateau.
+
+**What the model does.** The front is the toe. The belt's surface rises from the overriding
+edge's mean height z_f at `wedge_slope_deg` (1.5°, PLT-192) up to the crust's strength height
+h_s (about 5.2 km at 1 g, PLT-253), and is flat behind: S(d) = min(h_s, z_f + d tan α). The step's
+kept crust raises the ground under S nearest the front first, samples at the same distance alike,
+until it runs out, so the belt widens behind its toe as it takes crust in. When the whole belt
+within `collision_belt_km` (400 km, PLT-241) is under S and crust is left, the surface rises in
+place (S = min(h_s, H + d tan α), H by bisection): the toe advances (PLT-601). What does not fit
+with every sample at h_s goes down with the slab as before. How much the belt keeps is the old
+fill's placed total to the metre, PLT-243's room share and its repeated passes included; only
+where the thickening lands moves. At z_f = 300 m the ramp reaches h_s 187 km behind the front.
+
+The first two arms broke that rule. They kept PLT-243's room share k alone, while the old fill
+repeats its pass and keeps 1 - (1 - k)^6 behind a narrow overriding continent, so they sent 6.8 %
+of the crossed crust down as left over behind a sliver against base12's 4.4 %. The fixture test
+had a wide overriding plate (k = 1) and missed it. The fix (1e4bc9dd) places exactly the old
+fill's total, with a test behind a continent one row deep
+(`the_taper_keeps_what_the_old_fill_keeps_behind_a_sliver`); ct-taper3 is the clean arm.
+
+**The arms** (`earthlike_quick_16k`, 1000 Myr, seeds 1 to 4, both starts, `--threads 2`,
+`+DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`, measures `v1census` version 2
+and `guard`; base12 is master's 24-run base, key 4f5b17199a21 = 5cf16ecd76cd, argkey cd665cef):
+
+| arm | what | key, argkey |
+|---|---|---|
+| ct-base12-s1to4 | base12's own runs of seeds 1 to 4, cached, no sim | 5cf16ecd76cd, cd665cef |
+| ct-taper3 | the taper at 1.5°, conserving (the clean arm) | 2242d7ae7b13, e4750c17 |
+| ct-taper2 | the taper at 1.5°, before the fix | 43da3799ceea, e4750c17 |
+| ct-taper1 | the taper at 1.6°, before the fix | f04289f05a38, 1d8485b3 |
+
+Medians, the two-sided Mann-Whitney p against base12's 24 runs in brackets (`pool.sh table --base
+base12 --measure v1census --measure guard`); the crust budget's shares of the crossed crust from
+each run's last `cb_globals` line (`tools/review/m5diag/cbfinal.py`):
+
+| measure | base12 (24) | ct-base12-s1to4 | ct-taper3 | ct-taper2 | ct-taper1 |
+|---|---|---|---|---|---|
+| land | 0.312 | 0.309 (0.68) | 0.316 (0.72) | 0.301 (0.14) | 0.327 (0.086) |
+| largest landmass | 0.189 | 0.204 (0.91) | 0.203 (0.40) | 0.183 (0.33) | 0.221 (0.69) |
+| continental crust under the sea | 0.190 | 0.198 (0.74) | 0.181 (0.88) | 0.242 (0.094) | 0.160 (0.43) |
+| land above 2 km (fires above 0.07) | 0.128 | 0.128 (0.81) | 0.104 (0.78) | 0.091 (0.12) | 0.091 (0.12) |
+| coast with high ground (fires above 0.11) | 0.229 | 0.230 (0.68) | 0.234 (0.88) | 0.209 (0.11) | 0.202 (0.25) |
+| land under ice | 0.107 | 0.100 (0.45) | 0.082 (0.20) | 0.105 (0.69) | 0.091 (0.27) |
+| collisions per 100 Myr | 1.60 | 1.95 (0.48) | 1.95 (0.18) | 1.45 (0.19) | 1.70 (0.98) |
+| continental crust's net change over the run | −0.069 | −0.065 (0.78) | −0.053 (0.064) | −0.050 (0.018) | −0.061 (0.21) |
+| criteria met per run, median and mean of 7 | 5, 5.04 | 5, 5.00 | 5, 5.00 | 5, 5.25 | 5, 5.12 |
+| guard: steps beyond 2 Earth reliefs | 0 | 0 | 0 | 0 | 0 |
+| guard's worst, m from the sea | 10,118 | 10,105 (0.45) | 10,025 (0.48) | 10,138 (0.85) | 10,054 (0.45) |
+| largest rise / fall of a cell in a step, m | 7,237 / 7,338 | 7,252 / 7,277 | 6,902 / 7,101 | 7,259 / 7,326 | 7,052 / 7,086 |
+| plate cells' largest excess over Airy, m | 2,819 | 2,782 (0.91) | 2,248 (0.007) | 2,343 (0.010) | 2,333 (0.005) |
+| highest plate elevation, m | 6,341 | 6,272 (0.50) | 5,985 (0.033) | 5,996 (0.002) | 6,114 (0.013) |
+| crust crossing collision fronts, km³ over the run | 1.32e10 | 1.35e10 | 1.54e10 | 1.42e10 | 1.45e10 |
+| kept | 0.885 | 0.890 | 0.898 | 0.872 | 0.870 |
+| in the wedge (PLT-244) | 0.173 | 0.176 | 0.173 | 0.166 | 0.153 |
+| left over behind a sliver | 0.044 | 0.041 | 0.038 | 0.068 | 0.058 |
+| down at the strength height | 0.024 | 0.024 | 0.017 | 0.019 | 0.015 |
+| placed after the belt was full (`taper_toe`, PLT-601) | | | 0.035 | 0.032 | not counted |
+
+Against base12's own runs of the same seeds (`--base ct-base12-s1to4`) ct-taper3's p are 0.57 to
+1.0 for the realism checks (0.19 for the crust's net change), 0.028 for the excess over Airy and
+0.13 for the highest elevation.
+
+Where the coast's high ground comes from: the class of its nearest qualifying high ground, in
+absolute shares of the land. These come from the M5 diagnosis's fields
+(`tools/review/m5diag/m5arm.sh`, then `m5compare.py`), so every M5 and M4 in this table is the
+**version 1 rule** (the census grid, closed depressions as sea, the reach straight across), not
+the census's version 2 above. base12 here is its runs of seeds 1 to 4, and the p are against them:
+
+| version 1 rule | base12 s1-4 | ct-taper3 | ct-taper2 | ct-taper1 |
+|---|---|---|---|---|
+| M5, coast with high ground | 0.231 | 0.264 (0.72) | 0.211 (0.44) | 0.233 (0.65) |
+| M4, land above 2 km | 0.128 | 0.104 (1.0) | 0.091 (0.28) | 0.091 (0.28) |
+| M5 by young collision belts | 0.111 | 0.090 (0.08) | 0.075 (0.005) | 0.059 (0.01) |
+| M5 by young Andean margins | 0.026 | 0.061 (0.08) | 0.040 (0.38) | 0.047 (0.08) |
+| M5 by old collision belts | 0.035 | 0.044 (0.19) | 0.038 (0.80) | 0.046 (0.33) |
+| M5 without the young collision belts | 0.157 | 0.241 (0.03) | 0.187 (0.44) | 0.214 (0.13) |
+| M4 by young collision belts | 0.061 | 0.033 (0.01) | 0.030 (0.01) | 0.032 (0.005) |
+| M4 by young Andean margins | 0.008 | 0.026 (0.005) | 0.015 (0.10) | 0.014 (0.13) |
+
+What the arms say:
+
+- The physics holds on the pool: no run failed, no guard step, and the taper lowers what stood
+  too high. Plate cells' largest excess over Airy falls by a fifth (2,819 to 2,248 m) and the
+  highest plate elevation by 360 m, since the belt is no longer piled at the front.
+- The crust budget agrees with the rule. ct-taper3 keeps 0.898 of what crossed against 0.890 on
+  the same seeds, and its sliver and strength-height losses are as small or smaller. The planets
+  part after the first collisions, so the totals differ by run, not by rule.
+- The coast's high ground does not move (0.234 against 0.229, p 0.88). Land above 2 km falls from
+  0.128 to 0.104 (p 0.78). On the version 1 rule the young collision belts' share of land above
+  2 km halves (p 0.01) and their part of the high coast falls a fifth, but the young Andean
+  margins' part rises in step, so M5 stays where it was. The taper moves the collision belts'
+  high ground off the coast; it does not remove the coast's high ground.
+- The slope's own effect, ct-taper1 (1.6°) against ct-taper2 (1.5°), is small: coast with high
+  ground 0.202 against 0.209, land above 2 km 0.091 in both. Both carry the conservation flaw, so
+  the comparison holds between them, not against base12. 1.5° stays (PLT-192). 1.6° is the
+  average of DeCelles & Carrapa's nine profiles outside the Chitwan region, inside the 1 to 1.6°
+  already ledgered, and changing it would move the wedge (PLT-244) too.
+- PLT-241's width binds now and then: in the median run 3.5 % of the crossed crust (2.0 to 3.6 %)
+  was placed after the belt was full to 400 km. That bound is the belt's existing reach, a game
+  choice (PLT-601), not a value from the sources.
+
+**Limits.**
+
+- On the quick preset a sample is 71 km across, so the 187 km ramp is under three samples: the
+  surface's slope is resolved coarsely and a belt is a ramp of two or three rows and a plateau.
+- The Greater Himalaya's steeper front (7.4° on average outside the Chitwan region, DeCelles &
+  Carrapa 2021) is not modelled: it lies beyond the brittle wedge the slope belongs to, and one
+  sample could not resolve it.
+- The fill order (nearest the front first, ties alike), the front as the toe and the strength
+  height as the wedge's height limit are this lane's reading of Dahlen 1990 and DeCelles & Carrapa
+  2021, not values from them (PLT-600's status).
+- In the head-on fixture, where the overriding edge sits right at the front, the wedge on the
+  arriving plate (PLT-244) waits for the toe to advance; on the pool its share of the crossed crust
+  is unchanged (0.173 against 0.176). The two tests that read the old profile's wedge from the
+  first step pin `collision_belt_taper = false`.
+
 ## Orogenic collapse and the thickest crust (2026-10-03)
 
 Built 2026-10-03 (ledger PLT-254 to PLT-259; `plates/collapse.rs`). Ben's answer of that day
