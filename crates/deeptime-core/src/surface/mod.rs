@@ -353,9 +353,9 @@ struct Moved {
     newborn: Vec<bool>,
     known_plates: usize,
     /// A collision belt's foreland (`flexure::belt_reach`): each cell, the plate that bends it
-    /// and its source had it moved with the belt (ISO-133, ISO-136,
+    /// and the belt's plate, and its source had it moved with the belt (ISO-133, ISO-136,
     /// `flexure::FlexState::carry_frame`).
-    frame_src: Vec<(usize, f32, [f64; 2])>,
+    frame_src: Vec<(usize, f32, f32, [f64; 2])>,
 }
 
 impl Moved {
@@ -910,7 +910,7 @@ impl SurfaceStage {
                         let to = advect::sources_with(&grid, &cells, &omega, dt);
                         near.into_iter()
                             .zip(to)
-                            .map(|((c, bends, _), s)| (c, bends, s))
+                            .map(|((c, bends, belt), s)| (c, bends, belt, s))
                             .collect()
                     }
                     _ => Vec::new(),
