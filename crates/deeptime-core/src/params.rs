@@ -1212,7 +1212,7 @@ impl Default for TectonicParams {
             subduction_initiation_per_myr: 0.15, // ledger: PLT-063
             subduction_initiation_clearance_km: 1000.0,
             initiation_slab_km: 150.0,            // ledger: PLT-270
-            incipient_subduction: false,          // ledger: PLT-610
+            incipient_subduction: true,           // ledger: PLT-610 (on since 2026-10-25)
             subduction_initiation_offshore: true, // ledger: PLT-503 (on since 2026-10-23)
             initiation_stress_mpa: 20.0, // ledger: PLT-505 (game-choice; on since 2026-10-23)
             transference: false,         // ledger: PLT-516

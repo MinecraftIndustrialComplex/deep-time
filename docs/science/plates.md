@@ -8882,6 +8882,83 @@ p 0.33). Earth's is 0.122, so the rule leaves the excess where it was.
 opens. It now asks only a converging neighbour. The mix is measurement only, so the arm's planet
 stands as measured, but its records' ridge, rift and other lengths are the old reading's.
 
+### Step 12: incipient subduction (PLT-610 to PLT-614) and the Benioff census (PLT-615) (2026-10-25)
+
+The model made every front a working subduction zone from its first step: a contact found by the
+overlaps pulled with its slab, built an arc and counted as subducting boundary at once. On Earth a
+new subduction zone is forced before it sinks by itself. Gurnis, Hall & Lavier 2004 (G-cubed
+5:Q07001, read in full) model forced convergence across a fracture zone: the resisting force
+grows "as the plate begins bending, reaching a maximum value dependent on plate thickness, but
+typically ranging from 2 to 3 × 10^12 N/m for cases that become self-sustaining", and
+"Cumulative convergence, not the rate of convergence, is the dominant control", the critical
+convergence "only varies between 100 and 130 km (Table 3)". Hall et al. 2003 (abstract): "a
+fracture zone could be converted into a self-sustaining subduction zone after approximately 100 km
+of convergence". Crameri et al. 2020: "The progression from no subduction to subduction, marked by
+a slab reaching around 100 km depth". And Bird 2003 [126] defines his SUB steps by "a Benioff zone
+of intermediate to deep earthquakes and/or a parallel volcanic arc with Quaternary activity"; his
+other convergent oceanic steps are OCB (17,449 km, 6.7 % of the boundary).
+
+**The law** (`tectonics.incipient_subduction`, PLT-610). A front whose contact's slab, before the
+step, is shorter than 100 km (PLT-611, the bottom of Gurnis's table, as transference's PLT-518)
+is incipient:
+
+- The force balance adds the bending's resistance against its convergence, 2.5 × 10^12 N/m of
+  front (PLT-612, the middle of Gurnis's range), or 5 × 10^11 N/m where the floor going under is
+  younger than 10 Myr (PLT-613: "The entire initial hump in resisting force is eliminated when
+  lithosphere with a typical thermal model of a spreading center is subject to compression", the
+  ridge's topography adding "an additional 5 × 10^11 N/m"), both scaled with gravity as the slab
+  pull. The force is plastic (it does not grow with speed), so it enters the linear solve as a
+  collision's resistance does: a coefficient of the force over max(convergence, 1 mm/yr) (FRC-011).
+  It is booked in the record's collision resistance.
+- It builds no arc (`subduction::fronts_finish`: no arc magma and no arc band weight).
+- The boundary mix counts it as class other, converging, in the record's new
+  `front_bands.incipient` (not in `other_converging`, nor in the slab, normal and age bands), and
+  the margins count no subduction margin at it (PLT-614).
+
+The slab grows by the convergence as before (FRC-020), so the stage ends at the first step whose
+slab starts at 100 km or more. A subduction initiation's planted slab (PLT-270, 150 km) starts past
+it, so the model's spontaneous initiations are not held back: they stand for a zone that has
+already passed its forced stage. The slabs are kept by plate pair (`PlateState::slabs`), so a
+resampling's re-found contact keeps its stage.
+
+*Speed-dependent terms (for the force balance lane).* The incipient link is a plastic force
+linearised at the step's convergence, floored at 1 mm/yr: on Forsyth & Uyeda's balance it would be
+`add_friction`, a force whatever the speed.
+
+**The census column (B)** (PLT-615, measurement only). Beside `sub`, which counts every front past
+its incipient stage, the record now counts the subducting fronts whose slab reaches 100 km under
+their arc (`front_bands.benioff`): a slab at least hypot(`arc_distance_km`, 100) km long, 223.6
+km at the presets' 200, a straight slab from the trench to that depth under the arc's axis.
+`measure_boundary.py` version 3 adds `incipient`, `ocb` (no contact plus incipient, Bird's OCB)
+and `sub_benioff`; `transform` no longer counts the incipient fronts. The depth is read (Crameri
+2020; Syracuse & Abers 2006, abstract: "H ranges from 72 to 173 km with a global average of 105
+km"); the arc's distance is PLT-042's 200 km, which is `uncited`, so the column inherits its flag.
+
+**The tests** (`plates/tests.rs`, 20,000 samples):
+
+- `an_incipient_front_holds_its_plate_and_is_no_subduction_zone`: the reference plate with a
+  40-km slab (its pull about 1.7 × 10^12 N/m, under the resistance). On, the trench moves at 0.59
+  mm/yr in the balance (under the 1 mm/yr floor: a plastic force larger than the drive stalls the
+  plate), the mix has 3,832 km of incipient front and no ocean-continent front, and no coastal
+  sample of 127 is a subduction margin. Off, 3.03 mm/yr, 3,832 km of ocean-continent front, 31
+  subduction margins.
+- `cumulative_convergence_ends_the_incipient_stage`: the reference plate pushed at 10 and at 25
+  mm/yr from no slab (Gurnis's forced models), 2-Myr steps. The resistance is the same at both
+  rates (8.145 × 10^18 N over the front). It acts while the slab starts under 100 km and stops at
+  the first step that starts past it (114.6 km at 10 mm/yr, 143.3 km at 25). The balance's speed
+  then jumps from 6.28 to 10.60 mm/yr (10 mm/yr) and from 9.25 to 14.64 (25), more than the slab's
+  growth alone gives. On a straight front, the arcs over a 90-km slab: 0 m of magma on, 6,486 m
+  off; over a 110-km slab the arcs are the same on and off, bit for bit.
+- `a_ridge_under_compression_resists_less`: floor 5 Myr old resists a fifth of the 80-Myr floor's.
+- `an_initiations_planted_slab_is_past_the_incipient_stage`: every built-in preset plants at least
+  100 km; with the planted 150 km the reference plate has no incipient front.
+- `a_slabs_length_survives_a_resampling`: the head-on plates through carry, resampling and the
+  overlaps found again. With a 700-km slab the ocean-continent front holds (21,715 km before,
+  22,993 km after) with no incipient front; with none, the whole front is incipient on both sides.
+- `incipient_subduction_changes_nothing_past_its_stage`: with a full slab the balance, the slab,
+  the mix and the arcs are the same on and off, bit for bit; off, a 40-km slab has no incipient
+  front.
+
 
 ## Plate speed (2026-10-25)
 
