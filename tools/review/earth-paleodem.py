@@ -25,7 +25,7 @@ helpers, not a copy), on a grid that is 111 km at the equator instead of the cen
   coast_hi   N Fibonacci points sampled from the grid at their nearest node (earth-coast.py's way);
              continents_census.coast_metrics: the coast is land within 1.6 point spacings of the sea, and
              the share of it with land above 2 km within 200 km inland, over land. Since 2026-10-25
-             (RLC-052) the sea is the world ocean (a closed body of sea is land) and the 200 km are a
+             (RLC-055) the sea is the world ocean (a closed body of sea is land) and the 200 km are a
              path over land; coast_hi_old is the first version's rule (any sea, the straight line within
              one landmass), coast_hi_ocean the world ocean with the straight line. At N = 40,000 the
              spacing is 113 km, so the coast band is 181 km wide where the census's (N = 332,800, spacing

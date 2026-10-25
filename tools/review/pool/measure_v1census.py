@@ -14,7 +14,7 @@ tools/review/continents_census.py's `fields` report, read as numbers (its helper
   under_sea    continental crust under the sea, a share of the continental crust
   above_2km    land above 2 km, a share of the land
   coast_hi     coast cells (land within 1.6 point spacings of the sea) with land above 2 km within 200 km
-               inland, a share of the coast. Version 2 (RLC-052, M5 diagnosis 2026-10-25): measured on
+               inland, a share of the coast. Version 2 (RLC-055, M5 diagnosis 2026-10-25): measured on
                Fibonacci points of the grid's count (nearest cell; the grid's north-south step is wider
                than the coast band above about 51 degrees), the sea is the world ocean (a closed body of
                sea is land), and the 200 km are over land (a strait wider than 1.6 spacings blocks them).

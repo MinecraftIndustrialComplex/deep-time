@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: LGPL-3.0-or-later
-"""The bodies of sea of a run's final fields, on the census's Fibonacci points (RLC-052): the world
+"""The bodies of sea of a run's final fields, on the census's Fibonacci points (RLC-055): the world
 ocean (the largest body) and the closed ones, largest first, with area and share of the coast each
 carries, and what a size cut at 1 Mkm2 (the diagnosis note's first choice) would have called closed.
 

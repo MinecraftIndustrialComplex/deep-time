@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: LGPL-3.0-or-later
 """The seven realism checks of an arm's cached runs, version 1 against version 2 of the census (the
-M5 measure fixes, RLC-052): medians [IQR] over the runs of the two stored measures, and for M5 what
+M5 measure fixes, RLC-055): medians [IQR] over the runs of the two stored measures, and for M5 what
 each fix does (coast_hi_old, coast_hi_fib, coast_hi_ocean, coast_hi).
 
     python3 -I tools/review/m5diag/m5fix_table.py <arm folder> [old measure] [new measure]
