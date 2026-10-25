@@ -977,8 +977,10 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // seed 20 again since the contact carry went on by default, PLT-550, the same day, when seed
     // 19 no longer welds: all 12 welding seeds pass; seed 2 since the slab pull at the arcs'
     // fronts went on by default, PLT-560, the same day, when seed 20 no longer welds: all 13
-    // welding seeds pass, and seed 2 welds twice).
-    let p = preset(8000, 300.0, "scattered_continents", 2);
+    // welding seeds pass, and seed 2 welds twice; seed 4 since the critical-taper belt went on by
+    // default, PLT-600, 2026-10-25, when seed 2 no longer welds: the sweep's welding seeds 1, 4,
+    // 6, 7, 10, 11, 14, 21, 23 and 24).
+    let p = preset(8000, 300.0, "scattered_continents", 4);
     let total = PlatesStage::new(p.clone()).total_steps();
     let mut checked = 0u64;
     let mut life = CollisionLives::default();
