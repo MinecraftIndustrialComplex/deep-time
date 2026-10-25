@@ -154,24 +154,30 @@ def trains(rec):
     by = defaultdict(list)
     for c in rec["collisions"]:
         by[(c["under"], c["over"], round(c["contact_onset_myr"], 3))].append(
-            (c["start_myr"], c["end_myr"], c["front_km"], c["convergence_mm_yr"], "hand-off"))
+            (c["start_myr"], c["end_myr"], c["front_km"], c["convergence_mm_yr"],
+             "collision " + ("stalled" if c.get("stalled") else "not stalled") + (", sutured" if c.get("sutured") else ""),
+             c.get("shortening_km", 0.0) or 0.0))
     for p in rec["partings"]:
         by[(p["under"], p["over"], round(p["contact_onset_myr"], 3))].append(
-            (p["start_myr"], p["end_myr"], p["front_km"], p["peak_convergence_mm_yr"], p["reason"]))
+            (p["start_myr"], p["end_myr"], p["front_km"], p["peak_convergence_mm_yr"], p["reason"],
+             p.get("shortening_km", 0.0) or 0.0))
     out = []
     for k, v in by.items():
         v.sort()
         cur = None
-        for s, e, f, cv, why in v:
+        for s, e, f, cv, why, sh in v:
             if cur is None or s - cur["e"] > GRACE + 1e-6:
                 if cur:
                     out.append(cur)
-                cur = {"key": k, "s": s, "e": e, "f": f, "cv": [cv], "end": why, "onset": k[2]}
+                cur = {"key": k, "s": s, "e": e, "f": f, "cv": [cv], "end": why, "onset": k[2], "why": [why],
+                       "sh": sh}
             else:
                 cur["e"] = max(cur["e"], e)
                 cur["f"] = max(cur["f"], f)
                 cur["cv"].append(cv)
                 cur["end"] = why
+                cur["why"].append(why)
+                cur["sh"] += sh
         if cur:
             out.append(cur)
     return out
@@ -239,6 +245,7 @@ def main():
     print(f"{len(runs)} runs")
     # A. collision trains
     durs, fronts, cvs, opens, contact = [], [], [], [], []
+    longs = []  # trains longer than 110 Myr: (states, shortening km, peak convergence, mean, reasons, end)
     for run in runs:
         rec = json.loads((run / "rec.json").read_text())
         t0, t_end, dt = rec["t0_myr"] + 100.0, rec["steps"][-1]["t"], rec["dt_myr"]
@@ -250,6 +257,10 @@ def main():
             fronts.append(tr["f"])
             cvs += [c for c in tr["cv"] if c is not None]
             contact.append(tr["e"] - tr["onset"] + dt)
+            if d > 110:
+                cv = [c for c in tr["cv"] if c is not None]
+                longs.append((len(tr["why"]), tr["sh"], max(cv) if cv else float("nan"), tr["sh"] / d,
+                              tr["why"][:-1], tr["end"]))
             if tr["end"] == "open":
                 opens.append((d, tr["f"], max(tr["cv"]), tr["e"] - tr["onset"] + dt))
     durs, fronts = np.array(durs), np.array(fronts)
@@ -265,8 +276,25 @@ def main():
           f" than 200 Myr {ft[durs > 200].sum() / ft.sum():.2f}")
     print(f"  trains of 40 Myr or more {np.mean(durs >= 40):.2f}, of 100 or more {np.mean(durs >= 100):.2f};"
           f" contact age at the train's end (subduction before included) p50 {q(contact):.0f}, p90 {q(contact, 90):.0f}")
-    print(f"  states' convergence (hand-off: at the hand-off; parting: peak) p10/p50/p90 {q(cvs, 10):.1f}/"
+    print(f"  states' convergence (collision: at its end; parting: peak) p10/p50/p90 {q(cvs, 10):.1f}/"
           f"{q(cvs):.1f}/{q(cvs, 90):.1f} mm/yr")
+    if longs:
+        tally = defaultdict(int)
+        for x in longs:
+            for w in x[4]:
+                tally[w] += 1
+        tot = max(sum(tally.values()), 1)
+        print(f"  trains longer than 110 Myr: {len(longs)}; states a train p50 {q([x[0] for x in longs]):.0f}, p90"
+              f" {q([x[0] for x in longs], 90):.0f}; shortening summed over the states p50 {q([x[1] for x in longs]):.0f},"
+              f" p90 {q([x[1] for x in longs], 90):.0f} km; peak convergence p50 {q([x[2] for x in longs]):.1f},"
+              f" mean (shortening / duration) p50 {q([x[3] for x in longs]):.1f} mm/yr")
+        print("    how the states inside them ended (a new state on the contact followed within 6 Myr): "
+              + ", ".join(f"{w} {n / tot:.2f}" for w, n in sorted(tally.items(), key=lambda z: -z[1])))
+        fin = defaultdict(int)
+        for x in longs:
+            fin[x[5]] += 1
+        print("    how they ended: " + ", ".join(f"{w} {n / len(longs):.2f}"
+                                               for w, n in sorted(fin.items(), key=lambda z: -z[1])))
     if opens:
         od = np.array(opens)
         print(f"  open at the end: {len(od)} ({len(od) / len(runs):.1f} a run), duration p50 {q(od[:, 0]):.0f}, max"
