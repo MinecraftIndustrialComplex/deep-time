@@ -25,7 +25,9 @@ latitude) and the record's last step (rec.json), and writes one JSON object per 
    under it (wet_bands: share of the sea's area, mean depth below the sea, the continental share in the band), to set
    against CRUST1.0's (m5earthbands.py 2b);
 6. the height histograms of the continental and the oceanic crust (hist_cont, hist_oc) and the water layer less land
-   ice (water_layer_m: ISO-085's 2,664 m, ice at CLM-210's 917 over 1,028 kg/m3).
+   ice (water_layer_m: ISO-085's 2,664 m, ice at CLM-210's 917 over 1,028 kg/m3);
+7. counterfactual seas filled on the run's own cells: as it stands (sea_cf) and with the oceanic crust at least 10 or
+   15 km thick put at the mean height of the run's 6 to 10 km oceanic crust (sea_cf_oc10, sea_cf_oc15).
 
 `table` prints the medians over the runs, arm beside arm, and splits the change in the sea between the first arm and
 each other one by Shapley over four factors (the water, the continental area, the continental heights, the oceanic
@@ -74,6 +76,15 @@ def fill(W, f, hc, ho):
         s = 0.5 * (lo + hi)
         w = f * (hc * np.maximum(s - c, 0.0)).sum() + (1.0 - f) * (ho * np.maximum(s - c, 0.0)).sum()
         lo, hi = (s, hi) if w < W else (lo, s)
+    return 0.5 * (lo + hi)
+
+
+def cell_fill(h, W):
+    """The sea S over the datum at which water W (m over the planet) fills every cell of h below S (equal-area cells)."""
+    lo, hi = float(h.min()), float(h.max())
+    for _ in range(60):
+        s = 0.5 * (lo + hi)
+        lo, hi = (s, hi) if float(np.maximum(s - h, 0.0).mean()) < W else (lo, s)
     return 0.5 * (lo + hi)
 
 
@@ -179,6 +190,17 @@ def one(run):
     out["hist_cont"] = np.histogram(hp[cont], HIST_EDGES)[0].tolist()
     out["hist_oc"] = np.histogram(hp[~cont], HIST_EDGES)[0].tolist()
     out["water_layer_m"] = WATER_LAYER_M - float(ice.mean()) * RHO_ICE / RHO_SEA
+    # Counterfactual seas on this run's own cells (every cell below the sea fills, no steering): as it stands, and with
+    # the oceanic crust at least 10 or 15 km thick put at the mean height of the run's own 6 to 10 km oceanic crust
+    # (the bare floor), so the sea the thick oceanic crust holds up is the difference.
+    Wl = out["water_layer_m"]
+    bare = ~cont & (T >= 6.0) & (T < 10.0)
+    hb = float(hp[bare].mean()) if bare.any() else float("nan")
+    out["sea_cf"] = cell_fill(hp, Wl)
+    for t0 in (10, 15):
+        h2 = np.where(~cont & (T >= t0), hb, hp)
+        out[f"sea_cf_oc{t0}"] = cell_fill(h2, Wl)
+    out["oc_bare_h"] = hb
     rec_f = run / "rec.json"
     if rec_f.exists():
         rec = json.loads(rec_f.read_text())
@@ -248,6 +270,10 @@ def table(args):
     line("water layer less the land ice m", ["water_layer_m"], "{:.0f}")
     line("floor older than 180 Myr", ["floor_old180"])
     line("GDH1 depth over the floor's ages m", ["floor_gdh1_m"], "{:.0f}")
+    print(" counterfactual seas on each run's cells (no steering): as it stands; oceanic crust >= 10 / 15 km at the bare"
+          " floor's height")
+    for k in ("sea_cf", "sea_cf_oc10", "sea_cf_oc15", "oc_bare_h"):
+        line(k + " m", [k], "{:.0f}")
     for i, q in enumerate(("p10", "p50", "p90")):
         line(f"T_oc {q} km", ["T_oc_p10_p50_p90", i], "{:.1f}")
     print(" the oceanic crust by thickness (pools included): share of it, mean plate height over the datum")
