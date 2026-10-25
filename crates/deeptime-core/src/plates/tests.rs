@@ -4080,6 +4080,47 @@ fn a_consumed_slab_leaves_no_front() {
     );
 }
 
+/// The front on the current geometry asks only of a front's neighbour (the front lane, 2026-10-25;
+/// PLT-582): the plates of [`converging_plates`], the ocean turned 4 spacings about the x axis
+/// since the last resampling, so it runs under the continent where y > 0 and opens a gap where
+/// y < 0. The contact is active, and on the opening half the ocean's nearest visible sample stands
+/// up to 4 spacings from the continent's edge, beyond `subduction::trench_row_rad`. That gap is the
+/// opening's, which the next resampling fills; the boundary is there, so the boundary mix keeps
+/// the rift with the rule on as off (the pool arm's records lost a fifth of the ridge length
+/// through each cycle while the rule asked of every neighbour of the subducting plate).
+#[test]
+fn an_opening_boundary_of_a_subducting_plate_stays_in_the_mix() {
+    let p = preset(20_000, 20.0, "supercontinent", 5);
+    let mut off = p.tectonics.clone();
+    off.front_current_geometry = false;
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    assert!(
+        0.1 > 3.0 * subduction::trench_row_rad(env.norm.spacing_rad()) / 2.0,
+        "the gap is wider than the row"
+    );
+    let (mut st, geo, pos) = converging_plates(&p, &env);
+    st.dynamics = Some(dynamics::Dynamics::default());
+    let mut cones = vec![[0.0; 2]; st.samples.len()];
+    subduction::fronts_and_uplift(&mut st, &geo, &pos, &env, &mut cones, 0.0);
+    assert!(
+        st.contacts
+            .iter()
+            .any(|c| c.under == 1 && c.over == 0 && c.active(1)),
+        "the ocean subducts under the continent"
+    );
+    let tree = Tree::over(&pos, |_| true);
+    let [o, n] = [stage.env(&off, 1), env]
+        .map(|e| dynamics::boundary_mix(&st, &geo, &pos, &tree, &e, None).km);
+    eprintln!("the mix, km: off {o:?}, on {n:?}");
+    assert!(o[dynamics::mix::RIFT] > 1000.0, "the opening half: {o:?}");
+    assert!(
+        o[dynamics::mix::OCEAN_CONTINENT] > 1000.0,
+        "the converging half: {o:?}"
+    );
+    assert_eq!(n, o, "the rule keeps an opening boundary and a live front");
+}
+
 /// A subduction zone goes on through a resampling (`tectonics.contact_carry`, PLT-550; plates.md,
 /// "Step 7"). The resampling gives both plates of [`converging_plates`] fresh crust with no
 /// overlap, so at the next step, before the plates move, the contact sees none. Carried, it keeps
