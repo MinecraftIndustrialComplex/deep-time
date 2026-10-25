@@ -224,7 +224,6 @@ def live_fronts(rec, maps, t):
     for tr in trains(rec):
         if tr["s"] <= t + 1e-6 and tr["e"] >= t - DT - 1e-6:
             live.setdefault(tr["key"][1], []).append(tr)
-            live.setdefault(tr["key"][0], []).append(tr)
     keep = fr & np.isin(plate, list(live.keys()))
     return unit(a[keep, 0], a[keep, 1]), [live[int(p)] for p in plate[keep]]
 
@@ -395,12 +394,17 @@ def main():
                 touch = np.full((len(T), 3), np.nan)
             else:
                 continue
-            fr, _ = live_fronts(rec, maps, t)
+            fr, lv = live_fronts(rec, maps, t)
             pts = unit(lat, lon)
             d = near_km(pts, fr)
             # the nearest column still in its quiet time and over T_c: lower-crustal flow's source (flow.rs)
             dy = near_km(pts, young)
-            rows.append(np.column_stack([age, T, zs, L, np.full(len(T), sea), d, gain, dy, fin, fin_h, touch]))
+            # the longest live train on the nearest front sample's (overriding) plate, Myr
+            dur = np.full(len(T), np.nan)
+            if len(fr) and len(pts):
+                nf = np.argmax(np.clip(pts @ fr.T, -1, 1), axis=1)
+                dur = np.array([max(t - tr["s"] + DT for tr in lv[x]) for x in nf])
+            rows.append(np.column_stack([age, T, zs, L, np.full(len(T), sea), d, gain, dy, fin, fin_h, touch, dur]))
     if not rows:
         return
     r = np.concatenate(rows)
@@ -475,6 +479,11 @@ def main():
                   f"  L {q(r[k, 3]):4.0f}  eta {q(eta_factor(r[k, 3])):5.2f}  sea {q(r[k, 4]):4.0f}"
                   f"  sheet {100 * q(eps):5.2f}  near {np.mean(r[k, 5] <= 400):.2f}  held km {q(r[k, 10]):5.0f}"
                   f"  <=200 {np.mean(r[k, 10] <= 200):.2f}{gs}")
+            kn = k & (r[:, 5] <= 400) & np.isfinite(r[:, 16])
+            if kn.sum() >= 10:
+                print(f"         the live collision within 400 km ({kn.sum() / k.sum():.2f} of them): its train so far p50"
+                      f" {q(r[kn, 16]):.0f}, p90 {q(r[kn, 16], 90):.0f} Myr; longer than 110 Myr"
+                      f" {np.mean(r[kn, 16] > 110):.2f}, than 60 {np.mean(r[kn, 16] > 60):.2f}")
             if np.isfinite(r[k, 11]).any():
                 pc = np.array([pace(a, b) for a, b in zip(r[k, 1], r[k, 3])])
                 fin, fh = r[k, 11], r[k, 12]
