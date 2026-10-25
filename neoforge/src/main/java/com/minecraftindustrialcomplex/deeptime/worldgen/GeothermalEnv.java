@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.worldgen;
 
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
 import com.minecraftindustrialcomplex.deeptime.worlddata.IceCover;
 import com.minecraftindustrialcomplex.deeptime.worlddata.RasterSampler;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
+import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
 
 import java.util.List;
 import java.util.Optional;
@@ -14,7 +16,7 @@ import java.util.Set;
  * climate answers NaN: warm and wet), the ice cover, and the rock under a column from the strata
  * horizons (carbonate rock makes a hot spring's terrace travertine; everything else, sinter), and
  * the plate model's heat flow on continental crust ({@code meta/heat_flow_mw_m2}; a world without
- * the layer answers NaN: no heat-flow fields).
+ * the layer answers NaN: no heat-flow fields), and on a cube world which columns are on its faces.
  */
 final class GeothermalEnv implements Geothermal.Env {
 
@@ -27,9 +29,12 @@ final class GeothermalEnv implements Geothermal.Env {
     private final RasterSampler precip, mean, strata, heat;
     private final Optional<IceCover> ice;
     private final List<String> classes;
+    /** A cube world's net, or null: a site stands on its faces only ({@link Geothermal.Env#onPlanet}). */
+    private final CubeLayout cube;
 
     GeothermalEnv(WorldData wd) {
         this.wd = wd;
+        this.cube = wd.projection() instanceof WorldProjection.Cube c ? c.cube() : null;
         this.precip = wd.has(PRECIP) ? wd.layer(PRECIP) : null;
         this.mean = wd.has(MEAN_C) ? wd.layer(MEAN_C) : null;
         this.heat = wd.has(HEAT_FLOW) ? wd.layer(HEAT_FLOW) : null;
@@ -61,6 +66,11 @@ final class GeothermalEnv implements Geothermal.Env {
     @Override
     public boolean iced(int x, int z) {
         return ice.isPresent() && ice.get().blocks(x, z) > 0;
+    }
+
+    @Override
+    public boolean onPlanet(int x, int z) {
+        return cube == null || cube.faceOfBlock(x, z) != null;   // off a cube's faces: CubeFill's copy (ledger SCL-210)
     }
 
     @Override

@@ -49,7 +49,7 @@ public final class GeothermalGameTests {
     /** What was read back around one site. */
     private static final class Tally {
         long poolBlocks, poolWater, rimColumns, rimSolid, bedColumns, bedSolid, uncut, uncutOpen, leaks, wetNextToMagma, lavaNear,
-                groundColumns, groundRight, ventColumns, ventRight, skipped, offFaces, partnerSame;
+                groundColumns, groundRight, ventColumns, ventRight, skipped;
         final StringBuilder detail = new StringBuilder();
 
         void note(String what, int x, int y, int z) {
@@ -75,7 +75,9 @@ public final class GeothermalGameTests {
      *       holds; {@code lavaNear}: no lava in a site's pool, rim or vent columns;</li>
      *   <li>{@code ground}, {@code vents}: the top ground block of a terrace, altered-ground and sulfur
      *       column is the palette's block for it (columns with a fluid or magma on top are left alone),
-     *       and a vent's heart is the vent block.</li>
+     *       and a vent's heart is the vent block;</li>
+     *   <li>every column of every site of the planet is on the cube's faces ({@code ChunkSampling.onFaces}): off
+     *       them a chunk is {@code CubeFill}'s copy of its partner's, so a site there is never built (GEO-017).</li>
      * </ul>
      * A planet with no site at all fails (Ben's rule, decisions log 2026-10-01: a test that reads
      * nothing is not a pass). The test planet's preset puts fields on its hot continental ground (heat
@@ -135,7 +137,10 @@ public final class GeothermalGameTests {
         geo.sites().stream().filter(s -> s.volcano() == Geothermal.HEAT_FLOW_SOURCE).findFirst().filter(s -> !picked.contains(s))
                 .ifPresent(picked::add);
         // Every site stands wholly on the cube's faces: off them a chunk is a turned copy of its partner's ground
-        // (CubeFill), which the geothermal pass never paints at the site's own place, so a site there is never built.
+        // (CubeFill, ledger SCL-210), which the geothermal pass never paints at the site's own place, so a site there is
+        // never built. Its columns would be read back as the partner's blocks: on master c47f3056's planet site 43, in
+        // the void square north of F2, failed the ground check (13 of 59) with all 59 columns the partner's own top
+        // block at the partner's height. That is a placement defect, so it fails first, by name (GEO-017).
         var wd = t.data();
         List<Integer> offFaceSites = new ArrayList<>();
         for (Geothermal.Site s : geo.sites())
@@ -234,18 +239,6 @@ public final class GeothermalGameTests {
                         else
                             n.note(part.name().toLowerCase() + "=" + net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(b.getBlock()).getPath(),
                                     x, top, z);
-                        // DIAGNOSTIC (temporary): a column off the faces against its partner's (CubeFill's copy).
-                        if (cube != null && !ChunkSampling.onFaces(wd, x, z)) {
-                            n.offFaces++;
-                            if (cube.fold(x, z) instanceof com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout.Outside o) {
-                                int px = (int) com.minecraftindustrialcomplex.deeptime.worldgen.CubeFill.twX(cube, o.x()), pz = (int) o.z();
-                                ChunkAccess pc = level.getChunkSource().getChunk(px >> 4, pz >> 4, ChunkStatus.SURFACE, true);
-                                int ptop = pc.getHeight(Heightmap.Types.OCEAN_FLOOR_WG, px & 15, pz & 15);
-                                BlockState pb = pc.getBlockState(new BlockPos(px, ptop, pz));
-                                if (ptop == top && pb.getBlock() == b.getBlock())
-                                    n.partnerSame++;
-                            }
-                        }
                         if (part == Geothermal.Part.VENT) {
                             n.ventColumns++;
                             if (ok)
@@ -271,14 +264,13 @@ public final class GeothermalGameTests {
                 Geothermal.Site s = e.getKey();
                 Tally n = e.getValue();
                 line.append(String.format(" [id=%d %s of volcano %d at (%d, %d) face=%s r=%d apron=%d level=%d %s poolWater=%d/%d bed=%d/%d rim=%d/%d "
-                                + "uncutOpen=%d/%d leaks=%d lavaNear=%d ground=%d/%d vents=%d/%d wetNextToVent=%d skippedFaces=%d "
-                                + "offFaceColumns=%d sameAsPartner=%d%s]", s.id(),
+                                + "uncutOpen=%d/%d leaks=%d lavaNear=%d ground=%d/%d vents=%d/%d wetNextToVent=%d skippedFaces=%d%s]", s.id(),
                         s.kind().name().toLowerCase(), s.volcano(), s.x(), s.z(),
                         cube == null ? "-" : java.util.Optional.ofNullable(cube.faceOfBlock(s.x(), s.z())).map(f -> f.face().name()).orElse("none"),
                         s.r(), s.apron(), s.level(),
                         s.kind() == Geothermal.Kind.POOL ? (s.sinter() ? "sinter" : "travertine") : "-", n.poolWater, n.poolBlocks,
                         n.bedSolid, n.bedColumns, n.rimSolid, n.rimColumns, n.uncutOpen, n.uncut, n.leaks, n.lavaNear, n.groundRight,
-                        n.groundColumns, n.ventRight, n.ventColumns, n.wetNextToMagma, n.skipped, n.offFaces, n.partnerSame, n.detail));
+                        n.groundColumns, n.ventRight, n.ventColumns, n.wetNextToMagma, n.skipped, n.detail));
                 if (failure == null && n.poolWater < n.poolBlocks)
                     failure = "site " + s.id() + ": only " + n.poolWater + " of " + n.poolBlocks + " pool blocks are water" + n.detail;
                 if (failure == null && n.bedSolid < n.bedColumns)
