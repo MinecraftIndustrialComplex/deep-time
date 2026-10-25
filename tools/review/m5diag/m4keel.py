@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: LGPL-3.0-or-later
-"""The keel test of the M4 diagnosis, from a run with the front trace on: m4keel.py <run folder>
+"""The keel test of the M4 diagnosis, from runs with the front trace on: m4keel.py <run folder> ...
 
 The crust-budget maps hold no lithosphere or keel, so the belts' slow decay cannot be put on the
 lithosphere's thermal state from them. The front trace's thickening attribution
@@ -26,8 +26,7 @@ def eta_factor(L):
     return np.exp(t_eq / 62.8)
 
 
-def main():
-    run = Path(sys.argv[1])
+def load(run):
     rec = json.loads((run / "rec.json").read_text())
     ts = np.array([s["t"] for s in rec["steps"]])
     seas = np.array([s.get("sea_m", 0.0) or 0.0 for s in rec["steps"]])
@@ -38,25 +37,36 @@ def main():
         a = np.fromfile(run / "trace" / kv["file"], "<f4").reshape(-1, ATT).astype(np.float64)
         sea = float(seas[int(np.argmin(np.abs(ts - t)))])
         rows.append((t, sea, a))
-    print(f"{run}: snapshots {[r[0] for r in rows]}, seas {[round(r[1]) for r in rows]}")
+    return rows
+
+
+def main():
+    # One run or several: every table pools the runs given (the by-snapshot table by snapshot time).
+    runs = [Path(r) for r in sys.argv[1:]]
+    rows = [r for run in runs for r in load(run)]
+    print(f"{len(runs)} runs: snapshots {sorted({r[0] for r in rows})}")
     allA = np.vstack([a for _, _, a in rows])
     K, L = allA[:, 7], allA[:, 6]
     print(f"all visible continental samples: {len(allA)}; keel >= 100 km {np.mean(K >= 100):.3f},"
           f" >= 190 km {np.mean(K >= 190):.3f}; lithosphere p10/p50/p90 {np.percentile(L, 10):.0f}/"
           f"{np.median(L):.0f}/{np.percentile(L, 90):.0f} km")
     # The high ground (continental, above 2 km over the sea) as a share of the continental land, by tag and keel.
-    print("\nM4 (continental land only) by snapshot: all; collision on a keel / not; Andean on a keel / not;"
-          " untagged on a keel / not; the high ground on a keel")
-    for t, sea, a in rows:
-        zs = a[:, 3] - sea
-        land, hi, keel, tag = zs > 0, zs > 2000, a[:, 7] >= 100, np.rint(a[:, 4])
-        nl = max(int(land.sum()), 1)
-
-        def s(m):
-            return f"{(hi & m).sum() / nl:.4f}"
-        print(f"  t {t:6.0f}: {s(hi)}  coll {s((tag == 2) & keel)} / {s((tag == 2) & ~keel)}"
-              f"  andean {s((tag == 1) & keel)} / {s((tag == 1) & ~keel)}  untagged {s((tag == 0) & keel)}"
-              f" / {s((tag == 0) & ~keel)}  on a keel {(hi & keel).sum() / max(int(hi.sum()), 1):.2f}")
+    print("\nM4 (continental land only) by snapshot, pooled over the runs: all; collision on a keel / not; Andean on a"
+          " keel / not; untagged on a keel / not; the high ground on a keel")
+    for t in sorted({r[0] for r in rows}):
+        c = np.zeros(9)
+        for t_, sea, a in rows:
+            if t_ != t:
+                continue
+            zs = a[:, 3] - sea
+            land, hi, keel, tag = zs > 0, zs > 2000, a[:, 7] >= 100, np.rint(a[:, 4])
+            c += [land.sum(), hi.sum(), (hi & (tag == 2) & keel).sum(), (hi & (tag == 2) & ~keel).sum(),
+                  (hi & (tag == 1) & keel).sum(), (hi & (tag == 1) & ~keel).sum(), (hi & (tag == 0) & keel).sum(),
+                  (hi & (tag == 0) & ~keel).sum(), (hi & keel).sum()]
+        nl = max(c[0], 1)
+        s = [f"{x / nl:.4f}" for x in c[1:8]]
+        print(f"  t {t:6.0f}: {s[0]}  coll {s[1]} / {s[2]}  andean {s[3]} / {s[4]}  untagged {s[5]} / {s[6]}"
+              f"  on a keel {c[8] / max(c[1], 1):.2f}")
     for tag, name in ((2, "collision"), (1, "andean"), (0, "untagged, T >= 49.5 km")):
         print(f"\n{name}: age Myr, keel class: samples, T p50 km, above 2 km over the sea, L p50 km,"
               f" eta/eta0 at L p50, K p50 km")
