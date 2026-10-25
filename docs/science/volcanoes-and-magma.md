@@ -608,7 +608,9 @@ What the previews show:
   its own face (MAG-059): within two columns of the edge its lava, conduit and lake are basalt shell,
   its plug and mush left out, so a lens ends against a two-column wall of its face's rock. A real
   body would go on under the partner face; folding the body onto it as the lava flows are (item 14)
-  would keep it whole but needs every chunk to ask every face's volcanoes. Its vent's water test and
+  would keep it whole, but every lens, the mush and the lake would have to be turned into the partner
+  face's frame, and the partner's chunks would have to look for bodies across each edge; the cut keeps
+  the rule the seal already states (MAG-041). Its vent's water test and
   its lake's ring read its own face only, and a lake whose ring would cross the edge leaves the
   volcano its plug.
 

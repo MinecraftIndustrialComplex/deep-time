@@ -99,8 +99,11 @@ public final class SiteChunks {
         return compute(d.bodies().ofSite(siteId), d.circumference(), cube, siteId);
     }
 
-    /** The footprint of a site's bodies on a planet of circumference {@code c} ({@code cube}: a cube world's net, or null). */
-    static Footprint compute(List<Body> bodies, int c, CubeLayout cube, int siteId) {
+    /**
+     * The footprint of a site's bodies on a planet of circumference {@code c} ({@code cube}: a cube
+     * world's net, or null). Public for the GameTests ({@code CompatGameTests.siteFootprintsStayOnTheFaces}).
+     */
+    public static Footprint compute(List<Body> bodies, int c, CubeLayout cube, int siteId) {
         List<Body> ore = bodies.stream().filter(b -> ORE_ROLE.equals(b.role())).toList();
         if (ore.isEmpty())
             return new Footprint(siteId, Map.of(), 0, 1);
