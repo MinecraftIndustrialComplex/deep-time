@@ -1345,6 +1345,83 @@ fn the_crust_budget_changes_nothing() {
     same_world(&with, &without);
 }
 
+/// The front trace (`front_trace.rs`, measurement only) changes nothing, writes its dip rows at
+/// the steps around the resamplings and the attribution at every 50 Myr, and its attribution
+/// agrees with the columns it describes.
+#[test]
+fn the_front_trace_changes_nothing() {
+    let p = preset(8000, 200.0, "scattered_continents", 6);
+    let dir = temp_dir("front_trace");
+    let with = run_stage_with(
+        PlatesStage::new(p.clone()).with_front_trace(dir.clone()),
+        &p,
+        |_, _, _| {},
+    );
+    let without = run_stage_with(PlatesStage::new(p.clone()), &p, |_, _, _| {});
+    same_world(&with, &without);
+    let st = with.plates.as_ref().unwrap();
+    assert!(st.counters.resamplings > 1);
+    let index = std::fs::read_to_string(dir.join("dip_index.txt")).expect("the dip index");
+    for phase in 0..3 {
+        assert!(
+            index.contains(&format!("phase={phase} ")),
+            "phase {phase}: {index}"
+        );
+    }
+    let floats = |file: &str| -> Vec<f32> {
+        let bytes = std::fs::read(dir.join(file)).unwrap();
+        assert_eq!(bytes.len() % 4, 0);
+        bytes
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|b| f32::from_le_bytes(*b))
+            .collect()
+    };
+    // Some step's rows hold fronts (the first steps have no active contact yet).
+    let f = front_trace::DIP_FIELDS;
+    let mut fronts = 0;
+    for line in index.lines() {
+        let rows = floats(line.rsplit("file=").next().unwrap());
+        assert_eq!(rows.len() % f, 0, "{line}");
+        fronts += rows.chunks_exact(f).filter(|r| r[20] >= 0.0).count();
+    }
+    assert!(fronts > 0, "{index}");
+    let att = std::fs::read_to_string(dir.join("att_index.txt")).expect("the attribution index");
+    assert_eq!(att.lines().count(), 4, "{att}");
+    // The last snapshot's rows are the visible continental samples, and the columns 45 km or
+    // thicker have a crossing (none was at the start), at or before now.
+    let last = att.lines().last().unwrap();
+    let t_now: f32 = last
+        .split_whitespace()
+        .find_map(|w| w.strip_prefix("t="))
+        .and_then(|x| x.parse().ok())
+        .unwrap();
+    let rows = floats(last.rsplit("file=").next().unwrap());
+    let f = front_trace::ATT_FIELDS;
+    let n = st
+        .samples
+        .iter()
+        .filter(|s| s.is_continental() && !s.is_hidden())
+        .count();
+    assert_eq!(rows.len(), n * f);
+    let thick: Vec<&[f32]> = rows
+        .chunks_exact(f)
+        .filter(|r| r[2] >= front_trace::THICK_M)
+        .collect();
+    let crossed = thick.iter().filter(|r| r[9] >= 0.0).count();
+    eprintln!("{} thick columns, {crossed} with a crossing", thick.len());
+    assert!(
+        crossed * 10 >= thick.len() * 9,
+        "{crossed} of {}",
+        thick.len()
+    );
+    for r in &thick {
+        assert!(r[9] < 0.0 || r[10] <= t_now, "crossed in the future: {r:?}");
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// The fronts' lengths as the slab pull and the arcs count them (measurement only, PLT-554; the
 /// front lane, step 8, 2026-10-24), over a 100-Myr run: the slab pull's one spacing per
 /// overriding sample that pulls, the part of each along the boundary's normal, and the same

@@ -8527,3 +8527,23 @@ of it. The maps hold visible samples only, so whether the band's neighbours are 
 is not in them; that, and the margins followed through a resampling, needs a trace of the lattice
 at a few resamplings of one run (measurement only), which is the coordinator's to call. The
 scripts are `build/front/recdip.py`, `recdip2.py`, `mapdip.py` to `mapdip4.py` (not kept).
+
+### The front trace (2026-10-25, measurement only, PLT-580)
+
+Two questions the maps cannot answer, asked of one run behind one variable,
+`DEEPTIME_FRONT_TRACE=<folder>` (`plates/front_trace.rs`); no rule reads either, and the world is
+the same with it on or off (the test `the_front_trace_changes_nothing`; on the pool, `pool.sh alias`
+of the commit against master's key).
+
+- **The dip trace**: are the band's front neighbours hidden? At the step a resampling ends, the step
+  after it and halfway through the next cycle, each visible sample with a lattice neighbour of
+  another plate gets a row: its class from the boundary mix, the front `subduction::fronts_begin`
+  found for it (that neighbour hidden or not, its distance now, the convergence along the
+  boundary's normal, the contact, its slab's length and age), the neighbour the mix's front reads,
+  and the distance to the nearest visible sample of another plate.
+- **The thickening attribution**: which process last took a continental column past 45 km (the
+  lower edge of the crust budget's 45-55 km bin; a measurement threshold, game-choice), and what
+  has thickened it since. The step's processes are bracketed as the gap budget brackets them; a
+  resampling hands each new sample the record of its blend's major corner and books the blend and
+  the crust accreted under it (the stack) as two parts of their own. Every 50 Myr a file holds the
+  visible continental samples with their record, orogeny tag and age, lithosphere and keel.
