@@ -3480,27 +3480,31 @@ fn fronts_and_band(
 /// stands near it: the band. The resampling drops it, and the front dips.
 #[test]
 fn an_oblique_promontory_through_a_resampling() {
-    let p = preset(20_000, 20.0, "supercontinent", 5);
+    // Fine enough that the forearc's reach (`arc_distance_km` and a spacing, about 4.5 spacings
+    // here) covers the promontory, as it covers a real margin's irregularities at 60 km spacing.
+    let p = preset(80_000, 20.0, "supercontinent", 5);
     let stage = PlatesStage::new(p.clone());
     let env = stage.env(&p.tectonics, 1);
     let spacing = env.norm.spacing_rad();
-    // The continent north of the equator, with a promontory about 4 spacings deep and 6 wide on
-    // the converging half.
-    let promontory = |q: DVec3| q.z > 0.0 || (q.y > 0.0 && q.x.abs() < 0.08 && q.z > -0.1);
-    let (mut st, mut geo, mut pos) = plates_split(&p, &env, 0.03, promontory);
+    // The continent north of the equator, with a promontory 4 spacings deep and 8 wide on the
+    // converging half.
+    let (half, deep) = (4.0 * spacing, 4.0 * spacing);
+    let promontory = |q: DVec3| q.z > 0.0 || (q.y > 0.0 && q.x.abs() < half && q.z > -deep);
+    let (mut st, mut geo, mut pos) = plates_split(&p, &env, 0.5 * spacing, promontory);
     st.dynamics = Some(dynamics::Dynamics::default());
     if p.tectonics.level_set_membership {
         level_set::reinit(&mut st, &geo, spacing);
     }
-    // North-west at 50 mm/yr where y = 1: 45 degrees oblique to the equator.
-    let axis = DVec3::new(1.0, 0.0, 1.0).normalize();
+    // West-north-west at 50 mm/yr where y = 1: 30 degrees from the equator, so the promontory's lee
+    // stretches along the margin.
+    let axis = DVec3::new(1.0, 0.0, 3f64.sqrt()).normalize();
     st.plates[1].omega = (axis * env.norm.omega_of_speed(50.0)).to_array();
     let mut world = WorldState::new(1, 16_384, p.t_start_years());
     let mut cones = vec![[0.0; 2]; st.samples.len()];
     let mut seen = Vec::new();
-    // A cycle: the ocean moves 6 spacings at y = 1, past the promontory's width.
+    // A cycle: the ocean moves 12 spacings at y = 1.
     let per_step = env.norm.omega_of_speed(50.0) * env.dt_yr;
-    let steps = (6.0 * spacing / per_step).ceil() as u64;
+    let steps = (12.0 * spacing / per_step).ceil() as u64;
     eprintln!(
         "dt {} Myr, {steps} steps of {:.2} spacings",
         env.dt_myr,
@@ -3520,73 +3524,24 @@ fn an_oblique_promontory_through_a_resampling() {
         subduction::fronts_and_uplift(&mut st, &geo, &pos, &env, &mut cones, 0.0);
         // DEBUG
         {
-            let hidden = (0..st.samples.len())
-                .filter(|&i| st.plate_of(i) == 1 && st.samples[i].is_hidden())
-                .count();
-            let vis = Tree::over(&pos, |i| !st.samples[i].is_hidden() && st.plate_of(i) == 1);
-            let fr = subduction::fronts_begin(&st, &geo, &pos, &env).traced_fronts();
-            let mut far = Vec::new();
-            for (v, f) in fr.iter().enumerate() {
-                if f.is_some() {
-                    let d = vis
-                        .nearest(pos[v])
-                        .map_or(f64::NAN, |(_, d)| d.sqrt() / spacing);
-                    if d > 1.6 {
-                        far.push(format!("({:.3},{:.3}):{d:.1}", pos[v].x, pos[v].z));
-                    }
-                }
-            }
             let held = st
                 .one_way
                 .as_ref()
                 .map_or(0, |ow| ow.held.iter().filter(|&&h| h).count());
-            let forearc = st
-                .one_way
-                .as_ref()
-                .map_or(0, |ow| ow.forearc.iter().filter(|&&h| h).count());
-            let lee =
-                |q: DVec3| q.y > 0.0 && q.x > -0.17 && q.x < -0.09 && q.z > -0.08 && q.z < 0.0;
+            let lee = |q: DVec3| {
+                q.y > 0.0 && q.x > -half - deep && q.x < -half && q.z > -deep && q.z < 0.0
+            };
             let (mut lv, mut lh) = (0, 0);
-            let mut moved = Vec::new();
             for i in 0..st.samples.len() {
                 if st.plate_of(i) == 1 && lee(pos[i]) {
                     if st.samples[i].is_hidden() {
                         lh += 1;
                     } else {
                         lv += 1;
-                        let r = geo.points()[i];
-                        moved.push(format!(
-                            "{i} rest ({:.3},{:.3}) now ({:.3},{:.3})",
-                            r.x, r.z, pos[i].x, pos[i].z
-                        ));
                     }
                 }
             }
-            if k == 1 || k == steps {
-                eprintln!("DEBUG lee at {k}: {moved:?}");
-            }
-            for i in [19979usize, 19987, 19995] {
-                let near = tree.nearest_n(pos[i], 4);
-                eprintln!(
-                    "DEBUG track {k} {i}: now ({:.3},{:.3}) hidden {} held {} overlap {:?}, nearest {:?}",
-                    pos[i].x,
-                    pos[i].z,
-                    st.samples[i].is_hidden(),
-                    st.one_way.as_ref().is_some_and(|ow| ow.held[i]),
-                    overlaps.iter().find(|o| o.i as usize == i).map(|o| o.group),
-                    near.iter()
-                        .map(|&(j, _)| (
-                            j,
-                            st.plate_of(j as usize),
-                            st.samples[j as usize].is_hidden()
-                        ))
-                        .collect::<Vec<_>>()
-                );
-            }
-            eprintln!(
-                "DEBUG step {k}: {hidden} hidden, {held} held, {forearc} forearc, lee ocean {lv} \
-                 visible {lh} hidden, fronts far from ocean {far:?}"
-            );
+            eprintln!("DEBUG step {k}: {held} held, lee ocean {lv} visible {lh} hidden");
         }
     }
     let env = stage.env(&p.tectonics, steps);
