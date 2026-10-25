@@ -544,7 +544,8 @@ pub fn resample(
         0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]),
         env.gravity,
     );
-    let tracing = state.gap_budget.is_some();
+    // Also for the front trace's attribution (`front_trace.rs`, measurement only).
+    let tracing = state.gap_budget.is_some() || super::front_trace::wants_resample();
     let old_limits = state
         .limits
         .as_ref()
@@ -1003,6 +1004,16 @@ pub fn resample(
         ow.forearc.clear();
     }
     state.limits = new_limits;
+    if super::front_trace::wants_resample() {
+        // Gap points are new sea floor (as for the gap budget below).
+        super::front_trace::stash_resample(
+            traces
+                .iter()
+                .zip(&gap)
+                .map(|(t, &g)| if g { None } else { *t })
+                .collect(),
+        );
+    }
     if let Some(gb) = state.gap_budget.as_mut() {
         // Gap points became new sea floor: born now.
         for (t, &g) in traces.iter_mut().zip(&gap) {

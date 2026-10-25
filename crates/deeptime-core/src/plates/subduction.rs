@@ -1056,6 +1056,18 @@ pub struct FrontsBegun {
     key: Vec<u32>,
 }
 
+impl FrontsBegun {
+    /// Measurement only (`front_trace.rs`): each sample's front (the other-plate neighbour, the
+    /// contact, the relative velocity, the lattice edge's direction) and its boundary normal.
+    pub fn traced_fronts(&self) -> Vec<super::front_trace::FbFront> {
+        self.boundary
+            .iter()
+            .zip(&self.normals)
+            .map(|(b, &n)| b.front.map(|(u, c, rel, out)| (u, c, rel, out, n)))
+            .collect()
+    }
+}
+
 #[cfg(test)]
 impl FrontsBegun {
     /// The step's front samples.
