@@ -697,7 +697,7 @@ pub struct TectonicParams {
     /// (η = η_0 e^(t_eq / τ_s), PLT-414, PLT-415, ISO-112), up to the whole convergence. That
     /// share of the crust the step keeps thickens the interior in proportion to T ε̇ instead of
     /// stacking at the front; nothing is created. A cold, keeled craton takes almost none, a hot
-    /// plate most. Needs `thermal_state` and a sheet viscosity. On since 2026-10-25 (arm
+    /// plate most. Does nothing without `thermal_state` or a sheet viscosity. On since 2026-10-25 (arm
     /// fl-upper-unfreeze, the guard clean). ledger: PLT-652
     pub collision_upper_plate_shortening: bool,
     /// The cordillera's back-arc source from the state: the crust behind an arc's range gives
@@ -1600,15 +1600,9 @@ impl PlanetPreset {
             "$.tectonics.thermal_state",
             "thermal_isostasy_m and thermal_backstop need thermal_state",
         )?;
-        // PLT-652 reads the sheet's strength at the lithosphere's thermal age.
-        check(
-            !k.collision_upper_plate_shortening
-                || (k.thermal_state
-                    && k.collapse_sheet_viscosity_pa_s > 0.0
-                    && k.collapse_sheet_viscosity_pa_s.is_finite()),
-            "$.tectonics.collision_upper_plate_shortening",
-            "needs thermal_state and collapse_sheet_viscosity_pa_s > 0",
-        )?;
+        // PLT-652 (`collision_upper_plate_shortening`, on by default) reads the sheet's strength
+        // at the lithosphere's thermal age: without the state or a sheet viscosity it does nothing
+        // (belts.rs `upper_applies`), so turning either off alone is allowed.
         // The force balance.
         pos(
             k.plate_speed_scale_mm_yr,

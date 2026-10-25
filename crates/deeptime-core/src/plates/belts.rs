@@ -624,7 +624,7 @@ fn stack_front(
     // ledger: PLT-652. The overriding plate's interior takes its share of the convergence as
     // distributed shortening (`collision_upper_plate_shortening`, the module docs); the front
     // stacks the rest, in the wedge and the belt as before.
-    let upper = (k.collision_upper_plate_shortening && rise_km2_m > 0.0)
+    let upper = (upper_applies(k) && rise_km2_m > 0.0)
         .then(|| upper_plate(state, env, pos, plate_of, &side, f, &d_over, sea_m));
     let (rise_km2_m, upper_rise_km2_m) = match &upper {
         Some(u) if u.share > 0.0 => {
@@ -1111,6 +1111,17 @@ fn upper_rate_mm_yr(force_n_m: f64, eta0_pa_s: f64, path_km: f64) -> f64 {
         return 0.0;
     }
     force_n_m / (4.0 * eta0_pa_s * LITHOSPHERE_KM * 1000.0) * (path_km * 1000.0) * YEAR_S * 1000.0
+}
+
+/// Whether PLT-652 acts: the switch on, and the sheet's strength readable (the thermal state and a
+/// finite positive sheet viscosity). Without them it does nothing, as `thermal_strength` does, so
+/// a preset may turn the state off alone.
+// ledger: PLT-652
+fn upper_applies(k: &crate::params::TectonicParams) -> bool {
+    k.collision_upper_plate_shortening
+        && k.thermal_state
+        && k.collapse_sheet_viscosity_pa_s > 0.0
+        && k.collapse_sheet_viscosity_pa_s.is_finite()
 }
 
 /// The interior's share of a front's convergence `conv_mm_yr` when it shortens at `rate_mm_yr`
@@ -1987,6 +1998,19 @@ mod tests {
         let f = belt_push_n_m(k, u(5000.0) - u(0.0));
         assert!((f - 6.7e12).abs() < 0.1e12, "{f}");
         assert_eq!(belt_push_n_m(k, u(0.0) - u(1000.0)), 0.0);
+        // On by default, it acts only where the sheet's strength can be read: not without the
+        // thermal state or a sheet viscosity, so a preset may turn either off alone.
+        let mut k = fx.preset.tectonics.clone();
+        k.collision_upper_plate_shortening = true;
+        k.thermal_state = true;
+        assert!(upper_applies(&k));
+        k.thermal_state = false;
+        assert!(!upper_applies(&k));
+        k.thermal_state = true;
+        for eta in [0.0, f64::NAN, f64::INFINITY] {
+            k.collapse_sheet_viscosity_pa_s = eta;
+            assert!(!upper_applies(&k), "{eta}");
+        }
     }
 
     /// PLT-652 off: the switch adds nothing to the record. On, a plate at the cold limit (225 km
