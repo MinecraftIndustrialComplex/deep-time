@@ -74,9 +74,9 @@ them in from [_template.md](_template.md).
 | [deposits.md](deposits.md) | stage 2 (checked against sources 2026-10-02) | DEP, ORE |
 | [provinces.md](provinces.md) | written with P1-10 (2026-10-02) | PRV |
 | [world-scale-and-bake.md](world-scale-and-bake.md) | stub | SCL, BAK |
-| [pole-cap.md](pole-cap.md) | stub | POL |
-| [quincuncial-projection.md](quincuncial-projection.md) | stage 1 (prototype only, not shipped) | SCL-070 to SCL-077 |
-| [seamless-world.md](seamless-world.md) | stage 2 for the Petroff-Guyou world (2026-10-04); its section on the cube world at stage 1 (phase 0, 2026-10-22) | SCL-049, SCL-078 to SCL-081, SCL-083, SCL-084, SCL-086 to SCL-091, SCL-100 to SCL-108, POL-022 to POL-024 |
+| [pole-cap.md](pole-cap.md) | retired 2026-10-24 with the pole cap (cube plan §7.4) | POL (POL-001 to POL-015 retired) |
+| [quincuncial-projection.md](quincuncial-projection.md) | retired 2026-10-24 with the prototype (cube plan §7.4) | SCL-070 to SCL-077 (retired) |
+| [seamless-world.md](seamless-world.md) | retired 2026-10-24 for the Petroff-Guyou world (cube plan §7.4; was stage 2, 2026-10-04); its section on the cube world at stage 1 (phase 0, 2026-10-22) | SCL-049, SCL-078 to SCL-081, SCL-083, SCL-084, SCL-086 to SCL-091, SCL-100 to SCL-108, POL-022 to POL-024 |
 | [round-features.md](round-features.md) | stage 1 (2026-10-23): features stamped with a radius drawn round on the planet, not in Lambert blocks; the audit of every such stamp | SCL-230 to SCL-236 |
 | [cube-world-bake.md](cube-world-bake.md) | stage 1 (cube plan phase 1, 2026-10-22): the bake writes cube worlds; measured on real bakes, nothing checked against a source | SCL-120 to SCL-129 |
 | [cube-world-game.md](cube-world-game.md) | stage 1 (cube plan phase 2, 2026-10-23): the game on a cube world, the fill off the faces, the border, spawn; all game choices | SCL-210, SCL-211, POL-031 |

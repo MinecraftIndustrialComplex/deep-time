@@ -52,19 +52,19 @@ import java.util.UUID;
 public final class EdgeBorder {
 
     /** How far inside the edge the stop line is, blocks (the layout block's {@code inset_blocks} default). */
-    public static final double INSET = 1.0; // ledger: POL-022, SCL-088 (game-choice)
+    public static final double INSET = 1.0; // ledger: POL-031, SCL-088 (game-choice)
     /** The warning band inside the stop line, blocks. */
     public static final double WARN_BLOCKS = 24.0; // ledger: POL-023 (game-choice)
     /** How often the warning repeats while in the band, ticks. */
     public static final int BAR_EVERY = 40; // ledger: POL-023 (game-choice)
     /** How far inside the stop line a stopped player or vehicle is put, blocks. */
-    static final double STOP_INSET = 0.05; // ledger: POL-022 (game-choice)
+    static final double STOP_INSET = 0.05; // ledger: POL-031 (game-choice)
 
     /**
      * The push that turns a Sable ship back at the border, blocks per second added per tick (20 blocks/s²):
      * the pole cap's Sable wind at its stop line, which the border kept when the cap went.
      */
-    public static final double SABLE_PUSH = 1.0; // ledger: POL-011 (game-choice)
+    public static final double SABLE_PUSH = 1.0; // ledger: POL-031 (game-choice)
 
     public static final String KEY_CUBE_NEAR = "deeptime.edgeborder.cube.near";
     public static final String KEY_CUBE_STOP = "deeptime.edgeborder.cube.stop";
@@ -209,7 +209,7 @@ public final class EdgeBorder {
 
     /**
      * The lowest y from {@code y} up at which {@code entity} fits at (x, z): the stop line can run
-     * through rising ground (ledger: POL-012). The destination is loaded first (it usually is: it is
+     * through rising ground (ledger: POL-031). The destination is loaded first (it usually is: it is
      * next to the entity).
      */
     static double freeY(ServerLevel level, Entity entity, double x, double y, double z) {

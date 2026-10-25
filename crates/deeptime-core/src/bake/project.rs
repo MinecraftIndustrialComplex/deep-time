@@ -44,7 +44,7 @@ pub const BORDER_INSET_BLOCKS: f64 = 1.0; // ledger: SCL-088 (game-choice)
 /// `units` is `flag` is one too, named here or not). `climate/koppen_l2` came a day after this list
 /// and was averaged as a number until 2026-10-18: a class border's footprint mean named a class
 /// neither side had (BSk beside Cfa read Csa to Csc), which the census and the biome rules' Köppen
-/// conditions read (ledger SCL-090). `meta/crust_type` (2026-10-19) is a code: an average of 0 and
+/// conditions read (ledger SCL-124; SCL-090 then). `meta/crust_type` (2026-10-19) is a code: an average of 0 and
 /// 1 at a coast would be no crust at all. `strata/lift` (2026-10-20) is a number but travels with
 /// the horizon stacks, which are the nearest cell's ([`Kind::Stack`]): the deformed column rule
 /// takes it for how far that cell's stack rose, so it must be the same cell's (STR-055).
@@ -119,7 +119,7 @@ pub(crate) enum Kind {
     /// depth of the footprint's samples that are covered, each read by the rule at its block. The
     /// footprint mean of the blocks covered every world cell that one covered sample reached (one
     /// block from a 12-block margin's twelfth), so the cover's area grew with the footprint, most
-    /// where it is widest, at the poles (ledger BIO-159, SCL-090).
+    /// where it was widest, at the Petroff–Guyou poles (ledger BIO-159; SCL-090, retired).
     Cover,
 }
 
