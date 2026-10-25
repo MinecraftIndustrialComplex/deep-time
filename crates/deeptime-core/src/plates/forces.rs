@@ -1047,6 +1047,16 @@ pub fn collision_buoyancy_n_m(
         * (shortening_km.max(0.0).min(d) / d)
 }
 
+/// The push per metre of a mountain belt on the lowland beside it: the belt's column energy over
+/// the lowland's, `du_n_m` (at least 0), with the balance's edge scale, N/m. It is the edge term
+/// (FRC-018) read across a belt: the force a range exerts on its lowlands (Molnar & Lyon-Caen 1988:
+/// Tibet's 6–7 × 10¹² N/m; [`column_energy`] gives 6.7 × 10¹² for a 5 km belt). For the overriding
+/// plate's share of a collision's convergence (`belts.rs`, PLT-652).
+pub fn belt_push_n_m(k: &TectonicParams, du_n_m: f64) -> f64 {
+    let edge_scale = k.edge_energy / EDGE_ENERGY_PHYSICAL; // ledger: FRC-009
+    edge_scale * du_n_m.max(0.0) // ledger: FRC-018, PLT-652
+}
+
 /// The relaxation of a rotation towards the balance's over one step (design §5.1 a): the share
 /// `1 − e^(−δt/τ)` of the way, τ = `motion_relax_myr` (ledger PLT-191).
 pub fn relax(omega: DVec3, target: DVec3, dt_myr: f64, tau_myr: f64) -> DVec3 {

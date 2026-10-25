@@ -443,7 +443,7 @@ impl PlatesStage {
         let (crossed, kept) = stacked.values().fold((0.0, 0.0), |a, s| {
             (
                 a.0 + s.crossed_km2 * s.thickness_m / 1000.0,
-                a.1 + (s.belt_km2_m + s.wedge_km2_m) / 1000.0,
+                a.1 + (s.belt_km2_m + s.wedge_km2_m + s.upper_km2_m) / 1000.0,
             )
         });
         *world
@@ -520,6 +520,36 @@ impl PlatesStage {
             ),
         ] {
             *world.globals.entry(name.to_owned()).or_insert(0.0) += x;
+        }
+        // The overriding plate's share (PLT-652, measurement only; written only with the switch so
+        // a run without it keeps its globals list).
+        if env.k.collision_upper_plate_shortening {
+            for (name, x) in [
+                (
+                    belts::UPPER_GLOBAL,
+                    stacked
+                        .values()
+                        .map(|s| s.upper_km2_m / 1000.0)
+                        .sum::<f64>(),
+                ),
+                (
+                    belts::UPPER_AREA_GLOBAL,
+                    stacked
+                        .values()
+                        .map(|s| s.crossed_km2 * s.upper_share)
+                        .sum::<f64>(),
+                ),
+                (
+                    belts::UPPER_MOST_GLOBAL,
+                    stacked
+                        .values()
+                        .filter(|s| s.upper_share >= 0.5)
+                        .map(|s| s.crossed_km2)
+                        .sum::<f64>(),
+                ),
+            ] {
+                *world.globals.entry(name.to_owned()).or_insert(0.0) += x;
+            }
         }
         lap(&mut clock, "belts");
         cut_trace::mark(st, &cache.geo, "belts");
