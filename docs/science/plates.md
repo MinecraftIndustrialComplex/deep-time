@@ -9685,7 +9685,9 @@ the dynamics record's age quantiles read). Nothing reads it in the model.
 
 Four pool runs carry the map (arm fl-agemap, key b95402b27d42: seeds 1 and 2, both starts, base15's
 environment, 2 threads). Each run's state and record hashes equal base15's: the map measures and does
-not act. `floorage_age.py` reads the 33 snapshots from -500 Myr on (none at a resampling, where the
+not act. On master 1b210fac (arm fl-agemap-1b21, key 153f5de6d52c) the records are base15's too and
+the world differs in one field of 109, the trap structure, which DEF-081 (structures drawn past a
+pole are not started) changes on purpose. `floorage_age.py` reads the 33 snapshots from -500 Myr on (none at a resampling, where the
 map hides nothing and flags no front) and checks each against the record: the map's oceanic count is
 the record's, and its count older than 180 Myr is the record's `old180`. Pooled over the four runs:
 
