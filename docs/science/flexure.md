@@ -51,8 +51,10 @@ and the spreading of over-thick crust.
    for the cooling from 2026-10-21, before which old floor sank about 1.45 times GDH1; the rest
    from 2026-10-23, "The trench rows").
 2. **The stiffness.** The effective elastic thickness `Te` says how thick the stiff part of the
-   shell is. Ocean floor stiffens with age. Continental crust is weak just after mountain
-   building and stiffens over a few hundred million years. Volcanic arcs and rifts are weak. A
+   shell is. Ocean floor stiffens with age. A continent's stiffness is that of its strong upper
+   crust and its strong mantle, on its lithosphere's geotherm (since 2026-10-25, "The foreland's
+   stiffness"): weak where the lithosphere is young and hot, 70 to 84 km on an old craton.
+   Volcanic arcs and rifts are weak. A
    plate that the law weakens (an orogeny, an arc, a rift reaching it) has to warm first and
    weakens over tens of millions of years ("The release's pace"). The
    boundary between two plates is a break: one plate does not hold the other up.
@@ -105,7 +107,9 @@ The plate equation, as coded (ISO-040):
 | ISO-048 | Oceanic `Te` | 2.7 × √(age in Myr) | km | Calmant et al. 1990 | `verified` |
 | ISO-049 | Oceanic `Te`, at most | 40 | km | Watts & ten Brink 1989 | `abstract-only` |
 | ISO-050 | Continental `Te` long after an orogeny | 80 | km | Burov & Diament 1995 | `abstract-only` |
-| ISO-051 | Continental recovery | `80 × (1 − e^(−t/300 Myr))` | km | form after Lu et al. 2024; the numbers are the agent's | `uncited` |
+| ISO-051 | Continental recovery | `80 × (1 − e^(−t/300 Myr))`; since 2026-10-25 only where a continental cell has no thermal age (ISO-137 takes the rest) | km | form after Lu et al. 2024; the numbers are the agent's | `uncited` |
+| ISO-137 | Continental `Te` from the geotherm | `(h₁³ + (h₂ − h_c)³)^⅓`, h₁ the 300 °C isotherm or the Moho, h₂ the 750 °C isotherm, on by default since 2026-10-25 | km | Burov & Diament 1995, eq. 14; Watts & Burov 2003, eq. 3 | `verified` |
+| ISO-138 | The geotherm it reads | steady, the crust's heat from sources over h_r 10 km, the mantle's B / L, 1,350 °C at the lithosphere's base | °C, km | Burov & Diament 1995, appendix | `verified` |
 | ISO-052 | Lowest `Te` | 5 | km | Lu et al. 2024 | `abstract-only` |
 | ISO-053 | Arcs and rifts | at the lowest `Te` | km | none | `uncited` |
 | ISO-055 | Plate boundaries | at the lowest `Te`; the boundary cells blurred, the share of stiffness kept `1 − 2.5 × blur` (0, then 0.17 and 0.72 on a straight boundary) | km | none | `uncited` |
@@ -153,14 +157,16 @@ the artifact fixes); the sea-depth row is from the final code (law 2.7, after th
 - The plate is elastic up to its strength, which is a bound on the load a cell's plate holds away
   from local isostasy (since 2026-10-23, on by default: "The plate's yield", ISO-120), not on its
   bending stress. Real lithosphere also depends on whether crust and mantle are coupled and on how
-  sharply the plate is bent (Burov & Diament 1995); neither is modelled.
+  sharply the plate is bent (Burov & Diament 1995): the continents' `Te` takes the two as always
+  decoupled (ISO-137), and the bending's weakening is not modelled.
 - The solve works in the raster's block metric: every cell is a square of the equator's width
   (`norm_dx_m`). On the equal-area raster a cell at latitude φ is cos φ as wide and 1 / cos φ as
   tall on the sphere, so near the poles the plate bends as if it were about 1 / cos⁴ φ too stiff
   north to south and cos⁴ φ too soft east to west (about 300 times each way at 76°). A solve on
   the sphere's metric exists since 2026-10-23 (ISO-127) but is off: its step diverges at the poles
   ("The solve on the sphere's metric").
-- `Te` depends only on the crust's type and thermal age.
+- `Te` depends only on the crust's type, its thermal age and, on continents, the crust's thickness
+  (ISO-137).
 - The plate equation's extra terms for varying rigidity are left out (ISO-040).
 - A step is 2 million years; the ground answers in thousands of years on Earth. The solve gives
   the equilibrium. Ice-age cycles inside a step are not followed: the load is the ice standing at
@@ -1024,8 +1030,9 @@ solve that converges at the poles is the cure; the growth is its symptom.
 ## Foreland basins
 
 Added 2026-10-24 (ISO-131, PLT-546), V1 gap 6 ([physics-gap-audit.md](physics-gap-audit.md),
-"Gap 6"). The switch is `tectonics.collision_underthrust`, off: on the pool it brought no foredeep
-beyond the wedge ("On the pool", below).
+"Gap 6"). The switch is `tectonics.collision_underthrust`, off: on the pool gap 6's form brought no
+foredeep beyond the wedge ("On the pool", below), and gap 6b's brought one with twice the step
+noise ("The superposition and the foreland's stiffness (gap 6b)").
 
 **What Earth does.** A thrust belt is a load on the edge of the stiff plate that goes under it, and
 that plate bends down into a foredeep in front of the belt, with a forebulge beyond: foredeeps are
@@ -1074,7 +1081,9 @@ of that lithosphere, ISO-110 to ISO-112, which the `Te` law reads). The flexure 
   larger of the two. The carrier's `Te` is the continental law (ISO-051) at its lithosphere's
   thermal age, not floored as orogenic crust: the plate under the belt is not reheated by the
   shortening above it.
-- **keeps the foreland in the belt's frame** (ISO-133). The flexure carries the plate's state with
+- **keeps the foreland in the belt's frame** (ISO-133; since gap 6b only the belt's own part of
+  the deflection, "The superposition and the foreland's stiffness (gap 6b)" below; what follows is
+  gap 6's column swap, which that replaced). The flexure carries the plate's state with
   its crust and takes it to be in balance ("Increments, not the whole load", in the code's module
   notes), which holds where the loads move with the plate. Beside a belt they do not: the belt
   moves with the overriding plate, and the incoming plate it bends slides under it. Carried with
@@ -1171,6 +1180,280 @@ moves with the belt, and that under the rest, which moves with the crust; the be
 solved apart on steps with a collision and that part carried in the belt's frame would swap a
 field as smooth as α, with no load to solve again), and a foreland as stiff as its lithosphere's
 age makes it (the carrier's `Te` from its foreland's thermal age, ISO-051 and PLT-546).
+
+### The superposition and the foreland's stiffness (gap 6b)
+
+Added 2026-10-24 (ISO-136 to ISO-138), both of what the paragraph above asked for. The
+superposition replaced gap 6's column swap behind `tectonics.collision_underthrust`; the stiffness
+is `surface.flexure.te_geotherm`. The stiffness is on by default since 2026-10-25: on the pool it
+neither diverged nor moved the guard or the steps. The superposition stays off: with it the
+foredeep came, but the largest change of a cell in a step doubled and the guard's worst rose by 2
+to 5 km, and the traces show why ("On the pool", below).
+
+**The superposition** (ISO-136). The thin plate is linear: with the step's rigidity and restoring
+density, the deflection under two loads is the sum of the deflections under each. So beside the
+deflection it carries with the crust the flexure keeps the belt's part of it (`FlexState::belt_m`),
+the deflection the belt's own increments bent, carried with the crust like the rest of the state.
+On a solve step the belt's increments are solved apart with the step's operator: on its footprint
+cells only (the over plate's crust that a collision's incoming plate carries; the wedge is the
+incoming plate's own crust and goes with it), its new loads and roots, the residual it carried, the
+bending of its plate root and the load it let go. The step's own solve is the whole one, as
+before, so the step's change of the deflection is unchanged; the belt's is one more solve on
+collision steps, never a load solved again. Over the belt's foreland (ISO-133's cells) a place then
+takes the belt's part where the place was a step ago in the belt's frame, and the crust that slid
+there keeps the rest of its own. What moves is a field as smooth as α, not a column's whole state:
+the local roots, the load and the ice stay with their crust, and nothing goes into the unsolved
+residual. Under the sea the water the move lets in or out is booked as answered, since the belt's
+solve took that water's restoring density; without that booking the flexure of a foreland under the
+sea moved 3.4 m off the case at rest already behind the belt (the bound is 1 m). Crust new at a
+place takes the belt's part where it is and moves nothing.
+
+Four rules came from the first arm's traces and the singles after it (g6b-both2, "On the pool"
+below):
+
+- **The yield is the belt's too.** Where the belt bends its foreland past what the plate holds
+  (ISO-120), the plate yields there, and the belt's part yields with the whole: off the belt it
+  holds `−ρ_m × belt_m`, and where that pushes the same way as the whole it gives up its share of
+  the sinking, all of it where the rest pushes the other way. Left with the rest, the belt's part
+  over a foreland kept the elastic answer, 18 to 38 km on the traced run where the plate holds about
+  2.75 km of mantle, and the frame moved that over the crust each step for the yield to take back.
+- **Crust coming into a foreland moves nothing.** The flexure names, for each cell, the belt whose
+  frame it is in or that it stood under a belt (`FlexState::belt_of`, carried with the crust). Crust
+  that comes into a belt's foreland from under a belt or from another belt's foreland carries a belt
+  part that is not this belt's far field, so it takes this belt's part where it is, without a move.
+  Crust from beyond any foreland moves as before: it carries the belt's far field, and the sliding
+  tests need that move (blocking it put the crust that had just entered 1.1 to 1.5 m off the case at
+  rest).
+- **A foreland ends where another belt is nearer.** With the reach of 1,180 km, belts' forelands
+  overlapped and a place's frame could change from one step to the next. A cell nearer, measured
+  over any crust, to another belt than to its own is that belt's to bend, and is in no other's
+  frame.
+- **A foreland takes the belt's part from its own crust only.** The place a step ago in the belt's
+  frame counts where it was the bending plate's own crust, not where it was the belt the plate
+  carried: there the belt's part is the belt's root under its own load. Counted, a cell by the
+  front took 16 to 28 km from such corners against the few hundred metres of the foreland's crust
+  beside them, and the yield took most of it back in the same step.
+
+**The foreland's stiffness** (ISO-137, ISO-138). A continental plate's strength is in two layers:
+the upper crust, strong down to about 300 °C (quartz), and the mantle under the Moho, strong down to
+about 750 °C (olivine) (Burov & Diament 1995, Figure 2's caption). Between them the weak lower
+crust lets them bend without a bond, so `Te = (h₁³ + (h₂ − h_c)³)^⅓` (their eq. 14, after McNutt
+et al. 1988; Watts & Burov 2003's eq. 3, the leaf spring), with h₁ the depth of the 300 °C
+isotherm or the Moho if that is shallower, h₂ that of the 750 °C isotherm and h_c the crust. For
+crust thicker than 20 to 25 km "decoupling should be permanent" (p. 3909), and the decoupled model
+"fits most of the continental data" (Figure 7b), so the model is always decoupled. The isotherms
+are those of the plate model's own steady geotherm: its lithosphere's depth L from the thermal age
+(PLT-460, ISO-112), its heat flow (PLT-467: the crust's 26 mW/m² from sources falling off over
+h_r = 10 km, the mantle's B / L), and T_m = 1,350 °C at L (both from B&D's appendix, ISO-138). The
+conductivity that implies is 2.69 W/m/K, within B&D's 2 to 3.5. Against ISO-051's recovery law
+at the same thermal age (τ_c 203.5 Myr from L_hot to L_cold):
+
+| thermal age, Myr | L, km | 300 °C, km | 750 °C, km | `Te`, 35 km crust | 40 km | 50 km | ISO-051 |
+|---|---|---|---|---|---|---|---|
+| 0 | 60 | 11.2 | 31.5 | 11.2 | 11.2 | 11.2 | 5 (floor) |
+| 50 | 95.9 | 16.9 | 50.1 | 20.2 | 18.0 | 16.9 | 12.3 |
+| 100 | 124.1 | 21.3 | 64.7 | 33.0 | 29.1 | 23.4 | 22.7 |
+| 142 | 142.9 | 24.2 | 74.5 | 42.3 | 38.1 | 30.7 | 30.2 |
+| 250 | 176.7 | 29.4 | 92.1 | 59.6 | 55.1 | 46.4 | 45.2 |
+| 600 | 216.4 | 35.6 | 112.8 | 80.1 | 75.5 | 66.4 | 69.2 |
+| a craton | 225 | 37.0 | 117.3 | 84.4 | 80.0 | 70.8 | 80 |
+
+An old craton under 40 to 50 km of crust gets 71 to 80 km, at the top of B&D's "about 60-75 km" for
+old decoupled lithosphere under 35 to 50 km of crust (p. 3916) and of Watts & Burov 2003's 80 to 90
+km under the Ganges (p. 117). The law is stiffer than ISO-051 where the crust is thin or the
+lithosphere young (a 100 Myr foreland under 35 km of crust: 33 km against 23, α 82 km against 64),
+and the same under 50 km. A belt's footprint is its own crust over the colder of its own and the
+carrier's lithosphere (a craton under 60 km of belt: 62 km), never under its own `Te`; an oceanic
+footprint keeps ISO-131's sum. The belt's reach is now 2πα of a craton's mantle with no crust, `Te`
+117.3 km: 1,180 km. The brief's suggestion, the depth of the 450 to 600 °C isotherm, is the
+oceanic relation (Watts 1978, as B&D cite it, p. 3906); a continent's `Te` is not one isotherm's
+depth (B&D's point).
+
+**Unit tests.**
+
+- `a_belts_increments_solved_apart_add_up_to_the_whole_solve`: on a 192 by 96 plate with patches
+  of `Te` 6 to 70 km (a rigidity varying more than a thousandfold) and the sea over a third of it,
+  a belt's loads and the rest's solved apart add up to the whole solve within 10⁻³ of the peak
+  deflection (over 100 m), and the belt's part reaches beyond the belt (over 1 m within 14 rows).
+- `a_belts_part_of_the_deflection_is_what_its_own_loads_bend`: a belt rising on its footprint and
+  a fill on its foreland, in one step; the belt's part the step keeps is the deflection the belt's
+  uplift alone bends (to 5 cm), the fill alone adds none to it, the two steps' deflections add up
+  to the step with both (to 10 cm), and over the foreland the belt's part is the belt's whole
+  deflection.
+- `a_foreland_sliding_under_its_belt_bends_as_one_at_rest` (gap 6's, now on the superposition) and
+  `a_foreland_under_the_sea_sliding_under_its_belt_bends_as_one_at_rest`: the belt stands still and
+  the foreland slides under it at 10 and 30 km/Myr; the flexure and the elevation are those of the
+  case at rest to the metre within the reach, on land and under the sea.
+- `where_a_belt_bends_its_foreland_past_its_strength_the_yield_is_the_belts`: a belt rising 3 mm/yr
+  bends its foreland past the yield (380 mGal); the foreland yields, and there the belt's part is
+  still the whole deflection, to 5 cm.
+- `crust_coming_into_a_belts_frame_moves_nothing`: a 3 km deflection on crust entering a foreland
+  moves with the frame when the crust came from beyond any foreland or was in this belt's frame
+  already, and does not when it stood under a belt or in another belt's frame; the frame's cells
+  are named for the belt and the crust under the belt is marked.
+- `a_belts_foreland_ends_where_another_belt_is_nearer`: two belts on three plates; each foreland is
+  its carrier's crust within reach and nearer to its own belt than to the other.
+- `a_place_that_held_the_belt_gives_its_foreland_no_belt_part`: a belt's root of 16 km beside a
+  foreland of 1 km; a source between them takes the foreland's 1 km (8.5 km with the belt's
+  corners), a source on the belt alone none.
+- `the_continental_te_follows_its_lithospheres_geotherm`: the isotherms against the geotherm's
+  closed form, the table's values (84.4, 80.0, 70.8, 42.4, 21.9 and 11.2 km), `Te` rising with the
+  thermal age and falling with the crust, and the belt's reach.
+
+**On the pool** (2026-10-24). The cumulative arm `g6b-both2`, both switches on, both starts x seeds
+1 to 4, 1,000 Myr, on master 19fa4077 (the superposition as first built, before the four rules),
+against base9's same 8 (`fl-pull`) and base9's 24 (Mann-Whitney p against the same 8, then the 24):
+
+| | base9, 24 | base9, the same 8 | both on, 8 |
+|---|---|---|---|
+| land | 0.296 | 0.288 | 0.316 (p 0.10; 0.22) |
+| land above 2 km | 0.114 | 0.086 | 0.141 (p 0.050; 0.10) |
+| coast with high ground | 0.249 | 0.198 | 0.319 (p < 0.001; < 0.001) |
+| continental crust under the sea | 0.249 | 0.318 | 0.283 (p 0.38; 0.88) |
+| land under ice | 0.113 | 0.083 | 0.122 (p 0.10; 0.48) |
+| collisions per 100 Myr | 1.90 | 1.95 | 2.20 (p 0.67; 0.16) |
+| criteria met per run, median and mean | 5, 5.08 | 5, 5.12 | 5, 5.12 |
+| the guard's worst, km from the sea | 10.2 | 10.1 | 15.3 (p < 0.001; < 0.001) |
+| largest rise / fall of a cell in a step, km | 7.3 / 7.2 | 7.2 / 7.4 | 14.4 / 11.5 |
+| record: belts above 3 km / share with a foredeep | 9 / 0.41 | 7 / 0.38 | 8 / 0.71 |
+| record: foredeep width, km (plate check 150 to 450) | 0 | 0 | 179 (p 0.001; < 0.001) |
+| record: foredeep flexure below local isostasy, m | 76 | 80 | 452 (p < 0.001; < 0.001) |
+| record: wedge width, km | 96 | 90 | 92 (p 0.96; 0.36) |
+| final frame: foredeep width to the zero crossing, all / belts above 3 km, km | | | 149 / 155 |
+| final frame: `Te`, footprint / foreland, km | | | 16.2 / 33.4 |
+
+No run diverged and no step passed two Earth reliefs. The foredeep came: beyond the wedge, 179 km
+wide at the median in the records, inside the plate check's 150 to 450 km, with 452 m of flexure
+below local isostasy where there were 80. But a cell's largest change in a step doubled, and the
+guard's worst rose by 5 km. So the arm meets the first of the brief's three conditions and fails
+the second.
+
+**The traces.** A run with a trace of every flexure step (`build/gap6b/trace2.py`, scattered
+continents seed 4, the arm's noisiest) put 321 of the 334 rises over 6 km in a step and 215 of the
+222 falls on cells in a belt's frame. The four rules above came from there; each took away a path
+the traces showed. With all four, the singles on that run against the base's same run:
+
+| scattered continents seed 4 | the guard's worst, km | largest rise / fall, km (beyond the polar rows) | polar rows, km | cells that yielded |
+|---|---|---|---|---|
+| base9 (fl-pull's run) | 10.6 | 6.7 / 7.3 | | |
+| as first built, the superposition alone | 12.1 | 11.8 / 10.5 | | 866,123 |
+| the first three rules, the superposition alone | 12.7 | 11.2 / 10.7 | 10.7 / 8.8 | 564,721 |
+| the first three rules, both on | 14.4 | 10.9 / 10.1 | 10.9 / 7.7 | 853,460 |
+| as first built, both on | 15.6 | 16.6 / 12.1 | | 1,197,045 |
+| `te_geotherm` alone | 10.5 | 6.7 / 6.6 | | 10,036 |
+| base10 (master 2dd50093) | 10.1 | 6.9 / 7.2 | 6.2 / 6.5 | 6,096 |
+| the first three rules, the superposition alone, traced | 16.1 | 14.5 / 11.3 | 9.8 / 10.3 | 588,000 |
+| the four rules, the superposition alone, traced | 12.7 | 12.0 / 8.4 | 10.2 / 7.1 | 728,000 |
+| the first three rules, both on, traced | 12.4 | 9.5 / 8.6 | 10.6 / 7.2 | 631,000 |
+
+The first five rows ran on master 19fa4077 (base9's planet), the rest on master 2dd50093
+(base10's). With both on, the first three rules took the largest rise from 16.6 to 10.9 km and the
+guard's worst from 15.6 to 14.4 km; the superposition alone hardly moved with them (12.1 to 12.7 km,
+11.8 to 11.2 km). The fourth took the superposition alone on base10's planet from 16.1 to 12.7 km
+and 14.5 to 12.0 km. None came near the base's 10 and 7 km. On the traced run
+with the first three rules, the frame's move was half the size of the rises over 6 km and 1.34
+times that of the falls; the yield took back 0.53 of the falls. The largest frame moves of a step
+came three ways: from source corners on the belt (bf 27.8 km against the 2.1 km the crust
+carried; the fourth rule ends this), from crust whose mark was lost (it came from beyond any
+foreland, NaN, and carried 26.8 km of the belt's part against 5 m at the place; the crust's carry
+and the belt's part's take their sources apart, and a cell can come from the belt for one and
+from beyond for the other), and inside the frame (26.6 km carried onto 168 m). With the fourth
+rule the last two remain: 22 km carried onto a place with none, and jumps of 21.6 km inside the
+frame.
+
+**Why it does not work.** The superposition moves a field that should be as smooth as α. On the
+runs it is not. Where a belt stands, its `Te` is low: 5 to 15 km on the traced cells, 16.2 km at
+the median over the footprints of the arm's final frames (orogenic crust; the foreland's is 33.4
+km). With E 70 GPa (ISO-041) that is α of 18 to 42 km, about one cell of the quick preset's 39 km.
+The belt's part there is the belt's own root, 30 to 49 km at the largest of a step (35 km at the
+median over the traced steps), and it falls to the foreland's few hundred metres within a cell or
+two. And the two parts are not each small: at a traced cell the belt's part was 22 km and the rest
+−19.7 km. The split books an increment to the belt by where it fell at the time; a cell that
+leaves the footprint keeps the part it gathered, and what the plate model, the surface and the
+yield take off it later is the rest's. So the parts can drift into large and opposite fields with
+the cell-scale shape of the loads (the traces measured the parts, not their history: that the
+drift comes this way is the agent's reading). Any change of the frame's geometry (a
+front that moves, a cell that enters or leaves a foreland, a mark the carry loses) then moves a
+cell-scale step of 20 to 27 km over the crust, and the yield, which holds about 2.75 km of mantle,
+takes most of it back in the same step. That is the step noise.
+
+What would work, not tried: keep the belt's part smooth by construction, the deflection under the
+belt's present load and not the sum of past increments. That is a solve of the belt's whole load
+each collision step, which the brief rules out ("Nothing is solved again"), and its cost is one
+more full solve. A cut-off on the belt's part or a smoothing of it would be a forcing term, so
+neither was tried.
+
+**The foreland's stiffness alone** (arm `g6b-te3`, 2026-10-25: `te_geotherm` on, the superposition
+off, both starts x seeds 1 to 4, 1,000 Myr, on master 2dd50093, against base10's same 8, `fl-ends`,
+and base10's 24; Mann-Whitney p against the same 8, then the 24). It is the per-switch arm that
+says which part of `g6b-both2`'s noise is whose:
+
+| | base10, 24 | base10, the same 8 | `te_geotherm` on, 8 |
+|---|---|---|---|
+| land | 0.294 | 0.294 | 0.299 (p 0.87; 1.0) |
+| land above 2 km | 0.112 | 0.112 | 0.137 (p 0.28; 0.15) |
+| coast with high ground | 0.226 | 0.233 | 0.250 (p 0.65; 0.24) |
+| continental crust under the sea | 0.246 | 0.205 | 0.212 (p 0.96; 0.69) |
+| land under ice | 0.095 | 0.095 | 0.119 (p 0.96; 0.59) |
+| collisions per 100 Myr | 1.80 | 1.65 | 1.55 (p 1.0; 0.73) |
+| criteria met per run, median and mean | 5, 5.00 | 5, 5.00 | 5, 5.12 |
+| the guard's worst, km from the sea | 10.1 | 10.2 | 10.1 (p 0.96; 0.98) |
+| largest rise / fall of a cell in a step, km | 7.7 / 7.2 | 7.4 / 7.2 | 7.5 / 7.2 |
+| record: belts above 3 km / share with a foredeep | 7 / 0.37 | 6 / 0.45 | 7.5 / 0.38 |
+| record: foredeep width, km | 0 | 36 | 0 (p 0.18; 0.68) |
+| final frame: `Te`, footprint / foreland, km | | | 11.4 / 34.7 |
+
+No run diverged, no step passed two Earth reliefs, and the guard and the largest steps are the
+base's. No V1 number moved beyond the seeds' spread. The noise of `g6b-both2` is the
+superposition's. Alone, the stiffness brings no foredeep: with the superposition off the belt is not
+carried (ISO-131 is under `tectonics.collision_underthrust`), so it stands on the overriding plate
+across the break, and the foreland's stiffness does not reach it.
+
+On master e87dbfae's planet (the front lane's PLT-562 on) the branch's defaults, `te_geotherm` on,
+ran again as arm `g6b-te4` against master's same 8 (`fl-margin`): no divergence, the guard's worst
+10.1 km against 10.0 (p 0.51), the largest rise and fall of a cell in a step 7.3 / 7.3 km against
+6.9 / 7.3, no V1 number moved (land 0.309 against 0.285, p 0.23; land above 2 km 0.128 against
+0.133; coast with high ground 0.231 against 0.233). The record's small foredeep went: the share of
+belts above 3 km with one 0.40 against 0.62 and its width 0 against 71 km at the median (p 0.077;
+`g6b-te3` had 0 against 36, p 0.18). Not traced; the agent's reading is that a stiffer foreland
+bends longer, so the shallow basin the base's belts bent lies under the wedge, as gap 6's
+`profile1.py` found for the carried belt.
+
+**The four rules, both on** (arm `g6b-both3`, 2026-10-25: both switches on, the superposition with
+the four rules, both starts x seeds 1 to 4, 1,000 Myr, on master 2dd50093, against base10's same 8,
+`fl-ends`, and base10's 24; Mann-Whitney p against the same 8, then the 24):
+
+| | base10, 24 | base10, the same 8 | both on, the four rules, 8 |
+|---|---|---|---|
+| land | 0.294 | 0.294 | 0.313 (p 0.038; 0.037) |
+| land above 2 km | 0.112 | 0.112 | 0.147 (p 0.13; 0.026) |
+| coast with high ground | 0.226 | 0.233 | 0.274 (p 0.050; 0.007) |
+| continental crust under the sea | 0.246 | 0.205 | 0.183 (p 0.33; 0.10) |
+| land under ice | 0.095 | 0.095 | 0.115 (p 0.51; 0.45) |
+| collisions per 100 Myr | 1.80 | 1.65 | 1.80 (p 0.63; 0.91) |
+| criteria met per run, median and mean | 5, 5.00 | 5, 5.00 | 5, 5.00 |
+| the guard's worst, km from the sea | 10.1 | 10.2 | 12.1 (p < 0.001; < 0.001) |
+| largest rise / fall of a cell in a step, km | 7.7 / 7.2 | 7.4 / 7.2 | 10.3 / 9.0 |
+| plate cells' largest excess over Airy, km | 2.6 | 2.3 | 3.8 (p 0.002; 0.003) |
+| record: belts above 3 km / share with a foredeep | 7 / 0.37 | 6 / 0.45 | 7 / 0.67 |
+| record: foredeep width, km (plate check 150 to 450) | 0 | 36 | 143 (p 0.037; < 0.001) |
+| record: foredeep flexure below local isostasy, m | 75 | 120 | 291 (p 0.038; 0.001) |
+| record: wedge width, km | 99 | 117 | 95 (p 0.33; 0.38) |
+| final frame: foredeep width to the zero crossing, all / belts above 3 km, km | | | 0 / 0 |
+| final frame: `Te`, footprint / foreland, km | | | 16.2 / 33.3 |
+
+No run diverged and no step passed two Earth reliefs. The foredeep stays, beyond the wedge: 143 km
+wide at the median in the records, just short of the plate check's 150 km, with 291 m of flexure
+below local isostasy where the base had 75 to 120, and two thirds of the belts above 3 km with
+one. The noise stays too. The guard's worst is 12.1 km against the base's 10.1 (p < 0.001), a
+cell's largest rise in a step 10.3 km against 7.4 to 7.7 and its largest fall 9.0 km against 7.2,
+and the plate cells' largest excess over Airy 3.8 km against 2.3 to 2.6. Against `g6b-both2`'s
+excess over its own base (5.2 km of guard, 7.2 km of rise) the four rules took away about 60 per
+cent (1.9 to 2.0 km, 2.6 to 2.9 km), on a different base (base9 against base10), so that is a
+rough reading. The land, the land above 2 km and the coast with high ground rose (p 0.007 to 0.05),
+the last two away from their targets. In the final frames, at 1,000 Myr, the median run held no
+foredeep (`g6b-both2`'s 149 km); that was not traced. So the arm meets the brief's first and third
+conditions and fails the second again: the superposition stays off, for the reasons above.
 
 **Simplifications.**
 
