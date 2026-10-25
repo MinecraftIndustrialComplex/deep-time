@@ -4,6 +4,7 @@ package com.minecraftindustrialcomplex.deeptime.climate;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import net.minecraft.core.Holder;
+import net.minecraft.tags.BiomeTags;
 import net.minecraft.world.level.biome.Biome;
 
 import java.util.Comparator;
@@ -23,7 +24,8 @@ import java.util.TreeMap;
  * biome where the pack has one. That share is of the cold wetland the peatland rule is there to decide (ledger:
  * BIO-189): a column whose biome a volcano's zone decided (a role's biome, a role's rule, or a rule that holds only
  * inside a zone, the black beach's) is counted apart, since a volcanic role outranks every ordinary rule (BIO-113)
- * and the zone's rules come first in the files' order.
+ * and the zone's rules come first in the files' order; so is one on a beach (BIO-190), where the peatland rule keeps
+ * the pack's answer: no peat builds up where the waves rework the shore.
  */
 public final class RuleCensus {
 
@@ -31,12 +33,15 @@ public final class RuleCensus {
     private final Map<String, BiomeRules.Bound> byId = new HashMap<>();
     private final Map<String, Map<String, Integer>> decided = new TreeMap<>();
     private final Map<String, Integer> seen = new TreeMap<>();
-    private int columns, notCandidate, wrongClass, exclusiveLeaked, coldWetland, coldWetlandPeat, coldWetlandVolcanic;
+    private int columns, notCandidate, wrongClass, exclusiveLeaked, coldWetland, coldWetlandPeat, coldWetlandVolcanic,
+            coldWetlandShore;
     private final List<String> examples = new java.util.ArrayList<>();
     /** Cold-wetland columns per decision and biome ("&lt;decision&gt; &lt;biome&gt;"), so a low peatland share names its cause. */
     private final Map<String, Integer> coldWetlandBy = new TreeMap<>();
     /** The cold-wetland columns a volcano's zone decided, likewise. */
     private final Map<String, Integer> coldWetlandVolcanicBy = new TreeMap<>();
+    /** The cold-wetland columns on a beach (BIO-190), likewise. */
+    private final Map<String, Integer> coldWetlandShoreBy = new TreeMap<>();
 
     public RuleCensus(BiomeRules.Set_ rules) {
         this.rules = rules;
@@ -82,6 +87,9 @@ public final class RuleCensus {
         if (coldWet && byVolcano(decision, r)) {
             coldWetlandVolcanic++;
             coldWetlandVolcanicBy.merge(key + " " + name, 1, Integer::sum);
+        } else if (coldWet && (b.is(BiomeTags.IS_BEACH) || b.is(C_IS_BEACH))) {
+            coldWetlandShore++;
+            coldWetlandShoreBy.merge(key + " " + name, 1, Integer::sum);
         } else if (coldWet) {
             coldWetland++;
             if (b.is(PEATLAND))
@@ -105,6 +113,9 @@ public final class RuleCensus {
 
     static final net.minecraft.tags.TagKey<Biome> PEATLAND = net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.BIOME,
             net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(com.minecraftindustrialcomplex.deeptime.DeepTime.MODID, "peatland"));
+    /** The common tag of beaches, beside vanilla's {@link BiomeTags#IS_BEACH} (the peatland rule keeps both, BIO-190). */
+    static final net.minecraft.tags.TagKey<Biome> C_IS_BEACH = net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.BIOME,
+            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("c", "is_beach"));
 
     private void example(String s) {
         if (examples.size() < 8)
@@ -151,6 +162,11 @@ public final class RuleCensus {
     /** The cold-wetland columns a volcano's zone decided ({@link #byVolcano}), not in {@link #coldWetland()}. */
     public int coldWetlandVolcanic() {
         return coldWetlandVolcanic;
+    }
+
+    /** The cold-wetland columns on a beach (BIO-190), not in {@link #coldWetland()}. */
+    public int coldWetlandShore() {
+        return coldWetlandShore;
     }
 
     /** Columns per biome of the rules' candidates (every rule's, role rules included). */
@@ -217,6 +233,10 @@ public final class RuleCensus {
         JsonObject cv = new JsonObject();
         coldWetlandVolcanicBy.forEach(cv::addProperty);
         o.add("cold_wetland_volcanic_by", cv);
+        o.addProperty("cold_wetland_shore", coldWetlandShore);
+        JsonObject cs = new JsonObject();
+        coldWetlandShoreBy.forEach(cs::addProperty);
+        o.add("cold_wetland_shore_by", cs);
         JsonArray ex = new JsonArray();
         examples.forEach(ex::add);
         o.add("examples", ex);
