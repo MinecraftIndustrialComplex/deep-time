@@ -160,6 +160,56 @@ pub fn provinces(
     (ids, classes, counts)
 }
 
+/// The province list made true to the world's layer: the projection pass resamples `meta/province`
+/// (u16, little-endian `bytes`) onto the world's grid by the nearest cell (`project::CATEGORICAL`), and a
+/// province whose simulation cells no world cell's centre lands in is not in the world. On master
+/// 60a1e1ae's 4k test planet one of 53 was not (2026-10-24), while the notes still listed it for
+/// the game's region table. Such provinces leave the list for
+/// `dropped_by_projection` and the rest are numbered again in their order, layer and list together;
+/// each listed province gets its `world_cells`. Its `cells` and `km2` stay the simulation's, the
+/// planet's true area (the world's grid is not equal-area). `notes` is the bake's
+/// (`notes.bake`); returns what was done, for the projection's note.
+pub(crate) fn provinces_on_world(notes: Option<&mut Value>, bytes: &mut [u8]) -> Value {
+    let Some(list) = notes
+        .and_then(|b| b.pointer_mut("/meta/provinces"))
+        .filter(|p| p["province"].is_array())
+    else {
+        return json!(null);
+    };
+    let listed = list["province"].as_array().map_or(0, Vec::len);
+    let mut world_cells = vec![0u64; listed];
+    for c in bytes.as_chunks::<2>().0 {
+        if let Some(n) = world_cells.get_mut(usize::from(u16::from_le_bytes(*c))) {
+            *n += 1;
+        }
+    }
+    let mut remap = vec![u16::MAX; listed];
+    let (mut kept, mut dropped) = (Vec::new(), Vec::new());
+    let old = list["province"].as_array().cloned().unwrap_or_default();
+    for (id, mut e) in old.into_iter().enumerate() {
+        if world_cells[id] == 0 {
+            dropped.push(e);
+            continue;
+        }
+        remap[id] = kept.len() as u16;
+        e["id"] = json!(kept.len());
+        e["world_cells"] = json!(world_cells[id]);
+        kept.push(e);
+    }
+    if !dropped.is_empty() {
+        for c in bytes.as_chunks_mut::<2>().0 {
+            if let Some(&to) = remap.get(usize::from(u16::from_le_bytes(*c))) {
+                *c = to.to_le_bytes();
+            }
+        }
+    }
+    let note = json!({"listed": listed, "kept": kept.len(), "dropped": dropped.len()});
+    list["count"] = json!(kept.len());
+    list["province"] = json!(kept);
+    list["dropped_by_projection"] = json!(dropped);
+    note
+}
+
 pub fn bake(
     world: &WorldState,
     p: &PlanetPreset,
@@ -417,6 +467,43 @@ mod tests {
         assert_eq!(classes.iter().filter(|&&c| c == 0).count(), 2);
         assert_ne!(ids[1], ids[5]);
         assert_eq!(counts.iter().sum::<usize>(), w * h);
+    }
+
+    #[test]
+    fn a_province_the_world_does_not_hold_leaves_the_list_and_ids_close_up() {
+        let entry =
+            |id: usize, class: &str| json!({"id": id, "class": class, "cells": 50, "km2": 9000.0});
+        let mut bake = json!({"meta": {"provinces": {"count": 3, "province": [
+            entry(0, "Shield"), entry(1, "Orogen"), entry(2, "Basin"),
+        ]}}});
+        // The world's resampled layer holds provinces 0 and 2, not 1.
+        let ids: [u16; 6] = [0, 0, 2, 2, 2, 0];
+        let mut bytes: Vec<u8> = ids.iter().flat_map(|v| v.to_le_bytes()).collect();
+        let note = provinces_on_world(Some(&mut bake), &mut bytes);
+        assert_eq!(note, json!({"listed": 3, "kept": 2, "dropped": 1}));
+        let got: Vec<u16> = bytes
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|&c| u16::from_le_bytes(c))
+            .collect();
+        assert_eq!(got, [0, 0, 1, 1, 1, 0]);
+        let p = &bake["meta"]["provinces"];
+        assert_eq!(p["count"], 2);
+        assert_eq!(p["province"][1]["id"], 1);
+        assert_eq!(p["province"][1]["class"], "Basin");
+        assert_eq!(p["province"][1]["world_cells"], 3);
+        assert_eq!(p["province"][1]["km2"], 9000.0, "the planet's area stays");
+        assert_eq!(p["dropped_by_projection"][0]["class"], "Orogen");
+        // All held: the layer is as it was.
+        let mut bake =
+            json!({"meta": {"provinces": {"count": 1, "province": [entry(0, "Shield")]}}});
+        let mut bytes = vec![0u8; 8];
+        provinces_on_world(Some(&mut bake), &mut bytes);
+        assert_eq!(bytes, vec![0u8; 8]);
+        assert_eq!(bake["meta"]["provinces"]["province"][0]["world_cells"], 4);
+        // No province notes (a world without the layer's notes): nothing done.
+        assert_eq!(provinces_on_world(None, &mut bytes), json!(null));
     }
 
     #[test]

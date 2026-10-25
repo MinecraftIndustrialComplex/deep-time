@@ -5,7 +5,10 @@
 //! **Overlaps.** Every step, each sample looks at its 8 nearest samples (all plates, current
 //! positions); for each other plate among them it asks whether it lies inside one of that plate's
 //! lattice triangles (three vertices of one rigid group, located in the group's frame). Such a
-//! sample overlaps the other plate: the plates interpenetrate there.
+//! sample overlaps the other plate: the plates interpenetrate there. With `outline_cover` (on by
+//! default, PLT-553) it asks whether it lies inside that plate's outline instead, the zero line
+//! of the interpolated distance the resampling gives the ground by (`level_set::cover`): a
+//! triangle with corners of other groups holds it on the group's side of that line.
 //!
 //! **Collisions.** `resolve` also lists, per contact, the subducting plate's continental crust in
 //! the overlap (the seeds of a terrane). Whether a contact is in collision, how much it has
@@ -83,6 +86,7 @@ use super::collapse::{iso_height, toward};
 use super::events::{self, SUBDUCTION_ONSET};
 use super::geometry::{Cover, Geo, Tree, cover, dijkstra_parts};
 use super::kinematics::{quat, tangent, to_group, to_world};
+use super::level_set;
 use super::pools::isostatic_change_m;
 use super::shortening::{boundary_normal, front_share_rad, is_transform};
 use super::state::{
@@ -113,8 +117,35 @@ pub struct Overlap {
     pub cover: Cover,
 }
 
-/// Finds every overlap (parallel over samples).
-pub fn detect(state: &PlateState, geo: &Geo, pos: &[DVec3], tree: &Tree) -> Vec<Overlap> {
+/// The step's overlaps as `env`'s switches have them ([`detect`], with the outline when
+/// `tectonics.outline_cover` is on; ledger PLT-553).
+pub fn overlaps(
+    state: &PlateState,
+    geo: &Geo,
+    pos: &[DVec3],
+    tree: &Tree,
+    env: &Env,
+) -> Vec<Overlap> {
+    let outline = env
+        .k
+        .outline_cover
+        .then(|| level_set::distances_now(state, geo, env.norm.spacing_rad()));
+    detect(state, geo, pos, tree, outline.as_deref())
+}
+
+/// Finds every overlap (parallel over samples). With `outline` (each sample's distance from its
+/// group's outline, `level_set::distances_now`; `tectonics.outline_cover`, ledger PLT-553) a
+/// sample overlaps another plate where it lies inside that plate's outline
+/// (`level_set::cover`); without, only inside a lattice triangle whose corners are all one of
+/// that plate's groups (`geometry::cover`).
+pub fn detect(
+    state: &PlateState,
+    geo: &Geo,
+    pos: &[DVec3],
+    tree: &Tree,
+    outline: Option<&[f64]>,
+) -> Vec<Overlap> {
+    let outline = outline.filter(|o| o.len() == state.samples.len());
     let rots: Vec<DQuat> = state.groups.iter().map(|g| quat(g.rot)).collect();
     let plate_of: Vec<u32> = (0..state.samples.len())
         .into_par_iter()
@@ -139,7 +170,12 @@ pub fn detect(state: &PlateState, geo: &Geo, pos: &[DVec3], tree: &Tree) -> Vec<
                 }
                 tried[nt] = g;
                 nt += 1;
-                if let Some(c) = cover(geo, state, g, rots[g as usize], pos[i], j) {
+                let rot = rots[g as usize];
+                let found = match outline {
+                    Some(phi) => level_set::cover(geo, state, phi, g, rot, pos[i], j),
+                    None => cover(geo, state, g, rot, pos[i], j),
+                };
+                if let Some(c) = found {
                     return Some(Overlap {
                         i: i as u32,
                         group: g,
@@ -307,6 +343,8 @@ pub fn resolve(
         // `stacked` stays while the crust stays under (below).
         s.collision_mm_yr = 0.0;
         s.shortening_km = 0.0;
+        s.carrier = 0;
+        s.carrier_lithosphere_km = 0.0;
     }
     // Ocean floor at a plate contact with at least a normal continental column's crystalline
     // crust (T_n, 33 km, the transition's PLT-261) is continental crust, whatever stacked it there
@@ -802,6 +840,10 @@ pub const FRONT_G_CONTINENTAL_NORMAL_GLOBAL: &str = "plates/arc_front_g_normal_c
 /// front, km × Myr, whatever `front_share` (measurement: the `arc_front_*` globals over this are
 /// the lattice's count of a front against its straight length while it is off). ledger: PLT-530
 pub const ARC_FRONT_STRAIGHT_GLOBAL: &str = "plates/arc_front_straight_km_myr";
+/// World global: the oceanic slabs' arc bands over the run by their length, km × Myr
+/// ([`Pull::arc_band_km_myr`]; measurement: the arcs' crust is made over this length, against the
+/// straight front above). ledger: PLT-554
+pub const ARC_BAND_GLOBAL: &str = "plates/arc_band_km_myr";
 /// World global: crust shortened into the arcs' cordilleras over the run, km³ (moved, not made).
 pub const CORDILLERA_GLOBAL: &str = "plates/cordillera_shortened_km3";
 
@@ -831,6 +873,11 @@ pub struct Pull {
     /// Oceanic fronts this step by their share of the straight front, km × Myr, whatever
     /// `front_share` (measurement; PLT-530).
     pub front_straight_km_myr: f64,
+    /// The oceanic slabs' arc bands this step by their length, km × Myr: the band's weight summed
+    /// over the samples its fronts reach, times a sample's area, over the band's integral across
+    /// the arc (√π · `arc_width_km`); a straight front's band gives its length (measurement;
+    /// ledger: PLT-554).
+    pub arc_band_km_myr: f64,
     /// The step's erosive fronts and their forearcs ([`erode_forearcs`]); `None` while the rule is
     /// off.
     pub forearcs: Option<Forearcs>,
@@ -1415,6 +1462,8 @@ pub fn fronts_finish(
     }
     let axis_gap_km = &axis_gap_km;
     let mut budget = vec![Budget::default(); contacts.len()];
+    // Measurement only: the arc bands' weight over the samples they reach (ledger: PLT-554).
+    let mut band_weight = 0.0_f64;
     // Over the reached samples, ascending (P1-19: over every sample before; the others add
     // nothing).
     for &i in &reached {
@@ -1428,6 +1477,7 @@ pub fn fronts_finish(
         if !src.oceanic_slab {
             continue;
         }
+        band_weight += w_arc_of(norm.km(dist[i]), k);
         let b = &mut budget[src.contact];
         let share = if s.kind == CONTINENTAL {
             CONTINENTAL_VOLCANIC_SHARE
@@ -1638,6 +1688,7 @@ pub fn fronts_finish(
         front_g_normal_km_myr: g_normal_km_myr,
         front_g_continental_km_myr: g_continental_km_myr,
         front_straight_km_myr: straight_km_myr,
+        arc_band_km_myr: band_weight * area / band_km * env.dt_myr,
         forearcs: (erosion_rate > 0.0).then_some(Forearcs {
             loss_km3,
             continental: loss_continental,
