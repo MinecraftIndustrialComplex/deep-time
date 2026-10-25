@@ -108,9 +108,25 @@ class BiomeRuleSetTest {
         assertEquals(null, first(ee, new F("Cfb", 9, 15, 3, 900, 50, Wetland.NONE, false, false, false, "", "x"), null));
         assertEquals("mediterranean_scrub", first(ee, new F("Csa", 17, 25, 9, 500, 50, Wetland.NONE, false, false, false, "", "x"), null));
         assertEquals("cold_steppe", first(ee, land("BSk"), null));
-        // Hot desert is the pack's deserts; a cold desert (BWk under 10 degC) is not.
+        // Hot desert is the pack's deserts; a cold desert (BWk under 10 degC) is not: its cool part (above 0 degC) is the
+        // cool desert (BIO-195), its polar part (0 degC and below) the polar desert, and the edges go to the earlier rule.
         assertEquals("hot_desert", first(ee, new F("BWh", 25, 33, 15, 80, 300, Wetland.NONE, false, false, false, "sandstone", "x"), null));
-        assertEquals(null, first(ee, new F("BWk", 5, 18, -10, 150, 300, Wetland.NONE, false, false, false, "sandstone", "x"), null));
+        assertEquals("cool_desert", first(ee, new F("BWk", 5, 18, -10, 150, 300, Wetland.NONE, false, false, false, "sandstone", "x"), null));
+        assertEquals("cool_desert", first(ee, new F("BWk", 9.9, 24, -8, 150, 300, Wetland.NONE, false, false, false, "sandstone", "x"), null));
+        assertEquals("hot_desert", first(ee, new F("BWk", 10.0, 24, -8, 150, 300, Wetland.NONE, false, false, false, "sandstone", "x"), null));
+        assertEquals("cool_desert", first(ee, new F("BWk", 0.1, 14, -15, 150, 300, Wetland.NONE, false, false, false, "sandstone", "x"), null));
+        assertEquals("polar_desert", first(ee, new F("BWk", 0.0, 14, -15, 150, 300, Wetland.NONE, false, false, false, "sandstone", "x"), null));
+        assertEquals("polar_desert", first(ee, new F("BWk", -3, 10, -20, 150, 300, Wetland.NONE, false, false, false, "sandstone", "x"), null));
+        // The cool desert keeps the pack's peaks, slopes, shores, rivers, sea and swamps, like the hot desert.
+        assertEquals(null, first(ee, new F("BWk", 5, 18, -10, 150, 2500, Wetland.NONE, false, false, false, "granite",
+                "minecraft:jagged_peaks", "#c:is_mountain/peak"), null));
+        assertEquals(null, first(ee, new F("BWk", 5, 18, -10, 150, 2, Wetland.NONE, false, false, false, "sand",
+                "minecraft:beach", "#c:is_beach"), null));
+        assertEquals(null, first(ee, new F("BWk", 5, 18, -10, 150, 40, Wetland.NONE, false, false, false, "sand",
+                "minecraft:river", "#minecraft:is_river"), null));
+        // Only BW: the cool desert does not take the other dry class or a cool Cs.
+        assertEquals("cold_steppe", first(ee, new F("BSk", 5, 18, -10, 300, 300, Wetland.NONE, false, false, false, "", "x"), null));
+        assertEquals(null, first(ee, new F("Cfb", 6, 14, 0, 900, 50, Wetland.NONE, false, false, false, "", "x"), null));
         // Hot desert highland; a beach in a volcano's zone is black.
         assertEquals("tibesti_mountains", first(ee, new F("BWh", 22, 30, 12, 20, 1800, Wetland.NONE, false, false, false, "basalt", "x"), null));
         assertEquals("black_beach_volcanic", first(ee, new F("Cfb", 12, 17, 6, 1200, 2, Wetland.NONE, false, false, true, "sand",
