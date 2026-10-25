@@ -1425,7 +1425,13 @@ fn record_margins(st: &PlateState, world: &mut WorldState, pos: &[DVec3], env: &
             _ => None,
         })
         .collect();
-    let m = stats::margins(st, pos, &env.norm, &|p| initiated.contains(&p));
+    let m = stats::margins(
+        st,
+        pos,
+        &env.norm,
+        &|p| initiated.contains(&p),
+        forces::incipient_km(env.k),
+    );
     let mut note: serde_json::Value = world
         .notes
         .get(STAGE_NAME)

@@ -16,6 +16,16 @@ normal over two rings of samples, Bird's 20 degree transform window, PLT-310 and
   coll         at a collision (continental crust on the subducting side)       CCB 8.8 %
   transform    transform (the motion within 20 degrees of the boundary)       OTF + CTF 28.3 %
   nocontact    converging with no contact yet                      OCB 6.7 %
+  incipient    an incipient front (tectonics.incipient_subduction, PLT-610, PLT-614): a contact whose
+               slab is shorter than the critical convergence, counted with no subduction zone yet (0
+               with the switch off)
+  ocb          converging with no subduction zone: nocontact plus incipient, Bird's OCB (his SUB has
+               "a Benioff zone of intermediate to deep earthquakes and/or a parallel volcanic arc")
+                                                                   OCB 6.7 %
+  sub_benioff  the subducting boundary whose slab reaches 100 km under its arc (the record's
+               front_bands.benioff, PLT-615: a slab at least hypot(arc_distance_km, 100) km long),
+               beside `sub`, which counts every front past its incipient stage
+                                                                   SUB 19.7 %
   oo_of_sub    the ocean-ocean share of the subducting boundary (PLT-370)  about 35 % (Stern & Scholl)
   sub_km, total_km   the subducting and the whole boundary, lattice km per step (one sample spacing per
                boundary sample counts a straight boundary about 1.04 times, the share test in
@@ -56,7 +66,9 @@ The plates (the summary's counters per 100 Myr, the plate check's plates alive):
   rifts, initiations, reversals   per 100 Myr (Crameri et al. 2020: 13 initiations since 104 Ma, 4 of them
                by polarity reversal)
 
-Version 2 (version 1 without fast_front, across_mm_yr and the margins line).
+Version 3 (2026-10-25: incipient, ocb and sub_benioff; transform no longer counts the incipient
+fronts, which the mix classes as other). Version 2: version 1 without fast_front, across_mm_yr and
+the margins line.
 """
 import json
 import sys
@@ -109,13 +121,16 @@ def record_values(path):
     span = steps[-1]["t"] - t0 if steps[-1]["t"] > t0 else len(steps) * dt
     use = [s for s in steps if s["t"] > t0 + SKIP_MYR]
     mix = [0.0] * 6
-    other_conv = 0.0
+    other_conv, incipient, benioff = 0.0, 0.0, 0.0
     slow, fast, across, fronts = 0.0, 0.0, 0.0, 0.0
     for s in use:
         for k, x in enumerate(s.get("mix_km", [0.0] * 6)):
             mix[k] += x
         fb = s.get("front_bands", {})
         other_conv += fb.get("other_converging", 0.0)
+        # Ocean-ocean, ocean-continent; absent in records before 2026-10-25.
+        incipient += sum(fb.get("incipient", [0.0, 0.0]))
+        benioff += sum(fb.get("benioff", [0.0, 0.0]))
         # Normal bands 0, 5, 10, 20, 40, 80 mm/yr; rows ocean-ocean, ocean-continent.
         for row in fb.get("normal", []):
             slow += sum(row[:2])
@@ -128,8 +143,13 @@ def record_values(path):
         out["sub"] = (mix[OO] + mix[OC]) / total
         out["spread"] = (mix[RIDGE] + mix[RIFT]) / total
         out["coll"] = mix[COLL] / total
-        out["transform"] = (mix[OTHER] - other_conv) / total
+        out["transform"] = (mix[OTHER] - other_conv - incipient) / total
         out["nocontact"] = other_conv / total
+        # Records before these bands have neither: leave the columns empty, not zero.
+        if any("incipient" in s.get("front_bands", {}) for s in use):
+            out["incipient"] = incipient / total
+            out["ocb"] = (other_conv + incipient) / total
+            out["sub_benioff"] = benioff / total
         out["oo_of_sub"] = mix[OO] / max(mix[OO] + mix[OC], 1e-9)
         out["sub_km"] = (mix[OO] + mix[OC]) / n
         out["total_km"] = total / n

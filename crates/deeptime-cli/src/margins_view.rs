@@ -50,7 +50,13 @@ pub fn run(input: &Path, out: &Path) -> Result<Margins, Box<dyn std::error::Erro
             _ => None,
         })
         .collect();
-    let (m, class) = margin_classes(st, &pos, &norm, &|q| initiated.contains(&q));
+    let (m, class) = margin_classes(
+        st,
+        &pos,
+        &norm,
+        &|q| initiated.contains(&q),
+        deeptime_core::plates::forces::incipient_km(&p.tectonics),
+    );
 
     let c = p.scale.circumference_blocks;
     let grid = GridDesc::for_planet("map", c, c / W)?;
