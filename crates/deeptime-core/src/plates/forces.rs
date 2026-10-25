@@ -1124,6 +1124,35 @@ struct Balanced {
     /// Each plate's slab pull and suction torques (N m, about the planet's centre, by plate id).
     #[cfg(test)]
     torques: Vec<(DVec3, DVec3)>,
+    #[cfg(test)]
+    terms: BoundaryTerms,
+}
+
+/// The trench resistances of one balance, for the tests: each (plate, other plate)'s Forsyth &
+/// Uyeda friction summed over the plate's boundary samples, N, and the part of it at the fronts
+/// the plate overrides; each front's oceanic metres, by (overriding, subducting) plate; each
+/// incipient front's resistance, N, by contact; and the colliding and transform resistances, N/m.
+#[cfg(test)]
+#[derive(Clone, Debug, Default)]
+pub(in crate::plates) struct BoundaryTerms {
+    pub friction_n: BTreeMap<(u32, u32), f64>,
+    pub front_friction_n: BTreeMap<(u32, u32), f64>,
+    pub front_m: BTreeMap<(u32, u32), f64>,
+    pub incipient_n: BTreeMap<usize, f64>,
+    pub colliding_n_m: f64,
+    pub transform_n_m: f64,
+}
+
+/// [`BoundaryTerms`] at a balance of `st` as it stands, its slabs left as they are.
+#[cfg(test)]
+pub(in crate::plates) fn boundary_terms(
+    st: &PlateState,
+    geo: &Geo,
+    pos: &[DVec3],
+    env: &Env<'_>,
+) -> BoundaryTerms {
+    let mut slabs = st.slabs.clone();
+    balance_step(st, geo, pos, env, DVec3::Z, 0.0, &mut slabs).terms
 }
 
 /// The slab pull's and the suction's torque on each plate (N m, about the planet's centre, by
@@ -1180,6 +1209,19 @@ fn balance_step(
         .filter(|s| s.km > 0.0 && !s.latent)
         .map(|s| (s.under, s.over))
         .collect();
+    // The active contacts at their incipient stage (PLT-610), by their slab before this step's
+    // growth (none without a slab yet), as the arcs and the boundary mix read it.
+    let incipient_pairs: BTreeSet<(u32, u32)> = if k.incipient_subduction {
+        let before: BTreeMap<(u32, u32), f64> =
+            slabs.iter().map(|s| ((s.under, s.over), s.km)).collect();
+        active
+            .keys()
+            .filter(|key| incipient(k, before.get(key).copied().unwrap_or(0.0)))
+            .copied()
+            .collect()
+    } else {
+        BTreeSet::new()
+    };
     // The length of boundary one boundary sample stands for, m (`Coeffs::spacing_m`).
     let ell = norm.km(norm.spacing_rad()) * 1000.0;
     let c = Coeffs::new(k, &norm, env.gravity, st.a0_km2, flow, sea_m);
@@ -1316,11 +1358,16 @@ fn balance_step(
             // have gone under it and see no other plate). Every other stretch of boundary with a
             // visible plate beyond it counts from both sides, half of its share each (PLT-530),
             // by its own normal (PLT-310), except the side going under in an active contact,
-            // which its front counts.
+            // which its front counts. With incipient subduction (PLT-610), a contact at its
+            // incipient stage has none from either side: its front's oceanic samples take the
+            // incipient resistance alone, which stands for the trench's resistance until the
+            // slab sinks by itself (a continental sample at its front is a collision's, as at a
+            // mature contact).
             if friction {
                 let front_q = e.front.map(|f| plate_of[f.u as usize]);
                 if let Some(f) = e.front
                     && let Some(q) = front_q
+                    && !(incipient_pairs.contains(&(q, pv)) && samples[f.u as usize].kind != CONTINENTAL) // ledger: PLT-610
                     && let Some(i) = e.others[..usize::from(e.n_others)]
                         .iter()
                         .position(|&o| o == q)
@@ -1335,7 +1382,13 @@ fn balance_step(
                 }
                 for i in 0..usize::from(e.n_others) {
                     let q = e.others[i];
-                    if seen & (1 << i) == 0 || Some(q) == front_q || active.contains_key(&(pv, q)) {
+                    // An incipient partner is skipped from either side: the side going under is an
+                    // active contact's, the overriding side's here. ledger: PLT-610
+                    if seen & (1 << i) == 0
+                        || Some(q) == front_q
+                        || active.contains_key(&(pv, q))
+                        || incipient_pairs.contains(&(q, pv))
+                    {
                         continue;
                     }
                     let normal =
@@ -1360,6 +1413,31 @@ fn balance_step(
             any.then_some(e)
         })
         .collect();
+    #[cfg(test)]
+    let (friction_n, front_friction_n, front_m) = {
+        let mut friction_n: BTreeMap<(u32, u32), f64> = BTreeMap::new();
+        let mut front_friction_n: BTreeMap<(u32, u32), f64> = BTreeMap::new();
+        let mut front_m: BTreeMap<(u32, u32), f64> = BTreeMap::new();
+        for e in &edges {
+            let front_q = e.front.map(|f| plate_of[f.u as usize]);
+            for (&q, &(f, _)) in e.others[..usize::from(e.n_others)].iter().zip(&e.friction) {
+                if f > 0.0 {
+                    *friction_n.entry((e.plate, q)).or_default() += f;
+                    if Some(q) == front_q {
+                        *front_friction_n.entry((e.plate, q)).or_default() += f;
+                    }
+                }
+            }
+            if let Some(sf) = e.front
+                && samples[sf.u as usize].kind != CONTINENTAL
+            {
+                *front_m
+                    .entry((e.plate, plate_of[sf.u as usize]))
+                    .or_default() += sf.len_m;
+            }
+        }
+        (friction_n, front_friction_n, front_m)
+    };
 
     // Slabs: grow by the oceanic front's convergence, break off when continental crust has held
     // the trench for `slab_breakoff_myr`; a slab no front feeds hangs and pulls along the shared
@@ -1386,8 +1464,7 @@ fn balance_step(
     // Slabs with a front this step (fed when it is partly oceanic).
     let mut fronted: BTreeSet<(u32, u32)> = BTreeSet::new();
     let mut fed: BTreeSet<(u32, u32)> = BTreeSet::new();
-    // Incipient fronts (PLT-610), by their slab before this step's growth, as the arcs and the
-    // boundary mix read it.
+    // Incipient fronts (PLT-610): the fronts of `incipient_pairs`.
     let mut young: BTreeSet<usize> = BTreeSet::new();
     for (&ci, f) in &fronts {
         let c = &st.contacts[ci];
@@ -1400,7 +1477,7 @@ fn balance_step(
         });
         // A split's copy holds the slab from its first front on (ledger: PLT-534).
         s.latent = false;
-        if incipient(k, s.km) {
+        if incipient_pairs.contains(&key) {
             young.insert(ci);
         }
         if grow_slab(s, f, env.dt_myr, k.slab_depth_km, k.slab_breakoff_myr) {
@@ -1650,6 +1727,15 @@ fn balance_step(
             rot_known: false,
         });
     }
+    #[cfg(test)]
+    let terms = BoundaryTerms {
+        friction_n,
+        front_friction_n,
+        front_m,
+        incipient_n: incipient_n.clone(),
+        colliding_n_m: bal.c.colliding_n_m,
+        transform_n_m: bal.c.transform_n_m,
+    };
     Balanced {
         omega: out,
         stress_mpa: stress,
@@ -1662,6 +1748,8 @@ fn balance_step(
             breakoffs,
         },
         slab_front_km,
+        #[cfg(test)]
+        terms,
         #[cfg(test)]
         torques: bal.acc.iter().map(|a| (a.t_pull, a.t_suck)).collect(),
     }
