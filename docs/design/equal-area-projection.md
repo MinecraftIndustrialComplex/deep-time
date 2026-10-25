@@ -1,5 +1,11 @@
 # The map projection: one coordinate layer, any projection
 
+> **Superseded (2026-10-24, cube plan 7.4).** The game's map is the conformal cube (`docs/design/cube-game.md`,
+> `docs/science/cube-world-bake.md`). Lambert's cylinder stays only as the simulation's own frame and the
+> synthetic fixtures until the simulation moves to the cube (plan phase 4); Petroff-Guyou, the quincuncial
+> prototype, `deeptime project` and the playable Lambert level types are deleted. This note stays as the
+> design record of the projection module (§§3 to 5 still say where each conversion lives).
+
 **Status (2026-10-03).** Ben chose Lambert's cylindrical equal-area projection (decisions log
 2026-10-02: "Use an equal area projects FFS", then "Game world and maps" and "The equator
 (Lambert)"), reopened the choice to look at square tiling maps (Peirce quincuncial and its

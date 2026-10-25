@@ -7,6 +7,13 @@ same commit series as the code that changes it (§12.3), and `STATUS.md` records
 the second cold-read review (`docs/plan-reviews/2026-09-28-cold-read-review-2.md`) are fixed here by
 the task that hits each one.
 
+> **Level types and projections since 2026-10-24 (cube plan §7.4).** The cube is the only world type: the
+> level types are `deeptime:planet_cube` (C = 16,384) and `deeptime:planet_cube_32k` (C = 32,768). Wherever
+> this plan says `deeptime:planet`, `planet_32k`, Lambert or Petroff-Guyou worlds, `planet_lambert[_32k]` or
+> `deeptime project`, it records the design as it was: those level types and that command are deleted. The
+> Lambert frame lives on only for the simulation and the synthetic fixtures (dev level types
+> `deeptime:test_planet_lambert[_32k]`) until plan phase 4.
+
 **Contents.** 1 Start here · 2 Environment and conventions · 3 Architecture overview · 4 Repository
 layout · 5 Core data model · 6 The JNI boundary · 7 The Minecraft adapter · 8 Engine stages ·
 9 Review and test pipeline · 10 Phase plan (Phase 0 and 1 work items, Phases 2–3, later) ·
@@ -2095,8 +2102,8 @@ folder then holds only what vanilla wrote before any mod event: `level.dat` (wri
 level-type: after a circumference mismatch the folder must be deleted, not only `level-type`
 changed), `session.lock` and `serverconfig/`.
 
-`server.properties` needs `level-type=deeptime\:planet` (16,384) or `level-type=deeptime\:planet_32k`
-(32,768) before the first start (`level-type` is resolved as a world-preset key; `generator-settings`
+`server.properties` needs `level-type=deeptime\:planet_cube` (16,384) or `level-type=deeptime\:planet_cube_32k`
+(32,768) before the first start (the 2026-09 names were `planet` and `planet_32k`, deleted in cube plan §7.4) (`level-type` is resolved as a world-preset key; `generator-settings`
 is only read for `minecraft:flat`, so Deep Time's parameters cannot travel there). This step lands in
 P1-13; until then (Phase 0) the binder (`server/WorldDataBinder`, §7.1) only binds world data that is
 already in the world folder, or the analytic test terrain.

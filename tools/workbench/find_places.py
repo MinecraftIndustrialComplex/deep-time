@@ -1,22 +1,29 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: LGPL-3.0-or-later
-"""Candidate places for the Final world map's review shots: volcanoes, fjords, river mouths.
+"""Candidate places for the Final world map's review shots: volcanoes and river mouths.
 
-    python3 tools/workbench/find_places.py PORT RUN [volcanoes|fjords|mouths|all]
+    DEEPTIME_WORLD=<the run's world folder> python3 tools/workbench/find_places.py PORT RUN [volcanoes|mouths|all]
 
 Asks a running `deeptime watch` on 127.0.0.1:PORT (a private one, never Ben's on 8642) about the
 finished run RUN and prints `?run=RUN&world=<layer>/<x>/<z>/<blocks per px>` links to open in the
 page. Nothing is claimed until you have looked: open each link and check the shot shows the thing.
 
-- volcanoes: the run's own events (`deeptime:volcano_*` with a standing height) with their block.
-- fjords: a lattice of `world/sample` calls (step 24 blocks) over 45..80 degrees of latitude for sea
-  points more than 8 blocks below sea level with land at least FJORD_WALL (25) blocks high within FJORD_REACH (36) blocks
-  on both sides of an axis: a narrow deep arm between high ground, ranked by the lower side.
+- volcanoes: the run's own events (`deeptime:volcano_*` with a standing height). An event holds a
+  latitude and longitude only, and a cube world has no closed form from those to a block (its map is
+  a table and the manifest carries the turn), so the block comes from the Rust evaluator:
+  `deeptime inspect-column --world-data $DEEPTIME_WORLD --points - --latlon` (the binary is
+  $DEEPTIME_BIN, else `deeptime` on the PATH).
 - mouths: the river network's largest mouths in the sea (rivers/rivers.dtrv, read from --world).
+
+The fjord scan this tool once had is gone with the plate carree: it walked a lattice over a latitude
+band, and a latitude band is no z range on the cube's net (cube plan 7.4).
 Standard library only.
 """
 import json
+import os
+import shutil
 import struct
+import subprocess
 import sys
 import urllib.request
 
@@ -25,7 +32,24 @@ def get(url):
     return json.load(urllib.request.urlopen(url))
 
 
-def volcanoes(base, c):
+def blocks_of(world, points):
+    """The blocks (x, z) of (latitude, longitude) points on the cube world at `world`, one call to the
+    Rust evaluator (WorldProjection::block_of, the game's own placement)."""
+    exe = os.environ.get("DEEPTIME_BIN") or shutil.which("deeptime")
+    if not exe:
+        sys.exit("no deeptime binary: set DEEPTIME_BIN (or put `deeptime` on the PATH)")
+    text = "".join(f"{lat!r} {lon!r}\n" for lat, lon in points)
+    p = subprocess.run([exe, "inspect-column", "--world-data", world, "--points", "-", "--latlon"],
+                       input=text.encode(), capture_output=True, timeout=120)
+    if p.returncode != 0:
+        sys.exit("deeptime inspect-column: " + p.stderr.decode(errors="replace").strip()[-400:])
+    cols = [json.loads(line) for line in p.stdout.decode().splitlines() if line.strip()]
+    if len(cols) != len(points):
+        sys.exit(f"deeptime inspect-column placed {len(cols)} of {len(points)} points")
+    return [(int(c["x"]), int(c["z"])) for c in cols]
+
+
+def volcanoes(base, world):
     ev = get(base + "/state.json").get("events", [])
     out = []
     for e in ev:
@@ -36,45 +60,12 @@ def volcanoes(base, c):
         prm = e.get("params", {})
         h = prm.get("height_m") or prm.get("tallest_m") or 0
         if k.endswith("stratovolcano") or prm.get("standing", 0) or prm.get("live", 0):
-            out.append((h, k, round(p["lon"] / 360 * c - c / 2), round(-p["lat"] / 360 * c), e.get("t_start")))
-    for h, k, x, z, t in sorted(out, reverse=True)[:10]:
+            out.append((h, k, p["lat"], p["lon"], e.get("t_start")))
+    out = sorted(out, reverse=True)[:10]
+    for (h, k, _lat, _lon, _t), (x, z) in zip(out, blocks_of(world, [(o[2], o[3]) for o in out]) if out else []):
         print(f"volcano {k[17:]:14} {h:6.0f} m  elev/{x}/{z}/1   sat/{x}/{z}/0.5")
     if not out:
         print("no standing volcano in the run's events")
-
-
-def sample(base, x, z):
-    return get(f"{base}/world/sample?x={x}&z={z}")
-
-
-def fjords(base, info):
-    c, sea = info["circumference"], info["sea_level_y"]
-    import os
-    step, reach = 24, int(os.environ.get("FJORD_REACH", 36))
-    wall = float(os.environ.get("FJORD_WALL", 25))
-    found = []
-    for hemi in (-1, 1):
-        for zi in range(int(45 / 360 * c), int(80 / 360 * c), step):
-            z = hemi * zi
-            for x in range(-c // 2, c // 2, step):
-                s = sample(base, x, z)
-                if s["surface"] != "sea" or s["terrain_y"] > sea - 8:
-                    continue
-                for dx, dz in ((reach, 0), (0, reach)):
-                    a, b = sample(base, x - dx, z - dz), sample(base, x + dx, z + dz)
-                    low = min(a["terrain_y"], b["terrain_y"])
-                    if a["surface"] != "sea" and b["surface"] != "sea" and low > sea + wall:
-                        found.append((low - sea, x, z))
-    found.sort(reverse=True)
-    seen = []
-    for h, x, z in found:
-        if all(abs(x - sx) + abs(z - sz) > 200 for sx, sz in seen):
-            seen.append((x, z))
-            print(f"fjord candidate walls {h:5.0f} blocks  elev/{x}/{z}/0.5   sat/{x}/{z}/2")
-        if len(seen) >= 10:
-            break
-    if not found:
-        print("no fjord-like arm found on the lattice")
 
 
 def mouths(world):
@@ -103,13 +94,13 @@ def main():
     if not info.get("available"):
         print("no world:", info.get("reason"))
         return 1
+    w = os.environ.get("DEEPTIME_WORLD")
     if what in ("volcanoes", "all"):
-        volcanoes(base, info["circumference"])
-    if what in ("fjords", "all"):
-        fjords(base, info)
+        if w:
+            volcanoes(base, w)
+        else:
+            print("set DEEPTIME_WORLD to the run's world folder (a volcano's block comes from its map)")
     if what in ("mouths", "all"):
-        import os
-        w = os.environ.get("DEEPTIME_WORLD")
         if w:
             mouths(w)
         elif what == "mouths":
