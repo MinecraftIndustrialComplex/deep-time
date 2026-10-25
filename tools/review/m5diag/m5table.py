@@ -214,11 +214,11 @@ def main():
         x = np.array([g(r) for r in F])
         rho, p = spearmanr(m5, x)
         print(f"   {k:<32} rho {rho:+.3f} p {p:.4f}")
-    from m5fields import ARM, KEY, POOL
+    from m5fields import RUNS
     col = []
     for r in F:
         try:
-            col.append(json.loads((POOL / KEY / ARM / r["run"] / "measures" / "v1census.json").read_text())
+            col.append(json.loads((RUNS / r["run"] / "measures" / "v1census.json").read_text())
                        ["values"]["collisions"])
         except (OSError, KeyError):
             col.append(np.nan)

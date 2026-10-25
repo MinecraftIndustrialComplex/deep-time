@@ -36,6 +36,19 @@
 //!    plateau, and erosion wears it down. (The plate-only presets keep their isostatic ceiling,
 //!    `uplift_ceiling_m`.)
 //!
+//!    With `collision_belt_taper` the belt's surface is the critical taper's instead (ledger
+//!    PLT-600, PLT-601). The front is the toe of the orogenic wedge: in a collision the plate
+//!    boundary surfaces at the deformation front, the wedge on its hanging wall (the Himalaya's
+//!    Main Frontal Thrust). The surface rises from the front's height at `wedge_slope_deg`,
+//!    `z(d) = z_front + d · tan α`, up to the strength height, where a wide wedge stops rising
+//!    (the brittle–plastic transition; the break in slope at the edge of the Tibetan Plateau,
+//!    Dahlen 1990) and widens as a plateau. The step's crust raises the ground under it nearest
+//!    the front first, so the belt widens behind its toe as a critical wedge grows ("at
+//!    constant taper", Davis, Suppe & Dahlen 1983), and once it is full to `collision_belt_km`
+//!    the surface rises in place (the toe advances). How much the belt keeps is the old fill's to
+//!    the metre (the sliver rule above and the strength height's passes): only where it lands
+//!    moves.
+//!
 //! Both are stamped as a collision orogeny where they rose by more than 5 m/Myr (the subduction
 //! fronts' rule): the `collision` regime the structure stage folds and thrusts, the orogen
 //! provinces, the young-orogen weakness of the flexure. The fold direction is the shortening
@@ -109,6 +122,10 @@ pub const SLIVER_GLOBAL: &str = "plates/collision_noroom_sliver_km3";
 pub const CAPPED_GLOBAL: &str = "plates/collision_noroom_capped_km3";
 /// … and what the ceiling and the highest elevation clipped off the rises.
 pub const CLIPPED_GLOBAL: &str = "plates/collision_noroom_clipped_km3";
+/// Crust the critical-taper belt took after it was full to its width, km³ of crust (measurement
+/// only; ledger: PLT-601): the toe advancing, so whether the width `collision_belt_km` (PLT-241)
+/// bounds the belt at all. Zero without `collision_belt_taper`.
+pub const TOE_GLOBAL: &str = "plates/collision_taper_toe_km3";
 /// How young a collision orogeny on the incoming crust counts as raised by this collision's
 /// wedge, Myr (measurement only; the agent's window, ledger: PLT-401).
 const RECENT_MYR: f64 = 30.0;
@@ -147,6 +164,9 @@ pub struct Stacked {
     pub sliver_km2_m: f64,
     pub capped_km2_m: f64,
     pub clipped_km2_m: f64,
+    /// What the critical-taper belt took after it was full to its width, km² × m of crust
+    /// (measurement only, [`TOE_GLOBAL`]).
+    pub toe_km2_m: f64,
     /// Crust added to the belt and to the wedge, km² × m: Σ added thickness × a sample's area.
     pub belt_km2_m: f64,
     pub wedge_km2_m: f64,
@@ -601,23 +621,46 @@ fn stack_front(
     let across = |d: f64, in_wedge: bool| {
         if in_wedge { norm.km(d) } else { -norm.km(d) }
     };
-    let (mut sliver_km2_m, mut capped_km2_m) = (0.0, 0.0);
+    let (mut sliver_km2_m, mut capped_km2_m, mut toe_km2_m) = (0.0, 0.0, 0.0);
     if belt_weight > 0.0 && belt_rise_km2_m > 0.0 {
         let cap_m = k.strength_height_m(env.gravity);
         let z_of: Vec<f64> = belt
             .iter()
             .map(|&(i, _)| f64::from(samples[i].elevation_m))
             .collect();
-        let given = fill_belt(&belt, &z_of, belt_rise_km2_m, belt_weight, area, cap_m);
+        // The old fill: how much the belt keeps (PLT-243's room share, PLT-253's passes) and, with
+        // the taper off, where it lands.
+        let old = fill_belt(&belt, &z_of, belt_rise_km2_m, belt_weight, area, cap_m);
+        let kept_km2_m = old.iter().sum::<f64>() * area;
         // What was left over, and whether any sample still had room (measurement only).
-        let left =
-            (belt_rise_km2_m - given.iter().sum::<f64>() * area).max(0.0) * COLUMN_ISOSTATIC_FACTOR;
-        let room = cap_m <= 0.0 || z_of.iter().zip(&given).any(|(z, g)| cap_m - z - g > 1e-6);
+        let left = (belt_rise_km2_m - kept_km2_m).max(0.0) * COLUMN_ISOSTATIC_FACTOR;
+        let room = cap_m <= 0.0 || z_of.iter().zip(&old).any(|(z, g)| cap_m - z - g > 1e-6);
         if room {
             sliver_km2_m = left;
         } else {
             capped_km2_m = left;
         }
+        let given = if k.collision_belt_taper {
+            // ledger: PLT-600 (the surface from critical taper), PLT-601 (the toe advances once
+            // the belt is full). The crust kept is the old fill's, to the m: only where it lands
+            // changes. It always fits (the same samples, the same strength height).
+            // The field lists its samples by index: the fill takes them nearest the front first.
+            let mut order: Vec<usize> = (0..belt_d.len()).collect();
+            order.sort_by(|&a, &b| belt_d[a].2.total_cmp(&belt_d[b].2).then(a.cmp(&b)));
+            let d_km: Vec<f64> = order.iter().map(|&j| norm.km(belt_d[j].2)).collect();
+            let z_near: Vec<f64> = order.iter().map(|&j| z_of[j]).collect();
+            let (near, toe) = fill_taper(&d_km, &z_near, z_front, tan, kept_km2_m, area, cap_m);
+            toe_km2_m = toe * COLUMN_ISOSTATIC_FACTOR;
+            let mut given = vec![0.0f64; belt_d.len()];
+            for (&j, g) in order.iter().zip(near) {
+                given[j] = g;
+            }
+            capped_km2_m +=
+                (kept_km2_m - given.iter().sum::<f64>() * area).max(0.0) * COLUMN_ISOSTATIC_FACTOR;
+            given
+        } else {
+            old
+        };
         rises.extend(
             belt_d
                 .iter()
@@ -636,6 +679,7 @@ fn stack_front(
             restack_m,
             sliver_km2_m,
             capped_km2_m,
+            toe_km2_m,
             wedge_km,
             ..Default::default()
         },
@@ -846,6 +890,94 @@ fn fill_belt(
         }
     }
     given
+}
+
+/// The belt's fill under the critical taper (`collision_belt_taper`, the module docs): `d_km`
+/// are the belt's samples' distances behind the front, ascending, `z` their elevations, m;
+/// `z_front` the front's height, m, where the surface starts; `tan` its slope; `rise_km2_m` the
+/// step's crust to place (km² × m of Airy rise) on samples of `area` km²; `cap_m` the strength
+/// height (≤ 0: no limit). Returns each sample's rise, m, and the part of the crust placed after
+/// the belt was full under the surface (the toe advancing), km² × m of rise.
+///
+/// The surface is `min(cap, z_front + d tan α)`. Ground under it is raised to it nearest the
+/// front first, samples at the same distance alike, until the step's crust runs out: a critical
+/// wedge keeps its taper as it grows, so the crust coming in at the toe widens it, its width
+/// growing as the square root of the crust taken in (Dahlen 1990, eq. 1–3), and at the strength
+/// height it widens as a plateau (the brittle–plastic transition limits a wide wedge's height,
+/// the break in slope at the edge of the Tibetan Plateau; Dahlen 1990). When the whole belt is
+/// under the surface and crust is left, the surface rises in place, `min(cap, H + d tan α)` with
+/// `H` by bisection: the toe advances onto the incoming plate (ledger PLT-601). What the belt
+/// cannot hold with every sample at the strength height is not placed (the caller sends it down
+/// with the slab).
+// ledger: PLT-600 (the surface and its fill), PLT-601 (the toe advances).
+fn fill_taper(
+    d_km: &[f64],
+    z: &[f64],
+    z_front: f64,
+    tan: f64,
+    rise_km2_m: f64,
+    area: f64,
+    cap_m: f64,
+) -> (Vec<f64>, f64) {
+    let n = d_km.len();
+    let mut given = vec![0.0f64; n];
+    if n == 0 || rise_km2_m <= 0.0 || area <= 0.0 {
+        return (given, 0.0);
+    }
+    debug_assert!(d_km.windows(2).all(|w| w[0] <= w[1]), "distances ascending");
+    let surface = |h: f64, d: f64| {
+        let s = h + 1000.0 * d * tan;
+        if cap_m > 0.0 { s.min(cap_m) } else { s }
+    };
+    let deficit = |h: f64, j: usize| (surface(h, d_km[j]) - z[j]).max(0.0);
+    // Nearest the front first, in groups of equal distance.
+    let total = rise_km2_m / area;
+    let mut left = total;
+    let mut j = 0;
+    while j < n {
+        let k = j + d_km[j..].iter().take_while(|&&d| d == d_km[j]).count();
+        let need: f64 = (j..k).map(|i| deficit(z_front, i)).sum();
+        if need >= left {
+            let f = left / need;
+            for (i, g) in given.iter_mut().enumerate().take(k).skip(j) {
+                *g = f * deficit(z_front, i);
+            }
+            return (given, 0.0);
+        }
+        for (i, g) in given.iter_mut().enumerate().take(k).skip(j) {
+            *g = deficit(z_front, i);
+        }
+        left -= need;
+        j = k;
+    }
+    // The belt is full under the surface: it rises in place.
+    let full = total - left;
+    let fill = |h: f64| (0..n).map(|i| deficit(h, i)).sum::<f64>();
+    let mut hi = if cap_m > 0.0 {
+        cap_m
+    } else {
+        z.iter().copied().fold(z_front, f64::max) + total / n as f64 + 1.0
+    };
+    if fill(hi) > total {
+        let mut lo = z_front;
+        for _ in 0..200 {
+            let mid = 0.5 * (lo + hi);
+            if mid <= lo || mid >= hi {
+                break;
+            }
+            if fill(mid) > total {
+                hi = mid;
+            } else {
+                lo = mid;
+            }
+        }
+        hi = 0.5 * (lo + hi);
+    }
+    for (i, g) in given.iter_mut().enumerate() {
+        *g = deficit(hi, i);
+    }
+    let toe = (given.iter().sum::<f64>() - full).max(0.0) * area;
+    (given, toe)
 }
 
 /// Distance (rad) to km and the bin width of the foreland's profile.
@@ -1147,6 +1279,11 @@ mod tests {
     fn a_head_on_collision_builds_a_belt_over_many_steps() {
         let mut fx = Fixture::new();
         fx.preset.tectonics.collision_threshold_km = 1.0e9;
+        // PLT-243's profile, highest at the front, so the wedge (PLT-244) grows from the first
+        // step and the belt's height within half its width rises every step. Under the critical
+        // taper (the default) the front's edge in this fixture stands at its own height until
+        // the toe advances (ledger: PLT-600, PLT-601); the taper's own tests check it.
+        fx.preset.tectonics.collision_belt_taper = false;
         // The old default share (0.5), so twelve steps stay under the strength height (PLT-253)
         // and every step's rise shows in the belt's height.
         fx.preset.tectonics.collision_stacking_share = 0.5;
@@ -1240,6 +1377,11 @@ mod tests {
     fn a_collisions_own_wedge_crosses_whole_with_the_switch() {
         let mut fx = Fixture::new();
         fx.preset.tectonics.collision_threshold_km = 1.0e9;
+        // PLT-243's profile, so the wedge (PLT-244) builds from the first step and its crust
+        // reaches the front within six. Under the critical taper the front's edge in this
+        // fixture stands at its own height until the toe advances, and the wedge waits for it
+        // (ledger: PLT-600, PLT-601).
+        fx.preset.tectonics.collision_belt_taper = false;
         let share = 0.5;
         fx.preset.tectonics.collision_stacking_share = share;
         let mut restacked = false;
@@ -1443,12 +1585,14 @@ mod tests {
     /// is untouched by the stacking. This is PLT-242's share alone, so `collision_restack_whole`
     /// (PLT-400, on by default since 2026-10-22: the collision's own wedge crosses whole and the
     /// volume added is more than the share of what crossed) is off here; the switch has its own
-    /// test, `a_collisions_own_wedge_crosses_whole_with_the_switch`.
+    /// test, `a_collisions_own_wedge_crosses_whole_with_the_switch`. Under either belt profile
+    /// (PLT-243's, the critical taper's PLT-600): only where the crust lands differs.
     #[test]
     fn stacking_moves_crust_and_creates_none() {
-        for share in [1.0, 0.5] {
+        for (taper, share) in [(false, 1.0), (false, 0.5), (true, 1.0), (true, 0.5)] {
             let mut fx = Fixture::new();
             fx.preset.tectonics.collision_threshold_km = 1.0e9;
+            fx.preset.tectonics.collision_belt_taper = taper;
             fx.preset.tectonics.collision_stacking_share = share;
             fx.preset.tectonics.collision_restack_whole = false;
             // A crust strong enough that the strength height (PLT-253) never binds here.
@@ -1642,6 +1786,192 @@ mod tests {
             fill_belt(&belt, &full, 150_000.0, weight, area, 5000.0)
                 .iter()
                 .all(|&x| x == 0.0)
+        );
+    }
+
+    /// PLT-600 and PLT-601: under the critical taper the belt's surface rises from the front at
+    /// the wedge's surface slope, and the step's crust is all placed. It fills the ground under
+    /// `z_front + d tan α` nearest the front first, the strength height a plateau behind; with
+    /// the belt full to its width the surface rises in place (the toe advances); what the belt
+    /// cannot hold at the strength height is left over.
+    #[test]
+    fn the_taper_belt_rises_from_the_front_at_the_slope_and_keeps_the_volume() {
+        let tan = 1.5f64.to_radians().tan();
+        let (z0, cap, area) = (300.0, 5200.0, 25.0);
+        // A line of samples every 5 km behind the front, out to the belt's 400 km.
+        let d: Vec<f64> = (0..=80).map(|j| 5.0 * f64::from(j)).collect();
+        let flat = vec![z0; d.len()];
+        let surface = |h: f64, d: f64| (h + 1000.0 * d * tan).min(cap);
+        let placed = |g: &[f64]| g.iter().sum::<f64>() * area;
+        let close = |a: f64, b: f64| (a - b).abs() < 1e-6 * b.abs().max(1.0);
+
+        // 1. Part of the ramp: the surface rises from the front's height at the slope out to the
+        //    last sample filled (that one in part); nothing beyond it rises.
+        let rise = 600_000.0;
+        let (g, toe) = fill_taper(&d, &flat, z0, tan, rise, area, cap);
+        assert!(close(placed(&g), rise), "{} placed of {rise}", placed(&g));
+        assert_eq!(toe, 0.0, "the belt is not full: the toe stays");
+        let last = g.iter().rposition(|&x| x > 0.0).unwrap();
+        assert!(last > 5 && last < 30, "{last}");
+        assert_eq!(g[0], 0.0, "the front stands at its own height, the toe's");
+        for j in 1..last {
+            assert!(close(z0 + g[j], surface(z0, d[j])), "{j}: {}", z0 + g[j]);
+            let slope = (g[j] - g[j - 1]) / (1000.0 * (d[j] - d[j - 1]));
+            assert!((slope - tan).abs() < 1e-9, "{j}: slope {slope} for {tan}");
+        }
+        assert!(g[last] <= surface(z0, d[last]) - z0 + 1e-9);
+        assert!(g[last + 1..].iter().all(|&x| x == 0.0));
+
+        // 2. Past the strength height: a ramp from the front, then a plateau at the limit.
+        let rise = 4_000_000.0;
+        let (g, toe) = fill_taper(&d, &flat, z0, tan, rise, area, cap);
+        assert_eq!(toe, 0.0);
+        assert!(close(placed(&g), rise), "{} placed of {rise}", placed(&g));
+        let last = g.iter().rposition(|&x| x > 0.0).unwrap();
+        let toe_to_cap = (cap - z0) / (1000.0 * tan);
+        assert!(d[last] > toe_to_cap && last < 80, "{last}");
+        for j in 0..last {
+            assert!(close(z0 + g[j], surface(z0, d[j])), "{j}: {}", z0 + g[j]);
+        }
+
+        // 3. The belt full to its width: the toe advances, the whole surface rising in place at
+        //    the same slope; all of it placed.
+        let full_width: f64 = d.iter().map(|&x| surface(z0, x) - z0).sum::<f64>() * area;
+        let rise = full_width + 500_000.0;
+        let (g, toe) = fill_taper(&d, &flat, z0, tan, rise, area, cap);
+        assert!(close(placed(&g), rise), "{} placed of {rise}", placed(&g));
+        assert!(
+            close(toe, 500_000.0),
+            "the toe took {toe} of the 500000 past full"
+        );
+        let h = z0 + g[0];
+        assert!(h > z0 + 1.0, "the toe advanced: the front rose {}", g[0]);
+        for j in 0..d.len() {
+            assert!(close(z0 + g[j], surface(h, d[j])), "{j}: {}", z0 + g[j]);
+        }
+
+        // 4. More than the belt holds at the strength height: every sample at the limit, the
+        //    rest left over (the caller sends it down with the slab).
+        let (g, toe) = fill_taper(&d, &flat, z0, tan, 2.0e7, area, cap);
+        assert!(g.iter().all(|&x| close(z0 + x, cap)), "{g:?}");
+        assert!(close(placed(&g), (cap - z0) * area * d.len() as f64));
+        assert!(close(toe, placed(&g) - full_width), "{toe}");
+
+        // 5. Ground already above the surface takes nothing and the fill passes it; samples at
+        //    the same distance share the last of it alike.
+        let mut z = flat.clone();
+        z[4] = 4000.0;
+        let (g, _) = fill_taper(&d, &z, z0, tan, 600_000.0, area, cap);
+        assert_eq!(g[4], 0.0);
+        assert!(close(z0 + g[5], surface(z0, d[5])));
+        assert!(close(placed(&g), 600_000.0));
+        let d2 = [0.0, 10.0, 10.0, 20.0];
+        let (g, _) = fill_taper(
+            &d2,
+            &[z0; 4],
+            z0,
+            tan,
+            0.5 * 1000.0 * 10.0 * tan * area,
+            area,
+            cap,
+        );
+        assert!(g[1] > 0.0 && close(g[1], g[2]) && g[3] == 0.0, "{g:?}");
+    }
+
+    /// PLT-600 on a head-on collision: the belt's ground rises behind the front, not at it (the
+    /// front is the toe), and the step keeps the crust the old profile kept.
+    #[test]
+    fn the_taper_belt_is_lowest_at_the_front_and_keeps_the_steps_crust() {
+        let mut kept = Vec::new();
+        for taper in [false, true] {
+            let mut fx = Fixture::new();
+            fx.preset.tectonics.collision_threshold_km = 1.0e9;
+            fx.preset.tectonics.collision_belt_taper = taper;
+            let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
+            let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
+            let (stacked, _) = fx.step(&mut st, 1, None);
+            let s = &stacked[&0];
+            kept.push((
+                s.belt_km2_m + s.wedge_km2_m + s.clipped_km2_m,
+                s.sliver_km2_m + s.capped_km2_m,
+            ));
+            // The overriding plate's rises: on its edge at the front (a neighbour on the incoming
+            // plate) and behind it, away from the cap's corners.
+            let pts = fx.geo.points();
+            let (mut near, mut all) = (0.0f64, 0.0f64);
+            for (i, s) in st.samples.iter().enumerate() {
+                let p = pts[i];
+                if !arc(p) || p.y < 0.95 || p.x >= 0.0 {
+                    continue;
+                }
+                let dz = f64::from(s.elevation_m - z0[i]);
+                all = all.max(dz);
+                if fx
+                    .geo
+                    .edges(i as u32)
+                    .any(|(v, _)| pts[v as usize].x >= 0.0)
+                {
+                    near = near.max(dz);
+                }
+            }
+            assert!(all > 100.0, "taper {taper}: the belt rose {all} m");
+            if taper {
+                assert!(
+                    near < 0.5 * all,
+                    "the front rose {near} m, the belt {all} m"
+                );
+            } else {
+                assert!(
+                    near > 0.9 * all,
+                    "the old profile: {near} m at the front, {all} m"
+                );
+            }
+        }
+        // Within a millionth of what stays (the taper books its rounding as sent down).
+        let tol = 1e-6 * (kept[0].0 + kept[0].1);
+        assert!(
+            (kept[1].0 - kept[0].0).abs() <= tol && (kept[1].1 - kept[0].1).abs() <= tol,
+            "the crust kept, and sent down: {kept:?}"
+        );
+    }
+
+    /// PLT-600: how much the belt keeps is the old fill's to the metre behind a narrow overriding
+    /// continent too, where the sliver rule (PLT-243's floor and the passes of PLT-253) sends part
+    /// of the stack down with the slab: a 2,000 km belt behind a continent one row of samples
+    /// deep.
+    #[test]
+    fn the_taper_keeps_what_the_old_fill_keeps_behind_a_sliver() {
+        let mut out = Vec::new();
+        for taper in [false, true] {
+            let mut fx = Fixture::new();
+            fx.preset.tectonics.collision_threshold_km = 1.0e9;
+            fx.preset.tectonics.collision_belt_km = 2000.0;
+            fx.preset.tectonics.collision_belt_taper = taper;
+            let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
+            let pts = fx.geo.points();
+            for (i, s) in st.samples.iter_mut().enumerate() {
+                if s.kind == CONTINENTAL && fx.norm.km(pts[i].x.asin()) < -250.0 {
+                    let mut ocean = Sample::blank(0);
+                    ocean.elevation_m = -4000.0;
+                    *s = ocean;
+                }
+            }
+            let (stacked, _) = fx.step(&mut st, 1, None);
+            let s = &stacked[&0];
+            out.push((
+                s.belt_km2_m + s.wedge_km2_m + s.clipped_km2_m,
+                s.sliver_km2_m + s.capped_km2_m,
+                s.sliver_km2_m,
+            ));
+        }
+        let close = |a: f64, b: f64| (a - b).abs() <= 1e-6 * (a.abs() + b.abs()).max(1.0);
+        assert!(
+            out[0].2 > 0.02 * (out[0].0 + out[0].1),
+            "the sliver rule sends part of the stack down: {out:?}"
+        );
+        assert!(
+            close(out[1].0, out[0].0) && close(out[1].1, out[0].1),
+            "the crust kept, and sent down: {out:?}"
         );
     }
 
