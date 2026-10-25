@@ -148,6 +148,40 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | A server config key for far terrain (on by default; `-Ddeeptime.dh=false` stays), added when the config file next changes | build log 2026-10-01 "P3-04 Distant Horizons far terrain" | small |
 
 ## Build log
+### 2026-10-25: M5 lane: why the land drowns on m5-unfreeze (M2 0.055, M3 0.566) and M4 went flat (0.016); the sea stands 700 m over the datum because oceanic-labelled crust of 15 km and more, built mostly from the continents' sediment on ocean floor that never recycles, takes the basins' volume (it holds the sea 837 m up on m5-unfreeze, 566 m on base14's seeds 1 to 4); Earth's numbers fetched; diagnosis only, no law changed (coordinator's diagnosis task after the 16db742d merge; agent worktree .claude/worktrees/agent-a447f975b05e919a2, branch worktree-agent-a447f975b05e919a2 at origin/master 097581fe; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Runs.** m5-unfreeze (key 67edbe8a8914, argkey bd0dbb14) and fl-off-env8 (4040677e7800, argkey cd665cef: the same 8 runs with the crust-budget maps), read against base14's seeds 1 to 4 (a963c9ac56ee, cd665cef, `@4`). Tools in tools/review/m5diag/: `m5sea.py` (the sea's budget, its Shapley split, the counterfactual seas refilled on each run's own cells), `m5thickoc.py` (the thick oceanic crust at the end, `series` over the maps), `m5earthbands.py` (CRUST1.0 by thickness band), `m5budget.sh`; `tools/review/loss-budget.py` for the felsic-ocean parts.
+- **Earth (Q1).** Fetched unless marked:
+  - Cogley 1984: continental crust 41 % of the planet, 30.6 % of it under the sea, mean 36 km.
+  - Christensen & Mooney 1995: 41.1 km, extended crust 30.5, orogens 46.3. CRUST1.0's continental mean: 36.1 km (Hacker 2015).
+  - Land 0.29, mean land height 797 m (ETOPO1, secondary).
+  - Wise 1974: freeboard within ±60 m of 20 m over 80 % of post-Precambrian time.
+  - Charette & Smith 2010: mean ocean depth 3,682 m.
+  - Seton et al. 2020: mean floor age 64.2 Myr. Rowley 2002's 3.4 km²/yr is from-memory.
+  - Stern & Scholl 2010, km³/yr: additions 3.2; sediment subduction 1.1, subduction erosion 1.4, suture zones 0.7.
+  - Clift et al. 2009 (abstract): sediment subduction 1.65, forearc erosion 1.3, delamination about 1.1, accretion 0.3 km³/yr.
+  - van Hinsbergen et al. 2011: India 40 to 50 mm/yr from 20 Ma to now.
+- **CRUST1.0 read here.** Crust of 15 km and more covers 0.410 of the planet, of which 0.12 lies under the sea (margins, 2.7 to 2.9 km of sediment). Thin ocean crust under 8 km: rock at 4,402 m under 219 m of sediment.
+- **The sea's budget (Q2).**
+  - The filled sea over the datum rose from 387 to 728 m (per-run medians; steering held m5-unfreeze about 41 m lower).
+  - The Shapley split of the arm-pooled +308 m: water +10, continental area +130, continental heights -7, oceanic heights +175 (of which the older floor alone -136).
+  - Counterfactual seas, with the oceanic crust of 15 km and more set to the run's bare 6 to 10 km floor: -109 m on m5-unfreeze and -179 m on base14. That crust holds the sea 837 and 566 m up; the difference, +271 m, is most of the rise.
+  - That crust is 0.275 of the oceanic crust (0.17 of the planet) on m5-unfreeze at the end. It grows from 0 at the start, reaching 0.19 by -500 Myr. It lies 78 to 134 km from the continents and stands on the continental Airy line for its thickness.
+  - The model's sea over crust under 15 km covers 0.437 of the planet, against Earth's 0.591.
+  - Mean ocean depth: 3,271 m (m5-unfreeze) and 3,861 m (base14), against 3,682 m.
+  - Mean floor age: 139.8 and 92.6 Myr, against 64.2. Floor older than 180 Myr: 20.4 % and 13.5 %.
+- **What builds it.**
+  - Conserved (felsic and sediment) pools onto the oceanic samples on m5-unfreeze, in km³/yr: erosion +4.24, pelagic +1.37, arcs +1.09; off: resample -3.24, finish -0.79, collapse -0.57, subduction -0.27, the rest -0.39. Net +1.44, which over the run is about 80 % of the 1.75e9 km³ of oceanic crust beyond 7 km.
+  - On base14: erosion +8.16 and net +1.14.
+  - 84 % of what comes in is sediment. Neither GDH1, `settle` nor the plates' erosion ever takes it off (pools.rs, settle.rs; Sonnet code reading).
+- **Thickness and height (Q3).** The 35 to 45 km crust stands at its Airy height: 35 to 40 km plate p50 +1 m over the sea against Airy -13 m. Over the datum the model's line (142 m/km) is steeper than Earth's fit (85 to 89 m/km), and Earth's cold crust past 40 km gains almost nothing. So it stands too low only against the high sea. The thickness spread is too narrow: 35 to 40 km holds 0.647 of the continental crust against Earth's 0.323, 40 to 50 km 0.087 against 0.291, and T_cont p90 fell from 43.4 to 40.0 km.
+- **Earth's thickness (Q4)**, m5-unfreeze against base14, in km³/yr:
+  - belts 4.19 against 13.03; erosion of the continents -3.87 against -8.05;
+  - arcs 1.18 + 0.34 against Earth's 1.5 + 1.0;
+  - sediment to the mantle 0.99 (PLT-440's share 0.12, against Clift & Vannucchi 2004's 0.83); forearc erosion about 0.3 against 1.3 to 1.4;
+  - no convergence after the weld, no delamination.
+- **Contradicts.** PLT-440's note that Earth's share "drowns the land" was read before this budget. The sediment-heavy floor it names is what holds the sea up.
+- **Next.** The coordinator chooses among the sourced candidates in the report: the margin's sediment as continental margin (where Earth keeps it), sediment subduction at Clift & Vannucchi's share, the old floor beside continents going under (incipient subduction's reach), and post-weld convergence (the front lane's PLT-652). The pools of the oceanic samples by kind are not dumped yet; one run with a pools field would split the standing stock.
+
 ### 2026-10-25: What stays on the cube's faces: magma bodies cut and sealed at a turning edge (MAG-059), the censuses count the faces only, volcanic zones fold off the faces, structure burial and site chunks skip the void (coordinator's off-face follow-up; agent worktree .claude/worktrees/agent-ac569a2411d021d06, branch worktree-agent-ac569a2411d021d06, masters 56edfd16 and 1cf62cb9 merged in at 9cae140e and 063f04a4, the lake-ice branch at 4c8e50bf; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Item 1, magma bodies: real.** Master's planet (incipient subduction on) has 7 bodies and none reaches past a turning edge. The incipient-off planet (`DEEPTIME_TEST_PLANET_SET="tectonics.incipient_subduction=false"`, c47f3056's planet) has 15, and 3 reach past one: 303 (-504, 1045), 308 (-494, 702) and 317 (509, 1141), all on face S. Before the fix (`build/magma-seam/one.sh before-incipoff magmasealedatturningseams,magmaunderactivevolcanoes set:...`, the new GameTest on the old Magma): `volcano 303: at a turning seam its lava faces air or water 182 times and its mush 2613 times`, e.g. mush at x -512, y -391, z 1017 beside an open void column; 317 had 49 and 1,027. The void columns past the edge are the partner face's turned copy (SCL-210), which knows nothing of the body.
 - **The fix** (MAG-059, `Magma.Seam`, `SEAM_GAP` = 2). The body is cut at the edge and sealed on its own face: off the faces it has no part and no mush; within two columns (Chebyshev) of a void column its chamber, lens, conduit and lake parts become their shells (smooth basalt where open, MAG-011), its plug is left out and no mush is placed. Its vent's water test and its lake ring read on-face columns only, and a lake whose ring (r + 2) or band would leave the faces keeps the plug. Chosen over folding the body onto the partner face (each lens, the mush and the lake turned into the partner's frame, and every partner chunk looking for bodies across its edges) and over shrinking or dropping it (which breaks MAG-003, MAG-048 and MAG-054 or takes an active volcano's magma away), because MAG-041 already states the rule a cut needs: every body sealed. A projection that is not a cube passes `Faces.ALL` and is unchanged.
