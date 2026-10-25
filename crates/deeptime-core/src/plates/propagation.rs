@@ -51,7 +51,7 @@ use crate::world::WorldState;
 
 /// The plate_birth `origin` of a margin propagation's new plate.
 pub const ORIGIN: &str = "margin_propagation";
-/// World globals (measurement, PLT-660): the margin broken by propagations, planet km …
+/// World globals (measurement, PLT-656): the margin broken by propagations, planet km …
 pub const KM_GLOBAL: &str = "plates/propagation_km";
 /// … and the time the propagations were alive, Myr summed over them (the mean speed is the
 /// ratio).
@@ -72,7 +72,7 @@ const TEAR_STEP_SPACINGS: f64 = 0.5;
 enum Plan<T> {
     /// Nothing to do: no candidate, or the pull does not beat the margin's strength.
     None,
-    /// The force test passed but the lattice gave no clean cut (a stall, PLT-660).
+    /// The force test passed but the lattice gave no clean cut (a stall, PLT-656).
     Stall,
     Go(T),
 }
