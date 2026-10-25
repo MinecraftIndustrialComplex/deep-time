@@ -646,16 +646,15 @@ fn stack_front(
                 given[j] = g;
             }
             sliver_km2_m = (belt_rise_km2_m - kept_km2_m) * COLUMN_ISOSTATIC_FACTOR;
-            capped_km2_m = (kept_km2_m - given.iter().sum::<f64>() * area).max(0.0)
-                * COLUMN_ISOSTATIC_FACTOR;
+            capped_km2_m =
+                (kept_km2_m - given.iter().sum::<f64>() * area).max(0.0) * COLUMN_ISOSTATIC_FACTOR;
             given
         } else {
             let given = fill_belt(&belt, &z_of, belt_rise_km2_m, belt_weight, area, cap_m);
             // What was left over, and whether any sample still had room (measurement only).
             let left = (belt_rise_km2_m - given.iter().sum::<f64>() * area).max(0.0)
                 * COLUMN_ISOSTATIC_FACTOR;
-            let room =
-                cap_m <= 0.0 || z_of.iter().zip(&given).any(|(z, g)| cap_m - z - g > 1e-6);
+            let room = cap_m <= 0.0 || z_of.iter().zip(&given).any(|(z, g)| cap_m - z - g > 1e-6);
             if room {
                 sliver_km2_m = left;
             } else {
@@ -1832,7 +1831,10 @@ mod tests {
         let rise = full_width + 500_000.0;
         let (g, toe) = fill_taper(&d, &flat, z0, tan, rise, area, cap);
         assert!(close(placed(&g), rise), "{} placed of {rise}", placed(&g));
-        assert!(close(toe, 500_000.0), "the toe took {toe} of the 500000 past full");
+        assert!(
+            close(toe, 500_000.0),
+            "the toe took {toe} of the 500000 past full"
+        );
         let h = z0 + g[0];
         assert!(h > z0 + 1.0, "the toe advanced: the front rose {}", g[0]);
         for j in 0..d.len() {
@@ -1855,7 +1857,15 @@ mod tests {
         assert!(close(z0 + g[5], surface(z0, d[5])));
         assert!(close(placed(&g), 600_000.0));
         let d2 = [0.0, 10.0, 10.0, 20.0];
-        let (g, _) = fill_taper(&d2, &[z0; 4], z0, tan, 0.5 * 1000.0 * 10.0 * tan * area, area, cap);
+        let (g, _) = fill_taper(
+            &d2,
+            &[z0; 4],
+            z0,
+            tan,
+            0.5 * 1000.0 * 10.0 * tan * area,
+            area,
+            cap,
+        );
         assert!(g[1] > 0.0 && close(g[1], g[2]) && g[3] == 0.0, "{g:?}");
     }
 
@@ -1884,15 +1894,25 @@ mod tests {
                 }
                 let dz = f64::from(s.elevation_m - z0[i]);
                 all = all.max(dz);
-                if fx.geo.edges(i as u32).any(|(v, _)| pts[v as usize].x >= 0.0) {
+                if fx
+                    .geo
+                    .edges(i as u32)
+                    .any(|(v, _)| pts[v as usize].x >= 0.0)
+                {
                     near = near.max(dz);
                 }
             }
             assert!(all > 100.0, "taper {taper}: the belt rose {all} m");
             if taper {
-                assert!(near < 0.5 * all, "the front rose {near} m, the belt {all} m");
+                assert!(
+                    near < 0.5 * all,
+                    "the front rose {near} m, the belt {all} m"
+                );
             } else {
-                assert!(near > 0.9 * all, "the old profile: {near} m at the front, {all} m");
+                assert!(
+                    near > 0.9 * all,
+                    "the old profile: {near} m at the front, {all} m"
+                );
             }
         }
         assert!(
