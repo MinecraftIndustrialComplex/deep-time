@@ -53,9 +53,39 @@ def one(path):
     return out
 
 
+def series(folder, top):
+    """The thick oceanic crust over the run, from every map: its share of the oceanic crust at 15 km and more and at
+    25 km and more, their mean height, and the volume beyond a normal 7 km floor (planet-mean m), medians over runs."""
+    by_t = {}
+    for run in sorted(p for p in Path(folder).iterdir() if (p / "maps").is_dir()):
+        if top and int(run.name.rsplit("-", 1)[1]) > int(top):
+            continue
+        for m in (run / "maps").glob("t*.bin"):
+            a = np.fromfile(m, "<f4").reshape(-1, FIELDS).astype(np.float64)
+            T, oc = a[:, 3] / 1000.0, a[:, 4] <= 0.5
+            O = max(int(oc.sum()), 1)
+            row = {"oc": oc.mean()}
+            for lo in (15, 25):
+                k = oc & (T >= lo)
+                row[f"s{lo}"] = k.sum() / O
+                row[f"z{lo}"] = float(a[k, 2].mean()) if k.any() else float("nan")
+            row["excess_m"] = float(np.where(oc, np.maximum(T - 7.0, 0.0), 0.0).mean() * 1000.0)
+            by_t.setdefault(int(m.stem[1:]), []).append(row)
+    print("t Myr, runs, oceanic share of the planet, share of the oceanic crust >= 15 km and its mean z, >= 25 km and its"
+          " mean z, oceanic crust beyond 7 km as planet-mean m (medians)")
+    for t in sorted(by_t):
+        rs = by_t[t]
+        m = {x: statistics.median(r[x] for r in rs) for x in rs[0]}
+        print(f"  {t:6d} {len(rs)}  oc {m['oc']:.3f}  >=15 {m['s15']:.3f} z {m['z15']:6.0f}  >=25 {m['s25']:.3f}"
+              f" z {m['z25']:6.0f}  excess {m['excess_m']:5.0f} m")
+
+
 def main():
     folder, _, top = sys.argv[1].partition("@")
     name = sys.argv[2] if len(sys.argv) > 2 else "t0000.bin"
+    if name == "series":
+        series(folder, top)
+        return
     rows = []
     for run in sorted(p for p in Path(folder).iterdir() if (p / "maps" / name).exists()):
         if top and int(run.name.rsplit("-", 1)[1]) > int(top):
