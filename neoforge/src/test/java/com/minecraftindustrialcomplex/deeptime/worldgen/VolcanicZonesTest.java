@@ -265,6 +265,72 @@ class VolcanicZonesTest {
         assertEquals(10.0, zn.outside(-(b + 10) * az, (b + 10) * ax), 1e-6);
     }
 
+    private static final double MV = 35.0;
+    private static final int SEA = 63;
+
+    /** A shield of basal radius {@code rBlocks} blocks and height {@code hM} metres, on oceanic crust or not. */
+    private static Volcanoes.Volcano shield(int id, double x, double z, double rBlocks, double hM, boolean oceanic) {
+        return new Volcanoes.Volcano(id, "shield", x, z, rBlocks * MH, hM, 0.9, oceanic, false, 0, 0, false);
+    }
+
+    /** The ground: {@code ventAbove} blocks over the sea at (x, z) (the vent), the sea floor elsewhere. */
+    private static VolcanicZones.Ground ground(double x, double z, double ventAbove) {
+        return new VolcanicZones.Ground((bx, bz) -> bx == (int) Math.round(x) && bz == (int) Math.round(z) ? SEA + ventAbove : SEA - 100,
+                SEA, MV);
+    }
+
+    private static VolcanicZones.Zone zone(VolcanicZones z, Role r) {
+        return z.zones().stream().filter(zn -> zn.role() == r).findFirst().orElseThrow();
+    }
+
+    /**
+     * An oceanic shield's zones are sized on the part of the edifice above the sea (BIO-198), not on its basal radius
+     * on the sea floor: a shield standing 10.8 blocks above the sea at its vent, 3,000 m over a 220-block foot, has its
+     * coast where its profile (1 - rho^2)^1.5 falls to the sea, 64 blocks out, and its cone zone (0.45 of that) lies
+     * inside it. Sized on the foot the cone zone reached 99 blocks, past the coast.
+     */
+    @Test
+    void anOceanicShieldsConeZoneLiesInsideItsCoast() {
+        var v = shield(228, -531, 536, 220, 3000, true);
+        var z = VolcanicZones.build(List.of(v), List.of(), List.of(), VolcanicBiomeRules.DEFAULT, MH, C, null, ground(-531, 536, 10.8));
+        // The coast, from the profile itself: the radius at which the edifice (3,000 m = h blocks, the vent 10.8 above the sea)
+        // stands at the sea.
+        double h = 3000.0 / MV, f = (h - 10.8) / h;
+        double coast = 220 * Math.sqrt(1.0 - Math.pow(f, 2.0 / 3.0));
+        assertEquals(f, Math.pow(1.0 - Math.pow(coast / 220, 2), 1.5), 1e-9);
+        assertEquals(64.0, coast, 1.0);
+        assertEquals(0.45 * coast, zone(z, Role.CONE).radius(), 1e-9);
+        assertTrue(zone(z, Role.CONE).radius() < coast);
+        assertEquals(coast, zone(z, Role.LAVA_FIELD).radius(), 1e-9);
+        assertEquals(Role.CONE, first(z, -531 + 25, 536));
+        assertEquals(Role.LAVA_FIELD, first(z, -531 + 50, 536));
+        assertEquals(null, first(z, -531 + 70, 536));                // beyond the subaerial radius: the climate's own biome
+        // Without the ground: its basal radius, as before.
+        var old = VolcanicZones.build(List.of(v), List.of(), List.of(), VolcanicBiomeRules.DEFAULT, MH, C);
+        assertEquals(0.45 * 220, zone(old, Role.CONE).radius(), 1e-9);
+    }
+
+    /** A continental volcano stands on land: its zones are the same with or without the ground, whatever the ground says. */
+    @Test
+    void aContinentalVolcanoKeepsItsBasalZones() {
+        var v = shield(7, 100, 100, 150, 3000, false);
+        var plain = VolcanicZones.build(List.of(v), List.of(), List.of(), VolcanicBiomeRules.DEFAULT, MH, C);
+        var withGround = VolcanicZones.build(List.of(v), List.of(), List.of(), VolcanicBiomeRules.DEFAULT, MH, C, null, ground(100, 100, 10.8));
+        assertEquals(plain.zones(), withGround.zones());
+        assertEquals(0.45 * 150, zone(withGround, Role.CONE).radius(), 1e-9);
+    }
+
+    /** A vent above the whole edifice gives the foot, and a vent at or under the sea has no subaerial part. */
+    @Test
+    void theSubaerialRadiusIsBetweenNothingAndTheFoot() {
+        var v = shield(1, 0, 0, 100, 1000, true);
+        var tall = VolcanicZones.build(List.of(v), List.of(), List.of(), VolcanicBiomeRules.DEFAULT, MH, C, null, ground(0, 0, 500));
+        assertEquals(0.45 * 100, zone(tall, Role.CONE).radius(), 1e-9);
+        var drowned = VolcanicZones.build(List.of(v), List.of(), List.of(), VolcanicBiomeRules.DEFAULT, MH, C, null, ground(0, 0, -2));
+        assertEquals(VolcanicZones.MIN_RADIUS, zone(drowned, Role.CONE).radius(), 1e-9);
+        assertTrue(drowned.zones().stream().noneMatch(zn -> zn.role() == Role.LAVA_FIELD));
+    }
+
     @Test
     void theSettingIsReadFromTheBakeNotes() {
         var notes = JsonParser.parseString("{\"bake\": {\"underground\": {\"params\": {\"volcanic_biome_reach\": 1.5}}}}").getAsJsonObject();
