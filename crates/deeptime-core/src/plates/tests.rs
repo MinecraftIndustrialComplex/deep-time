@@ -2604,7 +2604,8 @@ fn the_slab_pull_takes_the_arcs_fronts_along_their_normal() {
                         .unwrap();
                     let per_m = c.pull_n_m * forces::slab_weight(age);
                     let d = lon_deg.to_radians();
-                    want = frame * DVec3::new(1.0 - d.cos(), -d.sin(), 0.0)
+                    want = frame
+                        * DVec3::new(1.0 - d.cos(), -d.sin(), 0.0)
                         * (per_m * c.radius_m * c.radius_m);
                 }
                 row.push((torque, fed));
@@ -2645,7 +2646,10 @@ fn the_slab_pull_takes_the_arcs_fronts_along_their_normal() {
                 );
                 // Fed by the convergence along the normal (cos 20° at the front's ends).
                 let across = fed_on / (50.0 * theta.to_radians().cos());
-                assert!((0.93..1.0).contains(&across), "{name}, {theta} degrees: {across}");
+                assert!(
+                    (0.93..1.0).contains(&across),
+                    "{name}, {theta} degrees: {across}"
+                );
             } else {
                 // Within Bird's 20 degrees of a transform: no front along the box's edge. At its
                 // corners the boundary turns towards plate 2's side, and the normal there (the
@@ -2660,7 +2664,10 @@ fn the_slab_pull_takes_the_arcs_fronts_along_their_normal() {
         }
         // The old law: a slab at a transform, and an oblique front's slab fed faster than the
         // plates converge across it.
-        assert!(got[1][4].1 > 0.0, "{name}: the old law feeds no slab at a transform");
+        assert!(
+            got[1][4].1 > 0.0,
+            "{name}: the old law feeds no slab at a transform"
+        );
         assert!(got[1][1].1 > got[0][1].1, "{name}: {:?}", got);
     }
 }
@@ -2768,8 +2775,13 @@ fn the_reference_plate_on_the_lattice_moves_at_the_speed_scale() {
         let stage = PlatesStage::new(p.clone());
         let env = stage.env(&p.tectonics, 1);
         let k = &p.tectonics;
-        let (mut st, geo, pos, alpha, r) =
-            a_reference_plate(&p, &env, forces::REF_TRENCH_KM, 0.02, k.plate_speed_scale_mm_yr);
+        let (mut st, geo, pos, alpha, r) = a_reference_plate(
+            &p,
+            &env,
+            forces::REF_TRENCH_KM,
+            0.02,
+            k.plate_speed_scale_mm_yr,
+        );
         let torque = forces::slab_torques(&st, &geo, &pos, &env)[1].0;
         let ans = forces::step(&mut st, &geo, &pos, &env, DVec3::Z, 0.0);
         assert!(ans.solved);
@@ -2932,7 +2944,11 @@ fn the_margin_as_the_mix_sees_it(
 /// [`converging_plates`] (an ocean moving north under a continent, head-on, at up to 50 mm/yr on
 /// the y > 0 half of the equator) goes through a resampling with its contact carried (PLT-550),
 /// as the plates step does it; the boundary mix before and after, and the continent's margin
-/// sample by sample ([`the_margin_as_the_mix_sees_it`]).
+/// sample by sample ([`the_margin_as_the_mix_sees_it`]). It shows no dip: the margin stays
+/// ocean-continent through the resampling and a step on, its normals within a few degrees of the
+/// convergence, the contact active. So the records' dip is not the resampling of a head-on margin
+/// itself; what this fixture lacks (obliquity, plates of several groups, a real margin's shape,
+/// other plates nearby) is where to look next.
 #[test]
 fn the_ocean_continent_front_through_a_resampling() {
     let p = preset(20_000, 20.0, "supercontinent", 5);
@@ -2989,8 +3005,19 @@ fn the_ocean_continent_front_through_a_resampling() {
             );
         }
     }
+    // Measured 2026-10-24: 21,715 km before, 22,993 km after and a step on; no margin sample's
+    // normal over 70 degrees off at any stage. The head-on margin holds.
     let oc = dynamics::mix::OCEAN_CONTINENT;
     assert!(before.0[oc].0 > 20, "{:?}", before.0);
+    for (when, (rows, km, _)) in [("after", &after), ("a step on", &on)] {
+        assert!(*km >= 0.9 * before.1, "{when}: {km:.0} km, {:.0} before", before.1);
+        assert!(rows[oc].0 > 20, "{when}: {:?}", rows);
+    }
+    for (when, (rows, _, _)) in [("before", &before), ("after", &after), ("a step on", &on)] {
+        let off: usize = rows.iter().map(|r| r.1).sum();
+        assert_eq!(off, 0, "{when}: margin normals over 70 degrees off: {:?}", rows);
+    }
+    assert!(st.contacts[0].active(env3.step));
 }
 
 /// A subduction zone goes on through a resampling (`tectonics.contact_carry`, PLT-550; plates.md,

@@ -1286,7 +1286,11 @@ fn balance_step(
             None => e.hang.and_then(|(u, dir, len_m)| {
                 let under = plate_of[u as usize];
                 (samples[u as usize].kind != CONTINENTAL)
-                    .then(|| hang_km.get(&(under, p)).map(|&km| (under, u, dir, len_m, km)))
+                    .then(|| {
+                        hang_km
+                            .get(&(under, p))
+                            .map(|&km| (under, u, dir, len_m, km))
+                    })
                     .flatten()
             }),
         };
