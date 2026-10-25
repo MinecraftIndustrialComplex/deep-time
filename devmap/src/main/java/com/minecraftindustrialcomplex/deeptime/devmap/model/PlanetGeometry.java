@@ -2,7 +2,6 @@
 package com.minecraftindustrialcomplex.deeptime.devmap.model;
 
 import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
-import com.minecraftindustrialcomplex.deeptime.worlddata.Projection;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
 import com.minecraftindustrialcomplex.deeptime.wrap.CubeBorder;
 
@@ -20,9 +19,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * {@link WorldProjection} (no projection formulas here): latitude and longitude as the F3 line shows
  * them ({@code net.PlanetDebugLine}), the distance to the seam and the edges, and the poles.
  *
- * <p>The longitude convention follows the F3 line: on a Petroff–Guyou or cube world the
- * simulation's longitude folded to [−180°, 180°); on a Lambert world degrees east of x = 0
- * ({@link Projection#longitudeEastDeg}), which is the simulation's longitude less 180°.
+ * <p>The longitude convention follows the F3 line: the simulation's longitude folded to
+ * [−180°, 180°), on the cube world and on a Lambert-frame test level alike (the playable Lambert and
+ * Petroff–Guyou worlds went with cube plan §7.4, 2026-10-24).
  *
  * <p>On a cube world (docs/plans/cube-world-plan.md G14) the block space is the net's window, 4s
  * by 3s ({@code CubeLayout.window}), of which the six faces are the planet and the rest the void.
@@ -33,16 +32,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class PlanetGeometry {
 
     private PlanetGeometry() {}
-
-    /** Whether the world is the seamless Petroff–Guyou world. */
-    public static boolean petroffGuyou(WorldProjection p) {
-        return p.kind() == WorldProjection.Kind.PETROFF_GUYOU;
-    }
-
-    /** Whether the world is Lambert's cylinder. */
-    static boolean lambert(WorldProjection p) {
-        return p.kind() == WorldProjection.Kind.LAMBERT;
-    }
 
     /** The cube projection of a cube world, or null. */
     public static WorldProjection.Cube cube(WorldProjection p) {
@@ -83,15 +72,13 @@ public final class PlanetGeometry {
 
     /** The F3 longitude of a simulation longitude, degrees in [−180, 180). */
     public static double displayLon(WorldProjection p, double simLonDeg) {
-        double l = !lambert(p) ? simLonDeg : simLonDeg - 180.0;
-        double w = ((l + 180.0) % 360.0 + 360.0) % 360.0 - 180.0;
+        double w = ((simLonDeg + 180.0) % 360.0 + 360.0) % 360.0 - 180.0;
         return w >= 180.0 ? w - 360.0 : w;
     }
 
     /** The simulation longitude, [0, 360), of an F3 longitude. */
     public static double simLon(WorldProjection p, double displayLonDeg) {
-        double l = !lambert(p) ? displayLonDeg : displayLonDeg + 180.0;
-        double w = (l % 360.0 + 360.0) % 360.0;
+        double w = (displayLonDeg % 360.0 + 360.0) % 360.0;
         return w >= 360.0 ? 0.0 : w;
     }
 
@@ -103,12 +90,9 @@ public final class PlanetGeometry {
      * {@link WorldProjection#latLon}: a result whose inverse misses the asked point by more than
      * {@link #FORWARD_TOLERANCE_DEG} is logged as an error (once per session, since the map asks every
      * frame) and still returned, so a broken forward shows in the log without crashing the client
-     * from a render path; {@link #strictBlockOf} throws instead. Until 2026-10-20 Deep Time's Petroff forward went wrong on exact
-     * inputs on the square's diagonals (the world's equator and the meridians λc and λc + 180°, up to
-     * 75 blocks off on the play planet) and at the cone points ((45° N, 236°) came back 616 blocks
-     * along the edge), and this method retried from nudged inputs. The forward now places those
-     * points by coordinates ({@code deeptime_format::petroff}, ledger SCL-083); its worst miss on
-     * exact diagonal inputs is about 4e-7°, the inverse's own rounding. Returns {x, z}, canonical.
+     * from a render path; {@link #strictBlockOf} throws instead. (It was written for the
+     * Petroff–Guyou forward, which until 2026-10-20 went wrong on exact inputs on its square's
+     * diagonals; that world went with cube plan §7.4.) Returns {x, z}, canonical.
      */
     public static double[] blockOf(WorldProjection p, double latDeg, double lonDeg) {
         double[] b = p.blockOf(latDeg, lonDeg);
@@ -150,11 +134,7 @@ public final class PlanetGeometry {
     /** {latitude, F3 longitude} of block (x, z), degrees. */
     public static double[] displayLatLon(WorldProjection p, double x, double z) {
         double[] ll = p.latLon(x, z);
-        // The F3 line's cube branch folds the simulation's longitude as on Petroff–Guyou.
-        if (!lambert(p))
-            return new double[]{ll[0], displayLon(p, ll[1])};
-        // The F3 line's own formula on Lambert (PoleCapCurve.longitudeDeg is longitudeEastDeg).
-        return new double[]{ll[0], Projection.longitudeEastDeg(p.period(), x)};
+        return new double[]{ll[0], displayLon(p, ll[1])};
     }
 
     /** {@code 12.345° N 67.890° E}: the F3 line's text for a latitude and an F3 longitude. */
@@ -176,8 +156,8 @@ public final class PlanetGeometry {
     }
 
     /**
-     * Blocks from (x, z) to the nearer of the world's edges: the z limits of a polar world (the
-     * edges of a Petroff–Guyou world, the poles of a Lambert one), the nearest of a cube's twelve
+     * Blocks from (x, z) to the nearer of the world's edges: the z limits of a Lambert-frame level
+     * (its poles), the nearest of a cube's twelve
      * border segments ({@link CubeBorder#distanceToSegment}).
      */
     public static double edgeDistance(WorldProjection p, double x, double z) {
@@ -270,9 +250,8 @@ public final class PlanetGeometry {
      *
      * @param name   {@code north} or {@code south}
      * @param latDeg +90 or −90
-     * @param images its block points in the domain (two on a Petroff–Guyou world, the same point
-     *               seen from both sides of its edge; one on Lambert, where the pole is the whole line
-     *               z = {@code images[0][1]}; one inside face N or S on a cube)
+     * @param images its block points in the domain (one on Lambert, where the pole is the whole
+     *               line z = {@code images[0][1]}; one inside face N or S on a cube)
      * @param line   true when the pole is a line of constant z (Lambert)
      */
     public record Pole(String name, double latDeg, List<double[]> images, boolean line) {}
@@ -283,18 +262,9 @@ public final class PlanetGeometry {
         for (int s = 1; s >= -1; s -= 2) {
             String name = s > 0 ? "north" : "south";
             double lat = 90.0 * s;
-            double[] c = blockOf(p, lat, 0.0);
-            List<double[]> images = new ArrayList<>(2);
             if (cube(p) != null) {
+                double[] c = blockOf(p, lat, 0.0);
                 out.add(new Pole(name, lat, List.of(new double[]{p.wrapX(c[0]), c[1]}), false));
-            } else if (petroffGuyou(p)) {
-                // On an edge: the half-turn about the edge's midpoint (x, z) -> (−x, z) glues it to its mirror.
-                images.add(new double[]{p.wrapX(c[0]), c[1]});
-                double mx = p.wrapX(-c[0]);
-                if (Math.abs(mx - p.wrapX(c[0])) > 1e-6)
-                    images.add(new double[]{mx, c[1]});
-                images.sort((a, b) -> Double.compare(a[0], b[0]));
-                out.add(new Pole(name, lat, List.copyOf(images), false));
             } else {
                 out.add(new Pole(name, lat, List.of(new double[]{0.0, s > 0 ? p.zMin() : p.zMax()}), true));
             }
@@ -333,22 +303,14 @@ public final class PlanetGeometry {
     }
 
     /**
-     * The cone points: on a Petroff–Guyou world where the gluing of its edges turns the plane
-     * through 180° (the edges' midpoints and corners: (0, ±b/2), (±b, ±b/2)); on a cube its corners'
-     * twelve images ({@link #corners}), where three faces meet in 270°; none on Lambert.
+     * The cone points: a cube's corners at their twelve images ({@link #corners}), where three
+     * faces meet in 270°; none on Lambert.
      */
     public static List<double[]> conePoints(WorldProjection p) {
-        if (cube(p) != null) {
-            List<double[]> out = new ArrayList<>(12);
-            for (Corner k : corners(p))
-                out.add(new double[]{k.x(), k.z()});
-            return out;
-        }
-        if (!petroffGuyou(p))
-            return List.of();
-        double half = p.period() / 2.0;
-        return List.of(new double[]{0.0, p.zMin()}, new double[]{-half, p.zMin()}, new double[]{half, p.zMin()},
-                new double[]{0.0, p.zMax()}, new double[]{-half, p.zMax()}, new double[]{half, p.zMax()});
+        List<double[]> out = new ArrayList<>(12);
+        for (Corner k : corners(p))
+            out.add(new double[]{k.x(), k.z()});
+        return out;
     }
 
     /**

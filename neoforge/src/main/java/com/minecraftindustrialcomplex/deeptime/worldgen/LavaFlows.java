@@ -221,7 +221,7 @@ public final class LavaFlows {
     private final Env env;
     private final int circumference, half;
     private final double zMin, zMax, mH, mV;
-    /** A cube world's net, or null on a polar world (Lambert, Petroff–Guyou). */
+    /** A cube world's net, or null on a Lambert-frame world. */
     private final CubeLayout cube;
     private final boolean keepPaths;
     private final Consumer<String> log;

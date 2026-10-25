@@ -5,12 +5,13 @@
 # Adapted from mic-climate's smoke/install.sh.
 #
 #   tools/smoke/install.sh <standalone|mic|mic-ev|mic-lite|terrablender|ee|ev|ev-client|dh|dh-next>
-#       [--size 16384|32768]      the planet's circumference -> level-type deeptime:planet[_32k] (a
-#                                 Petroff-Guyou world 13,312 / 26,112 blocks round, format 0.5) for a
-#                                 --preset run, deeptime:planet_lambert[_32k] (C itself) for synthetic
-#                                 worlds, test terrains and Lambert presets, deeptime:planet_cube[_32k]
-#                                 (a cube world, period 4s = 15,360 / 29,696 blocks, format 0.7) for a
-#                                 cube preset file (tools/smoke/presets/earthlike_quick_*_cube.json)
+#       [--size 16384|32768]      the planet's circumference -> level-type deeptime:planet_cube[_32k]
+#                                 (the cube world, period 4s = 15,360 / 29,696 blocks, format 0.7; the
+#                                 only world since cube plan §7.4) for a planet, the dev type
+#                                 deeptime:test_planet_lambert[_32k] (the simulation's Lambert frame, C
+#                                 itself; the datapack tools/smoke/datapacks/deeptime-lambert-frame,
+#                                 copied into the world) for synthetic worlds, test terrains and a
+#                                 synthetic preset that says "projection": "lambert"
 #       [--synth <kind>]          write synthetic world data before the first start (P0-09+)
 #       [--strata <kind>]         the synthetic horizons: placeholder (default), every-class (P1-12) or basin
 #       [--datapack <folder>]     copy a datapack folder into the world's datapacks/ (e.g. the MIC
@@ -29,8 +30,8 @@
 #                                 sets compared side by side (Q10: mic vs mic-ev) need the same seed,
 #                                 or vanilla's features, caves and scatter differ between them
 #       [--clean]                 throw the server away first
-#       [--cube]                  with --preset: the cube level type whatever the preset's map (the
-#                                 server bakes a preset of its notional size as a cube; cube plan G12)
+#       [--cube]                  accepted and ignored: every planet is the cube world now (cube plan
+#                                 §7.4; it chose the cube level type while the cube was opt-in, G12)
 #
 # DEEPTIME_PACK=<dir> installs mic/mic-ev from that pack checkout instead of ../../pack (a git
 # checkout with a .git directory: its HEAD, or its working tree with --pack-worktree).
@@ -108,21 +109,17 @@ esac
 # The sets installed from the MIC pack (packwiz-installer); the others are their pin files alone.
 case "$PROFILE" in mic|mic-ev|mic-lite) FROM_PACK=1 ;; *) FROM_PACK=0 ;; esac
 case "$SEED" in ''|-[0-9]*|[0-9]*) ;; *) echo "install.sh: --seed must be a number" >&2; exit 2 ;; esac
-# A planet preset's world is Petroff-Guyou (the default since format 0.5) unless the preset says
-# lambert or cube (a cube world, format 0.7, cube plan phase 2: tools/smoke/presets/*_cube.json);
-# synthetic worlds and test terrains are Lambert. Their level types differ in circumference.
-WORLD=lambert
-if [ -n "$PRESET" ]; then
-    WORLD=petroff_guyou
-    if [ -f "$PRESET" ] && grep -q '"projection": *"lambert"' "$PRESET"; then WORLD=lambert; fi
-    if [ -f "$PRESET" ] && grep -q '"projection": *"cube"' "$PRESET"; then WORLD=cube; fi
-    if [ "$CUBE" = 1 ]; then WORLD=cube; fi
-fi
+# A planet is the cube world (cube plan §7.4, decisions log 2026-10-24: "Cube only"). Synthetic
+# worlds, test terrains and a synthetic preset that says "projection": "lambert" (deposits_world_16k)
+# are laid out in the simulation's Lambert frame, on the dev level types of the repo datapack
+# deeptime-lambert-frame (never shipped). Their level types differ in circumference.
+WORLD=cube
+if [ -z "$PRESET" ] && { [ -n "$SYNTH" ] || [ -n "$TEST_TERRAIN" ]; }; then WORLD=lambert; fi
+if [ -f "$PRESET" ] && grep -q '"projection": *"lambert"' "$PRESET"; then WORLD=lambert; fi
+: "$CUBE"   # --cube: the cube is the only planet now
 case "$SIZE/$WORLD" in
-    16384/petroff_guyou) LEVEL_TYPE='deeptime\:planet' ;;
-    32768/petroff_guyou) LEVEL_TYPE='deeptime\:planet_32k' ;;
-    16384/lambert) LEVEL_TYPE='deeptime\:planet_lambert' ;;
-    32768/lambert) LEVEL_TYPE='deeptime\:planet_lambert_32k' ;;
+    16384/lambert) LEVEL_TYPE='deeptime\:test_planet_lambert' ;;
+    32768/lambert) LEVEL_TYPE='deeptime\:test_planet_lambert_32k' ;;
     16384/cube) LEVEL_TYPE='deeptime\:planet_cube' ;;
     32768/cube) LEVEL_TYPE='deeptime\:planet_cube_32k' ;;
     *) echo "install.sh: --size must be 16384 or 32768" >&2; exit 2 ;;
@@ -414,6 +411,14 @@ if [ -n "$SYNTH" ]; then
     say "writing synthetic world data ($SYNTH, C=$SIZE)"
     rm -rf "$SERVER/planet"
     ( cd "$REPO" && dev cargo run --release -q -p deeptime-cli -- synth --kind "$SYNTH" --strata "$STRATA" --size "$SIZE" --out "$SERVER/planet/deeptime" )
+fi
+if [ "$WORLD" = lambert ]; then
+    # The Lambert-frame level types: a world datapack is enabled at the first start, before
+    # level-type is looked up in the world presets.
+    say "world datapack deeptime-lambert-frame (level-type $(echo "$LEVEL_TYPE" | tr -d '\\'))"
+    mkdir -p "$SERVER/planet/datapacks"
+    rm -rf "$SERVER/planet/datapacks/deeptime-lambert-frame"
+    cp -R "$REPO/tools/smoke/datapacks/deeptime-lambert-frame" "$SERVER/planet/datapacks/deeptime-lambert-frame"
 fi
 if [ -n "$DATAPACK" ]; then
     [ -f "$DATAPACK/pack.mcmeta" ] || { echo "install.sh: --datapack $DATAPACK has no pack.mcmeta" >&2; exit 1; }

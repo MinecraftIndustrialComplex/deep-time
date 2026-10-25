@@ -97,19 +97,22 @@ public final class MagmaProbe {
 
         // What it means for a player: land columns drawn evenly over the playable planet.
         int c = t.circumference();
-        int zMax = (int) Math.abs(com.minecraftindustrialcomplex.deeptime.worlddata.Projection.zOfLatitude(c, com.minecraftindustrialcomplex.deeptime.wrap.PoleCapCurve.DEFAULT_CAP_DEG));   // inside the pole cap's soft line
+        int zMax = (int) t.zHalf();
+        var wp = t.data().projection();
         SplittableRandom rnd = new SplittableRandom(20261001L);
         double[] toLake = new double[POINTS], toVolcano = new double[POINTS], down = new double[POINTS], any = new double[POINTS];
         int n = 0;
         for (int tries = 0; n < POINTS && tries < POINTS * 40; tries++) {
             int x = rnd.nextInt(-c / 2, c / 2), z = rnd.nextInt(-zMax, zMax);
+            if (!onPlanet(wp, x, z))
+                continue;
             double h = t.height(x, z);
             if (h <= sea + 1)
                 continue;
             double lake = Double.POSITIVE_INFINITY, volcano = Double.POSITIVE_INFINITY;
             for (Magma.Body b : magma.bodies()) {
-                if (b.chamberRh() <= 0 || b.submerged() || Math.abs(b.z()) > zMax)
-                    continue;   // no magma, under water, or beyond the pole cap's line
+                if (b.chamberRh() <= 0 || b.submerged())
+                    continue;   // no magma, or under water
                 double d = Math.hypot(magma.dx(x, b), z - b.z());
                 volcano = Math.min(volcano, d);
                 if (b.lake())
@@ -146,5 +149,14 @@ public final class MagmaProbe {
                 s.addProperty((String) q[0], "none");
         }
         return s;
+    }
+
+    /**
+     * Whether column (x, z) is one of the planet's own blocks, not a folded copy of one (a void square
+     * of the cube's net): the projection's canonical point of its centre is the centre itself.
+     */
+    static boolean onPlanet(com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection wp, int x, int z) {
+        double[] q = wp.canonical(x + 0.5, z + 0.5);
+        return q[0] == x + 0.5 && q[1] == z + 0.5;
     }
 }

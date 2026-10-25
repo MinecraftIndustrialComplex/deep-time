@@ -65,12 +65,12 @@ class MapWidget extends AbstractWidget {
         return new int[]{mw, Math.max(1, mw * ah / aw)};
     }
 
-    /** The largest box of the map picture's aspect ({@code Projection.pictureHeight}: π : 1) inside (w, h). */
+    /** The largest box of the map picture's aspect ({@code MapPicture.height}: π : 1) inside (w, h). */
     static int[] fit(int w, int h) {
         int mw = w;
-        while (mw > 1 && com.minecraftindustrialcomplex.deeptime.worlddata.Projection.pictureHeight(mw) > h)
+        while (mw > 1 && com.minecraftindustrialcomplex.deeptime.worlddata.MapPicture.height(mw) > h)
             mw--;
-        return new int[]{mw, com.minecraftindustrialcomplex.deeptime.worlddata.Projection.pictureHeight(mw)};
+        return new int[]{mw, com.minecraftindustrialcomplex.deeptime.worlddata.MapPicture.height(mw)};
     }
 
     @Override
@@ -89,10 +89,10 @@ class MapWidget extends AbstractWidget {
         }
         var font = net.minecraft.client.Minecraft.getInstance().font;
         for (Box b : boxes.get()) {
-            int x0 = x + (int) Math.round(com.minecraftindustrialcomplex.deeptime.worlddata.Projection.pictureXOfLongitude(b.lonWest(), w)),
-                    x1 = x + (int) Math.round(com.minecraftindustrialcomplex.deeptime.worlddata.Projection.pictureXOfLongitude(b.lonEast(), w));
-            int y0 = y + (int) Math.round(com.minecraftindustrialcomplex.deeptime.worlddata.Projection.pictureYOfLatitude(b.latNorth(), h)),
-                    y1 = y + (int) Math.round(com.minecraftindustrialcomplex.deeptime.worlddata.Projection.pictureYOfLatitude(b.latSouth(), h));
+            int x0 = x + (int) Math.round(com.minecraftindustrialcomplex.deeptime.worlddata.MapPicture.xOfLongitude(b.lonWest(), w)),
+                    x1 = x + (int) Math.round(com.minecraftindustrialcomplex.deeptime.worlddata.MapPicture.xOfLongitude(b.lonEast(), w));
+            int y0 = y + (int) Math.round(com.minecraftindustrialcomplex.deeptime.worlddata.MapPicture.yOfLatitude(b.latNorth(), h)),
+                    y1 = y + (int) Math.round(com.minecraftindustrialcomplex.deeptime.worlddata.MapPicture.yOfLatitude(b.latSouth(), h));
             g.fill(x0, y0, x1, y1, b.argb());
             g.renderOutline(x0, y0, x1 - x0, y1 - y0, (b.argb() | 0xff000000));
             if (!b.label().isEmpty() && x1 - x0 > font.width(b.label()) + 2)
@@ -108,8 +108,8 @@ class MapWidget extends AbstractWidget {
             g.fill(cx - r, cy - r, cx + r + 1, cy + r + 1, m.colour());
         }
         if (isHovered()) {
-            double lon = com.minecraftindustrialcomplex.deeptime.worlddata.Projection.pictureLongitudeDeg(mouseX - x, w);
-            double lat = com.minecraftindustrialcomplex.deeptime.worlddata.Projection.pictureLatitudeDeg(mouseY - y, h);
+            double lon = com.minecraftindustrialcomplex.deeptime.worlddata.MapPicture.longitudeDeg(mouseX - x, w);
+            double lat = com.minecraftindustrialcomplex.deeptime.worlddata.MapPicture.latitudeDeg(mouseY - y, h);
             String s = String.format(java.util.Locale.ROOT, "%.1f°%s %.1f°E", Math.abs(lat), lat >= 0 ? "N" : "S", lon);
             g.drawString(font, s, x + 3, y + h - 11, 0xffffffff, true);
         }

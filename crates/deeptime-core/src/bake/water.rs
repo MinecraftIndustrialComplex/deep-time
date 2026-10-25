@@ -31,9 +31,8 @@
 //!   chains that leave it (`from` in the river file). The raise goes into `elevation` itself (on
 //!   its own grid, each L3 cell of a plain cell at least the plain's height), `detail/amplitude`
 //!   is zeroed there (a plain is flat), and the layer [`DELTA_LAYER`] keeps what was added, so a
-//!   re-run takes it off first and starts from the history's ground. On a Lambert world the
-//!   horizon stacks' tops are raised over the plains here; a projected world's pass does that for
-//!   every cell.
+//!   re-run takes it off first and starts from the history's ground. The projection pass raises
+//!   the horizon stacks' tops over every cell of the world afterwards.
 //! - **Floodplains** (V1 gap 5, stage 2; HYD-150 to HYD-152). With `hydro.floodplains` the last
 //!   network run also finds the floodplains (GFPLAIN: the cells draining to a river cell whose
 //!   ground lies at most the flood depth h = 0.01 A^0.30 m over that cell's), and the bake lays each
@@ -52,7 +51,7 @@
 //!   run (which then also runs when there are fans and no delta plain): the second network drains
 //!   the cones, finds no floodplain on them, and the raise goes into `elevation` (the cone at each
 //!   L3 cell), `detail/amplitude` is zeroed there, the layer [`FAN_LAYER`] keeps what was added (a
-//!   re-run takes it off), and a Lambert world's stacks are raised, as for the delta plains.
+//!   re-run takes it off).
 //! - **Braids** (V1 gap 5, stage 4; HYD-171 to HYD-175; [`hydro::braid`]). With `hydro.braids`,
 //!   after the meanders, a reach on a fan, or on the floodplain and steeper than the braided line,
 //!   divides around islands into two threads: the river file only (each island's second thread a
@@ -152,8 +151,8 @@ pub const FAN_LAYER: &str = "fan";
 
 /// Whether the folder being drained is in the simulation's Lambert frame, so lengths on it go
 /// through the Lambert metric: a fresh bake's manifest has no layout block yet (the session writes
-/// it when the bake ends), and a baked Lambert folder that `deeptime hydro` drains again has one
-/// of kind `lambert`. Testing only for a missing block measured a re-run in the grid's blocks.
+/// it when the bake ends), and a synthetic world's folder that `deeptime hydro` drains again has
+/// one of kind `lambert`. Testing only for a missing block measured a re-run in the grid's blocks.
 pub(crate) fn lambert_frame(m: &deeptime_format::Manifest) -> bool {
     m.projection
         .as_ref()
@@ -237,10 +236,8 @@ fn take_off_floodplains(out: &mut Out<'_>) -> Result<(), CoreError> {
 /// Sets `elevation` (grid `l3`) to the floodplains' level (on the hydrology's grid, `halvings` times
 /// coarser; [`network::Output::floodplain`]): each L3 cell of a plain cell takes the plain's
 /// height (HYD-151). Writes what that moved as [`FLOODPLAIN_LAYER`], zeroes `detail/amplitude` on
-/// the plain (it is flat), and on a Lambert world raises the horizon stacks' tops over the cells it
-/// raised (a lowered cell's stack is cut by the ground, as erosion cuts it). Returns the record.
+/// the plain (it is flat). Returns the record.
 fn lay_floodplains(
-    p: &PlanetPreset,
     out: &mut Out<'_>,
     l3: &GridDesc,
     hydro_grid: &GridDesc,
@@ -319,37 +316,6 @@ fn lay_floodplains(
         }
     }
 
-    // The horizon stacks' tops over the raised cells (a Lambert world; see `lay_plains`).
-    let (mut stack_cells, mut stack_max) = (0u64, 0.0);
-    if raised > 0
-        && p.scale.projection == ProjectionKind::Lambert
-        && let Some(st) = out.m.layer("strata/horizons").cloned()
-    {
-        const MASK: i16 = i16::MIN;
-        let mut masked = el;
-        masked.desc.nodata = Some(f64::from(MASK));
-        for (b, &m) in masked.bytes.as_chunks_mut::<2>().0.iter_mut().zip(&moved) {
-            if m == network::NODATA || m <= 0 {
-                *b = MASK.to_le_bytes();
-            }
-        }
-        let mut stack = crate::bake::load_layer(&out.dir.join(&st.path))?;
-        let (n, max, _) = super::project::raise_world_tops(
-            &stack.desc,
-            &mut stack.bytes,
-            &masked,
-            None,
-            p.scale.min_y,
-            p.scale.max_y,
-            false,
-        );
-        stack_cells = n;
-        stack_max = max;
-        if n > 0 {
-            out.layer_bytes(stack.desc, &stack.bytes)?;
-            tally_once(out, "strata/horizons");
-        }
-    }
     Ok(json!({
         "l3_cells": cells,
         "raised_cells": raised,
@@ -357,8 +323,6 @@ fn lay_floodplains(
         "max_raise_blocks": f64::from(max_up) / 16.0,
         "max_lowering_blocks": f64::from(max_down) / 16.0,
         "amplitude_zeroed": amplitude_zeroed,
-        "stack_raised_cells": stack_cells,
-        "stack_max_raise_blocks": stack_max,
     }))
 }
 
@@ -368,17 +332,12 @@ struct Laid {
     cells: u64,
     max_blocks: f64,
     amplitude_zeroed: u64,
-    /// The horizon stacks raised over the plains (a Lambert world), and the largest raise, blocks.
-    stack_cells: u64,
-    stack_max_blocks: f64,
 }
 
 /// Raises `elevation` (grid `l3`) to the plains (on the hydrology's grid, `halvings` times
 /// coarser): each L3 cell of a plain cell is at least the plain's height. Writes the raise as
-/// [`DELTA_LAYER`], zeroes `detail/amplitude` on the raised cells, and on a Lambert world raises
-/// the horizon stacks' tops over them (`project::raise_world_tops`, the bake's top rule).
+/// [`DELTA_LAYER`] and zeroes `detail/amplitude` on the raised cells.
 fn lay_plains(
-    p: &PlanetPreset,
     out: &mut Out<'_>,
     l3: &GridDesc,
     hydro_grid: &GridDesc,
@@ -422,8 +381,6 @@ fn lay_plains(
         cells,
         max_blocks: f64::from(max_raw) / 16.0,
         amplitude_zeroed: 0,
-        stack_cells: 0,
-        stack_max_blocks: 0.0,
     };
     out.layer_bytes(el.desc.clone(), &el.bytes)?;
     tally_once(out, "elevation");
@@ -449,47 +406,14 @@ fn lay_plains(
         }
     }
 
-    // The horizon stacks' tops over the plains: a projected world's pass raises every cell's;
-    // a Lambert world is played from these stacks, so they are raised here, over the plain cells
-    // alone (the elevation elsewhere masked as nodata).
-    if p.scale.projection == ProjectionKind::Lambert
-        && let Some(st) = out.m.layer("strata/horizons").cloned()
-    {
-        const MASK: i16 = i16::MIN;
-        let mut masked = el;
-        masked.desc.nodata = Some(f64::from(MASK));
-        for (b, &r) in masked.bytes.as_chunks_mut::<2>().0.iter_mut().zip(&raise) {
-            if r == 0 {
-                *b = MASK.to_le_bytes();
-            }
-        }
-        let mut stack = crate::bake::load_layer(&out.dir.join(&st.path))?;
-        let (n, max, _) = super::project::raise_world_tops(
-            &stack.desc,
-            &mut stack.bytes,
-            &masked,
-            None,
-            p.scale.min_y,
-            p.scale.max_y,
-            false,
-        );
-        laid.stack_cells = n;
-        laid.stack_max_blocks = max;
-        if n > 0 {
-            out.layer_bytes(stack.desc, &stack.bytes)?;
-            tally_once(out, "strata/horizons");
-        }
-    }
     Ok(laid)
 }
 
 /// Raises `elevation` (grid `l3`) to the fans' cones (their cells on the hydrology's grid,
 /// `halvings` times coarser; the cone evaluated at each L3 cell, so a fan is round on the planet
 /// at L3's spacing too). Writes the raise as [`FAN_LAYER`], zeroes `detail/amplitude` on the
-/// raised cells (the cone is the fan's surface), and on a Lambert world raises the horizon stacks'
-/// tops over them, as [`lay_plains`] does. Returns the record.
+/// raised cells (the cone is the fan's surface). Returns the record.
 fn lay_fans(
-    p: &PlanetPreset,
     out: &mut Out<'_>,
     l3: &GridDesc,
     hydro_grid: &GridDesc,
@@ -583,42 +507,10 @@ fn lay_fans(
         }
     }
 
-    let (mut stack_cells, mut stack_max) = (0u64, 0.0);
-    if cells > 0
-        && p.scale.projection == ProjectionKind::Lambert
-        && let Some(st) = out.m.layer("strata/horizons").cloned()
-    {
-        const MASK: i16 = i16::MIN;
-        let mut masked = el;
-        masked.desc.nodata = Some(f64::from(MASK));
-        for (b, &r) in masked.bytes.as_chunks_mut::<2>().0.iter_mut().zip(&raise) {
-            if r == 0 {
-                *b = MASK.to_le_bytes();
-            }
-        }
-        let mut stack = crate::bake::load_layer(&out.dir.join(&st.path))?;
-        let (n, max, _) = super::project::raise_world_tops(
-            &stack.desc,
-            &mut stack.bytes,
-            &masked,
-            None,
-            p.scale.min_y,
-            p.scale.max_y,
-            false,
-        );
-        stack_cells = n;
-        stack_max = max;
-        if n > 0 {
-            out.layer_bytes(stack.desc, &stack.bytes)?;
-            tally_once(out, "strata/horizons");
-        }
-    }
     Ok(json!({
         "raised_cells": cells,
         "max_raise_blocks": f64::from(max_raw) / 16.0,
         "amplitude_zeroed": amplitude_zeroed,
-        "stack_raised_cells": stack_cells,
-        "stack_max_raise_blocks": stack_max,
     }))
 }
 
@@ -889,18 +781,17 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
         let laid = if plains.plains.is_empty() {
             None
         } else {
-            Some(lay_plains(p, out, &l3, &grid, halvings, &plains)?)
+            Some(lay_plains(out, &l3, &grid, halvings, &plains)?)
         };
         let fan_laid = if fans.fans.is_empty() {
             None
         } else {
-            Some(lay_fans(p, out, &l3, &grid, halvings, &fans)?)
+            Some(lay_fans(out, &l3, &grid, halvings, &fans)?)
         };
         (second, splits, laid, fan_laid)
     };
     let flood_laid = if params.floodplains && !result.floodplain.is_empty() {
         Some(lay_floodplains(
-            p,
             out,
             &l3,
             &grid,
@@ -984,8 +875,6 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
             d["raised_cells"] = json!(l.cells);
             d["max_raise_blocks"] = json!(l.max_blocks);
             d["amplitude_zeroed"] = json!(l.amplitude_zeroed);
-            d["stack_raised_cells"] = json!(l.stack_cells);
-            d["stack_max_raise_blocks"] = json!(l.stack_max_blocks);
         }
         stats["deltas"] = d;
     }

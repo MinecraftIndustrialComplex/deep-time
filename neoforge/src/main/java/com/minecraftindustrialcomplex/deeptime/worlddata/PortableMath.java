@@ -2,9 +2,9 @@
 package com.minecraftindustrialcomplex.deeptime.worlddata;
 
 /**
- * Trigonometry that gives the <b>same bits</b> in Rust, Java and JS: the seamless world's projection
- * ({@link Petroff}, {@link PetroffGuyou}) runs on it in all three, so the bake, the game and the
- * workbench agree on every block's latitude and longitude bit for bit. The twin of
+ * Trigonometry that gives the <b>same bits</b> in Rust, Java and JS: the cube world's projection
+ * ({@link CubeWorld}) runs on it in all three, so the bake, the game and the workbench agree on every
+ * block's latitude and longitude bit for bit. The twin of
  * {@code deeptime_format::portable_math} (whose documentation gives the method) and of the pages'
  * {@code DTMath}: IEEE double {@code + − × /}, {@link Math#sqrt} (correctly rounded) and comparisons
  * only, in the same order. Java never fuses {@code a·b + c} on its own (strict floating point since

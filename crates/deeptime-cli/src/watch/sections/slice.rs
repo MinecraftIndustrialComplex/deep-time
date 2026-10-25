@@ -4,8 +4,8 @@
 //! Pixel (px, py) of a w × h map is what a keyframe pixel is: centred on longitude 360°·px/w (the
 //! seam is 0°) and on the row the projection gives py (`Projection::picture_z`: Lambert, sin φ =
 //! 1 − 2·py/h), i.e. block x = −C/2 + C·px/w, z = −R + 2R·py/h,
-//! so the picture sits under the workbench's map exactly. On a Petroff–Guyou world (format 0.5) the
-//! map is the world itself, 2 : 1: z = −b/2 + b·py/h with C = 2b. The depth is below the terrain's top
+//! so the picture sits under the workbench's map exactly. On a cube world (format 0.7) the map is
+//! the net's window, 4 : 3. The depth is below the terrain's top
 //! block there (⌈H⌉ − 1, the evaluator's `top_y`), H the generated terrain height; `Floor` is the
 //! lowest block of the world.
 
@@ -68,23 +68,17 @@ pub fn pixel_block(
     let x = -c / 2 + c * i64::from(px) / i64::from(w);
     let z = match wp {
         WorldProjection::Lambert(p) => p.picture_z(f64::from(py), h).floor() as i64,
-        WorldProjection::PetroffGuyou(g) => {
-            let b = g.hemisphere() as f64;
-            (-b / 2.0 + b * f64::from(py) / f64::from(h.max(1))).floor() as i64
-        }
         WorldProjection::Cube(_) => unreachable!(),
     };
     (x, z)
 }
 
-/// The height of a whole-world map `w` pixels wide: π : 1 on Lambert, 2 : 1 on Petroff–Guyou,
-/// 4 : 3 on a cube's window.
+/// The height of a whole-world map `w` pixels wide: π : 1 on Lambert, 4 : 3 on a cube's window.
 pub fn picture_height(wp: &deeptime_format::projection::WorldProjection, w: u32) -> u32 {
     match wp {
         deeptime_format::projection::WorldProjection::Lambert(_) => {
             deeptime_format::Projection::picture_height(w)
         }
-        deeptime_format::projection::WorldProjection::PetroffGuyou(_) => (w / 2).max(1),
         deeptime_format::projection::WorldProjection::Cube(_) => (3 * w / 4).max(1),
     }
 }
@@ -166,12 +160,19 @@ mod tests {
         assert_eq!(pixel_block(&l, 16384, 1024, 326, 0, 0), (-8192, -2608));
         assert_eq!(pixel_block(&l, 16384, 1024, 326, 512, 163), (0, 0));
         assert_eq!(pixel_block(&l, 16384, 1024, 326, 1023, 325), (8176, 2591));
-        let g = deeptime_format::projection::WorldProjection::PetroffGuyou(
-            deeptime_format::projection::PetroffGuyou::new(6656, 0.0),
+        // A cube's map is its net's window, 4 : 3 from (−3s/2, −3s/2).
+        let map = deeptime_format::cube_map::CubeMap::builtin_static(
+            deeptime_format::cube_map::WORLD_MAP,
+        )
+        .unwrap();
+        let g = deeptime_format::projection::WorldProjection::cube(
+            1024,
+            map,
+            deeptime_format::cube::CubeTurn::from_angles(0.0, 0.0, 0.0),
         );
-        assert_eq!(picture_height(&g, 1024), 512);
-        assert_eq!(pixel_block(&g, 13312, 1024, 512, 0, 0), (-6656, -3328));
-        assert_eq!(pixel_block(&g, 13312, 1024, 512, 512, 256), (0, 0));
+        assert_eq!(picture_height(&g, 1024), 768);
+        assert_eq!(pixel_block(&g, 4096, 1024, 768, 0, 0), (-1536, -1536));
+        assert_eq!(pixel_block(&g, 4096, 1024, 768, 384, 512), (0, 512));
     }
 
     #[test]

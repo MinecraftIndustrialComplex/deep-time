@@ -323,7 +323,7 @@ final class ShotDriver {
     /** The readout against Deep Time's own F3 line, and the distances, logged. */
     private static void checkReadout(MapContext c, Minecraft mc) {
         double x = mc.player.getX(), z = mc.player.getZ();
-        String f3 = PlanetDebugLine.format(c.info(), x, z, 0f);
+        String f3 = PlanetDebugLine.format(c.info(), x, z);
         double[] ll = PlanetGeometry.displayLatLon(c.projection(), x, z);
         String mine = PlanetGeometry.formatLatLon(ll[0], ll[1]);
         log("{}: F3 line '{}'", placeName(), f3);
@@ -369,9 +369,6 @@ final class ShotDriver {
             double sx = g[3] + h[0] * g[2], sy = g[4] - h[1] * g[2];
             double[] b = screen.blockAt(sx, sy);
             double d = b == null ? Double.NaN : Math.hypot(PlanetGeometry.wrapCentred(p, b[0] - want[0]), b[1] - want[1]);
-            // Mirror images on the Petroff-Guyou edge are the same point.
-            if (b != null && d > 0.5 && PlanetGeometry.petroffGuyou(p))
-                d = Math.min(d, Math.hypot(p.wrapX(b[0] + want[0]), b[1] - want[1]));
             log("{}: globe marker (turned {}°) at screen {} {} reads back block {} (player {} {}): {} blocks off",
                     placeName(), turn, sx, sy, b == null ? "none" : String.format(Locale.ROOT, "%.3f %.3f", b[0], b[1]),
                     want[0], want[1], d);

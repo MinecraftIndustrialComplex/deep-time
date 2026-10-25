@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -82,32 +83,29 @@ class ServerConfigTest {
         assertEquals("writing world data · total 100% · 1h02m elapsed · native 0.0/4.0 GiB",
                 FirstStartGenerator.progressLine(done, List.of(), 4L << 30));
         assertEquals("0 Ma", FirstStartGenerator.ma(0));
-        assertEquals("deeptime:planet_32k", FirstStartGenerator.levelTypeFor(26_112, "petroff_guyou"));
-        assertEquals("deeptime:planet", FirstStartGenerator.levelTypeFor(13_312, "petroff_guyou"));
-        assertEquals("deeptime:planet_lambert_32k", FirstStartGenerator.levelTypeFor(32_768, "lambert"));
-        assertEquals("13,312-block Petroff–Guyou world", FirstStartGenerator.describe(13_312, "petroff_guyou"));
-        // A cube world's x period is 4s (cube plan phase 2, G1): s = 3,840 at 16k, 7,424 at 32k.
+        // A cube world's x period is 4s (cube plan phase 2, G1): s = 3,840 at 16k, 7,424 at 32k. The
+        // cube types are the only Deep Time world types (cube plan section 7.4).
         assertEquals("deeptime:planet_cube", FirstStartGenerator.levelTypeFor(15_360, "cube"));
         assertEquals("deeptime:planet_cube_32k", FirstStartGenerator.levelTypeFor(29_696, "cube"));
+        // A synthetic Lambert-frame preset runs on the dev level types of the test resources.
+        assertEquals("deeptime:test_planet_lambert", FirstStartGenerator.levelTypeFor(16_384, "lambert"));
         assertEquals("15,360-block cube world", FirstStartGenerator.describe(15_360, "cube"));
+        assertEquals("16,384-block Lambert-frame world", FirstStartGenerator.describe(16_384, "lambert"));
         assertTrue(ServerConfig.template().contains("deeptime:planet_cube"));
+        assertFalse(ServerConfig.template().contains("planet_lambert"), "no Lambert level type any more");
     }
 
     @Test
     void aCubeLevelTypeTakesEveryBuiltInOfItsSize() {
-        // Cube plan G12: the level type chooses the map, so a cube level type bakes the built-ins of
-        // its notional size as cubes; the other level types take only presets of their own map.
+        // Every planet is the cube world (decisions log 2026-10-24, "Cube only"): a level type takes the
+        // built-ins of its size.
         assertEquals("earthlike_quick_16k, earthlike_full_16k", FirstStartGenerator.presetsFor(15_360, "cube"));
         assertEquals("earthlike_quick_32k, earthlike_full_32k", FirstStartGenerator.presetsFor(29_696, "cube"));
-        assertEquals("earthlike_quick_16k, earthlike_full_16k", FirstStartGenerator.presetsFor(13_312, "petroff_guyou"));
-        assertEquals("no built-in preset has that size", FirstStartGenerator.presetsFor(16_384, "lambert"));
+        assertEquals("no built-in preset has that size", FirstStartGenerator.presetsFor(16_384, "cube"));
         for (String n : Presets.BUILTIN) {
-            var p = Presets.parseObject(Presets.builtin(n).orElseThrow());
-            var cube = Presets.info(Presets.withProjection(p, "cube"));
-            assertEquals("cube", cube.projection(), n);
-            assertEquals(Presets.info(p).circumference(), cube.circumference(), n);
-            assertEquals(n.endsWith("32k") ? 29_696 : 15_360, cube.worldCircumference().getAsInt(), n);
-            assertEquals("petroff_guyou", Presets.info(p).projection(), n + ": the copy leaves the built-in alone");
+            var info = Presets.info(Presets.parseObject(Presets.builtin(n).orElseThrow()));
+            assertEquals("cube", info.projection(), n);
+            assertEquals(n.endsWith("32k") ? 29_696 : 15_360, info.worldCircumference().getAsInt(), n);
         }
     }
 }

@@ -9,12 +9,14 @@ cube's geometry and maps, `SCL-078` to `SCL-081` and `SCL-100` to `SCL-108`, des
 
 ## What you see in the world
 
-A run that asks for it (`--set scale.projection=cube`) is written as a cube world, format 0.7: the
-planet drawn on the six faces of a cube, laid out as a cross in the world (four faces in a band that
-wraps east to west, one above and one below the second). The simulation is the same as for any
-other world; only the last step, which turns the simulation's grid into the world the game plays,
-differs. The game does not play a cube world yet (the plan's phase 2); the default is still the
-Petroff-Guyou world, unchanged to the byte.
+Every planet is written as a cube world, format 0.7: the planet drawn on the six faces of a cube,
+laid out as a cross in the world (four faces in a band that wraps east to west, one above and one
+below the second). The simulation is the same as for any other world; only the last step, which
+turns the simulation's grid into the world the game plays, differs. (When this page was written,
+in phase 1, a run asked for it with `--set scale.projection=cube` and the default was the
+Petroff-Guyou world. Since cube plan §7.4, 2026-10-24, Ben's "Cube only (Recommended)" in the
+decisions log, the cube is the only world a planet bakes to and the game plays; the Petroff-Guyou
+world the measurements below compare against is deleted.)
 
 The map is conformal, so shapes are kept: a round lake is round on every face, and a mountain range
 keeps its proportions. It gives up area instead: a block in the middle of a face covers about 1.3
@@ -46,7 +48,7 @@ The pass runs after the Lambert bake, on the finished world folder, and rewrites
    Jacobian, the turn and the Lambert grid's metric say how many simulation cells the world cell
    spans along each of its two principal axes. Where it spans more than one, a Gaussian of the
    remaining width averages the simulation along that axis; where it spans less, the bilinear
-   read alone. This takes the place of the Petroff-Guyou pass's polar widening (SCL-090): near the
+   read alone. This takes the place of the Petroff-Guyou pass's polar widening (SCL-090, retired with that world): near the
    Lambert grid's poles the footprint follows the grid's stretch exactly instead of by a rule of
    thumb. Categories (rock, biome classes) take the nearest cell.
 3. **The topology** (SCL-122). The passes that look at neighbours (the closed basins, the open sea,
@@ -66,8 +68,8 @@ The pass runs after the Lambert bake, on the finished world folder, and rewrites
 5. **Rivers, bodies and points** (SCL-126 to SCL-128, SCL-130). Positions go through the inverse
    map, sizes and directions through the Jacobian. A deposit body's ellipse is the exact image of
    its planet ellipse under the Jacobian at its centre (its semi-axes the map's singular values),
-   so it keeps its planet area where the map shears; the Petroff-Guyou pass stretches each axis
-   alone (SCL-091), which grows a sheared body. A river that crosses a turning seam is cut on it into
+   so it keeps its planet area where the map shears; the Petroff-Guyou pass stretched each axis
+   alone (SCL-091), which grew a sheared body. A river that crosses a turning seam is cut on it into
    two chains: the upstream one ends on the seam with mouth code 3 (`seam`) into the downstream
    one, which starts at the same planet point on the partner edge. River widths are divided by the
    local scale, so a river is as many metres wide everywhere; depths are kept. Structure windows
@@ -265,7 +267,8 @@ and iron hold 3 of 3 (Petroff-Guyou 2 of 2), with 7 guaranteed sites.
 jag on 529,535 and 505,100 L3 cells, cliff bands on 145,204 and 128,578, mean change 0.95 and
 1.01 blocks. 4k: 3 and 3 cones gullied, 8 gullies each.
 
-**Coexistence.** With `scale.projection` unset the bake writes the Petroff-Guyou world of format
+**Coexistence (phase 1; gone since cube plan §7.4 deleted the Petroff-Guyou world, 2026-10-24).**
+With `scale.projection` unset the bake writes the Petroff-Guyou world of format
 0.6 exactly as master does: `tools/review/projection-identity.sh` on master (8485aaf6) and on the
 branch gives the same hashes for all 385 files of every bake and staged world but two of the
 viewer's: `report.js` differs between two runs of one binary, and `bundle.js` holds its build time

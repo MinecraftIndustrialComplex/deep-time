@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
-// The pages' twin of the seamless world's projection (crates/deeptime-viewer/assets/projection.js:
-// DTMath, DTPetroff, DTPetroffGuyou) against the Rust original, bit for bit: every output in
+// The pages' twin of the world's projection (crates/deeptime-viewer/assets/projection.js: DTMath
+// and the cube world) against the Rust original, bit for bit: every output in
 // crates/deeptime-format/tests/data/projection_parity.json (written by deeptime-format's
 // `parity_fixture` test) must come out with the same bits. Run on the test VM (nothing heavy on the
 // laptop):
@@ -39,47 +39,9 @@ for (const [k, r] of fixture.math.entries()) {
   same(`math[${k}].asin`, M.asin(u), r.asin);
   same(`math[${k}].acos`, M.acos(u), r.acos);
 }
-const pet = new globalThis.DTPetroff();
-for (const [k, r] of fixture.petroff.entries()) {
-  const [l, p] = pet.inverse(f(r.x), f(r.y));
-  same(`petroff[${k}].lambda`, l, r.lambda);
-  same(`petroff[${k}].phi`, p, r.phi);
-  const [x, y] = pet.forward(f(r.lam_in), f(r.phi_in));
-  same(`petroff[${k}].x_out`, x, r.x_out);
-  same(`petroff[${k}].y_out`, y, r.y_out);
-}
-for (const w of fixture.worlds) {
-  const g = new globalThis.DTPetroffGuyou(w.b, f(w.lambda_c_deg));
-  for (const [k, r] of w.points.entries()) {
-    const x = f(r.x), z = f(r.z);
-    const v = g.unit(x, z);
-    for (let i = 0; i < 3; i++) same(`b ${w.b} points[${k}].v[${i}]`, v[i], r.v[i]);
-    const [lat, lon] = g.latLon(x, z);
-    same(`b ${w.b} points[${k}].lat`, lat, r.lat);
-    same(`b ${w.b} points[${k}].lon`, lon, r.lon);
-  }
-  for (const [k, r] of w.inverse.entries()) {
-    const [x, z] = g.blockOf(f(r.lat), f(r.lon));
-    same(`b ${w.b} inverse[${k}].x`, x, r.x);
-    same(`b ${w.b} inverse[${k}].z`, z, r.z);
-  }
-  // Exact inputs on the forward's degenerate lines (ledger: SCL-083).
-  if (!w.exact || w.exact.length < 400) {
-    console.error(`b ${w.b}: the fixture has no exact rows`); process.exit(1);
-  }
-  for (const [k, r] of w.exact.entries()) {
-    const [x, z] = g.blockOf(f(r.lat), f(r.lon));
-    same(`b ${w.b} exact[${k}].x`, x, r.x);
-    same(`b ${w.b} exact[${k}].z`, z, r.z);
-  }
-}
-// The world object a manifest's layout block builds, and the Lambert fallback.
-const world = globalThis.DTProj.world({ kind: 'petroff_guyou', hemisphere_blocks: 6656, lambda_c_deg: 31.25 }, 13312);
-if (!world.isPetroff || world.period !== 13312 || world.zRange[1] !== 3328) {
-  console.error('DTProj.world does not build the Petroff–Guyou world'); process.exit(1);
-}
+// The world object a manifest without a layout block builds: the Lambert cylinder.
 const lam = globalThis.DTProj.world(null, 16384);
-if (lam.isPetroff || Math.abs(lam.latLon(0, -lam.radius)[0] - 90) > 1e-9) {
+if (lam.kind !== 'lambert' || Math.abs(lam.latLon(0, -lam.radius)[0] - 90) > 1e-9) {
   console.error('DTProj.world(null) is not the Lambert cylinder'); process.exit(1);
 }
 
@@ -507,7 +469,7 @@ for (const s of SIDES_UNDER_TEST) {
 // inverts by its transpose; reflections are refused.
 {
   const polar = CubeTurn.polar(30.0);
-  const c = polar.toCube(globalThis.DTPetroffGuyou ? [Math.cos(Math.PI / 6), Math.sin(Math.PI / 6), 0.0] : [1, 0, 0]);
+  const c = polar.toCube([Math.cos(Math.PI / 6), Math.sin(Math.PI / 6), 0.0]);
   need('polar turn: (0, 30) at F0\'s centre', Math.abs(c[0] - 1) < 1e-15 && Math.abs(c[1]) < 1e-15 && Math.abs(c[2]) < 1e-15);
   eqs('polar turn: the pole at N\'s centre', polar.toCube([0.0, 0.0, 1.0]), [0, 0, 1]);
   let threw = false;
