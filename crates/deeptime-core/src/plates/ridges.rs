@@ -86,9 +86,9 @@ pub const ACCRETIONARY_SUBDUCTED: f64 = 0.83;
 /// Sediment subduction by margin type (`sediment_subduction_sourced`, PLT-660): the share of the
 /// incoming sedimentary pile `pile_m` (the subducted floor's sediment and sedimentary rock, m)
 /// that goes down with the slab at a convergence of `convergence_mm_yr` (the overriding side's
-/// `Sample::convergence_mm_yr`: the plates' whole relative speed at the front, the component
-/// normal to it only with `DEEPTIME_ARC_NORMAL=1`, PLT-312; Clift & Vannucchi's rate is the
-/// orthogonal one, so an oblique margin reads faster here). An accretionary margin (a pile over
+/// `subduction::orthogonal_convergence_mm_yr`: the component of the plates' relative motion
+/// normal to the front, PLT-312, whatever `DEEPTIME_ARC_NORMAL` sets for the arcs, since Clift &
+/// Vannucchi's 76 mm/yr is an orthogonal rate). An accretionary margin (a pile over
 /// 1 km and convergence under 76 mm/yr) subducts 0.83 of it (Clift & Vannucchi 2004); any other
 /// margin is erosive and subducts all of it (Clift & Vannucchi 2004; von Huene & Scholl 1991's
 /// type 2 margins, where "effectively all incoming sediment is subducted"). The rule does not ask
@@ -140,8 +140,26 @@ fn interpolate(src: &[Sample], c: &Cover, rot: DQuat) -> Sample {
         .filter(|&k| corners[k].kind == s.kind)
         .map(|k| w[k])
         .sum();
+    // The corners of the sample's own class, the kind and, on continental crust, whether it is
+    // hyper-extended (under 10 km of its own crystalline crust, Brune et al. 2014), and their
+    // weight; the major corner is one of them, so the weight is never 0. A blend over a class is
+    // a convex mean of columns on one side of the 10 km line, and stays on that side. Blending a
+    // converted margin's columns (PLT-661: an ocean basement under a thin continental crust) with
+    // the core's put 10 km or more of the core's crust into them at a resampling: they stopped
+    // being hyper-extended, became the taper's continental side, and the ring beyond them turned
+    // at the next step, so the margin moved out at every resampling (the ratchet, arm
+    // m5-margins). The rule holds with the switches off: an old arc's thin continental crust
+    // stays apart from the thick crust beside it too (ledger: PLT-663).
+    let hyper = super::transition::hyper_extended(&src[m as usize]);
+    let same_class = |x: &Sample| {
+        x.kind == s.kind && (s.kind != CONTINENTAL || super::transition::hyper_extended(x) == hyper)
+    };
+    let class_w: f64 = (0..3)
+        .filter(|&k| same_class(corners[k]))
+        .map(|k| w[k])
+        .sum();
     // The crust's own rock belongs to its kind: the rock pools are blended over the corners of
-    // the sample's kind only, the loose sediment (which drapes across a margin) over all three.
+    // the sample's class only, the loose sediment (which drapes across a margin) over all three.
     // Blending them all made every resampling put a share of a continent's granite, gneiss and
     // platform cover into the ocean crust beside it. On ocean crust the felsic and metamorphic
     // pools are not blended at all but stay the nearest corner's, as its kind does: they are
@@ -157,25 +175,25 @@ fn interpolate(src: &[Sample], c: &Cover, rot: DQuat) -> Sample {
     for p in 0..pool::COUNT {
         s.pools[p] = if local(p) {
             src[m as usize].pools[p]
-        } else if p == pool::SEDIMENT || same_kind <= 0.0 {
+        } else if p == pool::SEDIMENT || class_w <= 0.0 {
             lerp(&|x| x.pools[p])
         } else {
             ((0..3)
-                .filter(|&k| corners[k].kind == s.kind)
+                .filter(|&k| same_class(corners[k]))
                 .map(|k| w[k] * f64::from(corners[k].pools[p]))
                 .sum::<f64>()
-                / same_kind) as f32
+                / class_w) as f32
         };
     }
     s.arc_continental_m = lerp(&|x| x.arc_continental_m);
     s.arc_oceanic_m = lerp(&|x| x.arc_oceanic_m);
     // A basement is the continental crust's own (ocean floor's is 0), blended as its pools are.
-    s.basement_m = if s.kind == CONTINENTAL && same_kind > 0.0 {
+    s.basement_m = if s.kind == CONTINENTAL && class_w > 0.0 {
         ((0..3)
-            .filter(|&k| corners[k].kind == s.kind)
+            .filter(|&k| same_class(corners[k]))
             .map(|k| w[k] * f64::from(corners[k].basement()))
             .sum::<f64>()
-            / same_kind) as f32
+            / class_w) as f32
     } else {
         0.0
     };
@@ -789,7 +807,7 @@ pub fn resample(
                                         + u.pools[pool::SEDIMENTARY].max(0.0);
                                     sediment_subducted_share(
                                         f64::from(pile),
-                                        f64::from(s.convergence_mm_yr),
+                                        super::subduction::orthogonal_convergence_mm_yr(&s),
                                     ) as f32
                                 } else {
                                     sediment_share

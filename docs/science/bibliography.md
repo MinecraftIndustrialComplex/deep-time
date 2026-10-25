@@ -6756,7 +6756,7 @@ not open is listed under "Not read". Bradley 2008 (above) was read in full in th
 - Reference: Brune, S., Heine, C., Pérez-Gussinyé, M. and Sobolev, S. V. (2014). Rift migration explains continental margin asymmetry and crustal hyper-extension. Nature Communications 5:4014.
 - DOI or URL: 10.1038/ncomms5014
 - Cited as: "Brune et al. 2014" (hyper-extended crust up to 200 km wide).
-- Ledger ids: PLT-261, PLT-262; PLT-661 and PLT-662 (2026-10-25, the M5 lane: the margin's sediment and the spread's rock continental, the 10 km of hyper-extended crust)
+- Ledger ids: PLT-261, PLT-262; PLT-661 and PLT-662 (2026-10-25, the M5 lane: the margin's sediment and the spread's rock continental, the 10 km of hyper-extended crust); PLT-663 (2026-10-25: the resampling blends continental crust within its class at the same 10 km)
 - Access: open access.
 - Read so far (by the project): full text, 2026-10-04: "up to 200 km wide areas of hyper-extended continental crust"; "hyper-extended (with a thickness <10 km) crustal slivers that vary in widths between 70 km offshore Iberia and 200 km off Angola".
 
