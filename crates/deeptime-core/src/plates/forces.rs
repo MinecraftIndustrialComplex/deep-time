@@ -10,7 +10,8 @@
 //! # The balance
 //! Mantle flow is viscous, so a plate has no inertia: the torques on it sum to zero (Forsyth &
 //! Uyeda 1975). With Ω_p each plate's angular velocity, every resisting force here is linear in
-//! the velocities, so the balance is one linear system over all plates,
+//! the velocities (the plastic ones linearised about this step's motion, below), so the balance
+//! is one linear system over all plates,
 //!
 //! ```text
 //!     M Ω = T,
@@ -37,10 +38,11 @@
 //!   thickness factor ([`slab_weight`]), `L` the contact's tracked slab length and `D`
 //!   `slab_depth_km`. Continental crust in the trench pulls nothing.
 //! - **Slab suction** (drives the overriding plate, towards the trench): `slab_suction_share` of
-//!   that pull. With `suction_saturates` (PLT-540) it is a traction towards the flow the sinking
-//!   slab drives, `k (v_t − u)`: `u` the overriding plate's speed towards the trench, `v_t` the
-//!   slab's terminal velocity (its pull over its slab resistance, Forsyth & Uyeda 1975), `k v_t`
-//!   the share of the pull. At rest it is the share; it falls to nothing as the plate catches up
+//!   that pull (Forsyth & Uyeda's 0.50 / 6.43 with `forsyth_uyeda_balance`, whatever the
+//!   speed). With `suction_saturates` (PLT-540) and without that it is a traction towards the
+//!   flow the sinking slab drives, `k (v_t − u)`: `u` the overriding plate's speed towards the
+//!   trench, `v_t` the slab's terminal velocity (its pull over its slab resistance, Forsyth &
+//!   Uyeda 1975), `k v_t` the share of the pull. At rest it is the share; it falls to nothing as the plate catches up
 //!   with the slab, so no overriding plate is drawn faster than the slab sinks.
 //! - **Edge energy** (ridge push and the weight of high ground): at every boundary sample of a
 //!   plate, `(U(edge) − Ū) · edge_energy / EDGE_ENERGY_PHYSICAL` per metre, pushing the plate
@@ -49,14 +51,26 @@
 //!   gives no torque, so only the differences matter; `Ū` keeps the sum's discretisation small.
 //!   At a collision front the belt's weight acts as the collision resistance instead (below).
 //! - **Basal drag** (resists): per m², `c_b (v − v_flow)`, `keel_drag` times more under
-//!   continental crust. `c_b` is set by `plate_speed_scale_mm_yr` (see [`Coeffs::new`]).
+//!   continental crust. `c_b` is set by `plate_speed_scale_mm_yr` (see [`Coeffs::new`]); with
+//!   `forsyth_uyeda_balance` (PLT-585, off by default) it and every other resistance's size are
+//!   Forsyth & Uyeda's (1975, Table 6) against the reference pull, the continental factor theirs
+//!   too, and the speed scale is not read.
 //! - **Mantle flow** (drives, weakly): the drag of a slow degree-2 flow ([`flow_velocity`]) of
 //!   peak `mantle_flow_mm_yr`, away from two antipodal upwellings: a stand-in for the
 //!   convection the model does not have (Ben, 2026-10-02: weak mantle flow as a setting).
 //! - **Slab resistance** (resists): per metre of trench, against the subducting plate's speed
 //!   towards the trench (Forsyth & Uyeda's resistance to a slab's sinking).
-//! - **Boundary resistance** (resists): per metre of any plate boundary, against the relative
-//!   velocity of the two plates (across and along), half from each side.
+//! - **Boundary resistance** (resists; only without `forsyth_uyeda_balance`): per metre of any
+//!   plate boundary, against the relative velocity of the two plates (across and along), half
+//!   from each side.
+//! - **Transform and colliding resistance** (resist; with `forsyth_uyeda_balance`): Forsyth &
+//!   Uyeda's friction, a force per metre whatever the speed, against the plates' relative motion,
+//!   on both alike ([`Balance::add_friction`]): the transform resistance where the boundary's
+//!   relative motion lies more than their 60 degrees from its normal ([`fu_transform`]), the
+//!   colliding resistance where the plates converge across it otherwise (trenches and collision
+//!   fronts both, as theirs), nothing at a ridge. A front's is counted once, at the front over
+//!   its metres as the pull and the suction are; the rest of the boundary from both sides, half
+//!   each. Linearised as the collision's resistance is (below).
 //! - **Collision resistance** (resists): along a collision front (continental crust at the
 //!   subducting side), against the convergence, with the force of the belt's edge energy
 //!   `max(0, U(belt) − U(incoming))` plus the buoyancy of the continental crust the collision has
@@ -155,6 +169,32 @@ pub const COLLISION_FLOOR_MM_YR: f64 = 1.0; // ledger: FRC-011
 pub const CONTINENT_BUOYANCY_RATIO: f64 = 0.09 / 0.04; // ledger: FRC-028
 /// … for the crust thickness of that figure, km (thicker crust is more buoyant, in proportion).
 pub const CONTINENT_BUOYANCY_CRUST_KM: f64 = 30.0; // ledger: FRC-029
+/// Forsyth & Uyeda 1975, Table 6 (p. 190; their model X_s): the forces' relative strengths, one
+/// scale for all. Per km of boundary: the slab pull, the suction, the transform resistance and
+/// the colliding resistance (velocity-independent; the last two against the relative motion,
+/// pp. 169-170); per km of trench per cm/yr of the plate's speed towards it: the slab resistance;
+/// per km² per cm/yr of the plate's speed over the mantle: the mantle drag and the continental
+/// drag beyond it. ledger: FRC-033
+pub const FU_SLAB_PULL: f64 = 6.43;
+pub const FU_SUCTION: f64 = 0.50; // ledger: FRC-033
+pub const FU_TRANSFORM: f64 = 0.36; // ledger: FRC-033
+pub const FU_COLLIDING: f64 = 0.16; // ledger: FRC-033
+pub const FU_SLAB_RESISTANCE: f64 = 0.89; // ledger: FRC-033
+pub const FU_MANTLE_DRAG: f64 = 0.82e-5; // ledger: FRC-033
+pub const FU_CONTINENTAL_DRAG: f64 = 5.65e-5; // ledger: FRC-033
+/// Forsyth & Uyeda's dividing line between a convergent boundary and a transform fault, the
+/// rule their strengths were fitted with (1975, p. 183): a boundary segment whose relative
+/// motion lies more than this from the boundary's normal (φ = tan⁻¹(V_PAR / V_PER)) is a
+/// transform, so within 30 degrees of strike-slip, where V1 gap 2's boundary types take Bird's
+/// 20 (PLT-311). ledger: FRC-035
+pub const FU_TRANSFORM_PHI_DEG: f64 = 60.0;
+
+/// Whether a boundary segment is a transform fault for Forsyth & Uyeda's resistances: the
+/// relative motion `rel` more than [`FU_TRANSFORM_PHI_DEG`] from the boundary's normal `normal`
+/// (a unit vector; either sense). No motion is no transform. ledger: FRC-035
+pub fn fu_transform(rel: DVec3, normal: DVec3) -> bool {
+    rel.dot(normal).abs() < FU_TRANSFORM_PHI_DEG.to_radians().cos() * rel.length()
+}
 /// Torques are recorded in this unit, N m.
 pub const TORQUE_UNIT_N_M: f64 = 1.0e24;
 
@@ -241,7 +281,8 @@ pub struct Coeffs {
     /// Slab pull per metre of trench of the reference slab, N/m (with `slab_pull` and gravity).
     pub pull_n_m: f64,
     pub suction_share: f64,
-    /// The suction saturates at the slab's terminal velocity (`suction_saturates`, PLT-540).
+    /// The suction saturates at the slab's terminal velocity (`suction_saturates`, PLT-540; never
+    /// with `forsyth_uyeda_balance`, whose suction does not depend on speed).
     pub suction_saturates: bool,
     /// The edge energy's multiplier (`edge_energy / EDGE_ENERGY_PHYSICAL`).
     pub edge_scale: f64,
@@ -253,6 +294,12 @@ pub struct Coeffs {
     /// Slab resistance per metre of trench and boundary resistance per metre of boundary, N s/m².
     pub slab_res: f64,
     pub boundary_res: f64,
+    /// The transform and colliding resistances, N per metre of boundary (friction:
+    /// [`Balance::add_friction`]; 0 without `forsyth_uyeda_balance`), and the speed their links
+    /// and the collision's divide by at least, mm/yr.
+    pub transform_n_m: f64,
+    pub colliding_n_m: f64,
+    pub floor_mm_yr: f64,
     /// Slab length that pulls in full, km.
     pub slab_depth_km: f64,
     /// The mantle flow's peak speed, m/s, and its axis.
@@ -274,6 +321,14 @@ impl Coeffs {
     /// `(1 + slab_resistance + boundary_resistance) c_b A v = F_sp L` with `v` the speed scale
     /// (`slab_resistance` and `boundary_resistance` are multiples of `c_b A` per reference trench
     /// and per the reference plate's perimeter `2 √(π A)`).
+    ///
+    /// With `forsyth_uyeda_balance` (PLT-585) none of those settings is read: the resistances are
+    /// Forsyth & Uyeda's (1975, Table 6) against the same reference pull. The slab resistance per
+    /// metre of trench is the pull over their slab's terminal velocity, `F_SP / F_SR` (7.2 cm/yr;
+    /// their text quotes 7.0 for the ratio of the drags, p. 189); the basal drag, the continental
+    /// drag beyond it, the suction and the two friction resistances are their shares of it; and
+    /// there is no viscous boundary resistance. The plates' speeds are then what these forces
+    /// give, with no speed scale.
     pub fn new(
         k: &TectonicParams,
         norm: &Norm,
@@ -290,21 +345,53 @@ impl Coeffs {
         let area = a0_km2.max(1.0) * 1.0e6;
         let trench = REF_TRENCH_KM * 1000.0;
         let perimeter = 2.0 * (std::f64::consts::PI * area).sqrt();
-        let v = k.plate_speed_scale_mm_yr * 1.0e-3 / YEAR_S;
-        let drag = f_ref * trench / ((1.0 + k.slab_resistance + k.boundary_resistance) * area * v); // ledger: FRC-016
+        let (drag, keel, slab_res, boundary_res, suction_share, transform_n_m, colliding_n_m) =
+            if k.forsyth_uyeda_balance {
+                // ledger: FRC-034 (the slab's terminal velocity, m/s: F_SP / F_SR in cm/yr)
+                let v_t = FU_SLAB_PULL / FU_SLAB_RESISTANCE * 1.0e-2 / YEAR_S;
+                let slab_res = f_ref / v_t; // ledger: FRC-034
+                // F_DF per km² against F_SR per km of trench, both per cm/yr: per m², 1e-3 of it.
+                let drag = slab_res * FU_MANTLE_DRAG / FU_SLAB_RESISTANCE * 1.0e-3; // ledger: FRC-034
+                let keel = (FU_MANTLE_DRAG + FU_CONTINENTAL_DRAG) / FU_MANTLE_DRAG; // ledger: FRC-034
+                (
+                    drag,
+                    keel,
+                    slab_res,
+                    0.0,
+                    FU_SUCTION / FU_SLAB_PULL,           // ledger: FRC-034
+                    f_ref * FU_TRANSFORM / FU_SLAB_PULL, // ledger: FRC-034, FRC-035
+                    f_ref * FU_COLLIDING / FU_SLAB_PULL, // ledger: FRC-034, FRC-035
+                )
+            } else {
+                let v = k.plate_speed_scale_mm_yr * 1.0e-3 / YEAR_S;
+                let drag =
+                    f_ref * trench / ((1.0 + k.slab_resistance + k.boundary_resistance) * area * v); // ledger: FRC-016
+                (
+                    drag,
+                    k.keel_drag,
+                    k.slab_resistance * drag * area / trench, // ledger: FRC-017
+                    k.boundary_resistance * drag * area / perimeter, // ledger: FRC-017
+                    k.slab_suction_share,
+                    0.0,
+                    0.0,
+                )
+            };
         Coeffs {
             radius_m,
             sample_m2,
             spacing_m,
             pull_n_m: f_ref * k.slab_pull,
-            suction_share: k.slab_suction_share,
-            suction_saturates: k.suction_saturates,
+            suction_share,
+            suction_saturates: k.suction_saturates && !k.forsyth_uyeda_balance, // ledger: PLT-540, PLT-585
             edge_scale: k.edge_energy / EDGE_ENERGY_PHYSICAL,
             buoyancy: k.collision_buoyancy,
             drag,
-            keel: k.keel_drag,
-            slab_res: k.slab_resistance * drag * area / trench, // ledger: FRC-017
-            boundary_res: k.boundary_resistance * drag * area / perimeter, // ledger: FRC-017
+            keel,
+            slab_res,
+            boundary_res,
+            transform_n_m,
+            colliding_n_m,
+            floor_mm_yr: COLLISION_FLOOR_MM_YR.min(k.weld_speed_mm_yr), // ledger: FRC-011
             slab_depth_km: k.slab_depth_km,
             flow_m_s: k.mantle_flow_mm_yr * 1.0e-3 / YEAR_S,
             flow_axis,
@@ -344,6 +431,9 @@ pub enum Resist {
     Collision,
     /// The saturating suction's speed-dependent part (booked with the suction, PLT-540).
     Suction,
+    /// The transform and colliding resistances' friction (booked with the boundary resistance,
+    /// PLT-585).
+    Friction,
 }
 
 /// The mantle as the other side of a link.
@@ -510,6 +600,29 @@ impl Balance {
         }
     }
 
+    /// A friction of `force_n` (N) between plates `a` and `b` at the boundary point `x`, against
+    /// their relative motion: Forsyth & Uyeda's transform and colliding resistances, "independent
+    /// of velocity and parallel to the relative motion between the plates", on both plates alike
+    /// (1975, pp. 169-170). Plastic, as the collision's resistance (design §3.4): in the linear
+    /// solve a link against the whole relative velocity whose coefficient is the force over this
+    /// step's relative speed `rel_mm_yr`, bounded below by `floor_mm_yr`, so where the plates
+    /// keep their relative motion it resists with the force itself, and a boundary the drive
+    /// cannot move against it slips at no more than the floor. ledger: FRC-035
+    pub fn add_friction(&mut self, a: u32, b: u32, x: DVec3, force_n: f64, rel_mm_yr: f64) {
+        if force_n <= 0.0 || self.c.floor_mm_yr <= 0.0 {
+            return;
+        }
+        let speed = rel_mm_yr.max(self.c.floor_mm_yr) * 1.0e-3 / YEAR_S; // ledger: FRC-011
+        self.add_link(Link {
+            a,
+            b,
+            x,
+            n: None,
+            k: force_n / speed, // ledger: FRC-035
+            term: Resist::Friction,
+        });
+    }
+
     /// Plates in the system: those with visible samples.
     fn index(&self) -> (Vec<usize>, Vec<Option<usize>>) {
         let mut idx = vec![None; self.acc.len()];
@@ -624,7 +737,7 @@ impl Balance {
                 let p = p as usize;
                 match l.term {
                     Resist::Slab => t_slab[p] += t,
-                    Resist::Boundary => t_bnd[p] += t,
+                    Resist::Boundary | Resist::Friction => t_bnd[p] += t,
                     Resist::Collision => t_col[p] += t,
                     Resist::Suction => t_sat[p] += t,
                 }
@@ -738,6 +851,11 @@ struct Edge {
     out: DVec3,
     others: [u32; 6],
     n_others: u8,
+    /// With `forsyth_uyeda_balance` (PLT-585), each other plate's friction at this sample: the
+    /// force, N (the transform's or the colliding resistance times the front's metres at the
+    /// front this sample overrides; elsewhere times half the sample's share of the boundary, the
+    /// other half from the other side), and the plates' relative speed, mm/yr.
+    friction: [(f64, f64); 6],
     /// The front this sample overrides.
     front: Option<SlabFront>,
     /// A neighbour of a plate whose slab hangs under this sample's plate (a slab with no front
@@ -1009,6 +1127,8 @@ fn balance_step(
         .collect();
     // The length of boundary one boundary sample stands for, m (`Coeffs::spacing_m`).
     let ell = norm.km(norm.spacing_rad()) * 1000.0;
+    let c = Coeffs::new(k, &norm, env.gravity, st.a0_km2, flow, sea_m);
+    let friction = c.transform_n_m > 0.0 || c.colliding_n_m > 0.0;
 
     // The boundary, sample by sample (the tests of `subduction::fronts_and_uplift`).
     let edges: Vec<Edge> = (0..n)
@@ -1027,12 +1147,15 @@ fn balance_step(
                 out: DVec3::ZERO,
                 others: [u32::MAX; 6],
                 n_others: 0,
+                friction: [(0.0, 0.0); 6],
                 front: None,
                 hang: None,
                 incoming: false,
             };
             let mut any = false;
             let mut best = 0.0;
+            // The other plates with a visible sample beside this one, by slot.
+            let mut seen = 0u8;
             for (u, _) in geo.edges(v as u32) {
                 let su = &samples[u as usize];
                 let pu = plate_of[u as usize];
@@ -1046,11 +1169,22 @@ fn balance_step(
                 if own_slab {
                     continue;
                 }
-                if !e.others[..usize::from(e.n_others)].contains(&pu)
-                    && usize::from(e.n_others) < e.others.len()
+                let slot = match e.others[..usize::from(e.n_others)]
+                    .iter()
+                    .position(|&q| q == pu)
                 {
-                    e.others[usize::from(e.n_others)] = pu;
-                    e.n_others += 1;
+                    Some(i) => Some(i),
+                    None if usize::from(e.n_others) < e.others.len() => {
+                        e.others[usize::from(e.n_others)] = pu;
+                        e.n_others += 1;
+                        Some(usize::from(e.n_others) - 1)
+                    }
+                    None => None,
+                };
+                if let Some(i) = slot
+                    && !su.is_hidden()
+                {
+                    seen |= 1 << i;
                 }
                 if e.hang.is_none() && !su.is_hidden() && hanging.contains(&(pu, pv)) {
                     e.hang = Some((u, dir, ell));
@@ -1116,6 +1250,57 @@ fn balance_step(
                     );
                     (u, normal, norm.km(share) * 1000.0)
                 });
+            }
+            // Forsyth & Uyeda's transform and colliding resistances (PLT-585), by their own
+            // dividing rule, the one their strengths were fitted with (`fu_transform`): a
+            // transform where the relative motion lies more than 60 degrees from the boundary's
+            // normal, a colliding boundary where the plates converge across it otherwise, nothing
+            // where they part (a ridge's resistance is not in their model). A trench's is counted
+            // once, where its pull and suction are: at the front this sample overrides, over the
+            // front's metres, against the plate going under (whose own samples beside the trench
+            // have gone under it and see no other plate). Every other stretch of boundary with a
+            // visible plate beyond it counts from both sides, half of its share each (PLT-530),
+            // by its own normal (PLT-310), except the side going under in an active contact,
+            // which its front counts.
+            if friction {
+                let front_q = e.front.map(|f| plate_of[f.u as usize]);
+                if let Some(f) = e.front
+                    && let Some(q) = front_q
+                    && let Some(i) = e.others[..usize::from(e.n_others)]
+                        .iter()
+                        .position(|&o| o == q)
+                {
+                    let rel = norm.velocity_mm_yr(omega[q as usize] - omega[pv as usize], x);
+                    let per_m = if fu_transform(rel, f.normal) {
+                        c.transform_n_m
+                    } else {
+                        c.colliding_n_m
+                    };
+                    e.friction[i] = (per_m * f.len_m, rel.length()); // ledger: FRC-035
+                }
+                for i in 0..usize::from(e.n_others) {
+                    let q = e.others[i];
+                    if seen & (1 << i) == 0 || Some(q) == front_q || active.contains_key(&(pv, q)) {
+                        continue;
+                    }
+                    let normal =
+                        shortening::boundary_normal(geo, pos, &rots, samples, &plate_of, v, q);
+                    let rel = norm.velocity_mm_yr(omega[q as usize] - omega[pv as usize], x);
+                    let per_m = if fu_transform(rel, normal) {
+                        c.transform_n_m
+                    } else if rel.dot(normal) < 0.0 {
+                        c.colliding_n_m
+                    } else {
+                        0.0
+                    };
+                    if per_m > 0.0 {
+                        let share = shortening::front_share_rad(
+                            geo, pos, &rots, samples, &plate_of, v, q, normal,
+                        );
+                        let len_m = norm.km(share) * 1000.0;
+                        e.friction[i] = (per_m * len_m * 0.5, rel.length()); // ledger: FRC-035
+                    }
+                }
             }
             any.then_some(e)
         })
@@ -1183,8 +1368,6 @@ fn balance_step(
     *slabs = by_key.into_values().collect();
 
     // The system.
-    let a0 = st.a0_km2;
-    let c = Coeffs::new(k, &norm, env.gravity, a0, flow, sea_m);
     let centroids: Vec<DVec3> = st
         .plates
         .iter()
@@ -1232,7 +1415,7 @@ fn balance_step(
     let mut slab_front_km = [0.0_f64; 3];
     // The collision drag's convergence floor (design §3.4 linearises with the weld speed; it sits
     // under it, so a held collision stalls).
-    let floor = COLLISION_FLOOR_MM_YR.min(k.weld_speed_mm_yr); // ledger: FRC-011
+    let floor = c.floor_mm_yr; // ledger: FRC-011
     let mut collision_n: BTreeMap<usize, f64> = BTreeMap::new();
     for e in &edges {
         let v = e.v as usize;
@@ -1340,15 +1523,20 @@ fn balance_step(
             }
         }
         let m = usize::from(e.n_others);
-        for &q in &e.others[..m] {
-            bal.add_link(Link {
-                a: p,
-                b: q,
-                x,
-                n: None,
-                k: c.boundary_res * ell * 0.5 / m as f64,
-                term: Resist::Boundary,
-            });
+        if c.boundary_res > 0.0 {
+            for &q in &e.others[..m] {
+                bal.add_link(Link {
+                    a: p,
+                    b: q,
+                    x,
+                    n: None,
+                    k: c.boundary_res * ell * 0.5 / m as f64,
+                    term: Resist::Boundary,
+                });
+            }
+        }
+        for (&q, &(force, rel)) in e.others[..m].iter().zip(&e.friction) {
+            bal.add_friction(p, q, x, force, rel);
         }
     }
 
@@ -1451,6 +1639,343 @@ mod tests {
         }
     }
 
+    /// Forsyth & Uyeda's balance (PLT-585, off by default), for its own tests.
+    fn fu() -> TectonicParams {
+        TectonicParams {
+            forsyth_uyeda_balance: true,
+            ..quiet()
+        }
+    }
+
+    /// The old law, for its own tests: the speed scale and the viscous resistances (the
+    /// 2026-10-02 calibration, FRC-016), the suction saturating (PLT-540).
+    fn old_law() -> TectonicParams {
+        TectonicParams {
+            forsyth_uyeda_balance: false,
+            suction_saturates: true,
+            ..quiet()
+        }
+    }
+
+    /// The reference plate of FRC-016: a cap of the 14 starting plates' mean area (its area, m²,
+    /// its samples and its rim).
+    #[allow(clippy::type_complexity)]
+    fn reference_cap(c: &Coeffs) -> (f64, Vec<DVec3>, Vec<(DVec3, DVec3)>) {
+        let area = 4.0 * std::f64::consts::PI * c.radius_m.powi(2) / 14.0;
+        let r_deg = (1.0 - area / (2.0 * std::f64::consts::PI * c.radius_m.powi(2)))
+            .acos()
+            .to_degrees();
+        let (pts, rim) = cap(c, r_deg);
+        (area, pts, rim)
+    }
+
+    /// `base` (plate 0 and everything but friction) solved with friction against the mantle at
+    /// the rim points `(x, outward normal, length m)`, classified as the balance step does: by
+    /// Forsyth & Uyeda's rule on the plate's motion against the boundary's normal, a transform, a
+    /// colliding boundary or, where the plate pulls away, nothing. The friction is linearised
+    /// about the last answer until the answer stops changing: the fixed point the plates' motion
+    /// relaxes to. The rotation (rad/s), the last system and the solves it took.
+    fn plastic(base: &Balance, rim: &[(DVec3, DVec3, f64)]) -> (DVec3, Balance, usize) {
+        let c = base.c;
+        let mut w = base.solve().expect("solvable")[0];
+        for it in 1..=200 {
+            let mut bal = base.clone();
+            for &(x, out, len) in rim {
+                // The mantle side's motion relative to the plate, mm/yr.
+                let rel = -(w.cross(x) * c.radius_m * 1.0e3 * YEAR_S);
+                let per_m = if fu_transform(rel, out) {
+                    c.transform_n_m
+                } else if rel.dot(out) < 0.0 {
+                    c.colliding_n_m
+                } else {
+                    0.0
+                };
+                bal.add_friction(0, MANTLE, x, per_m * len, rel.length());
+            }
+            let next = bal.solve().expect("solvable")[0];
+            let change = (next - w).length() / next.length().max(1.0e-30);
+            w = next;
+            if change < 1.0e-10 {
+                return (w, bal, it);
+            }
+        }
+        panic!("the friction found no fixed point");
+    }
+
+    /// With `forsyth_uyeda_balance` (PLT-585) the resistances are Forsyth & Uyeda's (1975, Table
+    /// 6) against the reference pull, whatever the old law's settings: the slab's terminal
+    /// velocity F_SP / F_SR (7.2 cm/yr; "the terminal velocity computed to be 7.0 cm/yr", p. 189),
+    /// the drag under continents "approximately eight times" the oceanic (ibid.), the suction and
+    /// the two frictions their shares of the pull, no viscous boundary resistance; on FRC-016's
+    /// reference plate the slab resistance is 8.9 times the basal drag.
+    #[test]
+    fn the_resistances_are_forsyth_and_uyedas_table_6() {
+        let k = fu();
+        let c = coeffs(&k);
+        // One switch: the saturating suction (PLT-540, on by default) is not read with it.
+        assert!(k.suction_saturates && !c.suction_saturates);
+        let v_t = c.pull_n_m / c.slab_res * 1.0e3 * YEAR_S;
+        assert!(
+            (v_t / (FU_SLAB_PULL / FU_SLAB_RESISTANCE * 10.0) - 1.0).abs() < 1e-12,
+            "{v_t}"
+        );
+        assert!(
+            (v_t / 70.0 - 1.0).abs() < 0.05,
+            "the paper's 7.0 cm/yr: {v_t}"
+        );
+        assert!((7.5..8.5).contains(&c.keel), "{}", c.keel);
+        assert!((c.suction_share - 0.50 / 6.43).abs() < 1e-12);
+        assert_eq!(c.boundary_res, 0.0);
+        assert!((c.transform_n_m / c.pull_n_m - 0.36 / 6.43).abs() < 1e-12);
+        assert!((c.colliding_n_m / c.pull_n_m - 0.16 / 6.43).abs() < 1e-12);
+        // Per km of trench against per km² of base, both per cm/yr: 0.89 against 0.82e-5.
+        let ratio = c.slab_res / (c.drag * 1.0e3);
+        assert!((ratio / (0.89 / 0.82e-5) - 1.0).abs() < 1e-12, "{ratio}");
+        let area = 4.0 * std::f64::consts::PI * c.radius_m.powi(2) / 14.0;
+        let s = c.slab_res * REF_TRENCH_KM * 1000.0 / (c.drag * area);
+        assert!((8.8..9.1).contains(&s), "{s}");
+        // None of the old law's settings is read.
+        let other = coeffs(&TectonicParams {
+            plate_speed_scale_mm_yr: 90.0,
+            slab_resistance: 10.0,
+            boundary_resistance: 7.0,
+            keel_drag: 1.0,
+            slab_suction_share: 0.9,
+            ..fu()
+        });
+        assert_eq!(
+            (other.drag, other.keel, other.slab_res, other.boundary_res),
+            (c.drag, c.keel, c.slab_res, c.boundary_res)
+        );
+        assert_eq!(
+            (
+                other.suction_share,
+                other.transform_n_m,
+                other.colliding_n_m
+            ),
+            (c.suction_share, c.transform_n_m, c.colliding_n_m)
+        );
+        // The old law has no friction.
+        let old = coeffs(&old_law());
+        assert_eq!((old.transform_n_m, old.colliding_n_m), (0.0, 0.0));
+        assert!(old.boundary_res > 0.0 && old.suction_share == 0.3);
+    }
+
+    /// FRC-016's reference plate (the starting plates' mean area, 3,000 km of trench of a
+    /// full-length 80-Myr slab, its neighbours at rest) under Forsyth & Uyeda's forces moves near
+    /// its slab's terminal velocity, as their oceanic plates attached to a slab do ("roughly
+    /// coincident with the average velocity of oceanic plates attached to a slab", p. 189): the
+    /// basal drag takes 1 / (1 + 8.9) of it, 65 mm/yr, and the friction on its transforms and its
+    /// colliding front (the trench's own included) about a sixth more (56 mm/yr).
+    /// At the fixed point the friction is a force whatever the speed: the same plate with fixed
+    /// forces in its place has the same answer.
+    #[test]
+    fn the_reference_plate_moves_near_its_slabs_terminal_velocity() {
+        let c = coeffs(&fu());
+        let (area, pts, rim) = reference_cap(&c);
+        let mut base = Balance::new(c, &[DVec3::Z]);
+        for &x in &pts {
+            base.add_area(0, x, false);
+        }
+        let trench_m = REF_TRENCH_KM * 1000.0;
+        let mut rim_sorted = rim.clone();
+        rim_sorted.sort_by(|a, b| b.0.x.total_cmp(&a.0.x));
+        let mut len = 0.0;
+        for &(x, _) in &rim_sorted {
+            if len >= trench_m {
+                break;
+            }
+            let f = tangent(x, DVec3::X).normalize();
+            base.add_force(0, x, f * c.pull_n_m * c.spacing_m, Drive::SlabPull);
+            base.add_link(Link {
+                a: 0,
+                b: MANTLE,
+                x,
+                n: Some(f),
+                k: c.slab_res * c.spacing_m,
+                term: Resist::Slab,
+            });
+            len += c.spacing_m;
+        }
+        let v_t = c.pull_n_m / c.slab_res * 1.0e3 * YEAR_S;
+        let s = c.slab_res * len / (c.drag * area);
+        let speed = |w: DVec3| w.cross(DVec3::Z).length() * c.radius_m * 1.0e3 * YEAR_S;
+        let free = speed(base.solve().unwrap()[0]);
+        let expect = v_t * s / (1.0 + s);
+        assert!(
+            (free / expect - 1.0).abs() < 0.05,
+            "{free} against {expect}"
+        );
+        // Friction all round the rim.
+        let rim_m =
+            2.0 * std::f64::consts::PI * c.radius_m * rim[0].0.z.acos().sin() / rim.len() as f64;
+        let rim3: Vec<_> = rim.iter().map(|&(x, out)| (x, out, rim_m)).collect();
+        let (w, bal, its) = plastic(&base, &rim3);
+        let v = speed(w);
+        eprintln!(
+            "the reference plate: v_t {v_t:.1}, s {s:.2}, frictionless {free:.1} ({expect:.1} \
+             flat), with friction {v:.1} mm/yr after {its} solves"
+        );
+        assert!((0.75..0.95).contains(&(v / free)), "{v} against {free}");
+        assert!(v > 0.7 * v_t, "{v}");
+        // Each link resists with its force: the friction as fixed forces against the motion, the
+        // transform's or the colliding resistance times the length, gives the same answer.
+        let mut fixed = base.clone();
+        let (mut transform, mut colliding) = (0, 0);
+        for &(x, out, len) in &rim3 {
+            let dv = w.cross(x) * c.radius_m * 1.0e3 * YEAR_S;
+            assert!(dv.length() > c.floor_mm_yr, "{dv}");
+            let per_m = if fu_transform(-dv, out) {
+                transform += 1;
+                c.transform_n_m
+            } else if dv.dot(out) > 0.0 {
+                colliding += 1;
+                c.colliding_n_m
+            } else {
+                0.0
+            };
+            fixed.add_force(0, x, -dv.normalize() * (per_m * len), Drive::Edge);
+        }
+        let links = bal.links.iter().filter(|l| l.term == Resist::Friction);
+        assert_eq!(links.count(), transform + colliding);
+        // Forsyth & Uyeda's 60 degrees: on a flat plate 120 degrees of the rim are transforms
+        // and 120 the colliding front; on the cap the rim's motion leans towards its normal (84
+        // and 103 of the rim's samples).
+        let share = transform as f64 / (transform + colliding) as f64;
+        assert!((share - 84.0 / 187.0).abs() < 0.03, "{share}");
+        let wf = fixed.solve().unwrap()[0];
+        assert!((wf - w).length() < 1e-6 * w.length(), "{wf} {w}");
+        // The budget books the friction with the boundary resistance.
+        let ans = bal.answers(&[w])[0].unwrap();
+        assert!(
+            ans.boundary_resistance > 0.0 && ans.residual < 1e-6,
+            "{ans:?}"
+        );
+    }
+
+    /// Friction is plastic (FRC-035): a drive that outweighs it moves the plate as a fixed force
+    /// against the motion would, and one that does not leaves the boundary slipping under the
+    /// floor speed.
+    #[test]
+    fn friction_resists_with_its_force_whatever_the_speed() {
+        let c = coeffs(&fu());
+        let (pts, _) = cap(&c, 25.0);
+        let x0 = on_sphere(0.0, 65.0);
+        let dir = tangent(x0, DVec3::X).normalize();
+        let pull = c.pull_n_m * 1.0e6;
+        let mut base = Balance::new(c, &[DVec3::Z]);
+        for &x in &pts {
+            base.add_area(0, x, false);
+        }
+        base.add_force(0, x0, dir * pull, Drive::SlabPull);
+        let at = |w: DVec3| w.cross(x0) * c.radius_m * 1.0e3 * YEAR_S;
+        let iterate = |force: f64| {
+            let mut w = base.solve().unwrap()[0];
+            for _ in 0..100 {
+                let mut bal = base.clone();
+                bal.add_friction(0, MANTLE, x0, force, at(w).length());
+                w = bal.solve().unwrap()[0];
+            }
+            w
+        };
+        let free = at(base.solve().unwrap()[0]).length();
+        let w = iterate(0.3 * pull);
+        let v = at(w);
+        let mut fixed = base.clone();
+        fixed.add_force(0, x0, -v.normalize() * (0.3 * pull), Drive::Edge);
+        let wf = fixed.solve().unwrap()[0];
+        assert!((wf - w).length() < 1e-6 * w.length(), "{wf} {w}");
+        assert!(
+            (0.6..0.8).contains(&(v.length() / free)),
+            "{} {free}",
+            v.length()
+        );
+        let held = at(iterate(2.0 * pull)).length();
+        assert!(held > 0.0 && held < c.floor_mm_yr, "{held}");
+    }
+
+    /// A plate with no slab, pushed by a ridge along the back of its rim. Without friction,
+    /// Table 6's basal drag (half the old law's) and no boundary resistance let it run many times
+    /// the old law's speed (the plate speed lane's diagnosis: the plates with no slab pull at 135
+    /// and 95 mm/yr RMS under Table 6's resistances alone, 19.5 and 15.5 under the old law). The
+    /// friction on its transforms and its colliding front takes most of that away: at Table 6's
+    /// own ridge push (0.36 per km against the pull's 6.43) the friction about balances the push
+    /// and the plate creeps at the floor speed (Forsyth & Uyeda's plates with no slab are slow:
+    /// "continental drag is the primary regulator of the velocity of plates not attached to
+    /// downgoing slabs", p. 190); at the model's (the column energy at the pool preset's ridge and old floor, about
+    /// 0.1 of the pull) an oceanic plate moves at about a quarter of its frictionless speed,
+    /// still faster than under the old law, and a continental one slower than under the old law.
+    #[test]
+    fn friction_holds_back_a_plate_with_no_slab() {
+        let pool = |k: TectonicParams| TectonicParams {
+            ridge_elevation_m: -2600.0,
+            oceanic_floor_elevation_m: -5651.0,
+            ..k
+        };
+        let c = coeffs(&pool(fu()));
+        let old = coeffs(&pool(old_law()));
+        let (_, pts, rim) = reference_cap(&c);
+        let rim_m =
+            2.0 * std::f64::consts::PI * c.radius_m * rim[0].0.z.acos().sin() / rim.len() as f64;
+        let model_push = c.edge_scale * (c.energy(-2600.0, false) - c.energy(-5651.0, false));
+        assert!(
+            (0.08..0.12).contains(&(model_push / c.pull_n_m)),
+            "{model_push:e}"
+        );
+        // Table 6's ridge push, 0.36 per km.
+        let table_push = c.pull_n_m * 0.36 / FU_SLAB_PULL;
+        let speed = |w: DVec3| w.cross(DVec3::Z).length() * c.radius_m * 1.0e3 * YEAR_S;
+        // The ridge: the back of the rim (140 degrees about longitude 180), pushing towards +X.
+        let build = |c: Coeffs, push: f64, continental: bool| {
+            let mut bal = Balance::new(c, &[DVec3::Z]);
+            for &x in &pts {
+                bal.add_area(0, x, continental);
+            }
+            for &(x, out) in &rim {
+                if x.y.atan2(x.x).to_degrees().abs() > 110.0 {
+                    bal.add_force(0, x, -out * (push * rim_m), Drive::Edge);
+                }
+                if c.boundary_res > 0.0 {
+                    bal.add_link(Link {
+                        a: 0,
+                        b: MANTLE,
+                        x,
+                        n: None,
+                        k: c.boundary_res * rim_m,
+                        term: Resist::Boundary,
+                    });
+                }
+            }
+            bal
+        };
+        let rim3: Vec<_> = rim.iter().map(|&(x, out)| (x, out, rim_m)).collect();
+        let old_v = speed(build(old, model_push, false).solve().unwrap()[0]);
+        let frictionless = speed(build(c, model_push, false).solve().unwrap()[0]);
+        let (w, _, _) = plastic(&build(c, model_push, false), &rim3);
+        let with = speed(w);
+        let (w, _, _) = plastic(&build(c, table_push, false), &rim3);
+        let held = speed(w);
+        let old_cont = speed(build(old, model_push, true).solve().unwrap()[0]);
+        let (w, _, _) = plastic(&build(c, model_push, true), &rim3);
+        let with_cont = speed(w);
+        eprintln!(
+            "a plate with no slab: the old law {old_v:.1}, Table 6 without friction \
+             {frictionless:.1}, with friction {with:.1}; at Table 6's ridge push {held:.2} mm/yr; \
+             continental: the old law {old_cont:.1}, with friction {with_cont:.1}"
+        );
+        assert!(frictionless > 4.0 * old_v, "{frictionless} {old_v}");
+        assert!(
+            (0.2..0.35).contains(&(with / frictionless)),
+            "{with} {frictionless}"
+        );
+        // Held at the floor: the friction is the push to within a few percent on this cap.
+        assert!(
+            held < 1.5 * c.floor_mm_yr && held < 0.02 * frictionless,
+            "{held}"
+        );
+        assert!(with_cont < old_cont, "{with_cont} {old_cont}");
+    }
+
     #[test]
     fn slab_weight_grows_with_the_root_of_age_and_young_crust_floats() {
         assert_eq!(slab_weight(5.0), 0.0);
@@ -1529,7 +2054,7 @@ mod tests {
 
     #[test]
     fn the_reference_plate_moves_at_the_speed_scale() {
-        let k = quiet();
+        let k = old_law();
         let c = coeffs(&k);
         // A flat-ish cap of the reference area pulled by a straight trench across its rim: drag
         // (1 + slab resistance + boundary resistance) c_b A v = F L, so v is about 45 mm/yr when
@@ -1613,7 +2138,7 @@ mod tests {
 
     #[test]
     fn a_plate_ringed_by_trenches_is_in_tension_and_stands_still() {
-        let k = quiet();
+        let k = old_law();
         let c = coeffs(&k);
         let (pts, rim) = cap(&c, 30.0);
         let mut bal = Balance::new(c, &[DVec3::Z]);
@@ -1676,7 +2201,7 @@ mod tests {
         let run = |r_deg: f64, trench_km: f64, edges: bool, saturates: bool| {
             let k = TectonicParams {
                 suction_saturates: saturates,
-                ..quiet()
+                ..old_law()
             };
             let c = coeffs(&k);
             let (pts, rim) = cap(&c, r_deg);
@@ -1765,6 +2290,7 @@ mod tests {
                 boundary_resistance: br,
                 keel_drag: keel,
                 mantle_flow_mm_yr: flow,
+                forsyth_uyeda_balance: false,
                 ..TectonicParams::default()
             };
             let c = coeffs(&k);
@@ -1914,7 +2440,7 @@ mod tests {
             let k = TectonicParams {
                 boundary_resistance: br,
                 slab_resistance: 0.0,
-                ..quiet()
+                ..old_law()
             };
             let c = coeffs(&k);
             let (pts, _) = cap(&c, 90.0);
