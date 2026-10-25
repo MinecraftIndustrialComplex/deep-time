@@ -21,7 +21,12 @@ What it writes (plan §7.1, §7.12):
       The same without the cave branch and without aquifers, for the GameTest dimensions: the
       density fill then leaves every surface intact, so tests can read heights at NOISE status.
   data/deeptime/dimension_type/planet_overworld.json   vanilla overworld, y -512..639
-  data/deeptime/worldgen/world_preset/planet{,_32k}.json and the #minecraft:normal tag entry.
+  data/deeptime/worldgen/world_preset/planet_cube{,_32k}.json and the #minecraft:normal tag entry.
+  deeptime:test_planet_lambert{,_32k} (C = 16,384 / 32,768, no projection: the simulation's Lambert
+      frame), the dev level types of synthetic worlds and test terrains (cube plan §7.4: the playable
+      Lambert world is gone), into the GameTest resources (neoforge/src/gametest/resources, for
+      gametest-planet.sh) and the datapack tools/smoke/datapacks/deeptime-lambert-frame (install.sh and
+      the workbench's preview.py copy it into a world). Never shipped.
 """
 import copy
 import json
@@ -134,8 +139,8 @@ def without_caves(final_density):
     return out
 
 
-def write(rel, obj):
-    path = os.path.join(OUT, rel)
+def write(rel, obj, out=OUT):
+    path = os.path.join(out, rel)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
         json.dump(obj, f, indent=2)
@@ -213,6 +218,15 @@ def main():
             },
         }
         write(f"deeptime/worldgen/world_preset/{name}.json", {"dimensions": dims})
+        if name == "planet_cube":
+            cube_dims = dims
+    # The Lambert-frame dev types: the cube's preset without a projection, at C itself.
+    lframe = os.path.join(REPO, "tools", "smoke", "datapacks", "deeptime-lambert-frame")
+    for name, c in (("test_planet_lambert", 16384), ("test_planet_lambert_32k", 32768)):
+        dims = copy.deepcopy(cube_dims)
+        dims["minecraft:overworld"]["generator"]["world_data"] = {"folder": "deeptime", "circumference_blocks": c}
+        for out in (os.path.join(REPO, "neoforge", "src", "gametest", "resources", "data"), os.path.join(lframe, "data")):
+            write(f"deeptime/worldgen/world_preset/{name}.json", {"dimensions": dims}, out)
     write("minecraft/tags/worldgen/world_preset/normal.json", {"replace": False, "values": ["deeptime:planet_cube"]})
     write("terrablender/tags/dimension_type/overworld_regions.json",
           {"replace": False, "values": [{"id": "deeptime:planet_overworld", "required": False}]})

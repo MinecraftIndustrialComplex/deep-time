@@ -73,11 +73,15 @@ PROFILES = ("standalone", "mic", "mic-ev", "terrablender", "ev", "ee")
 MAX_SIDE = 256
 DEEP_TIME_Y = (-512, 639)
 VANILLA_Y = (-64, 319)
-# The level types by the world's east-west period (manifest scale.circumference_blocks): the
-# Petroff-Guyou worlds of the 16k and 32k planets (format 0.5, the default) and the Lambert ones
-# (synthetic worlds, Lambert presets, the deposit preview world).
-LEVEL_TYPES = {13312: "deeptime:planet", 26112: "deeptime:planet_32k",
-               16384: "deeptime:planet_lambert", 32768: "deeptime:planet_lambert_32k"}
+# The level types by the world's east-west period (manifest scale.circumference_blocks): the cube
+# worlds of the 16k and 32k planets (period 4s, format 0.7; the only world since cube plan §7.4) and
+# the dev Lambert-frame ones (C itself: synthetic worlds, test terrains, the deposit preview world),
+# which the repo datapack tools/smoke/datapacks/deeptime-lambert-frame defines (prepare_world copies it).
+LEVEL_TYPES = {15360: "deeptime:planet_cube", 29696: "deeptime:planet_cube_32k",
+               16384: "deeptime:test_planet_lambert", 32768: "deeptime:test_planet_lambert_32k"}
+# The cube world's period for a planet's notional size (WorldDataRef.faceFor: s = 3,840 and 7,424).
+CUBE_PERIOD_OF = {16384: 15360, 32768: 29696}
+LAMBERT_FRAME_PACK = os.path.join(REPO, "tools", "smoke", "datapacks", "deeptime-lambert-frame")
 # The test VM's shared cache (tools/remote/mac.sh): the dev-shell profiles.
 MAC_CACHE = "/Volumes/Graphide/ban/deeptime-cache"
 
@@ -124,15 +128,24 @@ def fold(x, c):
 # §2): Lambert's equal-area cylinder, R = C/2π; the seam x = −C/2 is longitude 0°, north is −z,
 # latitude φ = asin(−z/R), the poles at z = ∓R.
 def pole_z(c):
-    """|z| of the poles, whole blocks (inside them); on a Petroff-Guyou world (its period 2b in
-    PETROFF_PERIODS) the half height b/2 less the border's block, the north and south edges."""
-    if c in PETROFF_PERIODS:
-        return c // 4 - 1
+    """|z| of the poles, whole blocks (inside them); on a cube world (its period 4s in CUBE_PERIODS)
+    the net window's z edge 3s/2 less a block (the polar faces N and S end there)."""
+    if c in CUBE_PERIODS:
+        return 3 * (c // 4) // 2 - 1
     return int(c / (2 * math.pi))
 
 
-# The east-west periods of Petroff-Guyou worlds (13,312 = 2 x 6,656 at 16k, 26,112 at 32k).
-PETROFF_PERIODS = {13312, 26112}
+# The east-west periods of cube worlds (4s: 15,360 at 16k, 29,696 at 32k).
+CUBE_PERIODS = set(CUBE_PERIOD_OF.values())
+
+
+def lambert_frame_preset(p):
+    """Whether a preset file is laid out in the simulation's Lambert frame (a synthetic preset that
+    says "projection": "lambert", e.g. deposits_world_16k); built-in names and share codes are planets."""
+    try:
+        return os.path.isfile(p) and re.search(r'"projection"\s*:\s*"lambert"', open(p).read()) is not None
+    except OSError:
+        return False
 
 
 
@@ -170,6 +183,9 @@ def normalise_spec(spec, max_side=MAX_SIDE):
         raise ValueError(f"size must be one of {sorted(LEVEL_TYPES)}")
     boxes = s.pop("boxes", None) or ([s.pop("box")] if "box" in s else [])
     w0 = s.get("world", {})
+    # A planet preset makes the cube world: its notional size names the cube's period.
+    if w0.get("preset") and s["size"] in CUBE_PERIOD_OF and not lambert_frame_preset(w0["preset"]):
+        s["size"] = CUBE_PERIOD_OF[s["size"]]
     locate = [str(b) for b in (w0.get("locate") or [])]
     if locate and not w0.get("level_type"):
         raise ValueError("locate needs level_type (a biome is located in the pack's own generator)")
@@ -665,6 +681,9 @@ def prepare_world(job, spec, server_dir):
                                       "length_myr": float(w.get("length_myr", 1000))},
                          "memory_cap_gib": float(w.get("memory_cap_gib", 4)), "threads": 0})
     datapacks = list(w.get("datapacks", []))
+    level = w.get("level_type") or LEVEL_TYPES[c]
+    if level.startswith("deeptime:test_planet_lambert") and LAMBERT_FRAME_PACK not in datapacks:
+        datapacks.append(LAMBERT_FRAME_PACK)   # the level type's world preset (enabled at the first start)
     tags = os.path.join(os.path.dirname(os.path.dirname(REPO)), "Docs", "datapacks", "deeptime-mic-rock-tags")
     if spec["profile"] in ("mic", "mic-ev") and w.get("mic_rock_tags", True) and os.path.isfile(os.path.join(tags, "pack.mcmeta")) \
             and tags not in datapacks:
@@ -675,7 +694,6 @@ def prepare_world(job, spec, server_dir):
     spec["world"]["datapacks_used"] = datapacks
     props = os.path.join(server_dir, "server.properties")
     text = open(props).read()
-    level = w.get("level_type") or LEVEL_TYPES[c]
     text = re.sub(r"(?m)^level-type=.*$", "level-type=" + level.replace(":", "\\:"), text)
     if w.get("seed") is not None:
         text = re.sub(r"(?m)^level-seed=.*\n?", "", text) + f"level-seed={w['seed']}\n"
@@ -990,9 +1008,9 @@ def box_on_world(req, c=PREVIEW_C):
     """The request's box on the planet of circumference c (from lat_lon when given), at most
     256 × 256 around its centre; returns (box, a note about any shrinking)."""
     ll = req.get("lat_lon") or {}
-    # A Petroff-Guyou world's blocks are not Lambert's: the page sends the box in the world's own
-    # blocks (workbench.js boxBlocks), so it wins there.
-    if c in PETROFF_PERIODS and isinstance(req.get("box"), dict):
+    # A cube world's blocks are not Lambert's: the page sends the box in the world's own blocks
+    # (workbench.js boxBlocks), so it wins there.
+    if c in CUBE_PERIODS and isinstance(req.get("box"), dict):
         ll = {}
     if all(isinstance(ll.get(k), (int, float)) for k in ("north", "south", "west", "east")):
         x0, z0 = latlon_to_block(ll["north"], ll["west"], c)

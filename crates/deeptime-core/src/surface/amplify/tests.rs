@@ -960,10 +960,11 @@ fn the_coupled_pipeline_amplifies_on_any_thread_count_and_registers_its_layers()
     assert_eq!(e["grid"], "L3");
     let bytes = std::fs::read(d1.join(e["path"].as_str().unwrap())).unwrap();
     assert_eq!(e["crc32"], crc32fast::hash(&bytes));
-    // L3 spans the world's x period (four faces on the cube world).
+    // L3 spans the world's x period: four faces of n cells on the cube world.
     let l3 = &manifest["grids"]["L3"];
+    assert_eq!(l3["kind"], "cube", "{l3}");
     assert_eq!(
-        l3["w"].as_u64().unwrap() * l3["r"].as_u64().unwrap(),
+        4 * l3["n"].as_u64().unwrap() * l3["r"].as_u64().unwrap(),
         manifest["scale"]["circumference_blocks"].as_u64().unwrap()
     );
     assert!(layers.iter().any(|l| l["name"] == "detail/amplitude"));

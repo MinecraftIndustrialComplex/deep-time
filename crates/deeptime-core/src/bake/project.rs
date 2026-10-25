@@ -289,6 +289,13 @@ pub(crate) const GROUND_BYTES_PER_WORLD_CELL: u64 = 12;
 /// layers (`relief::OnWorld::draw`: its f32 change and the calm flag; 5.0 B held on quick 16k).
 pub(crate) const RELIEF_BYTES_PER_WORLD_CELL: u64 = 6;
 
+/// Bytes per Fibonacci point of the cube's turn search (`cube_turn::Land` and `cube_turn::search`:
+/// the points, their land flags, the two k-d trees and the copies they are built from, and the
+/// search's candidates). Cube plan §7.4, 2026-10-24: the memory_estimate test planet's bake peaked
+/// in the search, 45.9 MiB above the loaded sources at 400,000 points (120 B a point), a figure the
+/// grids' steps left out while the estimate was checked on the Petroff-Guyou world only.
+pub(crate) const TURN_BYTES_PER_SAMPLE: u64 = 128;
+
 /// The memory the projection pass holds beyond the finished world (bytes), for the run's
 /// estimate (`session::estimate_for`).
 ///
@@ -296,7 +303,8 @@ pub(crate) const RELIEF_BYTES_PER_WORLD_CELL: u64 = 6;
 /// holding the grid's source layers, its resampled layers and one band of rows ([`ROW_BAND`]) or,
 /// after the band, what it draws on that grid: the closed basins on the hydrology's grid
 /// ([`GROUND_BYTES_PER_WORLD_CELL`]), the relief on the elevation's
-/// ([`RELIEF_BYTES_PER_WORLD_CELL`]). Beside them stay the Lambert elevation and amplitude it loads
+/// ([`RELIEF_BYTES_PER_WORLD_CELL`]). Before the grids comes the cube's turn search
+/// ([`TURN_BYTES_PER_SAMPLE`]). Beside them stay the Lambert elevation and amplitude it loads
 /// first (L3, shared with that grid's sources, kept to the end) and the world layers of the grids
 /// before: the horizon stacks (kept for the top raise), the L2 layers the relief and the biomes'
 /// land call read, and the world's elevation (the halved grid's ground). Last comes the top
@@ -328,7 +336,10 @@ pub fn estimate_bytes(p: &PlanetPreset) -> u64 {
     }
     // The Lambert elevation and amplitude, loaded before the first grid (a part of the L3 sources).
     let kept_sources = src_cells(r3) * terrain;
-    let (mut worst, mut kept) = (0u64, 0u64);
+    // The turn search on them, before the first grid (its points are dropped after the land
+    // statistics).
+    let turn = crate::bake::cube_turn::BAKE.samples as u64 * TURN_BYTES_PER_SAMPLE;
+    let (mut worst, mut kept) = (kept_sources + turn, 0u64);
     for (level, r, per_cell) in grids {
         let (src, out) = (src_cells(r) * per_cell, world_cells(r) * per_cell);
         let mut work = ROW_BAND as u64 * world_width(r) * per_cell;

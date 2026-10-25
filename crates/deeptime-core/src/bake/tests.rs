@@ -459,12 +459,40 @@ fn a_craters_lens_is_seated_under_the_drawn_floor() {
         if !matches!(c["fate"].as_str(), Some("fresh" | "degraded")) {
             continue;
         }
-        let drawn = w.height(b.center[0].round() as i64, b.center[2].round() as i64);
-        let want = drawn - c["cover_m"].as_f64().unwrap() / mv;
+        // The block the centre is in: a cube world draws the block (⌊x⌋, ⌊z⌋) at its centre
+        // (`project::Drawn`), which the pass moved the body by. The file rounds the centre to a
+        // tenth of a block, so a centre on a block line may be in the block before it.
+        let blocks = |v: f64| {
+            let k = v.floor() as i64;
+            if (v - v.round()).abs() < 0.051 && v.round() as i64 == k {
+                vec![k, k - 1]
+            } else {
+                vec![k]
+            }
+        };
+        let cover = c["cover_m"].as_f64().unwrap() / mv;
+        let (bx, bz) = (blocks(b.center[0]), blocks(b.center[2]));
+        let wants: Vec<f64> = bx
+            .iter()
+            .flat_map(|&x| bz.iter().map(move |&z| (x, z)))
+            .map(|(x, z)| w.height(x, z) - cover)
+            .collect();
+        let want = wants
+            .iter()
+            .copied()
+            .min_by(|p, q| (b.center[1] - p).abs().total_cmp(&(b.center[1] - q).abs()))
+            .unwrap();
+        let drawn = want + cover;
         seated += 1;
         eprintln!(
-            "crater {} lens at y {:.2}, drawn floor {:.2}, wanted {:.2}",
-            c["id"], b.center[1], drawn, want
+            "crater {} at ({:.1}, {:.1}): lens at y {:.2}, drawn floor {:.2}, wanted {:.2}, off {:.2}",
+            c["id"],
+            b.center[0],
+            b.center[2],
+            b.center[1],
+            drawn,
+            want,
+            b.center[1] - want
         );
         // Exact up to the file's rounding of the cover (to a metre) and of the centre (0.1 block).
         if (b.center[1] - want).abs() > 0.15 {
@@ -592,15 +620,21 @@ fn guaranteed_deposits_hold_ore_in_the_world() {
     let sea = f64::from(m.scale.sea_level_y);
     let (zlo, zhi) = wp.z_range();
     let step = anchor::TOP_UP_STEP_BLOCKS;
+    // The top-up's lattice: x from the cube window's west edge, the void past the net's faces
+    // never land (SCL-129).
+    let deeptime_format::projection::WorldProjection::Cube(view) = &wp else {
+        panic!("a cube world");
+    };
+    let x0 = wp.index_frame().origin.0;
     for ess in &p.deposits.as_ref().unwrap().essentials {
         let r =
             crate::deposits::playability::Regions::in_frame(wp.index_frame(), ess.region_blocks);
         let mut land = std::collections::BTreeSet::new();
         let mut z = zlo.ceil() as i64;
         while z <= zhi.floor() as i64 {
-            let mut x = -world.c / 2;
-            while x < world.c / 2 {
-                if world.height(x, z) >= sea {
+            let mut x = x0;
+            while x < x0 + world.c {
+                if view.cube.face_of_block(x, z).is_some() && world.height(x, z) >= sea {
                     land.insert(r.index(x as f64, z as f64));
                 }
                 x += step;
