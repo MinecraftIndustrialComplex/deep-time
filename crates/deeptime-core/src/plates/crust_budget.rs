@@ -821,7 +821,7 @@ mod tests {
         let mut ocean: Vec<f32> = rec.into_iter().filter(|a| !a.is_nan()).collect();
         ocean.sort_unstable_by(f32::total_cmp);
         let want: Vec<f32> = ocean_ages(&st, t).into_iter().map(|a| a as f32).collect();
-        assert!(want.iter().any(|&a| a > 0.0) && want.iter().any(|&a| a == 0.0));
+        assert!(want.iter().any(|&a| a > 0.0) && want.contains(&0.0));
         assert_eq!(ocean, want);
     }
 
