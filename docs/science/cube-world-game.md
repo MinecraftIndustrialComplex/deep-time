@@ -327,5 +327,5 @@ cube world, the conformal cube turned freely, format 0.7, the wrap engine in par
 
 - Whether the fill should place features (trees) from the partner: the wrap engine's band makes
   it moot where the engine runs.
-- Whether the two level types replace `deeptime:planet` and `deeptime:planet_32k` (cube plan
-  section 7.4, the coordinator's call after phase 2 is gated).
+- Decided (cube plan section 7.4, 2026-10-24): the two cube level types replaced `deeptime:planet` and
+  `deeptime:planet_32k`, which are deleted; the ids stay `deeptime:planet_cube` and `deeptime:planet_cube_32k`.
