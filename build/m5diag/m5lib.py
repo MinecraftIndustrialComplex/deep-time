@@ -133,6 +133,32 @@ def crossing(p, land, ci, jn, qual):
     return crosses, qi
 
 
+def fixed_measure(p, z, sea_body_km2, n, sp, keep=None):
+    """M5 and M4 with the three measure fixes proposed by the diagnosis, one after another, on a
+    grid (p, z; sea_body_km2 the area of each sea point's 8-connected sea body, km2; keep as
+    coast_detail's, carried to the nearest cell): fib = the grid resampled to n Fibonacci points
+    (nearest cell), bodies = then the closed sea bodies under 1 Mkm2 counted as land, inland =
+    then a coast point whose straight line to its nearest qualifying high point crosses the sea
+    not counted (an upper bound of an over-land reach)."""
+    flat, flon = fib(n)
+    pf = cc.xyz(flat, flon)
+    _, nf = cKDTree(p).query(pf)
+    kf = np.ones(n, bool) if keep is None else keep[nf]
+    out = {}
+    zf = z[nf]
+    det = coast_detail(pf, zf, sp, keep=kf)
+    out["fib"] = (m5_of(det), float((zf[(zf > 0) & kf] > 2000).mean()))
+    zb = zf.copy()
+    zb[(zb <= 0) & (sea_body_km2[nf] < 1e6)] = 1.0
+    det = coast_detail(pf, zb, sp, keep=kf)
+    out["fib_bodies"] = (m5_of(det), float((zb[(zb > 0) & kf] > 2000).mean()))
+    q = np.isfinite(det["D"][:, 0])
+    cr, qi = crossing(pf, det["land"], det["ci"], det["J"][:, 0], q)
+    kc = kf[det["ci"]]
+    out["fib_bodies_inland"] = (float((kc[qi] & ~cr).sum() / max(kc.sum(), 1)), out["fib_bodies"][1])
+    return out
+
+
 def dist_hist(dmin, edges=(0.0, 50.0, 100.0, 150.0, 200.0)):
     """Shares of the qualified coast points by the distance to their nearest qualifying high
     point: the coast point itself high (0), then (0, 50], (50, 100], (100, 150], (150, 200]."""

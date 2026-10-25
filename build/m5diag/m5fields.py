@@ -160,14 +160,14 @@ def one(run):
     out["coll_young_by_age"] = {f"{a_:g}-{b_:g}": float((cy & (m_age[np.maximum(jn, 0)] >= a_)
                                                          & (m_age[np.maximum(jn, 0)] < b_)).sum() / C)
                                 for a_, b_ in ((-1e9, 2), (2, 5), (5, 10))}
-    # The coast by the plate front nearest to it (the map's front flags 256 subduction, 512
-    # collision): within 200 km of a subduction front, else of a collision front, else neither.
-    fl_all = a[:, 10].astype(np.int64)
+    # The coast by the plate setting nearest to it, from the fields' regime (the final map
+    # t0000.bin is a fresh lattice whose arc, trench and front flags are all zero): within 200 km
+    # of a trench or arc cell, else of a collision cell, else neither.
     dfr = {}
-    for nm, bit in (("sub", 256), ("coll", 512)):
-        sel = (fl_all & bit) != 0
+    for nm, codes in (("sub", (2, 3)), ("coll", (REG_COLL,))):
+        sel = np.isin(reg, codes)
         if sel.any():
-            d_, _ = cKDTree(q[sel]).query(p[ci])
+            d_, _ = cKDTree(p[sel]).query(p[ci])
             dfr[nm] = cc.arc_km(d_)
         else:
             dfr[nm] = np.full(C, np.inf)
@@ -176,6 +176,21 @@ def one(run):
                                   "m5_in": float((qual & (ctype == i)).sum() / max((ctype == i).sum(), 1)),
                                   "m5_part": float((qual & (ctype == i)).sum() / C)}
                              for i, nm in enumerate(("sub200", "coll200", "neither"))}
+    # The qualifying high point's own setting, per class: its regime and whether it is on an
+    # active collision (plates/collision_mm_yr > 0).
+    coll_v = np.nan_to_num(f["plates/collision_mm_yr"])[ok]
+    jq = jn[qual]
+    nq = near_cls[qual]
+    out["hi_setting_by_class"] = {}
+    for i, k in enumerate(CLASSES):
+        m = nq == i
+        if not m.any():
+            continue
+        out["hi_setting_by_class"][k] = {
+            "regime": {str(rc): float((reg[jq[m]] == rc).mean()) for rc in range(10)},
+            "active_collision": float((coll_v[jq[m]] > 0).mean())}
+    out["hi_regime_all"] = {str(rc): float((hi & (reg == rc)).sum() / max(hi.sum(), 1)) for rc in range(10)}
+    out["hi_active_collision_all"] = float((hi & (coll_v > 0)).sum() / max(hi.sum(), 1))
     # Iced land kept out of the shares (the stand-in for Earth's by-rock figure without the
     # two ice sheets).
     ice_c = np.nan_to_num(f["climate/ice_thickness_m"][ok])
@@ -257,6 +272,8 @@ def one(run):
     chk["sea_bodies"] = {"n_ge1": int((ssz >= 1).sum()), "n_lt1": int(((ssz > 0) & (ssz < 1)).sum()),
                          "area_lt1_share_of_sea": float(ssz[(ssz > 0) & (ssz < 1)].sum() / max(ssz.sum(), 1e-9)),
                          "largest_share_of_sea": float(ssz.max() / max(ssz.sum(), 1e-9))}
+    body_km2 = np.where(land, np.inf, ssz[sea_ok] * 1e6)
+    chk["fixed_measure"] = m5lib.fixed_measure(p, z, body_km2, ncell, sp)
     for lim in (0.1, 1.0):
         chk[f"coast_on_body_lt{lim:g}"] = float((body < lim).sum() / C)
         chk[f"m5_coast_on_body_lt{lim:g}"] = float((qual & (body < lim)).sum() / max((body < lim).sum(), 1))
