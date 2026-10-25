@@ -4042,7 +4042,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Forsyth, D., Uyeda, S. (1975). On the relative importance of the driving forces of plate motion. Geophysical Journal of the Royal Astronomical Society 43(1):163-200.
 - DOI or URL: 10.1111/j.1365-246X.1975.tb00631.x; https://academic.oup.com/gji/article/43/1/163/586101 (abstract page; PDF returns 403).
 - Cited as: "Forsyth & Uyeda 1975, Geophys. J. R. Astron. Soc. 43:163-200".
-- Ledger ids: PLT-023, PLT-030, PLT-162, PLT-182, PLT-185, PLT-189, PLT-199, FRC-010, FRC-012, FRC-016, FRC-017
+- Ledger ids: PLT-023, PLT-030, PLT-162, PLT-182, PLT-185, PLT-189, PLT-199, FRC-010, FRC-012, FRC-016, FRC-017, PLT-575
 - Access: paywalled (abstract only).
 - Library (the project's source library, not distributed): fetched in WP-13a (publisher's free PDF, 38 pages, text layer). From: https://academic.oup.com/gji/article-pdf/43/1/163/1576393/43-1-163.pdf. Text file: ForsythUyeda1975.txt.
 - Substitute: none found.
@@ -4050,6 +4050,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read in this pass: abstract fetched (publisher page).
 - Reference check: citation correct. The journal title "Geophysical Journal of the Royal Astronomical Society" is the 1975 name (now Geophysical Journal International). The abstract does NOT contain the "3 to 4" speed ratio or any factor of 8 (see Part 2); those must come from the body or from another paper.
 - Read in WP-13a (2026-10-02): full text. Slab-attached plates 6-9 cm/yr, others 0-4 cm/yr, terminal velocity (p. 178); "no obvious relation between velocity and area" (p. 177, Fig. 5); slab pull and resistance an order of magnitude above the rest, drag under continents "approximately eight times" that under oceans (p. 189, Tables 5 and 6); continental viscosity "about eight times larger" (p. 194); Table 1 (areas, speeds, trench lengths) used to compute Earth statistics. Ledger: PLT-162, PLT-181 to PLT-189, PLT-197 to PLT-199, CHK-020 to CHK-027, CHK-056. The "3 to 4" is not a sentence of the paper (fix 18).
+- Read in the plate speed lane (2026-10-25): Table 6 in full and pp. 189-190, in the publisher's free PDF's text layer, downloaded again (agent's scratch; the library's text file is not on the VM since its rebuild): the eight strengths with their uncertainties (PLT-575); F_TF and F_CR "opp. rel. motion" per unit length, so independent of speed; the terminal velocity printed as "7.0 cm/yr (= 5.65/0.82)", 6.43 / 0.89 being 7.2; Table 1's speeds (slab plates 6.1 to 8.6 cm/yr, the others 0.7 to 4.2). PLT-181, PLT-189, PLT-540, CHK-020.
 
 ### Shepard1963
 - Reference: Shepard, F. P. (1963). Submarine Geology, 2nd ed. Harper & Row, New York.
@@ -4138,13 +4139,14 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Schellart, W. P., Stegman, D. R., Freeman, J. (2008). Global trench migration velocities and slab migration induced upper mantle volume fluxes: constraints to find an Earth reference frame based on minimizing viscous dissipation. Earth-Science Reviews 88(1-2):118-144.
 - DOI or URL: 10.1016/j.earscirev.2008.01.005.
 - Cited as: "Schellart et al. 2008, Earth-Sci. Rev. 88:118, Table 1" (28,000-32,000 km "tallied from").
-- Ledger ids: PLT-160
+- Ledger ids: PLT-160, PLT-540
 - Access: paywalled.
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
 - Read so far (by the project): tallied by an agent from Table 1.
 - Read in this pass: metadata only.
 - Reference check: correct journal and page. The paper is about trench migration; that it has a table of margin lengths is plausible but not checked.
+- Read in the plate speed lane (2026-10-25): full text (a PDF fetched 2026-10-25 into the agent's scratch; the URL was not recorded): the mean trench-normal migration is retreat in all eight reference frames, 1.33-1.51 cm/yr, with 61.9-77.9 % of trench segments retreating and extremes of -7.6 (advance) and 16.5 cm/yr; no limit of rollback by the slab's sinking speed is stated. PLT-540.
 
 ### MercierdeLepinay2016
 - Reference: Mercier de Lépinay, M., Loncke, L., Basile, C., Roest, W. R., Patriat, M., Maillard, A., De Clarens, P. (2016). Transform continental margins - Part 2: a worldwide review. Tectonophysics 693:96-115.
@@ -4462,13 +4464,14 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Zahirovic, S., Müller, R. D., Seton, M., Flament, N. (2015). Tectonic speed limits from plate kinematic reconstructions. Earth and Planetary Science Letters 418:40-52.
 - DOI or URL: 10.1016/j.epsl.2015.02.037; the EarthByte summary page https://www.earthbyte.org/tectonic-speed-limits-from-plate-kinematic-reconstructions/ returned HTTP 500 / timeouts in this pass.
 - Cited as: "Zahirovic et al. 2015, EPSL 418:40-52".
-- Ledger ids: PLT-025, PLT-198, PLT-181, FRC-024
+- Ledger ids: PLT-025, PLT-198, PLT-181, FRC-024, CHK-020
 - Access: paywalled (closed; OpenAlex has no open URL and no abstract).
 - Library (the project's source library, not distributed): fetched in WP-13a (accepted manuscript, 39 pages, text layer; the landing page is kept as Zahirovic2015_landing.txt). From: https://ro.uow.edu.au/ndownloader/files/50501994. Text file: Zahirovic2015.txt.
 - Read so far (by the project): link given. Force-balance task 5 (2026-10-02): the full text in the library, by a Sonnet sub-agent: "a median RMS plate speed of ~4 cm/yr over 200 Myr" (lines 123-125); fastest plates ~8.5 cm/yr RMS, slowest ~2.6-2.8; oceanic plates 2-3 times faster than continental; plates with more than 25 % of their perimeter subducting median 7.9 cm/yr, without subduction 2.6 (652-662).
 - Read in this pass: metadata only (Crossref). Speed numbers could not be read.
 - Reference check: correct.
 - Read in WP-13a (2026-10-02): full text (accepted manuscript): median RMS plate speed ~4 cm/yr over 200 Myr, 4.2 over 3,952 samples; global RMS ~5-10 cm/yr (section 3.2); category medians: no subduction 2.6, over 25 % subducting 7.9, over 50 % continental 2.8, under 25 % continental 8.1 cm/yr (section 3.5); oceanic plates "2-3 times faster" (abstract); present RMS Antarctica 1.1, Africa 2.0, Pacific 7.9 cm/yr. PLT-181, PLT-190, PLT-197 to PLT-199, CHK-020 to CHK-025.
+- Read in the plate speed lane (2026-10-25): the accepted manuscript again (agent's scratch; the URL of this download was not recorded), Table 1's medians: all plates 4.2 cm/yr; any subducting 7.05, the subducting portion over 25 % 7.87, none 2.6; continental portion under 25 % 8.13, over 50 % 2.80; global RMS ~5-10 cm/yr (section 3.2).
 
 ### DeCellesGiles1996
 - Reference: DeCelles, P. G., Giles, K. A. (1996). Foreland basin systems. Basin Research 8(2):105-123.
@@ -4627,12 +4630,13 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Lallemand, S., Heuret, A., Boutelier, D. (2005). On the relationships between slab dip, back-arc stress, upper plate absolute motion, and crustal nature in subduction zones. Geochemistry, Geophysics, Geosystems 6(9):Q09006.
 - DOI or URL: 10.1029/2005GC000917.
 - Cited as: not cited; candidate for slab dip (the code has no dip; PLT-061).
-- Ledger ids: (supports 061); notes: supports 061
+- Ledger ids: (supports 061); notes: supports 061, PLT-540
 - Access: open (G3).
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
 - Read so far (by the project): not read.
 - Read in this pass: abstract fetched (Crossref, full).
 - Reference check: n/a. The abstract gives dip relations (dips differ by about 20 degrees between oceanic and continental upper plates) but no global mean dip.
+- Read in the plate speed lane (2026-10-25): full text, the HAL copy hal-01261567 (https://hal.science/hal-01261567; agent's scratch): the hinges' motions are "controlled by Vup"; "the anchor force (viscous resistance to trench-normal slab migrations)" ... "Heuret and Lallemand [2005] had shown that the anchor force is inefficient to prevent trench migrations up to ±50 mm.y⁻¹". PLT-540.
 
 ### Courtillot2003b
 - Reference: Courtillot, V., Davaille, A., Besse, J., Stock, J. (2003). Three distinct types of hotspots in the Earth's mantle. Earth and Planetary Science Letters 205(3-4):295-308.
@@ -7536,9 +7540,10 @@ The source of the cordillera's shortening rate since the crust-budget task (buil
 - Reference: Heuret, A. and Lallemand, S. (2005). Plate motions, slab dynamics and back-arc deformation. Physics of the Earth and Planetary Interiors 149(1-2):31-51.
 - DOI or URL: 10.1016/j.pepi.2004.08.022
 - Cited as: "Heuret & Lallemand 2005".
-- Ledger ids: PLT-048 (the value since 2026-10-20), PLT-320, HNT-127, HYP-018
+- Ledger ids: PLT-048 (the value since 2026-10-20), PLT-320, HNT-127, HYP-018, PLT-540
 - Access: paywalled at the publisher; a full-text PDF was fetched 2026-10-20 (kept in the agent's scratch, not in the library).
 - Read so far (by the project): full text, 2026-10-20. Section 3.2: "upper plate absolute motion appears to exert a dominant control on back-arc deformation, relative to the influence of trench absolute motion"; "back-arc deformation rates cannot exceed the Vup(n) value"; section 1: "among a set of 26 parameters tested by Jarrard (1986), Vup was found to be the best single predictor of strain regime". Table 1, read in its text layer and tabulated by the agent: 88 two-degree segments of continental upper plates (Andaman, Sumatra, Java, Ryukyu, Nankai, Japan, Kamchatka, Alaska, Cascadia, Mexico, Costa Rica, Colombia, Peru, North Chile, Juan Fernandez, South Chile, the Chile triple junction and Patagonia); 21 of them are class C3, "lithospheric scale back-arc thrusting", with a mean measured back-arc deformation rate Vd(n) of 7.1 mm/yr over the 14 that give one; the others shorten little or extend. The length-weighted mean shortening is about 1.7 mm/yr (21 x 7.1 / 88, the agent's arithmetic), and the mean of max(Vup(n), 0) over the 88 is 18.1 mm/yr (the shortening about 0.09 of it). Segments over oceanic upper plates (Izu-Bonin, Mariana, Tonga, Kermadec, the Aleutians, the Antilles, the Sandwich arc and others) were left out.
+- Read again in the plate speed lane (2026-10-25), full text (a PDF in the agent's scratch): the abstract, "spontaneous trench rollback related to slab pull is negligible with respect to upper plate motion", trench motion "globally limited to 50 mm y−1"; the histogram of trench-normal motion, "92% of the trenches" within ±50 mm/yr. PLT-540.
 
 ## The arc's basement and the arcs' fronts (PLT-330, PLT-331), added 2026-10-20
 
@@ -8937,3 +8942,17 @@ them on 2026-10-24; the quotes are from that reading, and its downloads were not
 - Access: open (Nature Communications).
 - Library: not kept.
 - Read so far (by the project): full text, 2026-10-24 (the front lane's lookup agent): "Volcanoes at STEP are located at the lateral margins of retreating slabs"; "The few subduction settings with non-volcanic STEP, as the Sulawesi and Hellenic arcs, also lack of a well-developed volcanic arc and/or back-arc."
+
+
+## Plate speed (PLT-575), added 2026-10-25
+
+The sources of the plate speed lane's diagnosis (plates.md "Plate speed (2026-10-25)"; build log 2026-10-25). Forsyth & Uyeda 1975, Zahirovic et al. 2015, Schellart, Stegman & Freeman 2008 (Schellart2008), Heuret & Lallemand 2005 and Lallemand, Heuret & Boutelier 2005 (Lallemand2005) are above, their entries recording what was read this time; the one new source is below.
+
+### Lallemand2008
+- Reference: Lallemand, S., Heuret, A., Faccenna, C. and Funiciello, F. (2008). Subduction dynamics as revealed by trench migration. Tectonics 27:TC3014.
+- DOI or URL: 10.1029/2007TC002212 (read off the paper's first page).
+- Cited as: "Lallemand et al. 2008".
+- Ledger ids: PLT-540
+- Access: paywalled at the publisher; a full-text copy was fetched 2026-10-25 (agent's scratch, not in the library; the URL was not recorded).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-25 (the plate speed lane): "trench migration is primarily controlled by the subducting plate velocity Vsub, which largely depends on its age at the trench"; "Vt = 0.5Vsub − 2.3 (in cm a−1) in the HS3 reference" frame; in neutral subduction zones the velocity of the trench equals the velocity of the upper plate (Vt = Vup). No limit of rollback by the slab's sinking speed is stated.
