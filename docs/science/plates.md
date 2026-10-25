@@ -9275,6 +9275,39 @@ The census against base12: no measure at p < 0.05 but the collisions per 100 Myr
 0.160 (p 0.31). The current-geometry fronts do not clear the guard: it binds in 7 of the 8 runs, so
 the switch stays off on the merged head too.
 
+**Against base13** (`sp-fu3`, the same arm on the merge of master c47f3056 and 683166ea: the
+critical-taper belt, PLT-600 and PLT-601, with PLT-581 and PLT-582; key 26ea8ec0342f, argkey
+f7a070a5), read against base13 (master c47f3056, 24 runs) with `pool.py table --base base13`
+(v1census version 2; `--measure guard`, the relief guard) and build/speed/speedlevel.py. The plate
+check's `speed_rms_mm_yr` of every arm against base13:
+
+| Arm (8 runs each) | RMS plate speed, mm/yr | p against base13's 24 (26.9) | p against its matched 8 (27.3) |
+|---|---|---|---|
+| sp-fu (the branch before the merges) | 31.5 | < 0.001 | 0.014 |
+| sp-fu2 (master 05a60997 merged) | 31.9 | < 0.001 | 0.001 |
+| sp-fu3 (master c47f3056 merged) | 32.8 | < 0.001 | 0.001 |
+
+| Measure | base13 (24) | sp-fu3 (8) | p |
+|---|---|---|---|
+| plates with a slab, mm/yr | 50.5 | 51.3 | 0.23 |
+| plates without one, mm/yr | 22.6 | 27.3 | < 0.001 |
+| collisions per 100 Myr | 1.70 | 1.20 | 0.097 |
+| collision duration p90, Myr | 191.8 | 163.2 | |
+| land above 2 km (census) | 0.097 | 0.105 | 0.51 |
+| relief guard's worst, m from the sea | 10,047 | 10,188 | 0.57 |
+| speed guard, steps that bind | 0 in all 24 | 0 to 12, in 7 of 8 (4, 5, 12, 2; 0, 6, 2, 8) | |
+
+The census against base13: continental crust under the sea 0.214 to 0.160 (p 0.041), land 0.313 to
+0.331 (p 0.086), the largest landmass 0.166 to 0.221 (p 0.24), coast with high ground 0.196 to 0.218
+(p 0.45), land under ice 0.083 to 0.128 (p 0.24), the crust's net change −0.042 to −0.049 (p 0.43),
+criteria met 5 of 7 in both (means 5.38 and 5.12); the sea over the datum after 100 Myr and at the
+end 284 / 467 m to 189 / 206 m (not explained). No step passes 2 Earth reliefs in either. The
+collisions per 100 Myr fall in all three arms (1.60 to 1.55 and 1.30 against base12, 1.70 to 1.20
+against base13), none at p < 0.05 against the base it was read on but sp-fu2's 0.042. The speed
+guard binds in 7 of 8 runs again, so the switch stays off on this head. With it off, the head is
+master's planet bit for bit: one run (`sp-off3`, supercontinent 1, base13's arguments) has the
+state_sha256 and rec_sha256 of base13's.
+
 **The boundaries by the 60 degree rule** (a VM-only probe at PLT-585's fixed point on the same two
 planets as above, not committed). Of the planet's boundary, 0.28 to 0.29 is transform, 0.56 to 0.58
 converging and 0.13 to 0.15 diverging; Earth's by Table 1 is 30 % transform, 34 % convergent and 35 %
