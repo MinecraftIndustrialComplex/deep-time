@@ -260,6 +260,10 @@ def main():
     print("\nA. collision trains after the first 100 Myr (states on one contact, gaps <= 6 Myr)")
     print(f"  trains {len(durs)} ({len(durs) / len(runs):.1f} a run); duration p50 {q(durs):.0f}, p90 {q(durs, 90):.0f},"
           f" max {durs.max():.0f} Myr; by longest front p50 {wq(0.5):.0f}, p90 {wq(0.9):.0f} Myr")
+    ft = durs * fronts
+    print(f"  front-time (duration x longest front) in trains longer than 60 Myr {ft[durs > 60].sum() / ft.sum():.2f},"
+          f" than 110 Myr (Grenville's span, the longest sourced) {ft[durs > 110].sum() / ft.sum():.2f},"
+          f" than 200 Myr {ft[durs > 200].sum() / ft.sum():.2f}")
     print(f"  trains of 40 Myr or more {np.mean(durs >= 40):.2f}, of 100 or more {np.mean(durs >= 100):.2f};"
           f" contact age at the train's end (subduction before included) p50 {q(contact):.0f}, p90 {q(contact, 90):.0f}")
     print(f"  states' convergence (hand-off: at the hand-off; parting: peak) p10/p50/p90 {q(cvs, 10):.1f}/"
