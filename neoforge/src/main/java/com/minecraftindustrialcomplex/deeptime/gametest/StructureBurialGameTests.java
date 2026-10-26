@@ -80,13 +80,19 @@ public final class StructureBurialGameTests {
 
     /**
      * The deepest place (least of the greatest heights around it: a whole footprint under the sea) or the highest
-     * (greatest of the least heights: a whole footprint under high ground).
+     * (greatest of the least heights: a whole footprint under high ground), on the cube's faces with a trial
+     * chamber's reach around it ({@link #REACH}). Off the faces H is not the planet's ground, and the rule reads
+     * none there ({@link StructureBurial#onFaces}): until 2026-10-26 the search took any place of the flat net, and
+     * on the planet of master 8dd6440b the deepest one lay off the faces, where the rule found no ground to bury
+     * against (least ground {@code Integer.MAX_VALUE}) and left the chamber at vanilla's height.
      */
     private static Site find(WorldDataTerrain t, boolean deep) {
         int c = t.circumference(), zp = (int) t.zHalf();
         Site best = null;
         for (int z = -zp + 192; z < zp - 192; z += 32)
             for (int x = -c / 2; x < c / 2; x += 32) {
+                if (!onFaces(t, x, z))
+                    continue;
                 double least = Double.POSITIVE_INFINITY, most = Double.NEGATIVE_INFINITY;
                 for (int dx = -128; dx <= 128; dx += 32)
                     for (int dz = -128; dz <= 128; dz += 32) {
@@ -99,6 +105,18 @@ public final class StructureBurialGameTests {
                     best = s;
             }
         return best;
+    }
+
+    /** How far a trial chamber's pieces reach from its start chunk: the jigsaw's 116 blocks, a piece and the chunk beyond. */
+    private static final int REACH = 176;
+
+    /** Whether every block within {@link #REACH} of (x, z), on a 32-block grid with its edges, lies on the cube's faces. */
+    private static boolean onFaces(WorldDataTerrain t, int x, int z) {
+        for (int dx = -REACH; dx <= REACH; dx += 32)
+            for (int dz = -REACH; dz <= REACH; dz += 32)
+                if (!ChunkSampling.onFaces(t.data(), x + dx, z + dz))
+                    return false;
+        return true;
     }
 
     private static StructureStart start(ServerLevel level, Structure structure, ChunkPos at) {
