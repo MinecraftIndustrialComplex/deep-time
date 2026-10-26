@@ -9795,8 +9795,8 @@ ocean-continent boundary. The earlier subducted slab provided the driving force"
 clearance stood in for the missing propagation by keeping new zones away from working ones, which
 Crameri et al. 2020 contradict (new zones start within 500 km of working ones).
 
-With `tectonics.margin_propagation` (on by default; `propagation.rs`, run after the step's
-initiations):
+With `tectonics.margin_propagation` (off by default since 2026-10-26, parked: see "Parked" below;
+`propagation.rs`, run after the step's initiations):
 
 - **Where.** A plate U's trench (its visible floor with a hidden neighbour of its own group, so U is
   the plate going under) within 1.5 spacings (PLT-534) of U's own coast floor (its visible floor
@@ -9804,9 +9804,12 @@ initiations):
   overriding plate O active and past the critical convergence (100 km, PLT-611).
 - **The force test.** The slab's pull across the margin, FRC-002 (3 × 10^13 N/m) × `slab_pull` ×
   FRC-004's weight at the trench floor's age × min(L, 700 km) / 700 km × max(cos θ, 0), where θ is
-  the angle between the pull (towards O) and the margin's inward normal at the end of the stretch to
-  break (towards U's continent), against the margin's strength there (PLT-658, below). A pull along
-  the coast does not break it. The normal is taken across the margin's strike, the principal
+  the angle between the pull (across the strike of U's trench within 4 spacings of the trench
+  sample, towards O) and the margin's inward normal at the end of the stretch to break (towards U's
+  continent), against the margin's strength there (PLT-658, below). A pull along the coast does not
+  break it. The pull is read across the trench, not towards O's visible samples: near the trench's
+  end those lie mostly past it, where no hidden slab covers O's edge, and leaned a pull along the
+  coast to cos 0.74 in a test (0.12 across the trench). The normal is taken across the margin's strike, the principal
   direction of the coast floor within 2 spacings, where that floor reads as a line (PLT-659); a
   point of the margin sees only one or two samples of its continent within 1.5 spacings, and the
   direction to them alone tilted the test's tear 22° off the normal.
@@ -9819,15 +9822,19 @@ initiations):
   max(32, `min_plate_area_frac` × n) samples on each side, and its broken stretch short (PLT-659);
   otherwise it is a stall.
 - **The advance.** U now converges on K' along the broken stretch. The convergence across the margin
-  at the tip is summed; at each critical convergence (100 km), the pull of the slab U forms under K'
-  (its length, the age of U's floor beside the tip, the cosine between U's pull and the margin's
-  normal at the tip) is tested against the strength at the tip, and if it wins the next stretch of
+  at the tip (K''s coast floor within 1.5 spacings of U's crust, visible or hidden) is summed; at
+  each critical convergence (100 km), the pull of U's slab beside the tip (its length, the age of
+  U's crust there, the cosine between its pull and the margin's normal at the tip) is tested
+  against the strength at the tip. That slab is the one under the plate covering U's crust nearest
+  the tip: K' (the slab U forms under K', pulling across the broken stretch) while that crust is
+  visible, the nearest other plate once it is hidden (pulling across U's trench, as at the start), and if it wins the next stretch of
   K''s margin floor goes to U: its end is K''s coast floor within 1.6 spacings of the tip, the
   farthest from U, and K''s floor from the tip to a tear from that end, away from C, changes plate.
   C stays on K'. The tip moves to the stretch's end and rides K''s rotation between steps. A propagation ends when U or K' dies (absorbed, sutured) or no
   tip is found; a passed test the lattice cannot cut is a stall and ends it.
 - **PLT-064 replaced.** With law 2 on, an initiation may start anywhere beyond one lattice spacing of
-  a trench, in place of 1,000 km (Crameri et al. 2020 source both together). The records count
+  a trench, in place of 1,000 km (Crameri et al. 2020 source both together); with it off, the
+  default, the 1,000 km holds. The records count
   `initiations_near_fronts`, the initiations the old clearance would have refused.
 
 Records: `propagation_starts`, `propagations` (starts and advances) and `propagation_stalls` (the
@@ -9871,14 +9878,58 @@ converging on K' at 40 mm/yr: no advance after one step's 76 km, one after the s
 a strip of floor about two spacings wide from the margin to its southern boundary (42 samples), C
 stays on K', the tip moves 2.9° east along the margin, nothing when diverging) and
 `an_absorbed_sliver_ends_its_propagation_cleanly` (K' buried below the minimum plate area: the
-propagation ends, no sample on a dead plate or cut off its plate).
+propagation ends, no sample on a dead plate or cut off its plate), and `a_tip_beside_u_s_slab_carries_on`
+(U's floor within 2.5 spacings of the tip hidden: the propagation carries on beside U's crust and
+advances under U's slab, the tip about 1.8 spacings east). `plates::tests::why_law_2_propagations_end`
+(ignored) runs one planet of the pool's preset at 100k samples and prints why starts stall and
+propagations wait or end, with `LAW2_DIAG_TRACE` a sketch of the lattice at each start and visit.
+
+**Arm fl-law2 (2026-10-26, 3ccf9e13, against fl-law1, base16's seeds 1 to 4): no advance.** 116
+starts per run and not one advance in 8 runs; 1,055 stalls a run. Two V1 breaches, findings and not
+targets: the largest landmass 0.059 (fl-law1 0.095, base16 0.079) and the collisions 6.50 per 100
+Myr (4.25; 4.90), with sutures 65 a run against 42.5; criteria met 5, mean 5.38 (6, 6.12). The
+other five measures within their targets; sea over the datum 461 / 571 m (428 / 564); guard worst
+10,090 m. Initiations 189 a run (118.5), 91 of them within PLT-064's old 1,000 km, dead within 20
+Myr 0.32 (0.13); plates at the end 28.5 (24). Floor (not a criterion): older than 180 Myr 0.186 of
+the ocean (0.202), mean age 104.6 Myr (110.9), the margin zone's share of the old floor 0.837
+(0.791). The diagnosis: starts fire where the trench meets the margin at 45 to 90°, often where a
+basin closes with O's land already beside C, and many at "continents" of 1 to 11 samples; the tear,
+across the margin, runs nearly along the trench, so U keeps a wedge one or two spacings wide at the
+tip (and K' takes 88 to 97 % of U); U's slab takes that wedge down within a step or two, U's crust
+moves on along its trench, and the convergence across the margin at the tip is 0 to 15 km a step,
+short of the 100 km an advance needs. Zhou et al.'s geometry, a trench running on along the margin,
+is the one the law advances in (the unit tests), and the planet rarely makes it. The tip's hidden
+crust and the pull across the trench came after the arm; with them one diagnosis planet has 17
+starts (14) and still no advance.
+
+**Parked (2026-10-26, the coordinator's call).** `tectonics.margin_propagation` is off by default.
+The reason is correctness, not the V1 breaches (V1 is not a gate): under geometry A and Gurnis's
+100 km gate (PLT-611) law 2 does not advance in this sim, so the built mechanism never does the
+sourced process, propagation. Its starts alone are half a process: they fire at closing basins and
+at specks of land, and they cut slivers that are consumed within one or two steps. The code, the
+two fixes after the arm, the unit tests, the ignored diagnosis and the counters stay; PLT-064's
+1,000 km clearance is the default again. Law 3, built inside law 2's stage, is off with it: it acts
+at every incipient front, not only at law 2's margins, so on alone it would need an arm of its own.
+
+**For whoever picks this up.** Zhou et al. 2020's setup has the passive margin continuing the
+trench's strike, so the tear across the margin is a STEP at the trench's end; the starts here fire
+where the coast meets the trench at 45 to 90°, a configuration the source does not model. A start
+rule restricted to Zhou's geometry can be stated with no new constant, though not with no
+tolerance: start only where U's trench samples within 4 spacings of the trench sample
+(`TRENCH_STRIKE_SPACINGS`) all lie within 1.5 spacings (PLT-534's border) of the margin's strike
+line through the stretch's end, so that at the lattice's resolution the trench reads as the
+margin's own line (at most about 20°, an angle the lattice sets and no source gives), and only where
+C holds at least `min_samples` continental samples (PLT-659), which drops the "continents" of 1 to
+11 samples. No arm has run it, and the diagnosis planets suggest such junctions are rare, so it may
+start little.
 
 ### Law 3: the incipient front's resistance grows with the plate's thickness (PLT-657)
 
 Gurnis, Hall & Lavier 2004 ([46]): "Case 1, with an age of 30 Myr, He ... is 15 km. For 7 Myr
 lithosphere, this thickness is 8.5 km. With both friction and cohesion, the force required ...
 increases by a factor of 2.2 as He increases (Figure 9a)". PLT-612 took the middle of their 2 to 3 ×
-10^12 N/m at every age. With `tectonics.incipient_resistance_by_thickness` (on by default) the
+10^12 N/m at every age. With `tectonics.incipient_resistance_by_thickness` (off by default since
+2026-10-26: built inside law 2's stage and parked with it) the
 resistance is Case 1's 3 × 10^12 N/m × (Te(age) / Te(30 Myr))^n × g / 9.81, with n = ln 2.2 /
 ln(15 / 8.5) ≈ 1.39 and Te the model's own flexure law, min(2.7 √age, 40) km (ISO-048, ISO-049):
 0.47 times Case 1 at 10 Myr, 1.98 at 80, 3.46 at 180 and 3.98 from 219 Myr. Floor younger than 10 Myr
