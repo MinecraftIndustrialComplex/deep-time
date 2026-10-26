@@ -254,6 +254,38 @@ pub fn incipient(k: &TectonicParams, slab_km: f64) -> bool {
     slab_km < incipient_km(k)
 }
 
+/// The slab's thermal rate floor (`tectonics.slab_thermal_floor`, PLT-681), mm/yr of convergence
+/// across the boundary: Toth & Gurnis 1998 (JGR 103, 18,053-18,067, p. 18,063, from their
+/// models of a new subduction zone on a fault): "at subduction velocities of <10 mm/yr thermal
+/// diffusion inhibits slab formation and no substantial slab pull force develops"; at 4 mm/yr
+/// "the rate of convergence is so low that diffusive heating does not allow a slab to develop"
+/// (p. 18,062). McKenzie 1977's 13 mm/yr ("required a convergence rate of 13 mm/yr for
+/// subduction to be initiated", as Toth & Gurnis cite it, p. 18,064; Gurnis et al. 2004 [4] the
+/// same; the paper itself not read, no open copy) is not used. Their criterion is for a slab
+/// forming at a new trench (a model short of 10 mm/yr after 20 Myr has failed to initiate);
+/// applied at once to a slow stretch of a mature front it takes the stretch's pull away before
+/// an old slab would have warmed through (the agent's extension, an upper bound on the effect).
+pub const SLAB_THERMAL_FLOOR_MM_YR: f64 = 10.0; // ledger: PLT-682
+
+/// The convergence below which an oceanic front sample is incipient whatever its slab, mm/yr:
+/// [`SLAB_THERMAL_FLOOR_MM_YR`] with `slab_thermal_floor` on, else 0 (none is). ledger: PLT-681
+pub fn slab_floor_mm_yr(k: &TectonicParams) -> f64 {
+    if k.slab_thermal_floor {
+        SLAB_THERMAL_FLOOR_MM_YR
+    } else {
+        0.0
+    }
+}
+
+/// Whether an oceanic front sample converging at `v_n_mm_yr` across its boundary is too slow for
+/// a slab (PLT-681): incipient as a young contact's front is ([`incipient`]), whatever its
+/// contact's slab. Every consumer asks this of its own v_n (the force balance, the arcs, the
+/// boundary mix, the margins), each the other plate's motion towards the sample's along the
+/// boundary's normal (PLT-310) at the step's motion.
+pub fn below_floor(k: &TectonicParams, v_n_mm_yr: f64) -> bool {
+    v_n_mm_yr < slab_floor_mm_yr(k)
+}
+
 /// Law 3 (`tectonics.incipient_resistance_by_thickness`, PLT-657): the incipient resistance of
 /// floor of [`INCIPIENT_CASE1_AGE_MYR`], N per metre at Earth's gravity. Gurnis, Hall & Lavier
 /// 2004 [59], their Case 1 (30 Myr homogeneous lithosphere): a peak of "3 × 10^12 N/m".
@@ -1066,6 +1098,11 @@ pub struct Recorded {
     pub slabs_km: Vec<f64>,
     /// Slabs that broke off this step.
     pub breakoffs: u16,
+    /// Measurement only (PLT-683): each contact whose slab passed the critical convergence this
+    /// step (incipient before the step, PLT-610, its slab at least `INCIPIENT_SLAB_KM` after
+    /// its growth): its oceanic front's mean convergence, mm/yr (the slab's feed, FRC-020), the
+    /// contact's age, Myr since its onset, and its oceanic front samples. In contact order.
+    pub matured: Vec<[f64; 3]>,
 }
 
 /// The step's balance: each plate's balance rotation, rad/yr (indexed by plate id; `None` for a
@@ -1467,12 +1504,13 @@ fn balance_step(
             // incipient stage has none from either side: its front's oceanic samples take the
             // incipient resistance alone, which stands for the trench's resistance until the
             // slab sinks by itself (a continental sample at its front is a collision's, as at a
-            // mature contact).
+            // mature contact). An oceanic front sample converging below the slab's thermal floor
+            // (PLT-681) is incipient whatever its contact's slab, and takes none either.
             if friction {
                 let front_q = e.front.map(|f| plate_of[f.u as usize]);
                 if let Some(f) = e.front
                     && let Some(q) = front_q
-                    && !(incipient_pairs.contains(&(q, pv)) && samples[f.u as usize].kind != CONTINENTAL) // ledger: PLT-610
+                    && !((incipient_pairs.contains(&(q, pv)) || below_floor(k, f.conv)) && samples[f.u as usize].kind != CONTINENTAL) // ledger: PLT-610, PLT-681
                     && let Some(i) = e.others[..usize::from(e.n_others)]
                         .iter()
                         .position(|&o| o == q)
@@ -1564,6 +1602,7 @@ fn balance_step(
         .map(|s| ((s.under, s.over), s))
         .collect();
     let mut breakoffs = 0u16;
+    let mut matured: Vec<[f64; 3]> = Vec::new();
     let mut slab_km: BTreeMap<usize, f64> = BTreeMap::new();
     let mut slabs_km = Vec::new();
     // Slabs with a front this step (fed when it is partly oceanic).
@@ -1587,6 +1626,15 @@ fn balance_step(
         }
         if grow_slab(s, f, env.dt_myr, k.slab_depth_km, k.slab_breakoff_myr) {
             breakoffs += 1;
+        }
+        // Measurement only (PLT-683): the contact's slab passes the critical convergence.
+        if young.contains(&ci) && !incipient(k, s.km) && f.oceanic > 0 {
+            let r1 = |x: f64| (x * 10.0).round() / 10.0;
+            matured.push([
+                r1(f.conv_sum / f64::from(f.oceanic)),
+                r1(env.t_myr - c.onset_myr),
+                f64::from(f.oceanic),
+            ]);
         }
         if f.oceanic > 0 {
             s.idle_myr = 0.0;
@@ -1708,8 +1756,12 @@ fn balance_step(
                 } else {
                     // An incipient front resists its convergence with the bending's plastic
                     // force until its slab sinks by itself (PLT-610), linearised as the
-                    // collision's; booked with the collision resistance.
-                    if young.contains(&ci) {
+                    // collision's; booked with the collision resistance. A front sample
+                    // converging below the slab's thermal floor is incipient whatever its
+                    // contact's slab (PLT-681).
+                    let slow = below_floor(k, sf.conv);
+                    let incipient_here = young.contains(&ci) || slow;
+                    if incipient_here {
                         let force = incipient_resistance_n_m(k, su.age_myr(env.t_myr), env.gravity)
                             * sf.len_m;
                         let speed = sf.conv.max(floor) * 1.0e-3 / YEAR_S;
@@ -1723,8 +1775,15 @@ fn balance_step(
                             term: Resist::Collision,
                         });
                     }
-                    let km = slab_km.get(&ci).copied().unwrap_or(0.0);
-                    Some((under, u, sf.dir, sf.len_m, km))
+                    // Gurnis et al. 2004's resisting force is net, the young slab's own weight
+                    // in it: an incipient front has no pull, suction or slab resistance of its
+                    // own (PLT-680), nor a sample too slow for a slab (PLT-681).
+                    if slow || (young.contains(&ci) && k.incipient_net_resistance) {
+                        None
+                    } else {
+                        let km = slab_km.get(&ci).copied().unwrap_or(0.0);
+                        Some((under, u, sf.dir, sf.len_m, km))
+                    }
                 }
             }
             None => e.hang.and_then(|(u, dir, len_m)| {
@@ -1851,6 +1910,7 @@ fn balance_step(
             forces,
             slabs_km,
             breakoffs,
+            matured,
         },
         slab_front_km,
         #[cfg(test)]

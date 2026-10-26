@@ -230,15 +230,17 @@ pub mod margin_class {
 /// The continental margins of `state` now (see [`Margins`]). `pos` are the samples' current
 /// positions; `initiated(plate)` says whether a plate was split off by a subduction initiation;
 /// a contact whose slab is shorter than `incipient_km` is no subduction zone yet
-/// (`forces::incipient_km`, PLT-614).
+/// (`forces::incipient_km`, PLT-614), nor is ocean floor coming in slower than `floor_mm_yr`
+/// (`forces::slab_floor_mm_yr`, PLT-681).
 pub fn margins(
     state: &PlateState,
     pos: &[DVec3],
     norm: &Norm,
     initiated: &(dyn Fn(u32) -> bool + Sync),
     incipient_km: f64,
+    floor_mm_yr: f64,
 ) -> Margins {
-    margin_classes(state, pos, norm, initiated, incipient_km).0
+    margin_classes(state, pos, norm, initiated, incipient_km, floor_mm_yr).0
 }
 
 /// [`margins`] and every sample's [`margin_class`].
@@ -248,6 +250,7 @@ pub fn margin_classes(
     norm: &Norm,
     initiated: &(dyn Fn(u32) -> bool + Sync),
     incipient_km: f64,
+    floor_mm_yr: f64,
 ) -> (Margins, Vec<u8>) {
     let t = state.t_myr;
     let samples = &state.samples;
@@ -334,17 +337,23 @@ pub fn margin_classes(
                 if pj != plate_of[i] {
                     out.other_plate = true;
                     // A front where the two plates close in on each other (the model's own test,
-                    // `subduction::fronts_and_uplift`): a contact's diverging stretches are none.
+                    // `subduction::fronts_and_uplift`): a contact's diverging stretches are none,
+                    // nor ocean floor closing in slower than the slab's thermal floor (PLT-681),
+                    // whichever side of the pair this sample is on.
                     let x = pos[i];
                     let rel =
                         norm.velocity_mm_yr(omega[pj as usize] - omega[plate_of[i] as usize], x);
                     let out_dir =
                         (pos[j as usize] - x * pos[j as usize].dot(x)).normalize_or_zero();
-                    if rel.dot(out_dir) < 0.0
+                    let closing = -rel.dot(out_dir);
+                    if closing > 0.0
                         && let Some(c) = contact_of(plate_of[i], pj)
                     {
-                        out.front.get_or_insert(c);
-                        out.over |= live[c].1 == plate_of[i];
+                        let under_side = if live[c].0 == plate_of[i] { s } else { o };
+                        if under_side.kind == CONTINENTAL || closing >= floor_mm_yr {
+                            out.front.get_or_insert(c);
+                            out.over |= live[c].1 == plate_of[i];
+                        }
                     }
                 }
             }

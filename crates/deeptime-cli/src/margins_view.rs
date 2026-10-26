@@ -56,6 +56,7 @@ pub fn run(input: &Path, out: &Path) -> Result<Margins, Box<dyn std::error::Erro
         &norm,
         &|q| initiated.contains(&q),
         deeptime_core::plates::forces::incipient_km(&p.tectonics),
+        deeptime_core::plates::forces::slab_floor_mm_yr(&p.tectonics),
     );
 
     let c = p.scale.circumference_blocks;
