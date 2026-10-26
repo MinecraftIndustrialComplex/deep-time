@@ -138,6 +138,7 @@ const GLOBALS: [(&str, &str); 68] = [
     ("noroom_sliver", super::belts::SLIVER_GLOBAL),
     ("noroom_capped", super::belts::CAPPED_GLOBAL),
     ("noroom_clipped", super::belts::CLIPPED_GLOBAL),
+    ("noroom_stays", super::belts::STAYS_GLOBAL),
     ("taper_toe", super::belts::TOE_GLOBAL),
     // The overriding plate's share (ledger: PLT-652; zero without the switch).
     ("upper", super::belts::UPPER_GLOBAL),

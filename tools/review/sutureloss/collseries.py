@@ -41,6 +41,27 @@ def snaps(path):
     return out
 
 
+def dock(path):
+    """The dock tally's front-time (km x Myr) by the overriding side's oceanic share, summed over
+    the state-age bins, and its front-time-weighted convergence."""
+    bins, w, cw = [0.0] * 4, 0.0, 0.0
+    found = False
+    with open(f"{path}/summary.txt") as f:
+        for line in f:
+            m = re.match(r"dock_age=\S+ km_myr=(\S+) means=(\S+)", line)
+            if m:
+                found = True
+                km = [float(x) for x in m.group(1).split(",")]
+                means = m.group(2).split(",")
+                for i in range(4):
+                    bins[i] += km[i]
+                s = sum(km)
+                c = float(means[4]) if means[4] != "nan" else 0.0
+                w += s
+                cw += s * c
+    return (bins, cw / w if w > 0 else float("nan")) if found else None
+
+
 def parts(g):
     c, k = g.get("crossed", 0.0), g.get("kept", 0.0)
     sl, ca, cl = (g.get(f"noroom_{x}", 0.0) for x in ("sliver", "capped", "clipped"))
@@ -80,6 +101,7 @@ def summarize(length, runs):
         r["lost_frac"] = p["loss"] / p["crossed"] if p["crossed"] > 0 else float("nan")
         r["per_km"] = p["loss"] / p["front"] if p["front"] > 0 else float("nan")
         r["name"] = name
+        r["path"] = path
         r["series"] = s
         rows.append(r)
     return rows
@@ -127,6 +149,21 @@ def main():
                 f"{c} {mb[c]:.3f} -> {ma[c]:.3f} ({ma[c] - mb[c]:+.3f})" for c in ("share", "sliver", "capped", "clipped")))
             print("   as shares of crossed: " + ", ".join(
                 f"{c} {mb[c] / mb['crossed']:.4f} -> {ma[c] / ma['crossed']:.4f}" for c in ("share", "sliver", "capped", "upper", "wedge")))
+    print("# the dock tally (PLT-515, after the first 100 Myr): share of the collision front-time by the "
+          "overriding side's oceanic share within the belt's reach (0-0.25, 0.25-0.5, 0.5-0.75, 0.75-1), "
+          "and the front-time's mean convergence (mm/yr)")
+    for a, rows in arms.items():
+        bins, conv = [0.0] * 4, []
+        for r in rows:
+            d = dock(r["path"])
+            if d is None:
+                continue
+            for i in range(4):
+                bins[i] += d[0][i]
+            conv.append(d[1])
+        tot = sum(bins)
+        if tot > 0:
+            print(f"{a:14s} " + " ".join(f"{b / tot:7.3f}" for b in bins) + f"   conv {mean(conv):6.2f}")
     if series:
         for a, rows in arms.items():
             print(f"# {a}: each 50-Myr interval, mean over runs: front km, conv mm/yr, crossed, share, sliver, "
