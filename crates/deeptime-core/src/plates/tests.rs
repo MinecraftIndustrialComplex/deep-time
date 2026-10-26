@@ -5312,7 +5312,6 @@ fn ratchet(chain: u64, steps: bool) -> Ratchet {
     let mut p = preset(20_000, 20.0, "supercontinent", 5);
     p.tectonics.margin_sediment_continental = true;
     p.tectonics.transition_ocean_crust = true;
-    p.tectonics.pelagic_m_per_myr = 5.0;
     let stage = PlatesStage::new(p.clone());
     let env = stage.env(&p.tectonics, 1);
     let (mut st, geo, pos) = plates_split(&p, &env, 0.0, |q| q.z > -0.3);

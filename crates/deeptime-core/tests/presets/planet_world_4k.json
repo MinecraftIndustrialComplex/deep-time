@@ -109,7 +109,6 @@
     "cordillera_width_km": 120.0,
     "cordillera_height_m": 2500.0,
     "trench_half_life_myr": 2.0,
-    "pelagic_m_per_myr": 5.0,
     "hotspots_initial": 8,
     "hotspot_births_per_100myr": 3.0,
     "hotspot_lifetime_myr": [

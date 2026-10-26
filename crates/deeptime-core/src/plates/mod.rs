@@ -1535,7 +1535,6 @@ fn surface(st: &mut PlateState, geo: &Geo, env: &Env<'_>, held_floor: &[f32], se
         erosion_m: k.continental_erosion_mm_yr * 1.0e-3 * env.dt_yr,
         damping_m: k.oceanic_damping_mm_yr * 1.0e-3 * env.dt_yr,
         accretion_m: k.sediment_accretion_mm_yr * 1.0e-3 * env.dt_yr,
-        pelagic_m: k.pelagic_m_per_myr * env.dt_myr,
         z_c: k.max_elevation_m,
         z_t: k.trench_elevation_m,
         z_floor: k.oceanic_floor_elevation_m,

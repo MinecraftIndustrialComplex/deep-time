@@ -208,8 +208,6 @@ pub struct SurfaceRates {
     pub damping_m: f64,
     /// ε_t·δt.
     pub accretion_m: f64,
-    /// Pelagic sediment per step, metres.
-    pub pelagic_m: f64,
     pub z_c: f64,
     pub z_t: f64,
     /// The elevation oceanic crust subsides towards (`oceanic_floor_elevation_m`; Cortial: z_t).
@@ -267,9 +265,6 @@ pub fn surface_step(s: &mut Sample, r: &SurfaceRates, held_floor: f32) -> f64 {
                     sink
                 };
             }
-        }
-        if !s.is_hidden() {
-            s.pools[pool::SEDIMENT] += r.pelagic_m as f32;
         }
     } else if z > r.sea_m {
         // Cortial's ε_c·(z/z_c)·δt on the height above the sea (ledger: PLT-127, PLT-128).
@@ -415,7 +410,6 @@ mod tests {
             erosion_m: 60.0,
             damping_m: 0.04e-3 * 1.0e6,
             accretion_m: 600.0,
-            pelagic_m: 0.0,
             z_c: 10_000.0,
             z_t: -10_000.0,
             z_floor: -10_000.0,
@@ -483,7 +477,6 @@ mod tests {
             erosion_m: 0.0,
             damping_m: 0.0,
             accretion_m: 0.0,
-            pelagic_m: 0.0,
             z_c: 10_000.0,
             z_t: -10_000.0,
             z_floor: -GDH1_FLOOR_M,
@@ -559,7 +552,6 @@ mod tests {
             erosion_m: 0.0,
             damping_m: 0.0,
             accretion_m: 0.0,
-            pelagic_m: 0.0,
             z_c: 10_000.0,
             z_t: -10_000.0,
             z_floor: -GDH1_FLOOR_M,
