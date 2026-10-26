@@ -393,6 +393,14 @@ pub struct Contact {
     /// (`subduction::fronts_finish`).
     #[serde(default)]
     pub carried: bool,
+    /// When the contact's arc began, Myr: the first step one of its oceanic fronts was past
+    /// incipient (its slab past PLT-611's 100 km, [`super::forces::incipient`]; with
+    /// `incipient_subduction` off, its first oceanic front). `None` until then, and again after a
+    /// polarity reversal (a new slab); a split's copies keep it with the slab (`inherit.rs`). The
+    /// arc's age, from it, sets the island arcs' early pulse (`tectonics.arc_front_loaded`) and the
+    /// young fronts' measure. ledger: PLT-669
+    #[serde(default)]
+    pub arc_onset_myr: Option<f64>,
 }
 
 impl Contact {

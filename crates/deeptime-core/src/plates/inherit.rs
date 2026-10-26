@@ -401,6 +401,7 @@ pub(in crate::plates) mod tests {
             cont_in: 0,
             reversed: false,
             carried: false,
+            arc_onset_myr: None,
         }
     }
 
@@ -525,6 +526,7 @@ pub(in crate::plates) mod tests {
             let mut c = contact(0, 1, DVec3::new(0.0, 0.8, 0.5));
             c.collision = Some(collision_at(front));
             c.onset_event = Some(deeptime_format::EventId(11));
+            c.arc_onset_myr = Some(4.0);
             st.contacts.push(c);
             st.contacts.push(contact(0, 2, cap2));
             st.slabs.push(slab(0, 1, 300.0));
@@ -554,6 +556,8 @@ pub(in crate::plates) mod tests {
         for under in [0, 3] {
             let c = find(&st, under, 1).expect("both halves subduct under plate 1");
             assert_eq!(c.onset_myr, 2.0);
+            // The arc's onset goes with the slab (PLT-669).
+            assert_eq!(c.arc_onset_myr, Some(4.0));
             assert_eq!(c.onset_event, Some(deeptime_format::EventId(11)));
             assert_eq!(slab_of(&st, under, 1).map(|s| s.km), Some(300.0));
         }

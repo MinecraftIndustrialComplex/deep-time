@@ -10405,7 +10405,7 @@ between resamplings grew from −0.0163 to −0.0324, and is not split here. m5h
 continental crust is 0.0029 of the planet, all of it matured island arcs, none at any distance past
 its continent's crust.
 
-##### Toward front-loaded arcs (a design, not built)
+##### Toward front-loaded arcs (the design; built behind a switch below, PLT-668)
 
 Stern & Scholl's intra-oceanic 100 is "500 km3/million years for first 10 million years plus 30
 km3/million years for 60 million years thereafter" (PLT-045's quote, p. 11). Clift et al. 2009's
@@ -10423,6 +10423,71 @@ length) under the same law would add about 2.5 km³ a year against Stern & Schol
 Scholl put the continental arcs' lower average down to their longer lives (p. 13), and the planet's
 continental contacts live as briefly as its island ones. The burst's crust is 5,000 km³ a km; on the
 arc band (106 km) that is 47 km at the axis in 10 Myr.
+
+#### Front-loaded island arcs (PLT-668 to PLT-670, 2026-10-25)
+
+Built behind `tectonics.arc_front_loaded`, off by default and in every preset; no arm run yet (the
+coordinator's calls 1 to 5, 2026-10-25). Off, no rule reads the new contact field: the island
+rate's code path is unchanged, and the field and the two new globals only measure (the state and
+the summary carry them, so their hashes are new).
+
+- **The law (PLT-668).** An island arc adds 500 km³ per km of arc per Myr over its band while it is
+  younger than 10 Myr, at any convergence, then 30 × v_n / 86.6 (PLT-665's scaling at PLT-666's
+  reference). Stern & Scholl 2010, p. 11: "500 km3/million years for first 10 million years plus 30
+  km3/million years for 60 million years thereafter"; over 70 Myr at the 2-Myr step and Earth's mean
+  convergence that is (500 × 10 + 30 × 60) / 70 = 97.1, their "approximately 100". The burst takes no
+  v_n factor because Stern & Scholl put the pulse down to the sinking slab and the spreading forearc,
+  not to the convergence, p. 11: "Early rapid growth reflects wholescale upwelling of asthenosphere up
+  and over the sinking lithosphere (Hall et al. 2003), followed by a progressive diminution of
+  upwelling as early slab sinking is replaced by the nearly down-dip motion of the slab", and
+  "seafloor spreading in what will become the forearc predates plate convergence and thus true
+  subduction". The rates are constants beside the law in `subduction.rs`
+  (`ISLAND_ARC_BURST_KM3_PER_KM_MYR`, `ISLAND_ARC_BURST_MYR`, `ISLAND_ARC_MATURE_KM3_PER_KM_MYR`,
+  `island_arc_law`), not settings: the switch is the only new setting.
+- **Island arcs only.** Continental arcs keep PLT-285's 35 × v_n / 58.6 on or off: Stern & Scholl
+  give the front-loaded law for intra-oceanic arcs, and put the continental arcs' lower average down
+  to their longer lives (p. 13).
+- **The arc's age (PLT-669).** `Contact.arc_onset_myr` is the first step one of the contact's oceanic
+  fronts is past incipient, its slab at least PLT-611's 100 km long before the step (with
+  `incipient_subduction` off, the contact's first oceanic front). A polarity reversal clears it (a new
+  slab, a new arc) and a split's two copies keep it (`inherit.rs`). A front with no onset takes the
+  mature rate. The 100 km is a slab length standing for the slab's depth under the volcanoes,
+  Syracuse & Abers 2006's "global average of 105 km" (abstract): a straight slab to 105 km under
+  PLT-042's arc 200 km from the trench is hypot(200, 105) = 226 km long, so on that measure the onset
+  is early; Stern & Scholl time the pulse from the initiation itself, which PLT-610 counts as
+  incipient with no arc, so on that measure it is late.
+- **The young fronts, measured (PLT-670).** The globals `plates/arc_front_young_continental_km_myr`
+  and `plates/arc_front_young_oceanic_km_myr` (the crust budget's `front_young_c`, `front_young_o`):
+  the oceanic-slab fronts whose arc is under 10 Myr old, km × Myr a step, split as
+  `front_continental`/`front_oceanic` are (PLT-370). They count with the switch on or off, so an off
+  base already gives the share of the front a burst arm would pulse.
+- **Known gaps.** Back-arc pulses: Clift et al. 2009, p. 97, net addition "could occur in pulses of
+  enhanced mafic accretion and associated intracrustal differentiation, which are associated with
+  subduction initiation and arc-extension events", the Mariana arc's productivity "greatly increased"
+  while it split for back-arc basins; the model opens no back-arc basins and the source gives no
+  numbers, so these pulses are left out. Induced initiations: the model does not tell a spontaneous
+  initiation from an induced one (PLT-610 follows Gurnis et al.'s induced case), and every island arc
+  gets the pulse, where Stern & Scholl leave the induced ones open (p. 11: "There is no obvious
+  increase in magma production associated with the Solomon Is. INSZ").
+
+Tests (`plates/tests.rs`): `front_loaded_island_arcs_follow_stern_and_scholl` (the law: 500 at ages
+0 to 9.9 Myr at 5 to 200 mm/yr, 30 × v_n / 86.6 from 10 Myr, the 70-Myr mean 6,800 / 70; off, 100 ×
+v_n / 86.6 at any age, with or without an onset); `island_arcs_front_loaded_pulse_then_mature_rate`
+(the straight front of `a_front_of_known_length` with the overriding plate turned to ocean floor and
+150-km slabs: on, a young arc's magma is 500 × its band to 10⁻⁶, the same at 50 and 200 mm/yr; a
+20-Myr-old arc's is 0.3 of the one rate's and four times it at four times the convergence; off, the
+age changes nothing; on the continent the arcs are the same on and off; the young front is all of a
+just-begun arc's front and none of a 20-Myr-old one's; on the fixture's one step, 20,000 samples,
+a front of 9,146 km × Myr: off 5.43 × 10⁵ km³, on and young 4.83 × 10⁶ km³ at 50 and at 200 mm/yr,
+8.9 times); `an_arcs_onset_is_its_slabs_first_step_past_incipient`
+(a 90-km slab gives no onset, a 110-km slab the step's time, kept the steps after; young one step on,
+not 10 Myr on); and `inherit.rs`'s split test, which now checks both halves keep the onset.
+
+What the burst would do on the planet is the estimate above ("Toward front-loaded arcs"): with the
+planet's island front about three times Stern & Scholl's 14,500 km, the pulses would roughly double
+or triple the island arcs' crust (2.5 to 3.9 km³ a year against 1.26 off and Stern & Scholl's 1.4).
+The coordinator's call: if the burst overshoots because of the front's length, it stays off until the
+front is fixed.
 
 ## The sea floor's age and the initiation's polarity (2026-10-25)
 

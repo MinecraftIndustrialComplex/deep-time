@@ -120,7 +120,7 @@ pub const EDGES_KM: [f64; 10] = [
 ];
 
 /// The globals each snapshot copies (cumulative over the run, km³ or km² Earth-normalized).
-const GLOBALS: [(&str, &str); 66] = [
+const GLOBALS: [(&str, &str); 68] = [
     ("flow_steps", super::flow::STEPS_GLOBAL),
     ("flow_substeps", super::flow::SUBSTEPS_GLOBAL),
     ("flow_short_myr", super::flow::SHORT_GLOBAL),
@@ -197,6 +197,16 @@ const GLOBALS: [(&str, &str); 66] = [
     (
         "front_n_o",
         super::subduction::ARC_FRONT_NORMAL_OCEANIC_GLOBAL,
+    ),
+    // The arcs' fronts younger than the island arcs' early pulse (PLT-670): over front_c and
+    // front_o, the share of the fronts the pulse acts on.
+    (
+        "front_young_c",
+        super::subduction::ARC_FRONT_YOUNG_CONTINENTAL_GLOBAL,
+    ),
+    (
+        "front_young_o",
+        super::subduction::ARC_FRONT_YOUNG_OCEANIC_GLOBAL,
     ),
     ("forearc_c", super::subduction::FOREARC_CONTINENTAL_GLOBAL),
     ("forearc_o", super::subduction::FOREARC_OTHER_GLOBAL),
