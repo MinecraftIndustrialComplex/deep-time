@@ -166,6 +166,11 @@ pub struct Dynamics {
     /// the next step's `PlateForces::rot_change`).
     #[serde(default)]
     pub prev_balance: Vec<(u32, [f64; 3])>,
+    /// Each pair of plates' front after the last step by setting and state ([`PairFront`]: under,
+    /// over, setting, 1 if subducting, half sample spacings), for the next step's
+    /// [`FrontBands::gain`] (measurement only, PLT-683).
+    #[serde(default)]
+    pub prev_pair_front: Vec<(u32, u32, u8, u8, u64)>,
 }
 
 /// One step's state of the planet and its plates.
@@ -211,6 +216,11 @@ pub struct StepRec {
     /// Slabs that broke off this step (version 4).
     #[serde(default)]
     pub breakoffs: u16,
+    /// The contacts whose slab passed the critical convergence this step (PLT-610; measurement
+    /// only, PLT-683): `[mean convergence of its oceanic front, mm/yr; the contact's age, Myr;
+    /// its oceanic front samples]` (`forces::Recorded::matured`).
+    #[serde(default)]
+    pub matured: Vec<[f64; 3]>,
     /// Length of plate boundary by kind, km, indexed by [`mix`] (all 0 in a record without it).
     #[serde(default)]
     pub mix_km: [f64; MIX_CLASSES],
@@ -993,6 +1003,53 @@ pub struct FrontBands {
     /// intermediate to deep earthquakes and/or a parallel volcanic arc"). ledger: PLT-615
     #[serde(default)]
     pub benioff: [f64; 2],
+    /// Measurement only (the M5 lane's cross-tab, 2026-10-26; ledger: PLT-683), km, by setting
+    /// (ocean-ocean, ocean-continent, as above). `slow`: the part of `incipient` that is
+    /// incipient by the slab's thermal floor alone (its contact's slab past the critical
+    /// convergence, the sample converging below `forces::SLAB_THERMAL_FLOOR_MM_YR`; PLT-681).
+    #[serde(default)]
+    pub slow: [f64; 2],
+    /// … the incipient fronts (either cause) by their convergence across the boundary, in the
+    /// bands of [`NORMAL_BANDS_MM_YR`] (they sum to `incipient`) …
+    #[serde(default)]
+    pub incipient_normal: [[f64; BANDS]; 2],
+    /// … the subducting fronts by the sample's convergence band (first index after the
+    /// setting) and by the mean convergence over its pair of plates' front samples this step,
+    /// incipient ones included (second index; the mean the pair's slab is fed with, FRC-020),
+    /// both in the bands of [`NORMAL_BANDS_MM_YR`] (summed over the second index, `normal`) …
+    #[serde(default)]
+    pub normal_pair: [[[f64; BANDS]; BANDS]; 2],
+    /// … the ocean-ocean subducting front by how its plates are related ([`PAIR_INITIATION`],
+    /// [`PAIR_RIFT`], [`PAIR_OTHER`]) and its convergence band (sums: `oo_pair`, `normal[0]`) …
+    #[serde(default)]
+    pub oo_normal_pair: [[f64; BANDS]; 3],
+    /// … and the front's turnover since the step before, by setting and state (0 incipient, 1
+    /// subducting): over every pair of plates, setting and state, the growth (`gain`) and the
+    /// shrinking (`loss`) of its front's length; a pair's front that lengthens at one end and
+    /// shortens at the other in the same step counts only the difference. Zero on the record's
+    /// first step (filled by [`record_step`] from [`Dynamics::prev_pair_front`]).
+    #[serde(default)]
+    pub gain: [[f64; 2]; 2],
+    #[serde(default)]
+    pub loss: [[f64; 2]; 2],
+    /// … the subducting fronts' `gain` by their pair's slab, in the bands of [`SLAB_BANDS_KM`]:
+    /// front that joins a pair whose slab is already long subducts from its first step.
+    #[serde(default)]
+    pub gain_slab: [[f64; BANDS]; 2],
+}
+
+/// One pair of plates' front in one setting and state this step ([`Mix::pairs`]; measurement
+/// only, PLT-683): the plate going under, the overriding plate, the setting (0 ocean-ocean, 1
+/// ocean-continent), whether it subducts (else incipient), its length in half sample spacings
+/// and its pair's slab, km.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct PairFront {
+    pub under: u32,
+    pub over: u32,
+    pub setting: u8,
+    pub subducting: bool,
+    pub units: u64,
+    pub slab_km: f64,
 }
 
 /// The depth of the slab under the arc a subducting front's slab must reach for
@@ -1015,14 +1072,34 @@ pub const PAIR_RIFT: usize = 1;
 pub const PAIR_OTHER: usize = 2;
 
 /// [`boundary_mix`]'s answer: the length by kind and the subducting length's bands.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Mix {
     pub km: [f64; MIX_CLASSES],
     pub bands: FrontBands,
+    /// Each pair of plates' front by setting and state, ordered by (under, over, setting,
+    /// subducting): what the front's turnover ([`FrontBands::gain`]) is measured from.
+    pub pairs: Vec<PairFront>,
+}
+
+/// One front sample of [`boundary_mix`], kept for the cross-tabs that need the whole step
+/// (measurement only, PLT-683).
+#[derive(Clone)]
+struct FrontRec {
+    v: u32,
+    under: u32,
+    over: u32,
+    setting: usize,
+    subducting: bool,
+    /// Incipient by the slab's thermal floor alone (PLT-681).
+    slow: bool,
+    v_n: f64,
+    half: u32,
+    pair: usize,
+    slab_km: f64,
 }
 
 /// [`Mix`] in half sample spacings, summed over samples.
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Default)]
 struct MixUnits {
     km: [u64; MIX_CLASSES],
     slab: [[u64; BANDS]; 2],
@@ -1033,6 +1110,8 @@ struct MixUnits {
     oo_pair: [u64; 3],
     incipient: [u64; 2],
     benioff: [u64; 2],
+    /// The front samples, for the cross-tabs that need the whole step (PLT-683).
+    recs: Vec<FrontRec>,
 }
 
 impl MixUnits {
@@ -1068,6 +1147,7 @@ impl MixUnits {
             }
         }
         self.other_converging += b.other_converging;
+        self.recs.extend(b.recs);
         self
     }
 }
@@ -1283,14 +1363,32 @@ pub fn boundary_mix(
                     (k, f, km, age)
                 });
                 // An incipient front (PLT-610) is no subduction zone yet: a converging boundary
-                // with no slab sunk and no arc (ledger: PLT-614).
-                let young = front.is_some_and(|(_, _, km, _)| km < young_km);
+                // with no slab sunk and no arc (ledger: PLT-614); nor is a front converging too
+                // slowly for a slab to form, whatever its contact's slab (PLT-681).
+                let young_slab = front.is_some_and(|(_, _, km, _)| km < young_km);
+                let slow = front
+                    .is_some_and(|(_, f, _, _)| super::forces::below_floor(env.k, -buf[f].normal));
+                let young = young_slab || slow;
                 let class = if young { mix::OTHER } else { class };
                 if let Some(c) = classes {
                     c[v].store(class as u8 + 1, std::sync::atomic::Ordering::Relaxed);
                 }
                 acc.km[class] += u64::from(half);
                 if let Some((k, f, km, age)) = front {
+                    // Measurement only (PLT-683): the front sample for the step's cross-tabs.
+                    let under = plate_buf[f];
+                    acc.recs.push(FrontRec {
+                        v: v as u32,
+                        under,
+                        over: pv,
+                        setting: k,
+                        subducting: !young,
+                        slow: slow && !young_slab,
+                        v_n: -buf[f].normal,
+                        half,
+                        pair: pairs.get(&(under, pv)).copied().unwrap_or(PAIR_OTHER),
+                        slab_km: km,
+                    });
                     if young {
                         acc.incipient[k] += u64::from(half);
                         return acc;
@@ -1324,10 +1422,61 @@ pub fn boundary_mix(
             acc
         })
         .reduce(MixUnits::default, MixUnits::add);
+    let mut recs = units.recs;
     let km = |u: u64| (u as f64 * 0.5 * spacing_km).round();
     let bands = |b: [[u64; BANDS]; 2]| b.map(|row| row.map(km));
+    // The cross-tabs over the whole step's front samples (PLT-683), in sample order so the
+    // float sums are reproducible.
+    recs.sort_unstable_by_key(|r| r.v);
+    let mut pair_mean: BTreeMap<(u32, u32), (f64, u64)> = BTreeMap::new();
+    for r in &recs {
+        let m = pair_mean.entry((r.under, r.over)).or_default();
+        m.0 += r.v_n * f64::from(r.half);
+        m.1 += u64::from(r.half);
+    }
+    let mut slow = [0u64; 2];
+    let mut incipient_normal = [[0u64; BANDS]; 2];
+    let mut normal_pair = [[[0u64; BANDS]; BANDS]; 2];
+    let mut oo_normal_pair = [[0u64; BANDS]; 3];
+    let mut by_pair: BTreeMap<(u32, u32, u8, bool), (u64, f64)> = BTreeMap::new();
+    for r in &recs {
+        let h = u64::from(r.half);
+        let b = band_of(r.v_n, &NORMAL_BANDS_MM_YR);
+        let e = by_pair
+            .entry((r.under, r.over, r.setting as u8, r.subducting))
+            .or_default();
+        e.0 += h;
+        e.1 = r.slab_km;
+        if !r.subducting {
+            incipient_normal[r.setting][b] += h;
+            if r.slow {
+                slow[r.setting] += h;
+            }
+            continue;
+        }
+        let (sum, w) = pair_mean[&(r.under, r.over)];
+        let mean = sum / w.max(1) as f64;
+        normal_pair[r.setting][b][band_of(mean, &NORMAL_BANDS_MM_YR)] += h;
+        if r.setting == 0 {
+            oo_normal_pair[r.pair][b] += h;
+        }
+    }
+    let pairs = by_pair
+        .into_iter()
+        .map(
+            |((under, over, setting, subducting), (units, slab_km))| PairFront {
+                under,
+                over,
+                setting,
+                subducting,
+                units,
+                slab_km,
+            },
+        )
+        .collect();
     Mix {
         km: units.km.map(km),
+        pairs,
         bands: FrontBands {
             slab: bands(units.slab),
             normal: bands(units.normal),
@@ -1339,6 +1488,11 @@ pub fn boundary_mix(
             oo_pair: units.oo_pair.map(km),
             incipient: units.incipient.map(km),
             benioff: units.benioff.map(km),
+            slow: slow.map(km),
+            incipient_normal: bands(incipient_normal),
+            normal_pair: normal_pair.map(|m| m.map(|row| row.map(km))),
+            oo_normal_pair: oo_normal_pair.map(|row| row.map(km)),
+            ..FrontBands::default()
         },
     }
 }
@@ -1438,7 +1592,7 @@ pub fn arc_heights(st: &PlateState, sea_m: f64) -> [ArcStat; 2] {
 /// What a step measured before `record_step` sees its end state: the fronts' lengths, the boundary
 /// mix and the arc heights, taken where the flags are fresh ([`boundary_mix`], [`arc_heights`]),
 /// and the force balance (`forces::step`).
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Observed<'a> {
     /// Each plate's subduction front length this step (`subduction::Pull::front_km`).
     pub front_km: &'a [f64],
@@ -1698,6 +1852,54 @@ pub fn record_step(
             small += 1;
         }
     }
+    // The front's turnover since the step before, by pair of plates, setting and state
+    // (measurement only, PLT-683).
+    let mut front_bands = seen.mix.bands;
+    let now: Vec<(u32, u32, u8, u8, u64)> = seen
+        .mix
+        .pairs
+        .iter()
+        .map(|f| (f.under, f.over, f.setting, u8::from(f.subducting), f.units))
+        .collect();
+    if !d.steps.is_empty() {
+        let units_km = |u: u64| (u as f64 * 0.5 * spacing_km).round();
+        let slab_of: BTreeMap<(u32, u32, u8, u8), f64> = seen
+            .mix
+            .pairs
+            .iter()
+            .map(|f| {
+                (
+                    (f.under, f.over, f.setting, u8::from(f.subducting)),
+                    f.slab_km,
+                )
+            })
+            .collect();
+        let mut change: BTreeMap<(u32, u32, u8, u8), i64> = BTreeMap::new();
+        for &(u, o, s, m, n) in &now {
+            *change.entry((u, o, s, m)).or_default() += n as i64;
+        }
+        for &(u, o, s, m, n) in &d.prev_pair_front {
+            *change.entry((u, o, s, m)).or_default() -= n as i64;
+        }
+        let (mut gain, mut loss) = ([[0u64; 2]; 2], [[0u64; 2]; 2]);
+        let mut gain_slab = [[0u64; BANDS]; 2];
+        for (&(u, o, s, m), &dn) in &change {
+            let (s, m) = (usize::from(s.min(1)), usize::from(m.min(1)));
+            if dn > 0 {
+                gain[s][m] += dn as u64;
+                if m == 1 {
+                    let km = slab_of.get(&(u, o, s as u8, 1)).copied().unwrap_or(0.0);
+                    gain_slab[s][band_of(km, &SLAB_BANDS_KM)] += dn as u64;
+                }
+            } else {
+                loss[s][m] += dn.unsigned_abs();
+            }
+        }
+        front_bands.gain = gain.map(|r| r.map(units_km));
+        front_bands.loss = loss.map(|r| r.map(units_km));
+        front_bands.gain_slab = gain_slab.map(|r| r.map(units_km));
+    }
+    d.prev_pair_front = now;
     d.steps.push(StepRec {
         t,
         visible,
@@ -1715,12 +1917,13 @@ pub fn record_step(
         old250: older(OLD_AGES_MYR[1]) as u32,
         pieces,
         mix_km: seen.mix.km,
-        front_bands: seen.mix.bands,
+        front_bands,
         arc_oceanic: seen.arcs[0],
         arc_continental: seen.arcs[1],
         forces: seen.forces.map(|f| f.forces.clone()).unwrap_or_default(),
         slabs_km: seen.forces.map(|f| f.slabs_km.clone()).unwrap_or_default(),
         breakoffs: seen.forces.map_or(0, |f| f.breakoffs),
+        matured: seen.forces.map(|f| f.matured.clone()).unwrap_or_default(),
         shown: super::shown::take_step(st),
     });
 
