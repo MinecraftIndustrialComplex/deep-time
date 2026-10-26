@@ -659,7 +659,10 @@ fn chemical_denudation_takes_the_weathered_rock_away() {
     // The pelagic rain (`pelagic.rs`) returns the dissolved load: off, no opal and no returned
     // carbonate; on, its silica comes back as opal mol for mol and its Ca + Mg as carbonate, all
     // of the supply laid (what a full cell cannot hold settles where there is room).
-    assert_eq!((a.totals.opal_km3, a.totals.returned_carbonate_km3), (0.0, 0.0));
+    assert_eq!(
+        (a.totals.opal_km3, a.totals.returned_carbonate_km3),
+        (0.0, 0.0)
+    );
     let t = &c.totals;
     assert!(t.returned_carbonate_km3 > 0.0 && t.opal_km3 > 0.0, "{t:?}");
     let opal_km3 = t.dissolved_km3 * crate::climate::carbon::ROCK_KG_M3 * pelagic::SILICA_SHARE

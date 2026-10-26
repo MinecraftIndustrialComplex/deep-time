@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
-//! The pelagic rain (2026-10-26): what settles on the sea floor out of the air and the water,
+//! The pelagic rain (2026-10-25): what settles on the sea floor out of the air and the water,
 //! beyond the neritic factory's carbonate and the rivers' and the sea's mud. It replaced the
 //! plates' unsourced 5 m/Myr on oceanic crust (PLT-103, retired) and the fixed 4 m/Myr of chalk
 //! (ERO-191), and it closes the dissolved load's leak (ERO-205): the rock the land's weathering
@@ -521,7 +521,10 @@ mod tests {
             assert!(rel(arrays, sum.total()) < 1e-6);
             for (c, &x) in z.iter().enumerate() {
                 let got: f64 = a.iter().map(|v| f64::from(v[c])).sum();
-                assert!(got <= x * (1.0 + 1e-6), "cell {c}: {got} m in {x} m of water");
+                assert!(
+                    got <= x * (1.0 + 1e-6),
+                    "cell {c}: {got} m in {x} m of water"
+                );
             }
             // The calcifiers' share is the chalk.
             let carb = sum.chalk + sum.carbonate;

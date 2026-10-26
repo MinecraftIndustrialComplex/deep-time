@@ -30,8 +30,7 @@ use super::kinematics::{arr, random_motion};
 use super::noise::fbm;
 use super::pools::{continental_column, floor_at, ocean_heat_flow, oceanic_column};
 use super::state::{
-    CONTINENTAL, Counters, Group, Hotspot, OCEANIC, Plate, PlateState, Sample, SlabTrack,
-    regime,
+    CONTINENTAL, Counters, Group, Hotspot, OCEANIC, Plate, PlateState, Sample, SlabTrack, regime,
 };
 use crate::error::CoreError;
 use crate::params::{OceanDepth, PlanetPreset};
