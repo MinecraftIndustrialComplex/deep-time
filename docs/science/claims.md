@@ -44,14 +44,14 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [POL](ledger/POL.md) | the pole cap | 9 | 0 | 0 | 0 | 0 | 0 | 8 | 1 | 0 | 0 | 16 |
 | [PRS](ledger/PRS.md) | presets other than earthlike_quick_16k; test and world presets | 69 | 2 | 8 | 0 | 1 | 2 | 49 | 7 | 11 | 0 | 5 |
 | [PRV](ledger/PRV.md) | geologic provinces | 29 | 0 | 0 | 0 | 5 | 3 | 11 | 10 | 0 | 0 | 2 |
-| [RCK](ledger/RCK.md) | rock classes, metamorphism, plutons | 82 | 11 | 8 | 1 | 1 | 1 | 57 | 3 | 0 | 0 | 11 |
+| [RCK](ledger/RCK.md) | rock classes, metamorphism, plutons | 83 | 11 | 8 | 1 | 1 | 1 | 58 | 3 | 0 | 0 | 11 |
 | [RLC](ledger/RLC.md) | realism checks: Earth's range for V1 item 1's measures | 31 | 7 | 11 | 1 | 1 | 0 | 11 | 0 | 0 | 0 | 0 |
 | [SCL](ledger/SCL.md) | world scale, planet constants | 111 | 1 | 6 | 6 | 0 | 1 | 89 | 8 | 0 | 2 | 16 |
 | [STE](ledger/STE.md) |  | 15 | 1 | 0 | 3 | 0 | 0 | 10 | 1 | 0 | 0 | 0 |
 | [STR](ledger/STR.md) | strata, traps, hosts | 53 | 1 | 0 | 0 | 1 | 2 | 49 | 0 | 0 | 0 | 4 |
 | [VOL](ledger/VOL.md) | volcanoes | 109 | 7 | 0 | 3 | 3 | 2 | 70 | 24 | 0 | 0 | 0 |
 | [YNG](ledger/YNG.md) | the young landscape | 21 | 0 | 0 | 0 | 0 | 1 | 10 | 10 | 0 | 0 | 2 |
-| **all** | | **2,927** | **394** | **347** | **67** | **128** | **85** | **1,396** | **510** | **330** | **11** | **273** |
+| **all** | | **2,928** | **394** | **347** | **67** | **128** | **85** | **1,397** | **510** | **330** | **11** | **273** |
 
 72 rows are `verified` (counted from the ledger files after WP-2 merged WP-15/16 and the plate-check boundary mix, 2026-10-02, WP-13a, the volcano decisions and WP-8): PLT-213 and PLT-218 (plate-check boundary mix and arc heights), ISO-041, ISO-042
 and ISO-048 (the flexure agent), MAG-028 and MAG-029 (WP-2), one GEO row and thirteen HNT rows (WP-15, WP-16, WP-2 and the volcano decisions),
