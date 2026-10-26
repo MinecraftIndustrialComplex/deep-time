@@ -598,25 +598,19 @@ pub struct Counters {
     pub resamplings: u32,
     /// Margin propagations begun (law 2, `propagation.rs`, ledger PLT-656): each cut a
     /// passive margin off its continent and made a new plate.
-    #[serde(default, skip_serializing_if = "is_zero")]
+    #[serde(default)]
     pub propagation_starts: u32,
     /// Margin propagation events: the starts and every later advance along the margin.
-    #[serde(default, skip_serializing_if = "is_zero")]
+    #[serde(default)]
     pub propagations: u32,
     /// Propagations that passed the force test but whose cut or advance failed a geometry check
     /// (one piece each side, the plate sizes, the cut along the margin).
-    #[serde(default, skip_serializing_if = "is_zero")]
+    #[serde(default)]
     pub propagation_stalls: u32,
     /// Subduction initiations whose seed lay within PLT-064's old clearance (1,000 km) of a
     /// trench: possible only with law 2's one-spacing clearance (measurement, PLT-064).
-    #[serde(default, skip_serializing_if = "is_zero")]
+    #[serde(default)]
     pub initiations_near_fronts: u32,
-}
-
-/// Serde: counters added with law 2 are left out of the state while zero, so a run with the law
-/// off keeps its state hash.
-fn is_zero(x: &u32) -> bool {
-    *x == 0
 }
 
 /// A subduction zone propagating along a passive margin (law 2, `tectonics.margin_propagation`,
@@ -705,8 +699,8 @@ pub struct PlateState {
     #[serde(default)]
     pub one_way: Option<OneWay>,
     /// Subduction zones propagating along passive margins (law 2, `propagation.rs`, ledger
-    /// PLT-656); left out of the state while empty.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// PLT-656).
+    #[serde(default)]
     pub propagations: Vec<Propagation>,
     /// The land's gap budget (`gap_budget.rs`): measurement only, absent unless switched on; not
     /// kept in checkpoints.

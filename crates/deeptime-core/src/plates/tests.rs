@@ -675,6 +675,15 @@ fn arcs_build_a_cordillera() {
     );
 }
 
+/// The collision states a run's splits handed to a piece with their front (`inherit`, PLT-534).
+fn moved_collisions(world: &WorldState) -> u32 {
+    world
+        .globals
+        .get(inherit::COLLISIONS_GLOBAL)
+        .copied()
+        .unwrap_or(0.0) as u32
+}
+
 /// The life cycle of the collision states over a run (`shortening.rs`): checked after every step
 /// and against the dynamics record at the end.
 #[derive(Default)]
@@ -727,8 +736,9 @@ impl CollisionLives {
 
     /// Every collision state ended exactly once: in a transfer or weld (a collision record that
     /// carries the state's onset) or without one (a parting record; the run's end closes those
-    /// still under way).
-    fn finish(&self, st: &PlateState, d: &dynamics::Dynamics) {
+    /// still under way). `moved` is the run's collision states that went with their front to a
+    /// piece of a split plate (`inherit`, PLT-534): such a state is one life seen under two pairs.
+    fn finish(&self, st: &PlateState, d: &dynamics::Dynamics, moved: u32) {
         assert!(st.contacts.is_empty(), "the run's end closes every contact");
         assert!(st.counters.collision_onsets > 0);
         let with_state = d
@@ -740,7 +750,12 @@ impl CollisionLives {
             (with_state + d.partings.len()) as u32,
             st.counters.collision_onsets
         );
-        assert!(self.states.len() as u32 <= st.counters.collision_onsets);
+        assert!(
+            self.states.len() as u32 <= st.counters.collision_onsets + moved,
+            "{} states seen, {} onsets, {moved} moved with their front",
+            self.states.len(),
+            st.counters.collision_onsets
+        );
         assert!(
             self.longest >= 2,
             "no collision state outlived its first step"
@@ -858,7 +873,7 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     });
     let st = world.plates.as_ref().unwrap();
     let d = st.dynamics.as_ref().unwrap();
-    life.finish(st, d);
+    life.finish(st, d, moved_collisions(&world));
     assert!(!d.collisions.is_empty(), "no transfer or weld in 300 Myr");
     assert_eq!(d.collisions.len() as u32, st.counters.accretions);
     for c in &d.collisions {
@@ -1312,7 +1327,7 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
         d.collisions.iter().any(|c| c.sutured),
         "no suture in 300 Myr: the collision record is untested"
     );
-    life.finish(st, d);
+    life.finish(st, d, moved_collisions(&with));
     for c in &d.collisions {
         assert!(c.front_shortening_km >= 0.0 && c.area_km2 >= 0.0);
         assert!(c.end_myr >= c.start_myr && c.start_myr >= c.contact_onset_myr - 1e-9);
