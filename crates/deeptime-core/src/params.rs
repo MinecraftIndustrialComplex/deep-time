@@ -1091,6 +1091,27 @@ pub struct TectonicParams {
     /// Off, PLT-612 as before. Off by default: built inside law 2's stage and parked with it
     /// (2026-10-26). ledger: PLT-657
     pub incipient_resistance_by_thickness: bool,
+    /// An incipient front's resistance is net (the M5 lane, 2026-10-26; Gurnis, Hall & Lavier
+    /// 2004's resisting force is the force their models needed to push the plates together, the
+    /// young slab's own negative buoyancy included): an incipient front (PLT-610) has no slab
+    /// pull, suction or slab resistance of its own, only the incipient resistance (PLT-612,
+    /// PLT-613). Off, the front also pulled with its young slab, as a mature one does, which
+    /// matched the resistance at 58 km of slab on 80-Myr floor and cancelled it after that.
+    /// The correction of a double count, so on by default; the switch is for the identity
+    /// check. ledger: PLT-680
+    pub incipient_net_resistance: bool,
+    /// The slab's thermal rate floor (the M5 lane, 2026-10-26; Toth & Gurnis 1998: "at
+    /// subduction velocities of <10 mm/yr thermal diffusion inhibits slab formation and no
+    /// substantial slab pull force develops"): an oceanic front sample converging across its
+    /// boundary slower than `forces::SLAB_THERMAL_FLOOR_MM_YR` (PLT-682) is incipient whatever
+    /// its contact's slab: it resists its convergence with the incipient resistance and takes no
+    /// Forsyth & Uyeda friction, has no slab pull, suction or slab resistance of its own, builds
+    /// no arc, and the boundary mix and the margins count it as converging boundary, not a
+    /// subduction zone. Per sample, as the arcs' rate reads v_n (PLT-665): the slab is kept per
+    /// pair of plates and fed by the pair's mean convergence (FRC-020), so a slow stretch of a
+    /// fast pair would otherwise subduct as the pair does. The slab's growth is unchanged. Off,
+    /// only the slab's length (PLT-611) makes a front incipient. ledger: PLT-681
+    pub slab_thermal_floor: bool,
     /// Subduction initiation off the passive margin (V1 gap 2's stage C1): the old floor within
     /// the reach of the arc the new trench builds (`arc_distance_km` + `arc_width_km`, and one
     /// lattice spacing for where on the lattice the front falls; great circle) of the plate's
@@ -1328,6 +1349,8 @@ impl Default for TectonicParams {
             initiation_polarity_by_age: true,         // ledger: PLT-655
             margin_propagation: false, // ledger: PLT-656 (parked 2026-10-26: no advance)
             incipient_resistance_by_thickness: false, // ledger: PLT-657 (parked with law 2)
+            incipient_net_resistance: true, // ledger: PLT-680
+            slab_thermal_floor: true,  // ledger: PLT-681
             subduction_initiation_offshore: true, // ledger: PLT-503 (on since 2026-10-23)
             initiation_stress_mpa: 20.0, // ledger: PLT-505 (game-choice; on since 2026-10-23)
             transference: false,       // ledger: PLT-516

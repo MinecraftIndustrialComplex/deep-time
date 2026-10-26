@@ -850,7 +850,8 @@ struct Source {
     /// The subducting crust at the front is oceanic (a continental arc's cordillera needs an
     /// oceanic slab; continental crust forced under builds the collision's own relief).
     oceanic_slab: bool,
-    /// The front is incipient (PLT-610): its slab has not yet sunk far enough to melt an arc.
+    /// The front is incipient (PLT-610): its slab has not yet sunk far enough to melt an arc, or
+    /// its oceanic slab comes in too slowly for a slab to form (PLT-681).
     incipient: bool,
 }
 
@@ -1533,6 +1534,10 @@ pub fn fronts_finish(
             // the sample's along the boundary's normal. ledger: PLT-312
             let normal = normals[v];
             let across = (-rel.dot(normal)).max(0.0);
+            // Incipient: its contact's slab short of the critical convergence (PLT-610), or an
+            // oceanic slab coming in too slowly for a slab to form (PLT-681).
+            let incipient_here =
+                young[c] || (su.kind != CONTINENTAL && super::forces::below_floor(k, across));
             let len_km = length_km(v);
             if erosion_rate > 0.0 {
                 // An oceanic slab coming in fast under little sediment: an erosive margin.
@@ -1585,7 +1590,7 @@ pub fn fronts_finish(
                 slab_age: su.age_myr(t_myr),
                 sediment: f64::from(su.pools[pool::SEDIMENT]),
                 oceanic_slab: su.kind != CONTINENTAL,
-                incipient: young[c],
+                incipient: incipient_here,
             });
             // Only an oceanic slab counts as a front that pulls: continental crust at the front
             // is buoyant, and where it comes in the collision resists instead (`forces.rs`).
@@ -1593,9 +1598,10 @@ pub fn fronts_finish(
             if su.kind != CONTINENTAL {
                 let under = state.contacts[c].under as usize;
                 front_len[under] += front_km;
-                // The arc begins at its contact's first oceanic front past incipient, and is
-                // young until the early pulse ends (ledger: PLT-669, PLT-670).
-                let arc_young = !young[c] && {
+                // The arc begins at its contact's first oceanic front past incipient (a sample
+                // too slow for a slab is not, PLT-681), and is young until the early pulse ends
+                // (ledger: PLT-669, PLT-670).
+                let arc_young = !incipient_here && {
                     let onset = *state.contacts[c].arc_onset_myr.get_or_insert(t_myr);
                     t_myr - onset < ISLAND_ARC_BURST_MYR
                 };

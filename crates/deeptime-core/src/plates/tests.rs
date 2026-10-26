@@ -479,7 +479,7 @@ fn margins_are_measured_and_add_up() {
     let env = PlatesStage::new(p.clone()).env(&p.tectonics, 1);
     let (st, geo) = init::initial_state(&p, &env).unwrap();
     let pos = geometry::positions(&st, &geo);
-    let (m, class) = stats::margin_classes(&st, &pos, &env.norm, &|_| false, 0.0);
+    let (m, class) = stats::margin_classes(&st, &pos, &env.norm, &|_| false, 0.0, 0.0);
     assert!(m.coast > 0 && m.coast_km > 0.0);
     assert_eq!(
         m.subduction + m.collision,
@@ -1077,6 +1077,29 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
             assert!(q.continental <= q.visible);
             assert!((0.0..=1.0).contains(&q.slab_share()), "{q:?}");
             assert!(q.speed_mm_yr >= 0.0 && q.boundary_km >= 0.0 && q.front_km >= 0.0);
+        }
+        // The front's turnover (PLT-683): from one step to the next the front's length in each
+        // setting changes by its gains less its losses, and the subducting front's gains by
+        // their pair's slab add up to its gains, within the rounding of the cells to whole km.
+        if let [.., before, now] = d.steps.as_slice() {
+            let fb = &now.front_bands;
+            for k in 0..2 {
+                let total = |s: &dynamics::StepRec| {
+                    s.front_bands.normal[k].iter().sum::<f64>() + s.front_bands.incipient[k]
+                };
+                let turnover: f64 = (0..2).map(|m| fb.gain[k][m] - fb.loss[k][m]).sum();
+                let change = total(now) - total(before);
+                assert!(
+                    (change - turnover).abs() <= 9.0,
+                    "step {}: setting {k} changed by {change} km, turnover {turnover} km",
+                    st.step
+                );
+                let by_slab: f64 = fb.gain_slab[k].iter().sum();
+                assert!((by_slab - fb.gain[k][1]).abs() <= 3.5, "{fb:?}");
+            }
+            for m in &now.matured {
+                assert!(m[0] >= 0.0 && m[1] >= 0.0 && m[2] >= 1.0, "{m:?}");
+            }
         }
         // Task 1b. Rotation change: the vector change since the previous step, for the plates that
         // were there; the guard: a plate the guard held has its fastest point at the guard; the
@@ -4622,8 +4645,11 @@ fn hotspot_cones_are_counted_inside_the_hotspot_rate() {
 #[test]
 fn an_arcs_rate_is_its_types_rate_at_earths_convergence_scaled_by_its_own() {
     let mut p = preset(20_000, 20.0, "supercontinent", 5);
-    // A fixture with no slab, so an arc only with incipient subduction off (PLT-610).
+    // A fixture with no slab, so an arc only with incipient subduction off (PLT-610); and the
+    // slab's thermal floor off (PLT-681), since the rotation's stretches near its pole close in
+    // under 10 mm/yr at the slow speed and not at the fast one.
     p.tectonics.incipient_subduction = false;
+    p.tectonics.slab_thermal_floor = false;
     let stage = PlatesStage::new(p.clone());
     let env = stage.env(&p.tectonics, 1);
     let k = &p.tectonics;
@@ -5811,8 +5837,9 @@ fn where_the_plates_are_cut() {
 /// The reference plate ([`a_reference_plate`]: a 3,000 km trench, its neighbours held by their
 /// keels, no mantle flow) on 20,000 samples with its slab `slab_km` long, the incipient switch
 /// `on`, its floor `floor_age_myr` old and moving north at `mm_yr` before the balance; with the
-/// dynamics record on. Returns the preset (build the step's `Env` from it), the state and the
-/// middle of the trench.
+/// dynamics record on. The slab's thermal rate floor (PLT-681) is off, so the stage by the
+/// slab's length (PLT-610) is tested alone at any speed (the floor's tests turn it on). Returns
+/// the preset (build the step's `Env` from it), the state and the middle of the trench.
 fn an_incipient_reference(
     on: bool,
     slab_km: f64,
@@ -5821,6 +5848,7 @@ fn an_incipient_reference(
 ) -> (PlanetPreset, PlateState, Geo, Vec<DVec3>, DVec3) {
     let mut p = preset(20_000, 20.0, "supercontinent", 5);
     p.tectonics.incipient_subduction = on;
+    p.tectonics.slab_thermal_floor = false;
     p.tectonics.mantle_flow_mm_yr = 0.0;
     p.tectonics.keel_drag = 1.0e4;
     let stage = PlatesStage::new(p.clone());
@@ -5847,12 +5875,19 @@ fn trench_speed(env: &Env<'_>, ans: &forces::Answer, x: DVec3) -> f64 {
 /// on the straight front of [`a_front_of_known_length`] (40 degrees of the equator, 50 mm/yr)
 /// with its contacts' slabs `slab_km` long and the incipient switch `on`.
 fn known_front_arcs(on: bool, slab_km: f64) -> Vec<(f32, f32, f32)> {
+    known_front_arcs_at(on, slab_km, 50.0, true)
+}
+
+/// [`known_front_arcs`] with the plate going under at `mm_yr` and the slab's thermal rate floor
+/// (PLT-681) `floor`.
+fn known_front_arcs_at(on: bool, slab_km: f64, mm_yr: f64, floor: bool) -> Vec<(f32, f32, f32)> {
     let mut p = preset(20_000, 20.0, "supercontinent", 5);
     p.tectonics.incipient_subduction = on;
+    p.tectonics.slab_thermal_floor = floor;
     let stage = PlatesStage::new(p.clone());
     let env = stage.env(&p.tectonics, 1);
     let (mut st, geo, pos) =
-        a_front_of_known_length(&p, &env, glam::DQuat::IDENTITY, 40.0, 15.0, 0.02, 50.0);
+        a_front_of_known_length(&p, &env, glam::DQuat::IDENTITY, 40.0, 15.0, 0.02, mm_yr);
     assert!(st.contacts.iter().any(|c| (c.under, c.over) == (1, 0)));
     st.slabs = st
         .contacts
@@ -5878,8 +5913,9 @@ fn arc_total(arcs: &[(f32, f32, f32)]) -> f64 {
 }
 
 /// An incipient front holds its plate and is no subduction zone (PLT-610, PLT-612, PLT-614). The
-/// reference plate with a 40-km slab, whose pull (about 1.7 × 10^12 N/m) is under the bending's
-/// resistance (2.5 × 10^12 N/m, Gurnis et al. 2004): with the switch on, a plastic force larger
+/// reference plate with a 40-km slab, which pulls with about 1.7 × 10^12 N/m with the switch off
+/// (none on, PLT-680), against the bending's resistance (2.5 × 10^12 N/m, Gurnis et al. 2004):
+/// with the switch on, a plastic force larger
 /// than the drive stalls the plate, so the balance holds the trench under the floor the force is
 /// linearised over (`COLLISION_FLOOR_MM_YR`); the boundary mix counts the front as converging
 /// boundary with no subduction zone (Bird 2003's oceanic convergent boundary: subduction zones
@@ -5904,6 +5940,7 @@ fn an_incipient_front_holds_its_plate_and_is_no_subduction_zone() {
             &env.norm,
             &|_| false,
             forces::incipient_km(&p.tectonics),
+            forces::slab_floor_mm_yr(&p.tectonics),
         );
         let ans = forces::step(&mut st, &geo, &pos, &env, DVec3::Z, 0.0);
         assert!(ans.solved);
@@ -6133,11 +6170,14 @@ fn an_initiations_planted_slab_is_past_the_incipient_stage() {
 /// contacts, and a front with no slab is incipient on both sides of it. The head-on plates of
 /// [`converging_plates`] with the switch on, through carry, resampling and the overlaps found
 /// again (as `the_ocean_continent_front_through_a_resampling`), with a full slab and with none.
+/// The slab's thermal floor (PLT-681) is off: these plates close in from 0 to 50 mm/yr along the
+/// boundary, so its slow stretches would be incipient whatever the slab.
 #[test]
 fn a_slabs_length_survives_a_resampling() {
     let oc = dynamics::mix::OCEAN_CONTINENT;
     let mut p = preset(20_000, 20.0, "supercontinent", 5);
     p.tectonics.incipient_subduction = true;
+    p.tectonics.slab_thermal_floor = false;
     let stage = PlatesStage::new(p.clone());
     let env = stage.env(&p.tectonics, 1);
     let env2 = stage.env(&p.tectonics, 2);
@@ -6331,6 +6371,246 @@ fn an_incipient_front_takes_no_forsyth_uyeda_friction() {
         "{:?} {:?}",
         rest(&young),
         rest(&mature)
+    );
+}
+
+/// An incipient front's resistance is net (PLT-680): Gurnis et al. 2004's resisting force is the
+/// force their models needed to push the plates together, the young slab's own weight in it, so
+/// an incipient front has no slab pull, suction or slab resistance of its own. The reference
+/// plate with a 40-km slab (incipient) on 80-Myr floor: with the switch on, no pull torque on the
+/// plate going under and no suction torque on the overriding plate; off, both (the 40-km slab's
+/// pull, about 1.7 × 10^12 N/m); the incipient resistance the same, and the trench no faster on
+/// than off. With a full slab the switch changes nothing.
+#[test]
+fn an_incipient_fronts_resistance_is_net() {
+    let run = |net: bool, slab_km: f64| {
+        let (mut p, mut st, geo, pos, x_t) =
+            an_incipient_reference(true, slab_km, 0.5, forces::SLAB_AGE_REF_MYR);
+        p.tectonics.incipient_net_resistance = net;
+        let stage = PlatesStage::new(p.clone());
+        let env = stage.env(&p.tectonics, 1);
+        let (under, over) = (st.contacts[0].under, st.contacts[0].over);
+        let torques = forces::slab_torques(&st, &geo, &pos, &env);
+        let ans = forces::step(&mut st, &geo, &pos, &env, DVec3::Z, 0.0);
+        assert!(ans.solved);
+        let resistance: f64 = ans.incipient_n.values().sum();
+        (
+            torques[under as usize].0.length(),
+            torques[over as usize].1.length(),
+            resistance,
+            trench_speed(&env, &ans, x_t),
+            ans.omega,
+        )
+    };
+    let on = run(true, 40.0);
+    let off = run(false, 40.0);
+    eprintln!(
+        "a 40-km slab: net on, pull torque {:.3e} N m, suction {:.3e}, resistance {:.4e} N, the \
+         trench at {:.4} mm/yr; off, pull {:.3e}, suction {:.3e}, resistance {:.4e}, the trench \
+         at {:.4}",
+        on.0, on.1, on.2, on.3, off.0, off.1, off.2, off.3
+    );
+    assert_eq!(on.0, 0.0);
+    assert_eq!(on.1, 0.0);
+    assert!(off.0 > 0.0 && off.1 > 0.0, "{off:?}");
+    assert!(on.2 > 0.0 && on.2 == off.2, "{} {}", on.2, off.2);
+    assert!(on.3 <= off.3, "{} {}", on.3, off.3);
+    let full = TectonicParams::default().slab_depth_km;
+    let (a, b) = (run(true, full), run(false, full));
+    assert!(a.0 > 0.0 && a.0 == b.0 && a.1 == b.1);
+    assert!(a.2 == 0.0 && b.2 == 0.0);
+    assert!(a.4 == b.4, "{:?} {:?}", a.4, b.4);
+}
+
+/// The slab's thermal rate floor (PLT-681, PLT-682): Toth & Gurnis 1998, "at subduction
+/// velocities of <10 mm/yr thermal diffusion inhibits slab formation and no substantial slab
+/// pull force develops". The reference plate with a full slab (past the incipient stage) pushed
+/// at 5 mm/yr, under the floor along its whole trench: with the floor on, the trench takes the
+/// incipient resistance and no pull, the balance holds it under `COLLISION_FLOOR_MM_YR`, the
+/// boundary mix counts it incipient (all of it the floor's, `slow`) with no ocean-continent
+/// front, the margins count no subduction margin, and the straight front at 5 mm/yr builds no
+/// arc; off, the full slab's trench subducts. Pushed at 40 mm/yr, over the floor along the whole
+/// trench, on and off are the same.
+#[test]
+fn a_front_too_slow_for_a_slab_is_incipient() {
+    let oc = dynamics::mix::OCEAN_CONTINENT;
+    let full = TectonicParams::default().slab_depth_km;
+    let run = |floor: bool, mm_yr: f64| {
+        let (mut p, mut st, geo, pos, x_t) =
+            an_incipient_reference(true, full, mm_yr, forces::SLAB_AGE_REF_MYR);
+        p.tectonics.slab_thermal_floor = floor;
+        let stage = PlatesStage::new(p.clone());
+        let env = stage.env(&p.tectonics, 1);
+        let tree = Tree::over(&pos, |_| true);
+        let mix = dynamics::boundary_mix(&st, &geo, &pos, &tree, &env, None);
+        let mut world = WorldState::new(1, 16_384, p.t_start_years());
+        subduction::confirm(&mut st, &mut world, &env, 0).unwrap();
+        let m = stats::margins(
+            &st,
+            &pos,
+            &env.norm,
+            &|_| false,
+            forces::incipient_km(&p.tectonics),
+            forces::slab_floor_mm_yr(&p.tectonics),
+        );
+        let under = st.contacts[0].under;
+        let pull = forces::slab_torques(&st, &geo, &pos, &env)[under as usize]
+            .0
+            .length();
+        let ans = forces::step(&mut st, &geo, &pos, &env, DVec3::Z, 0.0);
+        assert!(ans.solved);
+        let resistance: f64 = ans.incipient_n.values().sum();
+        eprintln!(
+            "floor {floor}, pushed at {mm_yr} mm/yr: the trench at {:.3} mm/yr; pull torque \
+             {pull:.3e} N m, incipient resistance {resistance:.4e} N; the mix's ocean-continent \
+             {:.0} km, incipient {:?}, slow {:?}; subduction margins {} of {}",
+            trench_speed(&env, &ans, x_t),
+            mix.km[oc],
+            mix.bands.incipient,
+            mix.bands.slow,
+            m.subduction,
+            m.coast
+        );
+        (
+            mix,
+            m.subduction,
+            pull,
+            resistance,
+            trench_speed(&env, &ans, x_t),
+            ans.omega,
+        )
+    };
+    let slow_on = run(true, 5.0);
+    let slow_off = run(false, 5.0);
+    assert_eq!(slow_on.0.km[oc], 0.0);
+    assert!(slow_on.0.bands.incipient[1] > 0.0);
+    assert_eq!(slow_on.0.bands.slow, slow_on.0.bands.incipient);
+    assert_eq!(slow_on.1, 0);
+    assert_eq!(slow_on.2, 0.0);
+    assert!(slow_on.3 > 0.0);
+    assert!(
+        slow_on.4 < forces::COLLISION_FLOOR_MM_YR,
+        "the slow trench moves at {} mm/yr",
+        slow_on.4
+    );
+    assert!(slow_off.0.km[oc] > 0.0);
+    assert_eq!(slow_off.0.bands.incipient, [0.0; 2]);
+    assert!(slow_off.1 > 0);
+    assert!(slow_off.2 > 0.0);
+    assert_eq!(slow_off.3, 0.0);
+    assert!(slow_off.4 > 2.0 * forces::COLLISION_FLOOR_MM_YR);
+    let fast_on = run(true, 40.0);
+    let fast_off = run(false, 40.0);
+    assert!(fast_on.0.km == fast_off.0.km);
+    assert_eq!(fast_on.0.bands, fast_off.0.bands);
+    assert_eq!(fast_on.0.bands.incipient, [0.0; 2]);
+    assert!(fast_on.1 == fast_off.1 && fast_on.2 == fast_off.2 && fast_on.3 == 0.0);
+    assert!(fast_on.5 == fast_off.5, "{:?} {:?}", fast_on.5, fast_off.5);
+    // The arcs on the straight front.
+    let arcs_on = known_front_arcs_at(true, full, 5.0, true);
+    let arcs_off = known_front_arcs_at(true, full, 5.0, false);
+    eprintln!(
+        "arc magma at 5 mm/yr: floor on {:.2} m, off {:.2} m",
+        arc_total(&arcs_on),
+        arc_total(&arcs_off)
+    );
+    assert_eq!(arc_total(&arcs_on), 0.0);
+    assert!(arc_total(&arcs_off) > 0.0);
+    assert!(
+        known_front_arcs_at(true, full, 40.0, true) == known_front_arcs_at(true, full, 40.0, false)
+    );
+}
+
+/// The boundary mix's cross-tabs (PLT-683) add up to its bands, within the rounding of their
+/// cells to whole km: the subducting front by the sample's convergence and its pair's mean sums
+/// to `normal`, the incipient front by convergence to `incipient`, the ocean-ocean front by
+/// origin and convergence to `oo_pair` and `normal[0]`, the pairs' lengths to both states, and
+/// the slab's thermal floor only moves front from one state to the other. The head-on plates of
+/// [`converging_plates`] (convergence from 0 to 50 mm/yr along the boundary) with full slabs:
+/// with the floor on, the front under 10 mm/yr is incipient, all of it the floor's (`slow`), and
+/// none subducts there; off, none is incipient.
+#[test]
+fn the_front_cross_tabs_add_up() {
+    use dynamics::BANDS;
+    let mut p = preset(20_000, 20.0, "supercontinent", 5);
+    p.tectonics.incipient_subduction = true;
+    let near = |a: f64, b: f64, cells: usize| (a - b).abs() <= 0.5 * cells as f64 + 1e-9;
+    let mut totals = Vec::new();
+    for floor in [true, false] {
+        p.tectonics.slab_thermal_floor = floor;
+        let stage = PlatesStage::new(p.clone());
+        let env = stage.env(&p.tectonics, 1);
+        let (mut st, geo, pos) = converging_plates(&p, &env);
+        st.dynamics = Some(dynamics::Dynamics::default());
+        st.slabs = st
+            .contacts
+            .iter()
+            .map(|c| state::SlabTrack {
+                under: c.under,
+                over: c.over,
+                km: p.tectonics.slab_depth_km,
+                ..state::SlabTrack::default()
+            })
+            .collect();
+        let tree = Tree::over(&pos, |_| true);
+        let mix = dynamics::boundary_mix(&st, &geo, &pos, &tree, &env, None);
+        let b = &mix.bands;
+        eprintln!(
+            "floor {floor}: normal {:?}; incipient {:?} by band {:?}, slow {:?}; normal by pair \
+             mean {:?}; pairs {:?}",
+            b.normal, b.incipient, b.incipient_normal, b.slow, b.normal_pair, mix.pairs
+        );
+        let spacing_km = env.norm.km(env.norm.spacing_rad());
+        let pair_km = |subducting: bool, k: usize| -> f64 {
+            mix.pairs
+                .iter()
+                .filter(|f| f.subducting == subducting && usize::from(f.setting) == k)
+                .map(|f| f.units as f64 * 0.5 * spacing_km)
+                .sum()
+        };
+        for k in 0..2 {
+            for i in 0..BANDS {
+                let row: f64 = b.normal_pair[k][i].iter().sum();
+                assert!(near(row, b.normal[k][i], BANDS + 1), "{k} {i}: {row}");
+            }
+            let inc: f64 = b.incipient_normal[k].iter().sum();
+            assert!(near(inc, b.incipient[k], BANDS + 1), "{k}: {inc}");
+            assert!(b.slow[k] <= b.incipient[k]);
+            let sub: f64 = b.normal[k].iter().sum();
+            assert!(
+                near(pair_km(true, k), sub, BANDS),
+                "{k}: {}",
+                pair_km(true, k)
+            );
+            assert!(near(pair_km(false, k), b.incipient[k], 1));
+        }
+        for o in 0..3 {
+            let row: f64 = b.oo_normal_pair[o].iter().sum();
+            assert!(near(row, b.oo_pair[o], BANDS + 1), "{o}: {row}");
+        }
+        for i in 0..BANDS {
+            let col: f64 = (0..3).map(|o| b.oo_normal_pair[o][i]).sum();
+            assert!(near(col, b.normal[0][i], 4), "{i}: {col}");
+        }
+        if floor {
+            for k in 0..2 {
+                assert_eq!(b.slow[k], b.incipient[k]);
+                assert_eq!(b.normal[k][0] + b.normal[k][1], 0.0);
+                assert!(b.incipient_normal[k][2..].iter().all(|&x| x == 0.0));
+            }
+            assert!(b.incipient.iter().sum::<f64>() > 0.0);
+        } else {
+            assert_eq!(b.incipient, [0.0; 2]);
+            assert_eq!(b.slow, [0.0; 2]);
+            assert!(b.normal.iter().map(|r| r[0] + r[1]).sum::<f64>() > 0.0);
+        }
+        totals.push(b.normal.iter().flatten().sum::<f64>() + b.incipient.iter().sum::<f64>());
+    }
+    assert!(
+        near(totals[0], totals[1], 4 * (BANDS + 1)),
+        "the front with the floor {} km, without {} km",
+        totals[0],
+        totals[1]
     );
 }
 
