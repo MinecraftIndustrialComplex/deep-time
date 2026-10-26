@@ -289,6 +289,8 @@ pub struct Counts {
     pub arc_flag_cells_max: u64,
     pub arc_cells_max: u64,
     pub front_cells_max: u64,
+    /// Arc vents drawn at a point past a pole and not born (VOL-164).
+    pub arc_past_pole: u64,
 }
 
 /// The catalogue, kept in `WorldState::volcanoes` (checkpoints carry it; the amplifier reads it).
@@ -1091,7 +1093,7 @@ impl VolcanoStage {
                 .counts
                 .front_cells_max
                 .max(front.iter().filter(|&&f| f).count() as u64);
-            let born = place_arcs(
+            let (born, past_pole) = place_arcs(
                 &grid,
                 mh,
                 &front_flux,
@@ -1100,6 +1102,7 @@ impl VolcanoStage {
                 &mut occupied,
                 &mut rng,
             );
+            st.counts.arc_past_pole += past_pole;
             for (bx, bz, c) in born {
                 let hk = arc_height_km(&p, front_flux[c]);
                 let radius =
@@ -2163,7 +2166,9 @@ impl VolcanoStage {
 
 /// One step's arc births: the cells whose arc flux is at least `min_flux`, highest flux first
 /// (ties in the stream's order), each at a random point of its cell and kept when no point of
-/// `occupied` (which it then joins) lies within `spacing_m` × U(0.8, 1.2). Returns (x, z, cell).
+/// `occupied` (which it then joins) lies within `spacing_m` × U(0.8, 1.2). A point drawn past a
+/// pole is not kept, after all its draws (ledger: VOL-164). Returns the births, (x, z, cell), and
+/// the number of points dropped past a pole.
 pub fn place_arcs(
     grid: &GridDesc,
     mh: f64,
@@ -2172,7 +2177,7 @@ pub fn place_arcs(
     spacing_m: f64,
     occupied: &mut Vec<(f64, f64)>,
     rng: &mut Rng,
-) -> Vec<(f64, f64, usize)> {
+) -> (Vec<(f64, f64, usize)>, u64) {
     let frame = BlockFrame::new(grid.circumference() as u32);
     let w = grid.w as usize;
     let r = f64::from(grid.r);
@@ -2192,11 +2197,22 @@ pub fn place_arcs(
         grid_pts.entry(key(x, z)).or_default().push((x, z));
     }
     let mut out = Vec::new();
+    let mut past_pole = 0;
+    let planet = frame.projection();
     for c in cands {
         let (i, j) = ((c % w) as i64, (c / w) as i64);
         let bx = frame.wrap_x(grid.block_x(i) as f64 + (rng.uniform() - 0.5) * r);
         let bz = grid.block_z(j) as f64 + (rng.uniform() - 0.5) * r;
         let need = spacing_m * range(rng, 0.8, 1.2);
+        // The rows run on past the poles (to ±Zo, a quantum beyond R), and a point is drawn over
+        // the whole cell: one past a pole is off the planet, which holds it at the pole, and a
+        // segment's centroid or an event drawn from it is off the map. It is dropped here, after
+        // every draw, so the random stream is as it was; a vent the dropped one would have shut
+        // out may now be born (ledger: VOL-164).
+        if !planet.inside_poles(bz) {
+            past_pole += 1;
+            continue;
+        }
         let (kx, kz) = key(bx, bz);
         // The spacing is a great-circle distance (ledger: SCL-232): poleward it spans more
         // buckets east–west than the bucket's side (a Lambert block is cos φ of the planet's).
@@ -2223,7 +2239,7 @@ pub fn place_arcs(
         grid_pts.entry((kx, kz)).or_default().push((bx, bz));
         out.push((bx, bz, c));
     }
-    out
+    (out, past_pole)
 }
 
 /// The least-squares dH of `m[c] ≈ dH · w + b` over the cells (c, w) of a footprint: the change
