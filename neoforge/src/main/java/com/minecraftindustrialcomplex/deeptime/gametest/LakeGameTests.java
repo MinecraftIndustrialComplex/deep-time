@@ -171,7 +171,19 @@ public final class LakeGameTests {
                     playaCells++;
                 if ((!lake && !flat) || Math.floorMod(i * 31 + j * 17, 7) != 0)
                     continue;
-                int x = (int) (grid.originBlockX() + (long) i * grid.r()), z = (int) (grid.originBlockZ() + (long) j * grid.r());
+                // The block the samplers take to cell (i, j). On a cube grid the rows stack the six faces, so the
+                // flat origin + i·r is that block only on the first face: the cell's centre on the net, the block east
+                // and south of it (r is even). The flat sum passed while the sampled flats lay on the first face; on
+                // the planet after the M5 merge (2026-10-26) all 24 read dry ground elsewhere on the net.
+                int x, z;
+                if (grid.isCube()) {
+                    double[] p = grid.cubePoint(i, j);
+                    x = (int) Math.floor(p[0]);
+                    z = (int) Math.floor(p[1]);
+                } else {
+                    x = (int) (grid.originBlockX() + (long) i * grid.r());
+                    z = (int) (grid.originBlockZ() + (long) j * grid.r());
+                }
                 if (flat && salt.size() < MOST) {
                     // A hot spring's own pool, rim and terraces are not the flat: GeothermalPass paints them over the salt
                     // (sinter or travertine; the old rule passed there only because their vanilla stand-in, calcite, is
