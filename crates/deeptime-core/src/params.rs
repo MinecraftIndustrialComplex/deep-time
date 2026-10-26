@@ -1114,10 +1114,12 @@ pub struct TectonicParams {
     /// cut, under the same force test, moves the next stretch of the margin's floor from K' to U.
     /// The rule replaces PLT-064's clearance: with it on, a new subduction initiation keeps one
     /// lattice spacing from a front, not `subduction_initiation_clearance_km` (Crameri et al.
-    /// 2020: most initiations start within 500 km of another subduction zone). Off by default
-    /// (parked 2026-10-26, the coordinator's call): under these starts and the 100 km gate it
-    /// never advances in the sim, so it does not do the sourced process; off, PLT-064's 1,000 km
-    /// holds. ledger: PLT-656
+    /// 2020: most initiations start within 500 km of another subduction zone). Parked on
+    /// 2026-10-26 (under starts where the trench met the margin at 45 to 90° and the 100 km gate
+    /// it never advanced); since the M5 lane's stage 3 (2026-10-26) a start needs Zhou et al.'s
+    /// geometry, the trench running on along the margin's strike (PLT-717), and the law is on by
+    /// default. Off, PLT-064's 1,000 km holds where `initiation_near_trenches` is off.
+    /// ledger: PLT-656, PLT-717
     pub margin_propagation: bool,
     /// Back-arc rifting, the moving trench (the M5 lane's stage 3, 2026-10-26): where an
     /// overriding plate O moves away from its trench over an old, deep slab, its forearc and arc
@@ -1428,20 +1430,20 @@ impl Default for TectonicParams {
             subduction_initiation_reach_km: 1500.0, // ledger: PLT-691
             // 4 newly destructive initiations in 105 Myr over 51,310 km. ledger: PLT-692
             subduction_initiation_per_trench_km_myr: 4.0 / (105.0 * 51_310.0),
-            initiation_slab_km: 150.0,                // ledger: PLT-270
-            incipient_subduction: true,               // ledger: PLT-610 (on since 2026-10-25)
-            initiation_polarity_by_age: true,         // ledger: PLT-655
-            margin_propagation: false, // ledger: PLT-656 (parked 2026-10-26: no advance)
-            backarc_rifting: false,    // ledger: PLT-710
+            initiation_slab_km: 150.0,        // ledger: PLT-270
+            incipient_subduction: true,       // ledger: PLT-610 (on since 2026-10-25)
+            initiation_polarity_by_age: true, // ledger: PLT-655
+            margin_propagation: true, // ledger: PLT-656, PLT-717 (Zhou's geometry only; on since 2026-10-26)
+            backarc_rifting: true,   // ledger: PLT-710 (on since 2026-10-26)
             // E3 share 16 / 68 over (1 - 16 / 68) and 15.375 Myr. ledger: PLT-711
             backarc_rifting_per_myr: 16.0 / (52.0 * ((8.0 + 15.0 + 15.0 + 23.5) / 4.0)),
             incipient_resistance_by_thickness: false, // ledger: PLT-657 (parked with law 2)
-            incipient_net_resistance: true, // ledger: PLT-680
-            slab_thermal_floor: true,  // ledger: PLT-681
-            subduction_initiation_offshore: true, // ledger: PLT-503 (on since 2026-10-23)
+            incipient_net_resistance: true,           // ledger: PLT-680
+            slab_thermal_floor: true,                 // ledger: PLT-681
+            subduction_initiation_offshore: true,     // ledger: PLT-503 (on since 2026-10-23)
             initiation_stress_mpa: 20.0, // ledger: PLT-505 (game-choice; on since 2026-10-23)
-            transference: false,       // ledger: PLT-516
-            contact_timeout_myr: 24.0, // ledger: PLT-059
+            transference: false,         // ledger: PLT-516
+            contact_timeout_myr: 24.0,   // ledger: PLT-059
             collision_orogeny_myr: 30.0,
             l1_every_steps: 0,
             forsyth_uyeda_balance: false, // ledger: PLT-585 (built 2026-10-25, off)
