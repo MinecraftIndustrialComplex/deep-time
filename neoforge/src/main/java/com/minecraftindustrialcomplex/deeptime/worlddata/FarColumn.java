@@ -87,6 +87,12 @@ public final class FarColumn {
          * becomes the block under it (WaterBodies, BAK-067).
          */
         public boolean sealed;
+        /**
+         * A bank's {@code minGround} (the water's top beside it, within the build range), or
+         * {@link Integer#MIN_VALUE} for none (land, water, a column wider than a block): the bank pass
+         * raises the ground to it from wherever the passes before it left the ground ({@link #cut}).
+         */
+        public int minGround = Integer.MIN_VALUE;
 
         public boolean water() {
             return kind.isWater() && waterTop > ground;
@@ -191,8 +197,32 @@ public final class FarColumn {
             // below minGround wherever the ground stands at minGround: the pass raises it again.
             out.sealed = col.minGround() != null && ground == col.minGround() && ground <= maxY;
         }
+        out.minGround = !col.kind().isWater() && col.minGround() != null && col.minGround() <= maxY ? col.minGround() : Integer.MIN_VALUE;
         out.ground = clampGround(ground, minY, maxY);
         out.ice = out.water() ? 0 : Math.max(0, iceBlocks);
+    }
+
+    /**
+     * Lowers a dry column's ground by a surface rule's cut ({@code depth} blocks from its top painted
+     * air, ledger BAK-068) as the passes after the rule leave it: a bank the cut takes below the water
+     * beside it is raised to that water again ({@code worldgen/WaterBodies}' bank pass fills from the
+     * ground it finds up to {@link Shape#minGround}). {@link Shape#sealed} follows the new ground.
+     * The cut is taken from the shape's ground, which on a bank is already the bank pass's; the chunk's
+     * rule cut the ground the noise filled (a lowered bank's higher ground; a raised bank's lower).
+     *
+     * @return whether the bank pass raised the ground again (its top is then the cut's new top block
+     *         where that is soil, sand, gravel, snow or clay, and dirt otherwise)
+     */
+    public static boolean cut(Shape s, int depth, int minY) {
+        if (depth <= 0 || s.kind.isWater())
+            return false;
+        int g = Math.max(minY - 1, s.ground - depth);
+        boolean raised = s.minGround != Integer.MIN_VALUE && g < s.minGround;
+        if (raised)
+            g = s.minGround;
+        s.ground = g;
+        s.sealed = s.minGround != Integer.MIN_VALUE && g == s.minGround;
+        return raised;
     }
 
     /**
@@ -203,6 +233,7 @@ public final class FarColumn {
         out.kind = core.kind();
         out.wideRiver = false;
         out.sealed = false;
+        out.minGround = Integer.MIN_VALUE;
         out.channel = core.kind() == Water.Kind.RIVER || Water.cutByChannel(core);
         int ground = core.ground();
         if (core.kind().isWater()) {
