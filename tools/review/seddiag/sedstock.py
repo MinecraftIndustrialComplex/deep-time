@@ -166,6 +166,18 @@ def one(run, name):
     cbin = np.where(cnt > 0, csum / np.maximum(cnt, 1), np.nan)
     out["earth_ages_compacted"] = float((cbin[ok] * wt[ok]).sum() / wt[ok].sum()) * float(mo.sum()) / n * KM3_PER_M \
         + km3(comp * (w & cont))
+    # GlobSed's own regions (Straume et al. 2019, Table 3 and section 3; HYP-044), the model's like region beside
+    # each: its area (Earth-normalised km2), mean pile as solid and in place, and volume. The continental margins
+    # (to the continent-ocean boundary) against the wet continental samples; the ocean floor within and beyond 200 km
+    # of that boundary against wet oceanic samples within and beyond 200 km of continental crust; the ocean younger
+    # than 82 Myr within 72 degrees of the equator against wet oceanic samples so.
+    regions = {"margin": w & cont, "near200": w & oc & (dist < 200.0), "far200": w & oc & (dist >= 200.0),
+               "young82": w & oc & (agef < 82.0) & (np.abs(a[:, 0]) < 72.0)}
+    for key, m in regions.items():
+        out[f"G{key}:km2"] = float(m.sum()) / n * KM3_PER_M * 1e3
+        out[f"G{key}:pile"] = float(pile[m].mean()) if m.any() else float("nan")
+        out[f"G{key}:inplace"] = float(comp[m].mean()) if m.any() else float("nan")
+        out[f"G{key}"] = km3(pile * m)
     # Thick oceanic-labelled crust (15 km and more): its share of the sea's sediment, its arc magma.
     m = w & oc & (T >= 15e3)
     out["thick_iarc_km"] = float(a[m, 7].mean() / 1e3) if m.any() else float("nan")
@@ -206,6 +218,18 @@ def table(rows, name):
           f" {md['earth_ages_ratio']:.3f}; pelagic rain at that mean age {md['pel_earth_ages']:.3g}")
     print(f"  in place, porous (phi0 {PHI0}, lambda {LAM_KM} km): {md['sea_sed_compacted']:.3g}, ratio {md['compacted_ratio']:.3f};"
           f" earth ages and in place, with the continental part: {md['earth_ages_compacted']:.3g}")
+    # GlobSed's regions: (area km2, mean m in place, km3); the third is Table 3's total less its two named regions.
+    globsed = {"margin": ("continental margins | wet continental crust", 4.69e7, 3044, 1.43e8),
+               "near200": ("ocean floor within 200 km of the COB | wet oceanic within 200 km of continental crust",
+                           3.63e8 - 4.69e7 - 2.79e8, (3.37e8 - 1.43e8 - 1.13e8) / (3.63e8 - 4.69e7 - 2.79e8) * 1e3,
+                           3.37e8 - 1.43e8 - 1.13e8),
+               "far200": ("ocean floor beyond 200 km of the COB | wet oceanic beyond 200 km", 2.79e8, 404, 1.13e8),
+               "young82": ("ocean younger than 82 Myr, 72S to 72N | wet oceanic so", float("nan"), 267, float("nan"))}
+    print("  against GlobSed (Straume et al. 2019; region: GlobSed's | the model's): area km2, mean pile m (model: solid,"
+          " in place), km3")
+    for k, (label, ga, gm, gv) in globsed.items():
+        print(f"    {label}: GlobSed {ga:.3g} km2, {gm:.0f} m, {gv:.3g} km3 | model {md[f'G{k}:km2']:.3g} km2,"
+              f" {md[f'G{k}:pile']:.0f} m solid, {md[f'G{k}:inplace']:.0f} m in place, {md[f'G{k}']:.3g} km3")
     print(f"  oceanic crust 15 km and more: island-arc magma {md['thick_iarc_km']:.1f} km, metamorphic"
           f" {md['thick_meta_km']:.1f} km, felsic {md['thick_felsic_km']:.1f} km, distance p50 {md['thick_dist_p50']:.0f} km,"
           f" floor age p50 {md['thick_age_p50']:.0f} Myr")
