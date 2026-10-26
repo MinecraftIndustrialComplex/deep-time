@@ -4822,8 +4822,8 @@ fn island_arcs_front_loaded_pulse_then_mature_rate() {
 /// 2006): over a 90-km slab (incipient) the contact has no onset and no young front; over a
 /// 110-km slab its onset is the step's time, and a later step keeps it, its front still young
 /// 2 Myr on and no longer young 10 Myr on. Each later step runs on a fresh fixture with the
-/// onsets carried over: a second step on the first step's state, with the plates not moved,
-/// finds no oceanic front.
+/// onsets carried over and its contacts marked seen at that step (a contact is a working
+/// subduction zone only on the step its overlap was seen, `Contact::active`).
 #[test]
 fn an_arcs_onset_is_its_slabs_first_step_past_incipient() {
     let (p, mut st, geo, pos) = arc_fixture(false, true, 90.0, None, 50.0);
@@ -4846,6 +4846,8 @@ fn an_arcs_onset_is_its_slabs_first_step_past_incipient() {
         for (a, b) in after.contacts.iter_mut().zip(&st.contacts) {
             assert_eq!((a.under, a.over), (b.under, b.over));
             a.arc_onset_myr = b.arc_onset_myr;
+            // The fixture resolved its overlaps at step 1; seen again at this step.
+            a.last_step = 1 + steps;
         }
         let (pull, t) = arc_step(&p, &mut after, &geo, &pos, 1 + steps);
         assert!((t - t1 - steps as f64 * dt).abs() < 1e-9);
