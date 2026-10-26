@@ -951,3 +951,121 @@ fn coal_fields_adjoin_without_overlap_and_hold_stacked_seams() {
         }
     }
 }
+
+// ---- the playability guarantee and the poles (2026-10-25) --------------------------------------
+
+/// The synthetic history with its land moved to chosen rows: every frame's elevation is +200 m on
+/// the rows `land` holds and -4,000 m elsewhere, so the land the playability pass chooses among is
+/// those rows' cells and no other.
+struct LandOnRows {
+    inner: SyntheticHistory,
+    land: Vec<bool>,
+}
+
+impl FieldHistory for LandOnRows {
+    fn grid(&self) -> &deeptime_format::GridDesc {
+        self.inner.grid()
+    }
+
+    fn frame_count(&self) -> usize {
+        self.inner.frame_count()
+    }
+
+    fn frame(&self, k: usize) -> Result<fields::FieldFrame, crate::error::CoreError> {
+        let mut frame = self.inner.frame(k)?;
+        let w = self.inner.grid().w as usize;
+        let elev = frame
+            .fields
+            .get_mut(fields::ELEVATION)
+            .expect("the synthetic history has an elevation");
+        for (c, e) in elev.iter_mut().enumerate() {
+            *e = if self.land[c / w] { 200.0 } else { -4000.0 };
+        }
+        Ok(frame)
+    }
+
+    fn names(&self) -> Vec<String> {
+        self.inner.names()
+    }
+
+    fn receivers(&self) -> Option<&[u32]> {
+        self.inner.receivers()
+    }
+}
+
+/// The centres (blocks) of the guaranteed copper sites a synthetic run places when the present
+/// land is the rows `rows` select, the world's pole z (block) and the stage's census. One
+/// essential: a copper site per 4,096-block region, which on this 4,096-block planet is the whole
+/// of it.
+fn guaranteed_copper(rows: &dyn Fn(u32) -> bool) -> (Vec<[i32; 3]>, f64, Value) {
+    let sp = synthetic_params();
+    let inner = SyntheticHistory::new(sp.clone()).unwrap();
+    let grid = inner.grid().clone();
+    let pole = grid.projection().pole_z();
+    let land: Vec<bool> = (0..grid.h).map(rows).collect();
+    let params = DepositParams {
+        essentials: vec![playability::Essential {
+            material: "c:copper".into(),
+            min_sites_per_region: 1,
+            region_blocks: 4096,
+            exposed: false,
+            primary_only: true,
+        }],
+        ..DepositParams::default()
+    };
+    let mut stage = DepositStage::synthetic(sp.clone(), params).unwrap();
+    stage.synth_events = inner.events();
+    stage.history = Some(Box::new(LandOnRows { inner, land }));
+    let mut world = WorldState::new(sp.seed, sp.circumference, 0.0);
+    drive(&mut stage, &mut world);
+    let census: Value = serde_json::from_str(&world.notes[STAGE_NAME]).unwrap();
+    let centres = world
+        .sites
+        .iter()
+        .filter(|s| {
+            world
+                .events
+                .iter()
+                .any(|e| e.id == s.forming_event && e.kind == "deeptime:guaranteed_occurrence")
+        })
+        .map(|s| s.center)
+        .collect();
+    (centres, pole, census)
+}
+
+/// DEP-223: a guaranteed deposit is not placed on a cell whose centre is past a pole. The grid's
+/// rows run on to ±Zo past the poles at ±R (704 and 651.9 blocks on the 4,096-block planet), so
+/// the row that straddles a pole (24 % of its cell inside) has its centre past it, and the rows
+/// beyond lie wholly past it. The pass puts the body at the cell's centre, and the cube bake maps
+/// a body through the map's Jacobian at its centre, which is singular at a pole. With land on the
+/// pole's rows only, the pass found no cell inside the world and took one of them (the land cell
+/// nearest the spawn, a straddling row's, at z = ±656).
+#[test]
+fn a_guaranteed_deposit_is_not_placed_past_a_pole() {
+    let grid = deeptime_format::GridDesc::for_planet("L1", 4096, 16).unwrap();
+    let reaching = |j: u32| grid.area_share(j) < 1.0;
+    assert_eq!((0..grid.h).filter(|&j| reaching(j)).count(), 7);
+    let (sites, pole, census) = guaranteed_copper(&reaching);
+    for c in &sites {
+        assert!(
+            f64::from(c[2]).abs() < pole,
+            "a guaranteed site at z {} (pole {pole})",
+            c[2]
+        );
+    }
+    assert!(sites.is_empty(), "{sites:?}: no land inside the world");
+    // The cells it set aside are counted: the census says how many land cells lie past a pole.
+    assert_eq!(
+        census["guarantee_past_pole"],
+        serde_json::json!(7 * grid.w),
+        "{census}"
+    );
+    // With the two rows inside each pole land as well, the pass still guarantees its site, on
+    // one of them.
+    let (sites, pole, _) = guaranteed_copper(&|j| reaching(j) || [4, 84].contains(&j));
+    assert_eq!(sites.len(), 1, "{sites:?}");
+    assert!(
+        f64::from(sites[0][2]).abs() < pole && f64::from(sites[0][2]).abs() > 600.0,
+        "{sites:?}"
+    );
+}
