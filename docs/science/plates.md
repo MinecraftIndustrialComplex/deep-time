@@ -9032,6 +9032,266 @@ ac619d59fdab, `--set tectonics.incipient_subduction=false`, supercontinent 1, ba
 arguments) has the state_sha256 (adf20d4c...) and fields_sha256 of base13's run. Its rec_sha256
 differs, as it should: the record gains the `incipient` and `benioff` front bands.
 
+### Step 13: the island-front fixes A and B (PLT-680 to PLT-683) (2026-10-26)
+
+The M5 lane's island front diagnosis (`tools/review/islfront/`, decisions log 2026-10-26) found the
+model's island front about 2.75 times Stern & Scholl's intra-oceanic arcs in every v_n band at
+base17's speed level, not a surplus of slow fronts, and the incipient resistance's size (PLT-612,
+Law 3) not the lever. The coordinator's calls (2026-10-26): a measure-only cross-tab of the front,
+and two physics fixes, A and B, on by default once built and correct, with switches for the off
+check.
+
+**A: the incipient front's resistance is the net force** (`tectonics.incipient_net_resistance`,
+PLT-680). Step 12 gave an incipient front Gurnis et al.'s resistance and left its young slab
+pulling beside it. Gurnis, Hall & Lavier 2004 compute the resisting force as what holds the imposed
+convergence ([37]: "The net horizontal force required to maintain the prescribed velocity is
+determined by integrating the horizontal force on each side. A positive value implies an external
+force maintains the plate motion, while a negative force implies the imposed velocities are smaller
+than what would naturally arise from internal forces"), and their models' plates carry their own
+slab ("Forces which drive subduction are the negative buoyancy of the subducting plate and tectonic
+forces"; [61]: "The buoyancy force up until 5-6 Myr is not sufficient to overcome the plate
+bending"). The young slab's buoyancy is inside that net force, so with A an incipient front takes
+the resistance and no slab pull, no slab suction and no slab resistance link (`forces.rs`, the force
+loop's oceanic fronts). The slab still grows by the convergence (FRC-020), and the stage still ends
+at PLT-611's 100 km.
+
+**B: the slab's thermal floor** (`tectonics.slab_thermal_floor`, PLT-681, PLT-682). An oceanic front
+sample converging slower than 10 mm/yr is incipient whatever its contact's slab. Toth & Gurnis 1998,
+p. 18,063: "We concluded that at subduction velocities of <10 mm/yr thermal diffusion inhibits slab
+formation and no substantial slab pull force develops"; p. 18,062, at 4 mm/yr "the rate of
+convergence is so low that diffusive heating does not allow a slab to develop". McKenzie 1977's 13
+mm/yr is read only through Toth & Gurnis (p. 18,064: "also quite consistent with our direct
+calculations") and Gurnis et al. 2004 ("at least 1.3 cm/yr for the thermal anomaly of the slab to
+persist without diffusing away"), so it stays `cited-unverified`. Both are the same physics, the
+slab's heat diffusing away faster than it sinks, and the coordinator's rule takes the one whose
+physics is the rule's, not a midpoint: Toth & Gurnis's 10 mm/yr, computed in their models and read.
+Their criterion is for a slab forming at a new subduction zone; a mature front's slow stretch with
+its slab already sunk is outside it, so B's reach there is an extension (PLT-681 `game-choice`, the
+upper bound of what the source supports).
+
+B acts per sample, each consumer with the convergence it already reads:
+
+- the force balance: the front sample's convergence (`sf.conv`) gives the incipient resistance,
+  no pull, suction or slab link, and no Forsyth & Uyeda friction (Step 12's guard);
+- the arcs (`subduction::fronts_finish`): the convergence across the front gives no arc magma, no
+  arc band weight and no arc onset (PLT-669);
+- the boundary mix: the sample's normal convergence gives class other, `front_bands.incipient`,
+  and the floor's own part in `slow`;
+- the margins (`stats::margins`): the closing speed of the pair of samples gives no front where
+  the side going under is oceanic (a continental side going under is a collision, as before).
+
+The slab is fed as before (FRC-020: the pair's whole front, its slow samples included), so a contact
+still matures by cumulative convergence.
+
+*The fronts A and B act on.* The force balance reads its fronts from the deformation lattice, with
+no PLT-582 check that the subducting plate is still beside the front, while the arcs, the boundary
+mix and the margins read the current geometry. The front lane is adding that check to `forces.rs`
+(the coordinator, 2026-10-26). A's and B's force terms act at the lattice's fronts until then, so
+the island front is read here through the current geometry's fronts (the boundary mix's bands and
+the crust budget's `front_oceanic`), and the `matured` count below, from the force balance's front
+sums, inherits the lattice's fronts.
+
+*Lock-in.* With A and B a slow stretch has no pull and takes a plastic resistance linearised at
+max(convergence, 1 mm/yr), so the balance can hold it, and the next step's convergence (from the
+solved motion) is slower still. The unit tests show it on the reference plate: the 40-km slab's
+trench moves at 0.0000 mm/yr with A (0.59 without), the full slab pushed at 5 mm/yr at 0.000 with B
+(51.73 without), and in `cumulative_convergence_ends_the_incipient_stage` the incipient trench is
+held at 0.000 mm/yr at both pushes (6.28 and 9.25 before A). That test's stage ends at the same
+steps, since the prescribed push grows the slab, but a planet's front has no prescribed push.
+Whether its slow stretches lock in is read on the arm below, by the plate speeds of slab-attached
+and free plates.
+
+**The cross-tab** (PLT-683, measurement only). The record's `front_bands` gain:
+
+- `slow`: B's part of `incipient`;
+- `incipient_normal`: the incipient front by its convergence band;
+- `normal_pair`: the subducting front by its sample's convergence band and by the mean convergence
+  over its pair of plates' front samples that step, which tells a per-sample floor from a
+  per-stretch one;
+- `oo_normal_pair`: the ocean-ocean subducting front by its plates' origin and its band;
+- `gain`, `loss`, `gain_slab`: each pair of plates' front change since the step before, by setting
+  and state, net per pair, and the subducting gain by the pair's slab band.
+
+The step record gains `matured`: the contacts whose slab passed PLT-611 that step, with their
+oceanic front's mean convergence and sample count and the contact's age. A sample's flag byte has no
+bit left, so the pair's front change stands in for a per-stretch front age. Read by
+`tools/review/islfront/measure_islab.py` (the pool's `islab` measure, with
+`--registry tools/review/islfront/measures_islab.json`) and `islrec.py`.
+
+**The tests** (`plates/tests.rs`, 20,000 samples):
+
+- `an_incipient_fronts_resistance_is_net`: the reference plate with a 40-km slab on 80-Myr floor.
+  On, no pull torque on the plate going under and no suction torque on the overriding plate, the
+  incipient resistance 8.1446 × 10^18 N, the trench at 0.0000 mm/yr; off, pull 3.486 × 10^25 N m,
+  suction 1.046 × 10^25 N m, the same resistance, the trench at 0.59 mm/yr. With a full slab on and
+  off are the same, bit for bit.
+- `a_front_too_slow_for_a_slab_is_incipient`: the reference plate with a full slab pushed at 5
+  mm/yr. On, the trench at 0.000 mm/yr, no pull, the incipient resistance 8.1446 × 10^18 N, 3,832 km
+  of incipient front, all of it `slow`, no ocean-continent front, 0 of 127 coastal samples a
+  subduction margin, and on a straight front no arc; off, the trench at 51.73 mm/yr, pull 5.959 ×
+  10^26 N m, 3,832 km of ocean-continent front, 31 margins, 1,101 m of arc magma. Pushed at 40
+  mm/yr, on and off are the same.
+- `the_front_cross_tabs_add_up`: the head-on plates closing in from 0 to about 50 mm/yr with full
+  slabs. Floor off, 21,715 km of ocean-continent front in the bands 1,437 / 1,597 / 3,193 / 6,866 /
+  8,622 km, all of it on a pair whose mean is in the 20 to 40 band; floor on, the 3,034 km under 10
+  mm/yr is incipient and all of it `slow`, the rest unchanged. Every table sums to its band within
+  the rounding of its cells.
+- `recording_does_not_change_the_world_and_matches_the_run`: every step, the front's change equals
+  the gain less the loss, and the gain by slab band sums to the subducting gain.
+- With the floor on by default, `a_slabs_length_survives_a_resampling` (plates closing in from 0 to
+  50 mm/yr) and `an_arcs_rate_is_its_types_rate_at_earths_convergence_scaled_by_its_own` (stretches
+  near the pole under 10 mm/yr at the slow speed) pin it off: they test PLT-550 and PLT-665, not B.
+- The margins' front is decided by the side going under: the first build exempted a sample whose
+  neighbour across the front was continental, which left 30 subduction margins in
+  `a_front_too_slow_for_a_slab_is_incipient` with the floor on; the rule now reads the sample of
+  the side going under.
+
+**The off check** (`pool.sh run isl-aboff --seeds 1 --set tectonics.incipient_net_resistance=false
+--set tectonics.slab_thermal_floor=false`, key 155590e13591 from 4fbb2843, argkey 95d04659, both
+starts, base18's other arguments). Against base18's same two runs (key 4c55ab83c7a1, argkey
+cd665cef): the state_sha256 and fields_sha256 are equal on both starts and all 109 state files are
+the same. Every summary line is the same except four kinds:
+
+- the timings;
+- the memory, 1 MiB more for the record's new fields;
+- the two new settings;
+- crust-budget parts printed as 0.00000 with either sign.
+
+Every non-zero crust-budget number is the same to the last digit (`build/m4b/offcheck.py`). Only the
+rec_sha256 differs, since the record gains the cross-tab.
+
+**Per sample against per stretch.** The off check's cross-tab is base18's own front (km per step,
+means of the 2 runs):
+
+| | island | continental |
+|---|---|---|
+| subducting front under 10 mm/yr by its sample | 5,943 | 1,125 |
+| of it on a pair whose mean is 10 or more | 2,191 (0.369) | 503 (0.447) |
+| subducting front at 10 or more on a pair whose mean is under 10 | 668 (0.019 of 35,818) | 111 (0.004 of 28,111) |
+
+A per-pair floor would hold 4,420 km of island front where the per-sample floor holds 5,943. The
+two disagree on 2,859 km, 6.8 % of the island subducting front. Most of the disagreement lies next
+to the threshold: 1,600 of the 2,191 km are samples at 5 to 10 mm/yr on pairs at 10 to 20, and only
+324 km are samples under 5 mm/yr on pairs at 10 or more. The agent kept the per-sample floor
+(2026-10-26, undoable), for three reasons:
+
+- Toth & Gurnis's criterion is the slab's heat against its sinking, where it sinks.
+- Each consumer already reads its own local convergence.
+- A pair's mean would give a stretch converging under 5 mm/yr an arc and a pull because the rest of
+  its pair is faster. It would also make a whole pair incipient at once when its mean crosses 10.
+
+**The arm isl-ab.** 8 runs: seeds 1 to 4 on both starts, `earthlike_quick_16k`, 1000 Myr,
+`+DEEPTIME_CRUST_BUDGET=1`, key 155590e13591 from 4fbb2843 (origin/master 9b1c9e70 merged in at f9d8e979), A and B
+on by default. It is read against base18-s4 (base18's seeds 1 to 4, key 4c55ab83c7a1). The
+numbers are medians, with the two-sided Mann-Whitney p in brackets (`pool.sh table` for
+`v1census`, `guard` and `boundary`; `islab` from `measures_islab.json`, its pair columns' p
+computed exactly by `build/m4b/islab_p.py`). Every run ran its 1000 Myr, and no run had a step
+beyond 2 Earth reliefs.
+
+| Measure | base18-s4 | isl-ab |
+|---|---|---|
+| land (0.13 to 0.36) | 0.254 | 0.248 (0.51) |
+| largest landmass (≥ 0.06) | 0.122 | 0.093 (0.38) |
+| continental crust under the sea (≤ 0.56) | 0.334 | 0.395 (0.57) |
+| land above 2 km (≤ 0.07) | 0.020 | 0.027 (0.57) |
+| coast with high ground (≤ 0.11) | 0.096 | 0.139 (0.80) |
+| land under ice (≤ 0.32) | 0.046 | 0.066 (0.38) |
+| collisions per 100 Myr (≤ 6) | 4.85 | 4.90 (1.0) |
+| continental crust's net change | −0.064 | −0.059 (0.33) |
+| V1 criteria met per run (median, mean) | 6.5, 6.25 | 6, 6.12 (0.69) |
+| sea over the datum after 100 Myr / at the end, m | 434 / 419 | 424 / 516 |
+| the guard's worst, m from the sea | 9,962 | 10,010 (0.65) |
+| subducting, share of boundary (Bird SUB 0.197; 0.15 to 0.25) | 0.294 | 0.208 (< 0.001) |
+| subducting / all boundary, lattice km (Bird 53,500 / 271,700 on the lattice) | 74,299 / 248,972 | 53,691 / 262,713 |
+| incipient / converging with no subduction zone (Bird OCB 0.067) | 0.024 / 0.032 | 0.099 / 0.107 |
+| slab 100 km under the arc, column (B) (Bird SUB 0.197) | 0.259 | 0.194 (< 0.001) |
+| ocean-ocean share of subducting (Stern & Scholl 0.35) | 0.593 | 0.564 (0.065) |
+| mean convergence across the oceanic front, mm/yr (Bird 53.2) | 41.2 | 46.9 (< 0.001) |
+| active share of continental margin (0.25 to 0.40) | 0.338 | 0.296 (< 0.001) |
+| plates alive | 22 | 24 (0.012) |
+| boundary criteria met per run (median, mean) | 2, 2.00 | 3, 3.00 (< 0.001) |
+
+The island and continental fronts (`islab`, km per step):
+
+| | base18-s4 | isl-ab | p |
+|---|---|---|---|
+| island front, subducting and incipient | 46,552 | 50,847 | 0.005 |
+| island subducting front (Stern & Scholl's island arcs 14,500) | 42,150 | 30,363 | 0.0002 |
+| island incipient share / of it by the floor alone | 0.086 / | 0.405 / 0.312 | 0.0002 |
+| continental front, subducting and incipient | 31,598 | 27,619 | 0.002 |
+| continental subducting front | 29,866 | 24,249 | 0.0002 |
+| continental incipient share / of it by the floor alone | 0.054 / | 0.126 / 0.059 | 0.0002 |
+| crust budget's island / continental front (counts incipient fronts; Stern & Scholl 14,500 / 27,500) | 42,656 / 26,488 | 46,446 / 22,892 | |
+| crust budget's young island front, under 10 Myr (PLT-670) | 7,073 | 3,939 | |
+
+The island subducting front's convergence, as shares of it (the islrec splits, means of the runs):
+
+| v_n band, mm/yr | under 10 | 10 to 20 | 20 to 40 | 40 to 80 | 80 or more |
+|---|---|---|---|---|---|
+| base18-s4 | 0.141 | 0.215 | 0.333 | 0.269 | 0.043 |
+| isl-ab | 0 | 0.229 | 0.362 | 0.340 | 0.069 |
+
+At 10 mm/yr or more the island subducting front (the shares times the median front) falls in
+every band but the fastest: from 9,060
+to 6,950 km at 10 to 20, from 14,040 to 10,990 at 20 to 40 and from 11,340 to 10,320 at 40 to 80. It
+rises from 1,810 to 2,100 at 80 or more. Its origin moves from initiations (0.302 to 0.197) and
+rifts (0.084 to 0.047) to other contacts (0.614 to 0.756), and its slab of 600 km or more from 0.559
+to 0.654.
+
+The plate speeds by class (`islab`, from plate.json; a plate is slab-attached when slab fronts make
+20 % or more of its boundary, free when they make under 5 %):
+
+| mm/yr | base18-s4 | isl-ab | p |
+|---|---|---|---|
+| slab-attached | 51.26 | 47.49 | 0.0002 |
+| the rest | 22.33 | 21.82 | 0.083 |
+| slab-attached over the rest / over free (Earth 3 to 4) | 2.31 / 3.20 | 2.17 / 3.13 | 0.028 / 0.44 |
+| median / RMS | 26.00 / 28.53 | 22.85 / 26.41 | 0.0002 / 0.007 |
+| 10th percentile | 8.20 | 6.65 | 0.0003 |
+| mean slab share of a plate's boundary | 0.174 | 0.159 | 0.002 |
+
+The cross-tabs on the arm (km per step, means of 8, against the off check's 2 runs of base18's
+front):
+
+- The island front under 10 mm/yr grows from 8,271 km (5,943 subducting, 2,328 incipient) to 18,620,
+  all of it incipient: 12,598 under 5 mm/yr (3,222 before) and 6,022 at 5 to 10.
+- The front B alone holds is 15,619 km of island front and 1,728 of continental.
+- The island front at 10 mm/yr or more falls from 37,609 km (35,818 subducting, 1,791 incipient) to
+  32,046 (30,287 and 1,759).
+- Turnover per step: the island incipient front gains 4,064 km and loses 4,021, against 1,319 and
+  1,312. Its subducting front gains 3,703 and loses 3,637, against 4,715 and 4,615.
+- A per-pair floor on the arm would disagree with B on 2.7 % of the island subducting front (the
+  part at 10 or more on a pair under 10).
+- Contacts maturing per 100 Myr: 56.2 against 48.1, at a median front v_n of 22.2 mm/yr against
+  21.6, and a median contact age of 10.0 Myr against 8.0.
+
+**What the arm shows.** B shortens the arc front to Bird's length. The whole subducting front falls
+from 74,299 to 53,691 lattice km against Bird's 53,500 on the lattice, and its share from 0.294 to
+0.208 (Bird 0.197). The Benioff column moves from 0.259 to 0.194, and one more boundary criterion
+is met in every run. The island subducting front falls from 2.9 to 2.1 times Stern & Scholl's
+island arcs. The continental subducting front shortens too, by 19 % (the crust budget's continental
+front, 22,892 km, is now under Stern & Scholl's 27,500), so the ocean-ocean share of the subducting
+front barely moves (0.593 to 0.564, against Stern & Scholl's 0.35).
+
+B does not shorten the island front itself. Subducting and incipient together, it grows by 9 %:
+the stretches B holds are not consumed, and the boundary as a whole grows from 248,972 to 262,713
+lattice km.
+
+**Lock-in.** It shows, and it is bounded. The island front under 5 mm/yr is four times base18's.
+The slab-attached plates are 7 % slower (p 0.0002) while the rest hardly move (2 %, p 0.08). The
+10th percentile of plate speed falls by 19 %. The incipient front turns over three times as fast,
+since stretches cross the floor both ways. The contacts still mature by cumulative convergence, at
+56 per 100 Myr against 48 and 2 Myr older. The island front by 100-Myr window levels at
+52,000 to 58,000 km after 500 Myr (base18-s4 47,000 to 54,000), with no runaway. The slab-attached over free ratio
+holds (3.13 against 3.20, p 0.44, Earth 3 to 4).
+
+The V1 census moves nothing at p < 0.05. The coast with high ground's median passes its 0.11 at
+0.139 (p 0.80), and the sea at the end stands 516 m over the datum against 419. The guard is clean.
+
+**Not split.** A's share and B's cannot be told apart on one cumulative arm (decisions log
+2026-10-23). The young-slab incipient front, which A alone touches, moves only from 4,003 to 4,729
+km of island front. The front lane's current-geometry check in `forces.rs` will move where A's and
+B's force terms act.
 
 ## Plate speed (2026-10-25)
 

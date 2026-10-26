@@ -1,0 +1,31 @@
+{
+  "_doc": "The M5 lane's measure for the island-front fixes A (PLT-680) and B (PLT-681), 2026-10-26: the island and continental fronts from the dynamics record's boundary mix, their incipient and slow shares, the per-sample against per-pair convergence cross-tab, the front's turnover and the maturation events (PLT-683), and the plates' speeds by slab from plate.json. Measurement only. Pass it with --registry tools/review/islfront/measures_islab.json. Definitions in measure_islab.py.",
+  "measures": {
+    "islab": {
+      "version": 1,
+      "doc": "island and continental fronts, the thermal floor's cross-tabs and the plate speeds by slab; definitions in tools/review/islfront/measure_islab.py",
+      "command": ["{py}", "-I", "{tools}/../islfront/measure_islab.py", "{run}"],
+      "python": "numpy",
+      "needs": ["rec", "plate"],
+      "columns": [
+        {"key": "isl_km", "key2": "cont_km", "label": "front, km per step: island / continental", "target": null, "digits": 0, "pair": true},
+        {"key": "isl_sub_km", "key2": "cont_sub_km", "label": "subducting front, km per step: island / continental", "target": null, "digits": 0, "pair": true},
+        {"key": "isl_inc", "key2": "cont_inc", "label": "incipient share of the front: island / continental", "target": null, "digits": 3, "pair": true},
+        {"key": "isl_slow", "key2": "cont_slow", "label": "incipient by the thermal floor alone: island / continental", "target": null, "digits": 3, "pair": true},
+        {"key": "isl_sub_u10", "key2": "cont_sub_u10", "label": "subducting front under 10 mm/yr: island / continental", "target": null, "digits": 3, "pair": true},
+        {"key": "sub_u10_fastpair", "key2": "sub_o10_slowpair", "label": "under 10 on a pair at 10+ / at 10+ on a pair under 10", "target": null, "digits": 3, "pair": true},
+        {"key": "sub_slowpair", "label": "subducting front on pairs converging under 10 on the mean", "target": null, "digits": 3},
+        {"key": "isl_gain_sub", "key2": "isl_loss_sub", "label": "island subducting front, gain / loss, km per step", "target": null, "digits": 0, "pair": true},
+        {"key": "isl_gain_inc", "key2": "isl_loss_inc", "label": "island incipient front, gain / loss, km per step", "target": null, "digits": 0, "pair": true},
+        {"key": "cont_gain_sub", "key2": "cont_loss_sub", "label": "continental subducting front, gain / loss, km per step", "target": null, "digits": 0, "pair": true},
+        {"key": "gain_sub_longslab", "label": "subducting gain on pairs with a slab of 100 km or more", "target": null, "digits": 3},
+        {"key": "matured_per_100myr", "label": "contacts maturing per 100 Myr", "target": null, "digits": 1},
+        {"key": "matured_vn_p50", "key2": "matured_age_p50", "label": "at maturing: front v_n mm/yr / contact age Myr, medians", "target": null, "digits": 1, "pair": true},
+        {"key": "speed_slab", "key2": "speed_noslab", "label": "plate speed, slab 20 %+ of boundary / less, mm/yr", "target": null, "digits": 2, "pair": true},
+        {"key": "speed_slab_ratio", "key2": "speed_slab_over_free", "label": "slab over no-slab / slab 20 %+ over under 5 % (Earth 3 to 4)", "target": null, "digits": 2, "pair": true},
+        {"key": "speed_rms", "key2": "speed_p50", "label": "plate speed RMS / median, mm/yr", "target": null, "digits": 2, "pair": true},
+        {"key": "speed_p10", "key2": "slab_share", "label": "plate speed 10th percentile, mm/yr / mean slab share", "target": null, "digits": 3, "pair": true}
+      ]
+    }
+  }
+}
