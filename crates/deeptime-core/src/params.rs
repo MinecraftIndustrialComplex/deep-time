@@ -884,8 +884,6 @@ pub struct TectonicParams {
     /// default and every built-in preset's since 2026-10-23; 0 releases nothing (the model before
     /// the trench budget, 2026-10-22). ledger: PLT-443
     pub trench_release_half_life_myr: f64,
-    /// Pelagic sedimentation on oceanic crust, m/Myr.
-    pub pelagic_m_per_myr: f64,
     /// Sediment subduction: the share of subducted ocean floor's sediment (its sediment and
     /// sedimentary pools) that goes down with the slab at a resampling instead of accreting to
     /// the column on top (`ridges::resample`), on every overriding plate. 0.12 is the default
@@ -1225,7 +1223,6 @@ impl Default for TectonicParams {
             cordillera_height_m: 2500.0,       // ledger: PLT-050
             trench_half_life_myr: 2.0,         // ledger: PLT-053
             trench_release_half_life_myr: 2.0, // ledger: PLT-443 (on since 2026-10-23)
-            pelagic_m_per_myr: 5.0,
             sediment_subduction_share: 0.12, // ledger: PLT-440
             subduction_erosion_km3_per_km_myr: 90.0, // ledger: PLT-441
             subduction_erosion_min_mm_yr: 60.0, // ledger: PLT-442

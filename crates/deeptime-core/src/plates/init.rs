@@ -402,8 +402,9 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
                 s.kind = OCEANIC;
                 s.formed_myr = (t0 - age) as f32;
                 s.elevation_m = floor_at(k, age) as f32;
+                // Bare: the surface stage's pelagic rain (`surface::pelagic`) lays the floor's
+                // sediment from the first step (PLT-103's rate x age stand-in is gone).
                 s.pools = oceanic_column();
-                s.pools[pool::SEDIMENT] = (k.pelagic_m_per_myr * age) as f32;
                 s.heat_flow_mw_m2 = ocean_heat_flow(age) as f32;
             }
             s.thickness_m = s.pools.iter().sum();

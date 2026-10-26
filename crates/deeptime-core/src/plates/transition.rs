@@ -785,7 +785,6 @@ mod tests {
             erosion_m: 0.0,
             damping_m: fx.k.oceanic_damping_mm_yr * 1.0e-3 * 2.0e6,
             accretion_m: 0.0,
-            pelagic_m: 0.0,
             z_c: fx.k.max_elevation_m,
             z_t: fx.k.trench_elevation_m,
             z_floor: fx.k.oceanic_floor_elevation_m,
