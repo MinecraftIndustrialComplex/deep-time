@@ -9868,7 +9868,8 @@ the origin, no orphan samples), `a_pull_along_the_margin_or_a_short_slab_starts_
 meeting the margin at a right angle, the switch off, slabs of 60 and 120 km: no start; 160 km: a
 start, at 80 Myr where the threshold is 138 km), `the_convergence_moves_the_tip_along_the_margin` (U
 converging on K' at 40 mm/yr: no advance after one step's 76 km, one after the second, K' gives U
-floor, C stays on K', the tip moves east, nothing when diverging) and
+a strip of floor about two spacings wide from the margin to its southern boundary (42 samples), C
+stays on K', the tip moves 2.9° east along the margin, nothing when diverging) and
 `an_absorbed_sliver_ends_its_propagation_cleanly` (K' buried below the minimum plate area: the
 propagation ends, no sample on a dead plate or cut off its plate).
 
