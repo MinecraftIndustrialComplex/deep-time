@@ -13,40 +13,9 @@
 //! stops at sea level: a step adds at most the water depth (Landlab's explicit rate times Δt would
 //! overshoot at deep-time steps).
 //!
-//! **Pelagic carbonate** ([`pelagic`], 2026-10-19). Since the Mesozoic, planktic calcifiers
-//! (coccolithophores, planktic foraminifera) rain calcareous ooze on the open sea floor, and about
-//! as much carbonate accumulates there as on reefs, banks and shelves (Milliman and Droxler 1995,
-//! after Milliman 1993: deep sea 11 of 32 × 10¹² mol/yr, slopes 6, the neritic rest 14.5). The ooze
-//! survives only above the carbonate compensation depth (the CCD of the column builder,
-//! `structure::columns::CCD_M`, RCK-015); between the lysocline and the CCD it dissolves more and
-//! more. Before the calcifiers' clock (`deposits::clocks::Epoch::pelagic_calcifiers_at`) the deep
-//! sea gets none (the Neritan ocean of Ridgwell 2005).
-
-/// Pelagic carbonate above the lysocline once the calcifiers are in full swing, m/Myr of chalk:
-/// the deep sea's 11 × 10¹² mol CaCO₃/yr over 290 × 10⁶ km² (Milliman and Droxler 1995, table 1)
-/// is 1.4 m/Myr of calcite (2,710 kg/m³) over the whole deep floor, 3.1 m/Myr over the ~45 % of it
-/// that is calcareous (Dutkiewicz et al. 2015, supplement table DR1; Diesing 2020: 37 %), so
-/// 4.4 m/Myr of chalk at 30 % porosity (RCK-001: dry chalk 1,940 kg/m³, 28.8 %); rounded down
-/// because the taper above the CCD thins it further (calcareous ooze 0.3–5 cm/kyr wet).
-pub const PELAGIC_M_MYR: f64 = 4.0; // ledger: ERO-191
-/// The lysocline lies this far above the CCD: the ooze's dissolution grows linearly from none at
-/// the lysocline to all of it at the CCD.
-pub const LYSOCLINE_ABOVE_CCD_M: f64 = 1000.0; // ledger: ERO-192
-
-/// The share of the pelagic rain that survives at water depth `z` (m) over a CCD at `ccd_m`.
-pub fn pelagic_share(z: f64, ccd_m: f64) -> f64 {
-    if z <= 0.0 {
-        return 0.0;
-    }
-    ((ccd_m - z) / LYSOCLINE_ABOVE_CCD_M).clamp(0.0, 1.0)
-}
-
-/// Chalk laid over `dt` years at water depth `z` (m) when the calcifiers are at `calcifiers`
-/// (0–1) of their full rain, m (never more than the depth).
-pub fn pelagic(z: f64, calcifiers: f64, dt: f64, ccd_m: f64) -> f64 {
-    (PELAGIC_M_MYR * 1.0e-6 * dt * calcifiers.clamp(0.0, 1.0) * pelagic_share(z, ccd_m))
-        .min(z.max(0.0))
-}
+//! **Pelagic carbonate** (2026-10-19; since 2026-10-25 in `surface::pelagic`). The chalk is the
+//! calcifiers' share of the carbonate the dissolved load returns to the sea floor, not a rate of
+//! its own; the carbonate compensation depth decides where it survives.
 
 /// A cell's outgoing share below this is taken as none: the tracer stops spreading from it.
 const EXPORT_MIN_SHARE: f64 = 0.01; // ledger: ERO-195
@@ -660,20 +629,5 @@ mod tests {
         let part = laid(&some);
         assert!(part <= lost * (1.0 + 1.0e-5), "laid {part} of {lost} m");
         assert!(part < all, "land dilutes the tracer");
-    }
-
-    #[test]
-    fn pelagic_ooze_dissolves_between_the_lysocline_and_the_ccd() {
-        let ccd = 4500.0;
-        // Above the lysocline: the full rain, 4 m/Myr over 2 Myr.
-        assert!((pelagic(3000.0, 1.0, 2.0e6, ccd) - 8.0).abs() < 1e-9);
-        // Half way between the lysocline (3,500 m) and the CCD: half of it.
-        assert!((pelagic(4000.0, 1.0, 2.0e6, ccd) - 4.0).abs() < 1e-9);
-        // Below the CCD, on land, or before the calcifiers: none.
-        assert_eq!(pelagic(5000.0, 1.0, 2.0e6, ccd), 0.0);
-        assert_eq!(pelagic(-10.0, 1.0, 2.0e6, ccd), 0.0);
-        assert_eq!(pelagic(3000.0, 0.0, 2.0e6, ccd), 0.0);
-        // Never above the sea.
-        assert!((pelagic(3.0, 1.0, 2.0e6, ccd) - 3.0).abs() < 1e-9);
     }
 }

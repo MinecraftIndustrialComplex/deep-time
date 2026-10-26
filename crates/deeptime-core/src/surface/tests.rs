@@ -656,6 +656,32 @@ fn chemical_denudation_takes_the_weathered_rock_away() {
     let mean_m_myr = wet.iter().map(|&x| f64::from(x)).sum::<f64>() / wet.len() as f64 / 2.0;
     assert!((0.01..20.0).contains(&mean_m_myr), "{mean_m_myr} m/Myr");
     assert_ne!(a.elevation_m, c.elevation_m);
+    // The pelagic rain (`pelagic.rs`) returns the dissolved load: off, no opal and no returned
+    // carbonate; on, its silica comes back as opal mol for mol and its Ca + Mg as carbonate, all
+    // of the supply laid (what a full cell cannot hold settles where there is room).
+    assert_eq!(
+        (a.totals.opal_km3, a.totals.returned_carbonate_km3),
+        (0.0, 0.0)
+    );
+    let t = &c.totals;
+    assert!(t.returned_carbonate_km3 > 0.0 && t.opal_km3 > 0.0, "{t:?}");
+    let opal_km3 = t.dissolved_km3 * crate::climate::carbon::ROCK_KG_M3 * pelagic::SILICA_SHARE
+        / pelagic::SIO2_KG_PER_MOL
+        * pelagic::opal_m3_per_mol();
+    assert!(
+        (t.opal_km3 - opal_km3).abs() <= 1e-5 * opal_km3,
+        "opal {} km³ against the dissolved silica's {opal_km3}",
+        t.opal_km3
+    );
+    assert!(
+        t.rain_unlaid_km3.abs() <= 1e-6 * (opal_km3 + t.returned_carbonate_km3),
+        "unlaid {} km³",
+        t.rain_unlaid_km3
+    );
+    eprintln!(
+        "dissolved {:.4} km³: returned carbonate {:.4}, opal {:.4}, dust {:.4}, unlaid {:.2e}",
+        t.dissolved_km3, t.returned_carbonate_km3, t.opal_km3, t.dust_km3, t.rain_unlaid_km3
+    );
 }
 
 /// Flexure in the coupled pipeline (`flexure.rs`). With `flexure.strength` 0 the stage is the one

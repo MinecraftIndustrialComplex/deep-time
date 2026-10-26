@@ -2720,7 +2720,9 @@ that the budget books as moved.
 5. *Hotspots and rifts add 0.04, twelve times below Earth's 0.5*: flood basalts and volcanic rifted
    margins have no rule of their own.
 6. *Pelagic sediment counted felsic, 1.40*: the plate step's pelagic rain (`pelagic_m_per_myr`)
-   books as felsic rock on the ocean floor and reaches the continents at resamplings.
+   books as felsic rock on the ocean floor and reaches the continents at resamplings. (Since
+   2026-10-25 the plates lay no pelagic rain: PLT-103 is retired and the surface stage's sourced
+   rain, erosion-and-sediment.md "The pelagic rain", lays it in the surface's own budget.)
 
 Table 1's rows add about 12 km³ a year on the branch against Earth's 3.2 and take 5.7 against at
 least 3.2, but the continental volume moves far more by the budget's own parts: the surface stage
@@ -9698,9 +9700,13 @@ down. Two stages were asked for, each behind its own switch, with tests written 
   where Earth's margins have their necking and hyper-extended domains: continental crust thinned to
   under 10 km, "slivers that vary in widths between 70 km offshore Iberia and 200 km off Angola"
   (Brune et al. 2014). A member there that is ocean floor and holds rock from the continents
-  (sediment and sedimentary rock beyond the pelagic rain for its age, PLT-103) turns continental at the
-  end of the step, over its own ocean crust as its basement (PLT-331). Members with the rain alone,
-  at a trench, in a subduction zone or on an arc stay oceanic.
+  (sediment and sedimentary rock beyond the open ocean's pile for its age and latitude) turns
+  continental at the end of the step, over its own ocean crust as its basement (PLT-331). Members with
+  the rain alone, at a trench, in a subduction zone or on an arc stay oceanic. The line was the
+  plates' pelagic rain, 5 m/Myr times the age (PLT-103); since that was retired (the pelagic lane,
+  2026-10-25) the surface stage lays the rain, and the line is GlobSed's eq. 2a less its pore water
+  (`surface::pelagic::open_floor_solid_m`, ERO-215; erosion-and-sediment.md "The pelagic rain"),
+  which the rain lies 14 to 42 m in place under.
 - **The side rule.** So that a converted member is never the next member's margin, the taper takes a
   continental column with under 10 km of its own crystalline crust (`hyper_extended`) as its ocean
   side, not its continental side, and ocean crust the taper adds to it joins its basement. A matured
