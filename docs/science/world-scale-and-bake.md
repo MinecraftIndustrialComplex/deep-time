@@ -267,7 +267,12 @@ BAK-048, BAK-050, BAK-065, BAK-067 and BAK-068) are game choices about how far t
   bank pass, as in the chunk. A lake's bed is not lowered: the lake pass plugs a bed the rule left
   open (cut to air, or painted water) with dirt at the bed, and far terrain now draws that dirt, where
   before it drew a painted lake bed one block lower under a block of water. A cut under the sea is
-  not drawn. RESULT_PENDING
+  not drawn. With the cut, the same seam test (GameTest with Expanded Ecosphere, 2026-10-26)
+  holds every compared column on both sides within a block, all of them exact: 96 of 96 west (32
+  dry) and 96 of 96 east (25 dry), and no seam column logged for a height. A GameTest with a
+  synthetic rule (air at or above y 100 within the floor's surface depth, dirt under it) checks
+  the walk on 96 columns: 57 cut down to the stone, 15 onto the dirt, 24 below the line and not
+  cut, each with the depth, top block and soil the walk must give.
 - **Ties in the biome search** (2026-10-21, a game choice). Vanilla's climate search
   (`Climate.RTree.search`) starts from the entry the thread found last and replaces it only with a
   strictly nearer one, so where a climate point is equally near two entries the thread's history
