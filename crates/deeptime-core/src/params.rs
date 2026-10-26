@@ -1281,20 +1281,20 @@ impl Default for TectonicParams {
             arc_mature_crust_km: 15.0, // ledger: PLT-047
             cordillera_shortening_mm_yr: 0.0, // ledger: PLT-048
             cordillera_width_km: 120.0,
-            cordillera_height_m: 2500.0,       // ledger: PLT-050
-            trench_half_life_myr: 2.0,         // ledger: PLT-053
-            trench_release_half_life_myr: 2.0, // ledger: PLT-443 (on since 2026-10-23)
-            sediment_subduction_share: 0.12,    // ledger: PLT-440
-            sediment_subduction_sourced: false, // ledger: PLT-660
-            margin_sediment_continental: false, // ledger: PLT-661, PLT-662
-            subduction_erosion_km3_per_km_myr: 90.0, // ledger: PLT-441
-            subduction_erosion_min_mm_yr: 60.0, // ledger: PLT-442
+            cordillera_height_m: 2500.0,               // ledger: PLT-050
+            trench_half_life_myr: 2.0,                 // ledger: PLT-053
+            trench_release_half_life_myr: 2.0,         // ledger: PLT-443 (on since 2026-10-23)
+            sediment_subduction_share: 0.12,           // ledger: PLT-440
+            sediment_subduction_sourced: false,        // ledger: PLT-660
+            margin_sediment_continental: false,        // ledger: PLT-661, PLT-662
+            subduction_erosion_km3_per_km_myr: 90.0,   // ledger: PLT-441
+            subduction_erosion_min_mm_yr: 60.0,        // ledger: PLT-442
             subduction_erosion_max_sediment_m: 1000.0, // ledger: PLT-442
-            erosion_retreat: false,             // ledger: PLT-523
-            front_share: true,                  // ledger: PLT-530
-            plate_fission: true,                // ledger: PLT-532
-            split_inheritance: true,            // ledger: PLT-534
-            level_set_membership: true,         // ledger: PLT-536
+            erosion_retreat: false,                    // ledger: PLT-523
+            front_share: true,                         // ledger: PLT-530
+            plate_fission: true,                       // ledger: PLT-532
+            split_inheritance: true,                   // ledger: PLT-534
+            level_set_membership: true,                // ledger: PLT-536
             hotspots_initial: 8,
             hotspot_births_per_100myr: 3.0,
             hotspot_lifetime_myr: [40.0, 150.0],
