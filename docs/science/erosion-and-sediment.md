@@ -1038,7 +1038,7 @@ aeolian dust, the dissolved load returned as opal and carbonate, and chalk where
 it survive.
 
 **The rain** (`surface/pelagic.rs`). Three parts, each from a measured flux and none fitted to a
-sediment thickness, laid once per plate step (the first substep, after the neritic factory):
+sediment thickness, laid once per plate step, after its last substep, on the floor as the substeps leave it:
 
 - **Aeolian dust** (ERO-208 to ERO-210). Earth's arid land sends 450 Tg of mineral dust a year to
   the oceans (Jickells et al. 2005, Fig. 2). A planet sends that flux per km2 of Earth's 25.5
@@ -1132,8 +1132,8 @@ floor the age grid leaves out). Two findings, noted in the ledger and not acted 
   CCD) and goes to the shelf carbonate when no floor lets it survive.
 - *Mass, coupled* (the surface stage's chemical denudation test, the pipeline at 3,000 cells for
   30 Myr). The dissolved silica comes back as opal to 1e-5, and the unlaid rain is under 1e-6 of
-  the supply: 129,744 km3 dissolved, 49,358 km3 of carbonate and 135,766 km3 of opal returned,
-  303 km3 of dust, -6.8e-10 km3 unlaid. With chemical denudation off, no opal and no returned
+  the supply: 129,819 km3 dissolved, 49,383 km3 of carbonate and 135,845 km3 of opal returned,
+  308 km3 of dust, -4.2e-10 km3 unlaid. With chemical denudation off, no opal and no returned
   carbonate.
 
 **Limits.**
@@ -1154,5 +1154,9 @@ floor the age grid leaves out). Two findings, noted in the ledger and not acted 
 - The initial floor, new floor at a spreading gap and resampled floor start bare and gather the
   rain from then on. GlobSed's eq. 2a could give the initial floor a starting pile by its age; not
   built.
+- The rain falls once per plate step, after the last substep, on the floor the substeps leave. So
+  the marine diffusion first moves it in the next step, and the periplatform tracer (ERO-195)
+  never counts the opal or the dust. The step's end is where its arrays fit the memory budget:
+  laid in the first substep, they would be held through all the substeps, beside the tracer's.
 
 **Measured.** The 8-run arm against base16 (seeds 1 to 4) waits for the coordinator's slot.
