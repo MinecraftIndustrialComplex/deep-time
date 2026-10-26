@@ -507,7 +507,8 @@ impl Summary {
              plates_over_5pct={} plates_under_1pct={} rifts={} initiations={} reversals={} \
              subductions={} collisions={} sutures={} healed={} accretions={} ridges={} births={} \
              deaths={} lips={} resamplings={} emerged={} buoyant={} reversals_confirmed={} \
-             transferences={}",
+             transferences={} propagation_starts={} propagations={} propagation_stalls={} \
+             initiations_near_fronts={}",
             self.plates,
             self.ocean_age_p90_myr,
             self.ocean_age_p50_myr,
@@ -532,7 +533,11 @@ impl Summary {
             self.counters.emerged,
             self.counters.buoyant,
             self.counters.reversals_confirmed,
-            self.counters.transferences
+            self.counters.transferences,
+            self.counters.propagation_starts,
+            self.counters.propagations,
+            self.counters.propagation_stalls,
+            self.counters.initiations_near_fronts
         )
     }
 }
