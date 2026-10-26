@@ -161,7 +161,7 @@
     "contact_timeout_myr": 24.0,
     "collision_orogeny_myr": 30.0,
     "l1_every_steps": 1,
-    "plate_speed_scale_mm_yr": 75.0,
+    "plate_speed_scale_mm_yr": 45.0,
     "slab_pull": 1.0,
     "slab_depth_km": 700.0,
     "slab_breakoff_myr": 10.0,
