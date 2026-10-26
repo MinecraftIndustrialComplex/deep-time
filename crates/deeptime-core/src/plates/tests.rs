@@ -6964,7 +6964,7 @@ fn a_resampling_keeps_thin_crust_on_average() {
     );
 }
 
-/// Back-arc rifting through the force balance (ledger PLT-700, PLT-706): FRC-016's reference
+/// Back-arc rifting through the force balance (ledger PLT-710, PLT-716): FRC-016's reference
 /// plate ([`a_reference_plate`]: a 3,000 km trench of a full-length 80 Myr slab under plate 0)
 /// with plate 0's forearc and arc split off as a back-arc sliver (`rifting::rift_backarc`, the
 /// samples within `arc_distance_km` of the front). The sliver takes the slab's suction (PLT-186,

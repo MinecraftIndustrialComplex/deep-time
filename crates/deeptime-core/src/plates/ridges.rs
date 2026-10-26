@@ -1355,7 +1355,7 @@ pub fn bury(
         }
         let min = (env.k.min_plate_area_frac * f64::from(state.n)).ceil() as u32;
         // A back-arc sliver holding a subducting front is kept below the size (Bird 2003's
-        // back-arc microplates, 0.0002 to 0.016 sr; ledger: PLT-705).
+        // back-arc microplates, 0.0002 to 0.016 sr; ledger: PLT-715).
         let backarcs = state.backarcs.clone();
         while let Some(small) = state
             .alive()

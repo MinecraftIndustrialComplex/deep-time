@@ -966,25 +966,25 @@ fn membership(members: &[u32], n: usize) -> Vec<bool> {
     m
 }
 
-/// The plate_birth and rift_onset `origin` of a back-arc rift (ledger PLT-700).
+/// The plate_birth and rift_onset `origin` of a back-arc rift (ledger PLT-710).
 pub const BACKARC_ORIGIN: &str = "back_arc";
 
 /// The youngest floor coming in at a front where a back-arc rifts, Myr (Sdrolias & Müller
 /// 2006: "back-arc basins develop when the age of subducting normal oceanic lithosphere is
-/// greater than 55 million years"). ledger: PLT-702
+/// greater than 55 million years"). ledger: PLT-712
 pub const BACKARC_SLAB_AGE_MYR: f64 = 55.0;
 
 /// The shortest slab under a back-arc rift, km (Karig 1971: "Active extension is restricted to
 /// arc systems with earthquakes deeper than about 350 km"). The slab's length stands for its
-/// depth, as the slab pull reads it against PLT-184's 700 km. ledger: PLT-703
+/// depth, as the slab pull reads it against PLT-184's 700 km. ledger: PLT-713
 pub const BACKARC_SLAB_KM: f64 = 350.0;
 
 /// The fewest samples a back-arc rift leaves on each side: a subduction initiation's 32
-/// (`initiate`; the lattice's resolution, game-choice). ledger: PLT-704
+/// (`initiate`; the lattice's resolution, game-choice). ledger: PLT-714
 const BACKARC_MIN_SAMPLES: usize = 32;
 
 /// World globals of back-arc rifting and the trench's motion (measurement, written only with
-/// `tectonics.backarc_rifting` on; ledger PLT-706). Over the step's subducting fronts
+/// `tectonics.backarc_rifting` on; ledger PLT-716). Over the step's subducting fronts
 /// (`subduction::Pull::subducting_fronts`, one lattice spacing each, as PLT-692 counts them), km ×
 /// Myr …
 pub const TRENCH_FRONT_GLOBAL: &str = "plates/trench_front_km_myr";
@@ -1008,7 +1008,7 @@ pub const BACKARC_VD_KM_GLOBAL: &str = "plates/backarc_vd_km_myr";
 /// its parent's, opening positive; Heuret & Lallemand's Vd with the sign turned).
 pub const BACKARC_VD_GLOBAL: &str = "plates/backarc_vd_mm_yr_km_myr";
 
-/// Back-arc rifting (`tectonics.backarc_rifting`, ledger PLT-700 to PLT-706): the moving
+/// Back-arc rifting (`tectonics.backarc_rifting`, ledger PLT-710 to PLT-716): the moving
 /// trench. In a model of rigid plates whose fronts are fixed in the overriding plate, a trench
 /// moves only with that plate; Earth's trenches roll back where the overriding plate splits and a
 /// back-arc basin opens behind its forearc (Heuret & Lallemand 2005: Vt = Vup + Vd).
@@ -1016,20 +1016,20 @@ pub const BACKARC_VD_GLOBAL: &str = "plates/backarc_vd_mm_yr_km_myr";
 /// `fronts` and `detail` are the step's subducting fronts (`subduction::Pull`): the overriding
 /// side's samples past incipient, each with the subducting side's sample across it and the
 /// boundary normal towards it. A front qualifies where the floor coming in is older than 55 Myr
-/// (PLT-702), the plate holding the front moves away from it (its velocity along the normal
+/// (PLT-712), the plate holding the front moves away from it (its velocity along the normal
 /// below 0: Sdrolias & Müller 2006, "The initiation of back-arc extension is preceded by the
 /// landward migration of the overriding plate, in an absolute reference frame"; here the
-/// mantle's frame), the pair's slab is 350 km or longer (PLT-703), and no back-arc sliver holds
+/// mantle's frame), the pair's slab is 350 km or longer (PLT-713), and no back-arc sliver holds
 /// it (once open, "back-arc formation will continue unabated even if the overriding plate begins
 /// to move toward the trench"). Each pair of plates with a qualifying front draws once a step
-/// with probability 1 − e^(−λ), λ = `backarc_rifting_per_myr` × dt (PLT-701); a draw splits off
+/// with probability 1 − e^(−λ), λ = `backarc_rifting_per_myr` × dt (PLT-711); a draw splits off
 /// the overriding plate's samples within `arc_distance_km` of those fronts, its forearc and arc,
-/// the largest connected strip (PLT-704), as a new plate with the parent's motion. The sliver
+/// the largest connected strip (PLT-714), as a new plate with the parent's motion. The sliver
 /// takes the front, the slab and their suction (PLT-534's inheritance); the force balance decides
 /// whether it opens (the rest of the plate no longer feels that suction), a rift link lets a
 /// back-arc that does not open heal (PLT-272), and the sliver is kept below PLT-091's size while
-/// it holds a subducting front (PLT-705). Emits a rift_onset and a plate_birth with `origin`
-/// "back_arc". Also measures the trench's motion over every subducting front (PLT-706).
+/// it holds a subducting front (PLT-715). Emits a rift_onset and a plate_birth with `origin`
+/// "back_arc". Also measures the trench's motion over every subducting front (PLT-716).
 #[allow(clippy::too_many_arguments)]
 pub fn maybe_rift_backarc(
     state: &mut PlateState,
@@ -1049,7 +1049,7 @@ pub fn maybe_rift_backarc(
     let norm = env.norm;
     // One lattice spacing per front sample × the step (PLT-692's count).
     let km_myr = norm.km(norm.spacing_rad()) * env.dt_myr;
-    // A sliver keeps its exemption while it holds a subducting front (PLT-705).
+    // A sliver keeps its exemption while it holds a subducting front (PLT-715).
     let holders: std::collections::BTreeSet<u32> =
         fronts.iter().map(|&v| state.plate_of(v as usize)).collect();
     let plates = &state.plates;
@@ -1097,7 +1097,7 @@ pub fn maybe_rift_backarc(
             }
             continue;
         }
-        // ledger: PLT-702, PLT-703
+        // ledger: PLT-712, PLT-713
         let old = state.samples[u as usize].age_myr(t) > BACKARC_SLAB_AGE_MYR;
         let deep = slab_km.get(&(up, o)).is_some_and(|&km| km >= BACKARC_SLAB_KM);
         if up != o && old && deep && vt < 0.0 {
@@ -1121,7 +1121,7 @@ pub fn maybe_rift_backarc(
     {
         *world.globals.entry(key.to_owned()).or_insert(0.0) += x;
     }
-    // ledger: PLT-701 (per Myr, so the step's hazard scales with its length)
+    // ledger: PLT-711 (per Myr, so the step's hazard scales with its length)
     let lambda = k.backarc_rifting_per_myr * env.dt_myr;
     for ((_, o), at) in qualifying {
         if state.alive().count() as u32 >= k.max_plates {
@@ -1135,7 +1135,7 @@ pub fn maybe_rift_backarc(
 }
 
 /// Splits plate `id`'s samples within `arc_distance_km` of the fronts `at` off as a back-arc
-/// sliver (ledger PLT-700, PLT-704): the forearc and the arc, where Taylor & Karner 1983 find
+/// sliver (ledger PLT-710, PLT-714): the forearc and the arc, where Taylor & Karner 1983 find
 /// the arc rifting ("rifting of the volcanic arc may occur on either side of the line of active
 /// volcanoes (±50 km)") and Sdrolias & Müller 2006 the locus "commonly in between the remnant and
 /// active volcanic arc"; the arc stands `arc_distance_km` behind its trench (PLT-042). The
@@ -1168,7 +1168,7 @@ pub(super) fn rift_backarc(
         .collect();
     let member = membership(&members, n);
     let tree = Tree::over(&at, |_| true);
-    let reach = norm.rad(k.arc_distance_km); // ledger: PLT-042, PLT-704
+    let reach = norm.rad(k.arc_distance_km); // ledger: PLT-042, PLT-714
     let mut label = vec![u32::MAX; n];
     for &i in &members {
         let near = tree
@@ -2085,7 +2085,7 @@ pub(in crate::plates) mod tests {
         }
     }
 
-    /// Sdrolias & Müller 2006 (ledger PLT-700 to PLT-704): back-arc basins "develop when the age
+    /// Sdrolias & Müller 2006 (ledger PLT-710 to PLT-714): back-arc basins "develop when the age
     /// of subducting normal oceanic lithosphere is greater than 55 million years", their
     /// initiation "is preceded by the landward migration of the overriding plate", the locus is
     /// "commonly in between the remnant and active volcanic arc"; Karig 1971: extension only where
@@ -2190,7 +2190,7 @@ pub(in crate::plates) mod tests {
         assert_eq!(st.rng, rng, "off draws nothing");
     }
 
-    /// The hazard (ledger PLT-701): Heuret & Lallemand 2005's Table 1 has 16 of its 68 segments
+    /// The hazard (ledger PLT-711): Heuret & Lallemand 2005's Table 1 has 16 of its 68 segments
     /// with a slab of 55 Myr or older under a landward upper plate in class E3 (back-arc
     /// spreading); Sdrolias & Müller 2006's four Cenozoic back-arc basins spread for 15.4 Myr on
     /// average. A qualifying front that converts at the rate h and spreads for D holds a spreading
@@ -2208,7 +2208,7 @@ pub(in crate::plates) mod tests {
     /// Bird 2003's back-arc microplates are 0.0002 to 0.016 sr (Table 1: Mariana 0.01037, Tonga
     /// 0.00625, South Sandwich 0.00317, Futuna 0.00079), below PLT-091's 0.003 of the sphere
     /// (0.0377 sr) but for the largest. A sliver on the list is kept below the size at a
-    /// resampling's burial; off the list it is absorbed as any small plate (ledger PLT-705).
+    /// resampling's burial; off the list it is absorbed as any small plate (ledger PLT-715).
     #[test]
     fn a_sliver_holding_its_front_outlives_the_plate_size_rule() {
         let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();

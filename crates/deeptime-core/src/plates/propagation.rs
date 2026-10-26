@@ -684,7 +684,7 @@ fn plan_start(v: &View, env: &Env, u: u32) -> Plan<Cut> {
     let Some(inward) = v.normal(pos[p], u) else {
         return Plan::None;
     };
-    // Zhou et al. 2020's geometry (ledger: PLT-707): the trench runs on along the margin, so the
+    // Zhou et al. 2020's geometry (ledger: PLT-717): the trench runs on along the margin, so the
     // tear across the margin is a STEP at the trench's end. U's trench samples within
     // `TRENCH_STRIKE_SPACINGS` of e all lie within the border (PLT-534) of the margin's strike
     // line through p, the great circle whose pole is the margin's normal there (at most about
@@ -717,7 +717,7 @@ fn plan_start(v: &View, env: &Env, u: u32) -> Plan<Cut> {
     }
     // The cut: the continent and the floor beyond the tear go to K'. A continent of fewer
     // samples than a plate may hold (`min_samples`) is a speck, no passive margin (arm fl-law2's
-    // starts at "continents" of 1 to 11 samples). ledger: PLT-707
+    // starts at "continents" of 1 to 11 samples). ledger: PLT-717
     let cont = v.continent(p, u);
     if cont.iter().filter(|&&c| c).count() < min_samples(env, n) {
         tally(T_START_SMALL_C);
@@ -1481,7 +1481,7 @@ mod tests {
         }
     }
 
-    /// Zhou et al. 2020's geometry only (ledger PLT-707): a trench meeting the margin at 45° with
+    /// Zhou et al. 2020's geometry only (ledger PLT-717): a trench meeting the margin at 45° with
     /// a full 700 km slab, whose pull across the margin (cos 45° of 3 × 10¹³ N/m) beats the
     /// margin's 5.9 × 10¹² N/m at 80 Myr, starts nothing, because the trench does not run on along
     /// the margin's strike; the same slab where the trench does ([`in_line`]) starts. A continent

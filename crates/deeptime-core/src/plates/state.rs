@@ -647,7 +647,7 @@ pub struct Counters {
     /// realized rate reads against PLT-692's hazard.
     #[serde(default)]
     pub initiations_refused: u32,
-    /// Back-arc rifts made (`rifting::maybe_rift_backarc`, ledger PLT-700): each split a forearc
+    /// Back-arc rifts made (`rifting::maybe_rift_backarc`, ledger PLT-710): each split a forearc
     /// and arc sliver off an overriding plate.
     #[serde(default)]
     pub backarc_rifts: u32,
@@ -656,9 +656,9 @@ pub struct Counters {
     pub backarc_refused: u32,
 }
 
-/// A back-arc sliver (`tectonics.backarc_rifting`, ledger PLT-700): plate `plate`, split off
+/// A back-arc sliver (`tectonics.backarc_rifting`, ledger PLT-710): plate `plate`, split off
 /// `parent`'s forearc and arc at `born_myr`. Kept below `min_plate_area_frac` (PLT-091) while it
-/// holds a subducting front (PLT-705); the entry goes when it holds none or dies.
+/// holds a subducting front (PLT-715); the entry goes when it holds none or dies.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct BackArc {
     pub plate: u32,
@@ -756,7 +756,7 @@ pub struct PlateState {
     #[serde(default)]
     pub propagations: Vec<Propagation>,
     /// Back-arc slivers holding a subducting front (`rifting::maybe_rift_backarc`, ledger
-    /// PLT-700, PLT-705); empty while `tectonics.backarc_rifting` is off.
+    /// PLT-710, PLT-715); empty while `tectonics.backarc_rifting` is off.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub backarcs: Vec<BackArc>,
     /// The land's gap budget (`gap_budget.rs`): measurement only, absent unless switched on; not
