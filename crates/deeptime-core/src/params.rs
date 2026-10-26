@@ -1434,9 +1434,11 @@ impl Default for TectonicParams {
             incipient_subduction: true,       // ledger: PLT-610 (on since 2026-10-25)
             initiation_polarity_by_age: true, // ledger: PLT-655
             margin_propagation: true, // ledger: PLT-656, PLT-717 (Zhou's geometry only; on since 2026-10-26)
-            backarc_rifting: true,   // ledger: PLT-710 (on since 2026-10-26)
-            // E3 share 16 / 68 over (1 - 16 / 68) and 15.375 Myr. ledger: PLT-711
-            backarc_rifting_per_myr: 16.0 / (52.0 * ((8.0 + 15.0 + 15.0 + 23.5) / 4.0)),
+            backarc_rifting: true,    // ledger: PLT-710 (on since 2026-10-26)
+            // E3 share 16 / 68 over (1 - 16 / 68) and 15.375 Myr: 16 / (52 x 15.375) = 0.020013, to
+            // three figures (a 17-digit default does not survive the presets' JSON round trip).
+            // ledger: PLT-711
+            backarc_rifting_per_myr: 0.0200,
             incipient_resistance_by_thickness: false, // ledger: PLT-657 (parked with law 2)
             incipient_net_resistance: true,           // ledger: PLT-680
             slab_thermal_floor: true,                 // ledger: PLT-681
