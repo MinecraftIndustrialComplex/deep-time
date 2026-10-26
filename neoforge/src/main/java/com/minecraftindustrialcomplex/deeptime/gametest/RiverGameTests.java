@@ -582,12 +582,19 @@ public final class RiverGameTests {
             }
             // The pack's own list may give vanilla's valley slot a biome of its own (Expanded Ecosphere's sandy jungle
             // on the flattest, wettest warm ground): the slice reached the channel and the pack chose what grows on it.
-            // Not an ocean biome: a sample is a channel above the sea, and an ocean there is no valley's.
-            var vanilla = biomes.getHolderOrThrow(vanillaList.findValue(
-                    sampler.sample(QuartPos.fromBlock(x), QuartPos.fromBlock(y), QuartPos.fromBlock(z))));
-            if (valley(vanilla) > 0 && !b.is(BiomeTags.IS_OCEAN)) {
+            // Not an ocean biome: a sample is a channel above the sea, and an ocean there is no valley's. The one exception
+            // is vanilla's coast band of continentalness (-0.19 to -0.11), which the land call gives to land (BIO-170):
+            // Expanded Ecosphere 3.4.7's own list lays an ocean (frozen, icy, cold, plain, warm) across the valley slice
+            // there below erosion 0.57, where vanilla's list has a river, so a river crossing that band takes the pack's
+            // ocean. On the planet of the pelagic merge (2026-10-26) all 11 samples lay on one cold river through it.
+            var point = sampler.sample(QuartPos.fromBlock(x), QuartPos.fromBlock(y), QuartPos.fromBlock(z));
+            var vanilla = biomes.getHolderOrThrow(vanillaList.findValue(point));
+            boolean coastBand = point.continentalness() >= net.minecraft.world.level.biome.Climate.quantizeCoord(-0.19f)
+                    && point.continentalness() <= net.minecraft.world.level.biome.Climate.quantizeCoord(-0.11f);
+            if (valley(vanilla) > 0 && (!b.is(BiomeTags.IS_OCEAN) || coastBand)) {
                 packOwn++;
-                byPack.merge(b.getRegisteredName() + " for " + vanilla.getRegisteredName(), 1, Integer::sum);
+                byPack.merge(b.getRegisteredName() + " for " + vanilla.getRegisteredName() + (b.is(BiomeTags.IS_OCEAN) ? " (coast band)" : ""),
+                        1, Integer::sum);
                 continue;
             }
             if (seen.length() < 400)
