@@ -31,7 +31,15 @@
 //! act along the boundary's normal over each sample's share of the straight front
 //! (`shortening::front_share_rad`), the per-metre sizes' own count (a straight trench, the pull
 //! normal to it: [`Coeffs::new`]). Without it every lattice edge converging on an active contact
-//! was a front, each overriding sample pulling one spacing along that edge.
+//! was a front, each overriding sample pulling one spacing along that edge. With
+//! `front_current_geometry` (PLT-582) a front, a hanging slab and a collision's incoming side
+//! count a plate beside a sample only while a visible sample of that plate stands within
+//! `subduction::trench_row_rad` of it now, as the arcs' fronts and the boundary mix do: between
+//! resamplings the lattice is frozen, and the lattice neighbours a consumed plate had at the last
+//! resampling have gone under or been carried on. Until 2026-10-26 the force balance read them,
+//! so a consumed plate kept pulling along its trench as it stood at the last resampling while
+//! its basal drag shrank with its area (plates.md, "The force balance's front on the current
+//! geometry").
 //! - **Slab pull** (drives the subducting plate, towards the trench): per metre of trench where
 //!   the subducting crust is oceanic, `F_sp · slab_pull · s(age) · min(L, D)/D`, with `F_sp` the
 //!   reference pull ([`SLAB_PULL_N_M`] at Earth's gravity, scaled with gravity), `s` the slab's
@@ -110,11 +118,11 @@ use rayon::prelude::*;
 
 use super::Env;
 use super::dynamics::PlateForces;
-use super::geometry::Geo;
+use super::geometry::{Geo, Tree};
 use super::kinematics::{quat, tangent};
 use super::normalise::Norm;
-use super::shortening;
 use super::state::{CONTINENTAL, PlateState, SlabTrack};
+use super::{shortening, subduction};
 use crate::params::TectonicParams;
 use crate::sphere::SplitMix64;
 
@@ -1345,6 +1353,15 @@ fn balance_step(
     let ell = norm.km(norm.spacing_rad()) * 1000.0;
     let c = Coeffs::new(k, &norm, env.gravity, st.a0_km2, flow, sea_m);
     let friction = c.transform_n_m > 0.0 || c.colliding_n_m > 0.0;
+    // The front on the current geometry (PLT-582), as `subduction::fronts_begin` asks it: a plate
+    // beside a sample counts for its front, its hanging slab and a collision's incoming side only
+    // while a visible sample of it stands within the row of the sample now. The lattice is frozen
+    // between resamplings, so its neighbours of a consumed plate have gone under or been carried
+    // on. ledger: PLT-582
+    let row = k
+        .front_current_geometry
+        .then(|| subduction::trench_row_rad(norm.spacing_rad()));
+    let tree = row.map(|_| Tree::over(pos, |_| true));
 
     // The boundary, sample by sample (the tests of `subduction::fronts_and_uplift`).
     let edges: Vec<Edge> = (0..n)
@@ -1372,6 +1389,11 @@ fn balance_step(
             let mut best = 0.0;
             // The other plates with a visible sample beside this one, by slot.
             let mut seen = 0u8;
+            let mut beside = subduction::SlabBeside::new(row);
+            let mut near = |q: u32| match &tree {
+                Some(t) => beside.has(samples, &plate_of, t, x, q),
+                None => true,
+            };
             for (u, _) in geo.edges(v as u32) {
                 let su = &samples[u as usize];
                 let pu = plate_of[u as usize];
@@ -1402,7 +1424,7 @@ fn balance_step(
                 {
                     seen |= 1 << i;
                 }
-                if e.hang.is_none() && !su.is_hidden() && hanging.contains(&(pu, pv)) {
+                if e.hang.is_none() && !su.is_hidden() && hanging.contains(&(pu, pv)) && near(pu) {
                     e.hang = Some((u, dir, ell));
                 }
                 let rel = norm.velocity_mm_yr(omega[pu as usize] - omega[pv as usize], x);
@@ -1410,6 +1432,7 @@ fn balance_step(
                 if along < 0.0 {
                     if let Some(&c) = active.get(&(pu, pv))
                         && -along > best
+                        && near(pu)
                     {
                         best = -along;
                         e.front = Some(SlabFront {
@@ -1422,7 +1445,7 @@ fn balance_step(
                             normal: DVec3::ZERO,
                             share_rad: 0.0,
                         });
-                    } else if active.contains_key(&(pv, pu)) && sv.kind == CONTINENTAL {
+                    } else if active.contains_key(&(pv, pu)) && sv.kind == CONTINENTAL && near(pu) {
                         e.incoming = true;
                     }
                 }
@@ -2429,8 +2452,8 @@ mod tests {
         let k = old_law();
         let c = coeffs(&k);
         // A flat-ish cap of the reference area pulled by a straight trench across its rim: drag
-        // (1 + slab resistance + boundary resistance) c_b A v = F L, so v is about 45 mm/yr when
-        // the trench is one slab of 80 Myr at full length.
+        // (1 + slab resistance + boundary resistance) c_b A v = F L, so v is about the speed scale
+        // (`plate_speed_scale_mm_yr`) when the trench is one slab of 80 Myr at full length.
         let area = 4.0 * std::f64::consts::PI * c.radius_m.powi(2) / 14.0;
         let r_deg = (1.0 - area / (2.0 * std::f64::consts::PI * c.radius_m.powi(2)))
             .acos()
@@ -2479,10 +2502,12 @@ mod tests {
             "the reference plate on the ring moves at {:.1} mm/yr (the speed scale {:.0})",
             ans.speed_mm_yr, k.plate_speed_scale_mm_yr
         );
-        // The sphere's cap is not flat, so the factor of the reference only holds roughly.
+        // The sphere's cap is not flat, so the factor of the reference only holds roughly (49.5
+        // mm/yr at 45, 82.6 at 75).
+        let s = k.plate_speed_scale_mm_yr;
         assert!(
-            (25.0..70.0).contains(&ans.speed_mm_yr),
-            "speed {}",
+            (0.55 * s..1.55 * s).contains(&ans.speed_mm_yr),
+            "speed {} at the scale {s}",
             ans.speed_mm_yr
         );
         // It moves towards the trench: the velocity at the centroid points along +X.
@@ -2624,8 +2649,12 @@ mod tests {
             let (u_f, rest_f, fixed, v_t) = run(r_deg, trench_km, edges, false);
             let (u_s, rest_s, _, v_t2) = run(r_deg, trench_km, edges, true);
             assert_eq!(v_t, v_t2);
-            // About 105 mm/yr at Earth's settings: 45 × (1 + 3 + 3) / 3.
-            assert!((100.0..110.0).contains(&v_t), "{v_t}");
+            // The speed scale × (1 + 3 + 3) / 3 at Earth's settings: 105 mm/yr at 45, 175 at 75.
+            let k = old_law();
+            let want = k.plate_speed_scale_mm_yr
+                * (1.0 + k.slab_resistance + k.boundary_resistance)
+                / k.slab_resistance;
+            assert!((v_t / want - 1.0).abs() < 0.05, "{v_t} {want}");
             assert!((rest_f / fixed - 1.0).abs() < 1e-9 && (rest_s / fixed - 1.0).abs() < 1e-9);
             let expect = u_f / (1.0 + u_f / v_t);
             eprintln!(

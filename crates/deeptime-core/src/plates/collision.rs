@@ -86,6 +86,10 @@ pub struct Collided {
     pub sutured: bool,
     /// Nothing happened: the terrane is a continent and the collision has not stalled yet.
     pub deferred: bool,
+    /// A weld or a transfer moved the terrane and set both plates' motion this step (PLT-080).
+    /// False when the collision was deferred and when nothing could happen: a plate already dead
+    /// (welded earlier in the step) or a terrane gone (the collision ends emptied).
+    pub moved: bool,
 }
 
 /// Ends the collision of contact `k`, whose subducting plate's continental crust `seeds` stands at
@@ -446,5 +450,6 @@ pub fn collide(
         event,
         sutured: suture,
         deferred: false,
+        moved: true,
     })
 }
