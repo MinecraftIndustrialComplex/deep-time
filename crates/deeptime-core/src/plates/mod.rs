@@ -68,6 +68,7 @@ pub mod noise;
 pub mod normalise;
 pub mod peaks;
 pub mod pools;
+pub mod propagation;
 pub mod rate;
 pub mod ridges;
 pub mod rifting;
@@ -591,6 +592,15 @@ impl PlatesStage {
                 subduction::ARC_FRONT_STRAIGHT_GLOBAL,
                 pull.front_straight_km_myr,
             ),
+            // ledger: PLT-665 (measurement only)
+            (
+                subduction::ARC_FRONT_NORMAL_CONTINENTAL_GLOBAL,
+                pull.front_normal_km_myr[0],
+            ),
+            (
+                subduction::ARC_FRONT_NORMAL_OCEANIC_GLOBAL,
+                pull.front_normal_km_myr[1],
+            ),
             // ledger: PLT-554 (measurement only)
             (subduction::ARC_BAND_GLOBAL, pull.arc_band_km_myr),
         ] {
@@ -730,6 +740,10 @@ impl PlatesStage {
             .globals
             .entry(transition::MOVED_GLOBAL.to_owned())
             .or_insert(0.0) += taper.moved_km2_m / 1000.0;
+        *world
+            .globals
+            .entry(transition::MARGINS_LEFT_GLOBAL.to_owned())
+            .or_insert(0.0) += taper.margins_left_km2_m / 1000.0;
         // The visible continental crust's volume (measurement: the crust budget, km³).
         let volume_m: f64 = st
             .samples
@@ -885,6 +899,9 @@ impl PlatesStage {
         cut_trace::mark(st, &cache.geo, "rift");
         rifting::maybe_initiate_subduction(st, world, &cache.geo, &pos, &env, &balance.stress_mpa)?;
         cut_trace::mark(st, &cache.geo, "initiate");
+        // Along-strike propagation to a passive margin (law 2; ledger: PLT-656).
+        propagation::step(st, world, &cache.geo, &pos, &env)?;
+        cut_trace::mark(st, &cache.geo, "propagate");
         book(st, gap_budget::Part::Rifting);
         lap(&mut clock, "motion_rifting");
 

@@ -74,6 +74,35 @@ use crate::world::WorldState;
 /// What covers one new point: the group on top (if any) and the others.
 type Found = (Option<(u32, Cover)>, Vec<(u32, Cover)>);
 
+/// Clift & Vannucchi (2004) §34: accretion "appears to be an effective process when convergent
+/// rates are <76 mm yr-1 and where the sedimentary cover is >1 km thick" …
+pub const ACCRETIONARY_PILE_M: f64 = 1000.0;
+/// … (the convergence, mm/yr) …
+pub const ACCRETIONARY_MAX_MM_YR: f64 = 76.0;
+/// … and §53: "Even at the accretionary margins, typically 83% of the incoming sedimentary pile
+/// is subducted beneath the forearc wedge" (the median accreted, §39, is 17 %).
+pub const ACCRETIONARY_SUBDUCTED: f64 = 0.83;
+
+/// Sediment subduction by margin type (`sediment_subduction_sourced`, PLT-660): the share of the
+/// incoming sedimentary pile `pile_m` (the subducted floor's sediment and sedimentary rock, m)
+/// that goes down with the slab at a convergence of `convergence_mm_yr` (the overriding side's
+/// `subduction::orthogonal_convergence_mm_yr`: the component of the plates' relative motion
+/// normal to the front, PLT-312, whatever `DEEPTIME_ARC_NORMAL` sets for the arcs, since Clift &
+/// Vannucchi's 76 mm/yr is an orthogonal rate). An accretionary margin (a pile over
+/// 1 km and convergence under 76 mm/yr) subducts 0.83 of it (Clift & Vannucchi 2004); any other
+/// margin is erosive and subducts all of it (Clift & Vannucchi 2004; von Huene & Scholl 1991's
+/// type 2 margins, where "effectively all incoming sediment is subducted"). The rule does not ask
+/// what the overriding plate is made of: an intra-oceanic margin with a thin pelagic cover (the
+/// Marianas, Tonga) is erosive, one fed by a thick fan (the Lesser Antilles) accretes.
+// ledger: PLT-660
+pub fn sediment_subducted_share(pile_m: f64, convergence_mm_yr: f64) -> f64 {
+    if pile_m > ACCRETIONARY_PILE_M && convergence_mm_yr.abs() < ACCRETIONARY_MAX_MM_YR {
+        ACCRETIONARY_SUBDUCTED
+    } else {
+        1.0
+    }
+}
+
 /// Whether a resampling is due after this step.
 pub fn due(state: &PlateState, env: &Env) -> bool {
     let k = env.k;
@@ -95,10 +124,37 @@ pub fn due(state: &PlateState, env: &Env) -> bool {
     drift_km >= k.resample_drift_km
 }
 
+/// The old sample of cover `c` (a footprint of the group with rotation `rot` in the old lattice
+/// `geo`) nearest the mantle-frame direction `q`: of the cover's corners with a weight (the
+/// group's own), the one at the least angle from `q` in the group's frame. A resampled sample
+/// takes its categorical labels from it (`interpolate`): the material at `q` is the material of
+/// the old sample whose cell holds it, not of the corner with the largest barycentric weight,
+/// whose region in a triangle that is not equilateral is not the corner's cell (ledger: PLT-664).
+/// It keeps a class's area on average, so its edge walks; a vote of the corners' weight at one
+/// half smooths the edge but eats every body a fixed fraction of a cell per resampling, an island
+/// arc's band whole within a run, and was rejected (2026-10-25, plates.md "Which old sample a new
+/// one follows").
+fn nearest_corner(geo: &Geo, c: &Cover, rot: DQuat, q: DVec3) -> u32 {
+    let local = rot.inverse() * q;
+    let pts = geo.points();
+    let mut best = c.major();
+    let mut best_dot = pts[best as usize].dot(local);
+    for k in 0..3 {
+        if c.w[k] > 0.0 {
+            let d = pts[c.tri[k] as usize].dot(local);
+            if d > best_dot {
+                (best, best_dot) = (c.tri[k], d);
+            }
+        }
+    }
+    best
+}
+
 /// Interpolates a sample from a cover of the old crust; vectors come out in the mantle frame,
-/// which is the new lattice's frame (every group starts unrotated).
-fn interpolate(src: &[Sample], c: &Cover, rot: DQuat) -> Sample {
-    let m = c.major();
+/// which is the new lattice's frame (every group starts unrotated). `m` is the old sample nearest
+/// the new point (`nearest_corner`): the sample's kind, its class and every other categorical
+/// label are `m`'s, and the blends below run over the corners of `m`'s class (ledger: PLT-664).
+fn interpolate(src: &[Sample], c: &Cover, rot: DQuat, m: u32) -> Sample {
     let mut s = src[m as usize];
     let corners = c.tri.map(|v| &src[v as usize]);
     let w = c.w;
@@ -106,13 +162,31 @@ fn interpolate(src: &[Sample], c: &Cover, rot: DQuat) -> Sample {
         (0..3).map(|k| w[k] * f64::from(f(corners[k]))).sum::<f64>() as f32
     };
     s.elevation_m = lerp(&|x| x.elevation_m);
-    // The corners of the sample's own kind and their weight (the major corner is one of them).
+    // The corners of the sample's own kind and their weight (the nearest corner is one of them).
     let same_kind: f64 = (0..3)
         .filter(|&k| corners[k].kind == s.kind)
         .map(|k| w[k])
         .sum();
+    // The corners of the sample's own class, the kind and, on continental crust, whether it is
+    // hyper-extended (under 10 km of its own crystalline crust, Brune et al. 2014), and their
+    // weight; the nearest corner is one of them, so the weight is never 0. A blend over a class is
+    // a convex mean of columns on one side of the 10 km line, and stays on that side. Blending a
+    // converted margin's columns (PLT-661: an ocean basement under a thin continental crust) with
+    // the core's put 10 km or more of the core's crust into them at a resampling: they stopped
+    // being hyper-extended, became the taper's continental side, and the ring beyond them turned
+    // at the next step, so the margin moved out at every resampling (the ratchet, arm
+    // m5-margins). The rule holds with the switches off: an old arc's thin continental crust
+    // stays apart from the thick crust beside it too (ledger: PLT-663).
+    let hyper = super::transition::hyper_extended(&src[m as usize]);
+    let same_class = |x: &Sample| {
+        x.kind == s.kind && (s.kind != CONTINENTAL || super::transition::hyper_extended(x) == hyper)
+    };
+    let class_w: f64 = (0..3)
+        .filter(|&k| same_class(corners[k]))
+        .map(|k| w[k])
+        .sum();
     // The crust's own rock belongs to its kind: the rock pools are blended over the corners of
-    // the sample's kind only, the loose sediment (which drapes across a margin) over all three.
+    // the sample's class only, the loose sediment (which drapes across a margin) over all three.
     // Blending them all made every resampling put a share of a continent's granite, gneiss and
     // platform cover into the ocean crust beside it. On ocean crust the felsic and metamorphic
     // pools are not blended at all but stay the nearest corner's, as its kind does: they are
@@ -128,25 +202,25 @@ fn interpolate(src: &[Sample], c: &Cover, rot: DQuat) -> Sample {
     for p in 0..pool::COUNT {
         s.pools[p] = if local(p) {
             src[m as usize].pools[p]
-        } else if p == pool::SEDIMENT || same_kind <= 0.0 {
+        } else if p == pool::SEDIMENT || class_w <= 0.0 {
             lerp(&|x| x.pools[p])
         } else {
             ((0..3)
-                .filter(|&k| corners[k].kind == s.kind)
+                .filter(|&k| same_class(corners[k]))
                 .map(|k| w[k] * f64::from(corners[k].pools[p]))
                 .sum::<f64>()
-                / same_kind) as f32
+                / class_w) as f32
         };
     }
     s.arc_continental_m = lerp(&|x| x.arc_continental_m);
     s.arc_oceanic_m = lerp(&|x| x.arc_oceanic_m);
     // A basement is the continental crust's own (ocean floor's is 0), blended as its pools are.
-    s.basement_m = if s.kind == CONTINENTAL && same_kind > 0.0 {
+    s.basement_m = if s.kind == CONTINENTAL && class_w > 0.0 {
         ((0..3)
-            .filter(|&k| corners[k].kind == s.kind)
+            .filter(|&k| same_class(corners[k]))
             .map(|k| w[k] * f64::from(corners[k].basement()))
             .sum::<f64>()
-            / same_kind) as f32
+            / class_w) as f32
     } else {
         0.0
     };
@@ -314,6 +388,18 @@ pub const MAFIC_DROPPED_GLOBAL: &str = "plates/resample_mafic_dropped_km3";
 /// slab at resamplings instead of accreting (`sediment_subduction_share`, PLT-440), km³
 /// (Earth-normalized; the crust budget's sediment subduction against Stern & Scholl 2010).
 pub const SEDIMENT_SUBDUCTED_GLOBAL: &str = "plates/sediment_subducted_km3";
+/// World global (measurement only, for the sediment diagnosis, `tools/review/seddiag/`): the
+/// sediment and sedimentary rock of ocean floor that goes under at resamplings, before the share
+/// the slab takes (PLT-440, PLT-660) is applied, slab path included, km³ (Earth-normalized),
+/// whether or not sediment subduction is on. It separates what reaches the trenches from what
+/// they keep. Split by the crust type of the sample on top: continental …
+pub const SEDIMENT_REACHING_TRENCH_GLOBAL: &str = "plates/sediment_reaching_trench_km3";
+pub const SEDIMENT_REACHING_TRENCH_CONTINENTAL_GLOBAL: &str =
+    "plates/sediment_reaching_trench_continental_km3";
+/// … and oceanic; the rest of the total is the one-way slab's (`SLAB_GLOBAL`'s points, which have
+/// no sample on top).
+pub const SEDIMENT_REACHING_TRENCH_OCEANIC_GLOBAL: &str =
+    "plates/sediment_reaching_trench_oceanic_km3";
 /// World global (one-way subduction, `tectonics.one_way_subduction`, only while it is on): the
 /// conserved pools of crust that went down a trench and that only held crust covered at a
 /// resampling, gone down with the slab (the point became new sea floor), km³ (Earth-normalized).
@@ -674,38 +760,51 @@ pub fn resample(
     // belt or went down with the slab (`belts.rs`): it is consumed here, not accreted a second
     // time (ledger: PLT-276, PLT-292). Both are counted, m of rock per new sample.
     let mut plate_new: Vec<u32> = vec![u32::MAX; n];
-    let mut tally: Vec<[f64; 9]> = vec![[0.0; 9]; n];
+    // 9 to 11: the floor's sediment reaching a trench, under continental or oceanic crust, or the
+    // one-way slab's (measurement only).
+    let mut tally: Vec<[f64; 12]> = vec![[0.0; 12]; n];
     let sediment_share = k.sediment_subduction_share as f32; // ledger: PLT-440
+    // By margin type instead of one share (ledger: PLT-660).
+    let sourced = k.sediment_subduction_sourced;
     // How each new sample was blended, for the gap budget (`gap_budget.rs`) when it is on.
     let mut traces: Vec<Option<gap_budget::Trace>> = vec![None; n];
     // The step's limits (`rate.rs`) on the new lattice: a covered sample's ceiling and top are
     // its corners' blended with its own weights, its floor the blended surface before the
     // accretion (new sea floor's are set with the gaps below).
     let mut limits: Vec<[f32; 3]> = vec![[f32::INFINITY, 0.0, f32::INFINITY]; n];
+    // A cover of group `g` interpolated at the new point `q`, its labels from the old sample
+    // nearest `q` (ledger: PLT-664).
+    let interp = |g: u32, c: &Cover, q: DVec3| {
+        let rot = rots[g as usize];
+        interpolate(src, c, rot, nearest_corner(old, c, rot, q))
+    };
     let mut samples: Vec<Sample> = found
         .par_iter()
         .zip(plate_new.par_iter_mut())
         .zip(tally.par_iter_mut())
         .zip(traces.par_iter_mut())
         .zip(limits.par_iter_mut())
-        .map(|(((((top, others), pl), tally), trace), lim)| match top {
+        .zip(new_pts.par_iter())
+        .map(|((((((top, rest), pl), tally), tr), lim), &q)| match top {
             None => {
                 // One-way subduction's gap (the covers are all held crust; none elsewhere): its
                 // conserved pools went down with the slab, its sediment counted as subducted
                 // sediment too (ledger: PLT-542, PLT-440).
-                for (g2, c2) in others {
-                    let u = interpolate(src, c2, rots[*g2 as usize]);
+                for (g2, c2) in rest {
+                    let u = interp(*g2, c2, q);
                     tally[8] += u.pools[..pool::CONSERVED]
                         .iter()
                         .map(|&x| f64::from(x))
                         .sum::<f64>();
-                    tally[7] += f64::from(u.pools[pool::SEDIMENT].max(0.0))
+                    let pile = f64::from(u.pools[pool::SEDIMENT].max(0.0))
                         + f64::from(u.pools[pool::SEDIMENTARY].max(0.0));
+                    tally[7] += pile;
+                    tally[11] += pile;
                 }
                 Sample::blank(0)
             }
             Some((g, c)) => {
-                let mut s = interpolate(src, c, rots[*g as usize]);
+                let mut s = interp(*g, c, q);
                 *pl = group_plate[*g as usize];
                 if let Some(old) = old_limits {
                     let blend = |v: &[f32]| -> f32 {
@@ -716,7 +815,7 @@ pub fn resample(
                     *lim = [blend(&old.ceiling_m), s.elevation_m, blend(&old.top_m)];
                 }
                 if tracing {
-                    *trace = Some(gap_budget::Trace {
+                    *tr = Some(gap_budget::Trace {
                         tri: c.tri,
                         w: c.w,
                         pools: s.pools,
@@ -724,11 +823,11 @@ pub fn resample(
                     });
                 }
                 let blended = s.pools;
-                for (g2, c2) in others {
+                for (g2, c2) in rest {
                     let under = &src[c2.major() as usize];
                     let p2 = group_plate[*g2 as usize];
                     if under.is_hidden() || p2 == *pl || overrides(*pl, p2) {
-                        let mut u = interpolate(src, c2, rots[*g2 as usize]);
+                        let mut u = interp(*g2, c2, q);
                         let conserved: f64 = u.pools[..pool::CONSERVED]
                             .iter()
                             .map(|&x| f64::from(x))
@@ -746,14 +845,31 @@ pub fn resample(
                             // Sediment subduction: of ocean floor that went under (hidden, or
                             // of a plate the top overrides), the share of its sediment and
                             // sedimentary rock the slab takes down past the margin; the rest
-                            // accretes. ledger: PLT-440
+                            // accretes. ledger: PLT-440; with `sediment_subduction_sourced`
+                            // the share follows the margin's type (PLT-660).
                             let mut subducted = 0.0_f64;
-                            if sediment_share > 0.0
-                                && under.kind != CONTINENTAL
-                                && (under.is_hidden() || (p2 != *pl && overrides(*pl, p2)))
-                            {
+                            let going_under = under.kind != CONTINENTAL
+                                && (under.is_hidden() || (p2 != *pl && overrides(*pl, p2)));
+                            if going_under {
+                                // Measurement only: what reaches the trench, before the share.
+                                let pile = f64::from(u.pools[pool::SEDIMENT].max(0.0))
+                                    + f64::from(u.pools[pool::SEDIMENTARY].max(0.0));
+                                let slot = if s.kind == CONTINENTAL { 9 } else { 10 };
+                                tally[slot] += pile;
+                            }
+                            if (sourced || sediment_share > 0.0) && going_under {
+                                let share = if sourced {
+                                    let pile = u.pools[pool::SEDIMENT].max(0.0)
+                                        + u.pools[pool::SEDIMENTARY].max(0.0);
+                                    sediment_subducted_share(
+                                        f64::from(pile),
+                                        super::subduction::orthogonal_convergence_mm_yr(&s),
+                                    ) as f32
+                                } else {
+                                    sediment_share
+                                };
                                 for kp in [pool::SEDIMENT, pool::SEDIMENTARY] {
-                                    let down = u.pools[kp].max(0.0) * sediment_share;
+                                    let down = u.pools[kp].max(0.0) * share;
                                     u.pools[kp] -= down;
                                     subducted += f64::from(down);
                                 }
@@ -777,7 +893,7 @@ pub fn resample(
                             accrete(&mut s.pools, &u.pools);
                         }
                     } else if under.kind == CONTINENTAL {
-                        let u = interpolate(src, c2, rots[*g2 as usize]);
+                        let u = interp(*g2, c2, q);
                         tally[5] += f64::from(u.thickness_m);
                     }
                 }
@@ -818,7 +934,7 @@ pub fn resample(
         *world.globals.entry(name.to_owned()).or_insert(0.0) += sum(k);
     }
     // Only with the rule on, so a run with it off keeps the state it had before it existed.
-    if sediment_share > 0.0 {
+    if sourced || sediment_share > 0.0 {
         *world
             .globals
             .entry(SEDIMENT_SUBDUCTED_GLOBAL.to_owned())
@@ -826,6 +942,13 @@ pub fn resample(
     }
     if k.one_way_subduction {
         *world.globals.entry(SLAB_GLOBAL.to_owned()).or_insert(0.0) += sum(8);
+    }
+    for (name, v) in [
+        (SEDIMENT_REACHING_TRENCH_GLOBAL, sum(9) + sum(10) + sum(11)),
+        (SEDIMENT_REACHING_TRENCH_CONTINENTAL_GLOBAL, sum(9)),
+        (SEDIMENT_REACHING_TRENCH_OCEANIC_GLOBAL, sum(10)),
+    ] {
+        *world.globals.entry(name.to_owned()).or_insert(0.0) += v;
     }
 
     // Gaps: fresh oceanic crust between diverging plates.
@@ -1326,6 +1449,30 @@ pub fn bury(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// PLT-660, Clift & Vannucchi (2004): an accretionary margin (a pile over 1 km, convergence
+    /// under 76 mm/yr) subducts 83 % of the incoming pile; an erosive one (a thinner pile or a
+    /// faster convergence) all of it (von Huene & Scholl 1991's type 2). The bounds are strict,
+    /// as the sources word them, and the convergence's sign does not enter.
+    #[test]
+    fn sediment_goes_down_by_the_margins_type() {
+        for (pile, conv, want) in [
+            (1500.0, 50.0, 0.83),
+            (8000.0, 10.0, 0.83),
+            (1500.0, -50.0, 0.83),
+            (1500.0, 90.0, 1.0),
+            (1500.0, 76.0, 1.0),
+            (1000.0, 50.0, 1.0),
+            (300.0, 20.0, 1.0),
+            (0.0, 0.0, 1.0),
+        ] {
+            assert_eq!(
+                sediment_subducted_share(pile, conv),
+                want,
+                "{pile} m at {conv} mm/yr"
+            );
+        }
+    }
 
     #[test]
     fn band_offsets_are_fractions_and_wrap_folds_into_a_turn() {

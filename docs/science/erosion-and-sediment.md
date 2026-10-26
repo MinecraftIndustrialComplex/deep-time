@@ -1125,6 +1125,9 @@ floor the age grid leaves out). Two findings, noted in the ledger and not acted 
   | 80 Myr | 284 to 298 | 320 |
 
   The rain lies 14 to 42 m under eq. 2a, inside its average STD of 140 m (the test's bound).
+  Eq. 2a less its pore water (`open_floor_solid_m`) is also where the margin rule PLT-661 (off by
+  default) draws its line between floor with the rain alone and floor holding the continents' rock,
+  in place of PLT-103's 5 m/Myr times the age (plates.md).
 - *Mass, unit.* On 5,000 cells of random depth, 500 of them 1 to 50 mm deep, the dust, the
   silica and the calcite come back whole: each part's laid volume equals its supply to 1e-9, the
   part arrays add up to the laid total to 1e-6, and no cell takes more than its water. Full cells
