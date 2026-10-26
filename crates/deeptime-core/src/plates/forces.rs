@@ -1687,9 +1687,8 @@ fn balance_step(
                     // force until its slab sinks by itself (PLT-610), linearised as the
                     // collision's; booked with the collision resistance.
                     if young.contains(&ci) {
-                        let force =
-                            incipient_resistance_n_m(k, su.age_myr(env.t_myr), env.gravity)
-                                * sf.len_m;
+                        let force = incipient_resistance_n_m(k, su.age_myr(env.t_myr), env.gravity)
+                            * sf.len_m;
                         let speed = sf.conv.max(floor) * 1.0e-3 / YEAR_S;
                         *incipient_n.entry(ci).or_default() += force;
                         bal.add_link(Link {
@@ -2270,7 +2269,10 @@ mod tests {
         for age in [10.0, 80.0, 180.0] {
             let f = incipient_resistance_n_m(&on, age, g);
             assert!((1.0e12..=1.1e13).contains(&f), "{age} Myr: {f:e}");
-            assert_eq!(incipient_resistance_n_m(&off, age, g), INCIPIENT_RESISTANCE_N_M);
+            assert_eq!(
+                incipient_resistance_n_m(&off, age, g),
+                INCIPIENT_RESISTANCE_N_M
+            );
             assert!((incipient_resistance_n_m(&on, age, 0.5 * g) - 0.5 * f).abs() < 1.0);
         }
         assert_eq!(incipient_resistance_n_m(&on, 5.0, g), INCIPIENT_RIDGE_N_M);
@@ -2279,7 +2281,10 @@ mod tests {
         assert!((margin_strength_n_m(&on, 30.0, g) - t).abs() < 1.0);
         assert!(margin_strength_n_m(&on, 120.0, g) > margin_strength_n_m(&on, 40.0, g));
         assert_eq!(margin_strength_n_m(&off, 120.0, g), t);
-        assert_eq!(margin_strength_n_m(&on, 2.0, g), margin_strength_n_m(&on, 10.0, g));
+        assert_eq!(
+            margin_strength_n_m(&on, 2.0, g),
+            margin_strength_n_m(&on, 10.0, g)
+        );
         // Law 2's pull: FRC-002 at 80 Myr with a full slab, along the margin's normal only.
         let full = on.slab_depth_km;
         assert!((margin_pull_n_m(&on, full, 80.0, 1.0, g) - SLAB_PULL_N_M).abs() < 1.0);

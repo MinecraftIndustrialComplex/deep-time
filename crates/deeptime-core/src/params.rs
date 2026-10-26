@@ -1273,12 +1273,12 @@ impl Default for TectonicParams {
             subduction_initiation_age_myr: 150.0,
             subduction_initiation_per_myr: 0.15, // ledger: PLT-063
             subduction_initiation_clearance_km: 1000.0,
-            initiation_slab_km: 150.0,            // ledger: PLT-270
-            incipient_subduction: true,           // ledger: PLT-610 (on since 2026-10-25)
-            initiation_polarity_by_age: true,     // ledger: PLT-655
-            margin_propagation: true,             // ledger: PLT-656
+            initiation_slab_km: 150.0,               // ledger: PLT-270
+            incipient_subduction: true,              // ledger: PLT-610 (on since 2026-10-25)
+            initiation_polarity_by_age: true,        // ledger: PLT-655
+            margin_propagation: true,                // ledger: PLT-656
             incipient_resistance_by_thickness: true, // ledger: PLT-657
-            subduction_initiation_offshore: true, // ledger: PLT-503 (on since 2026-10-23)
+            subduction_initiation_offshore: true,    // ledger: PLT-503 (on since 2026-10-23)
             initiation_stress_mpa: 20.0, // ledger: PLT-505 (game-choice; on since 2026-10-23)
             transference: false,         // ledger: PLT-516
             contact_timeout_myr: 24.0,   // ledger: PLT-059
