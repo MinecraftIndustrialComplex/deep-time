@@ -7,8 +7,10 @@ import com.minecraftindustrialcomplex.deeptime.worlddata.Playa;
 import com.minecraftindustrialcomplex.deeptime.worlddata.RasterSampler;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
@@ -96,6 +98,48 @@ public final class PlayaPass {
             return false;
         double v = w.data().layer(Playa.LAYER).nearest(pos.getX(), pos.getZ());
         return !Double.isNaN(v) && Math.round(v) > 0;
+    }
+
+    /**
+     * The salt crust of chunk (cx, cz), for the deposit feature (ledger HYD-181): an ore body of the bedrock
+     * does not reach into a salt flat's salt, which dried out of the basin's water on top of that bedrock
+     * (the younger bed lies on the older), so no deposit turns it into ore. On master 3ce1a373's test planet a
+     * coal body under a playa turned the top salt block of 7 columns into coal ore. Null where the chunk has
+     * no salt.
+     */
+    public static Crust crust(WorldData wd, int cx, int cz) {
+        if (!wd.has(Playa.LAYER))
+            return null;
+        RasterSampler layer = wd.layer(Playa.LAYER);
+        int x0 = cx << 4, z0 = cz << 4;
+        if (!anySalt(layer, x0, z0, x0 + 15, z0 + 15))
+            return null;
+        BlockState salt = salt(wd);
+        return salt == null ? null : new Crust(layer, salt);
+    }
+
+    /** {@link #crust}'s answer: the playa layer and the salt's block. */
+    public record Crust(RasterSampler layer, BlockState salt) {
+        /**
+         * Whether the block at {@code pos}, {@code here}, is the salt this pass laid: the salt's block within the
+         * top n blocks of the column's ground, n the salt the column's nearest cell holds, counted down from the
+         * first block under air or fluid as {@link #apply} lays it.
+         */
+        public boolean holds(BlockGetter level, BlockPos pos, BlockState here) {
+            if (here != salt)
+                return false;
+            double v = layer.nearest(pos.getX(), pos.getZ());
+            int n = Double.isNaN(v) ? 0 : (int) Math.round(v);
+            BlockPos.MutableBlockPos up = pos.mutable();
+            for (int i = 1; i <= n; i++) {
+                BlockState above = level.getBlockState(up.move(Direction.UP));
+                if (above.isAir() || !above.getFluidState().isEmpty())
+                    return true;
+                if (above != salt)
+                    return false;
+            }
+            return false;
+        }
     }
 
     private record Salt(WorldData wd, RockPalette palette, BlockState state) {}

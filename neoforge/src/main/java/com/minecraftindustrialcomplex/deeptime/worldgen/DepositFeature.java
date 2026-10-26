@@ -39,7 +39,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * block is placed and brushed out as panning ({@link PlacerPanning}; a cell over air, water or a
  * plant stays plain gravel or sand, since the block would fall). A leached cap holds none of the
  * deposit's ore: the blocks of an exposed gossan's cap ({@link GossanSkin.Caps}, ledger DEP-212) are
- * left as the strata pass and the skin made them, except for the gossan's own gold and a placer's. Only blocks of
+ * left as the strata pass and the skin made them, except for the gossan's own gold and a placer's. Nor does a salt
+ * flat's salt ({@link PlayaPass#crust}, ledger HYD-181). Only blocks of
  * the chunk being decorated are written.
  * Does nothing unless the chunk's generator is Deep Time's and reads world data.
  */
@@ -82,6 +83,7 @@ public final class DepositFeature extends Feature<NoneFeatureConfiguration> {
         RockPalette palette = RockPalette.get();
         OreBlockResolver ores = OreBlockResolver.get();
         GossanSkin.Caps caps = GossanSkin.Caps.of(wd, bodies);
+        PlayaPass.Crust crust = PlayaPass.crust(wd, cx, cz);
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         int x0 = cx << 4, z0 = cz << 4, placed = 0;
         for (Body b : bodies) {
@@ -108,6 +110,9 @@ public final class DepositFeature extends Feature<NoneFeatureConfiguration> {
                         BlockState host = cell;
                         RockPalette.Host kind = palette.host(host);
                         if (kind == RockPalette.Host.NONE || (kind == RockPalette.Host.LOOSE && !loose))
+                            continue;
+                        // A salt flat's crust lies on the bedrock, younger than any body in it (HYD-181).
+                        if (crust != null && crust.holds(level, pos, cell))
                             continue;
                         // In a loose body the ore sits in the body's own rock (a placer's gravel),
                         // whatever loose block is there (the soil the surface rules left over it).
