@@ -96,8 +96,9 @@ public final class PackSurfaceRule {
     public static final BlockState AIR = Blocks.AIR.defaultBlockState();
     /**
      * How far under a cut's new top {@link #cut} looks for the rock (the soil left under it); past
-     * this the surface table's soil depth stands. Game-choice (ledger BAK-068): vanilla's surface
-     * depth is at most 6 blocks, its deepest band rule (badlands' terracotta) 15 under the floor.
+     * this the surface table's soil depth stands. Game-choice (ledger BAK-068): the soil under a cut
+     * is what is left of the floor's surface depth, at most 6 blocks in vanilla
+     * ({@code SurfaceSystem.getSurfaceDepth}), with a margin for a {@code stone_depth} secondary range.
      */
     private static final int MAX_SOIL = 16;
 

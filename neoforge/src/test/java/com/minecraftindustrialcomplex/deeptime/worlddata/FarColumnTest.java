@@ -581,6 +581,72 @@ class FarColumnTest {
         assertFalse(bank.sealed, "land");
     }
 
+    /**
+     * A surface rule's air cut (BAK-068: Expanded Ecosphere's windswept savanna above y 63 loses its
+     * whole surface depth): the ground drops by the cut, a bank the cut takes below the water beside
+     * it is raised to that water again and sealed, water and a column wider than a block keep no
+     * minGround, and a neighbour beside a cut shows the side the cut opened.
+     */
+    @Test
+    void airCutLowersTheGround() {
+        // Land: 72 with a cut of 5 (surface depth 4: blocks 72 to 68 are air) stands at 67.
+        FarColumn.Shape land = new FarColumn.Shape();
+        FarColumn.shape(new Water.Column(Water.Kind.NONE, 72.5, 72, null, null, null, null, null, null, false, null), 0, -64, 319, land);
+        assertEquals(Integer.MIN_VALUE, land.minGround, "land has no minGround");
+        assertFalse(FarColumn.cut(land, 5, -64));
+        assertEquals(67, land.ground);
+        assertFalse(land.sealed);
+        assertFalse(FarColumn.cut(land, 0, -64), "no cut");
+        assertEquals(67, land.ground);
+
+        // A bank beside water topped at 70: a cut to 67 is raised to 70 again (and sealed); a cut that
+        // stays above the water is kept; one that ends on it is sealed.
+        FarColumn.Shape bank = new FarColumn.Shape();
+        FarColumn.shape(new Water.Column(Water.Kind.BANK, 72.5, 72, null, null, null, 70, null, null, false, null), 0, -64, 319, bank);
+        assertEquals(70, bank.minGround);
+        assertEquals(72, bank.ground);
+        assertTrue(FarColumn.cut(bank, 5, -64), "raised to the water beside it");
+        assertEquals(70, bank.ground);
+        assertTrue(bank.sealed);
+        FarColumn.shape(new Water.Column(Water.Kind.BANK, 72.5, 72, null, null, null, 70, null, null, false, null), 0, -64, 319, bank);
+        assertFalse(FarColumn.cut(bank, 1, -64));
+        assertEquals(71, bank.ground);
+        assertFalse(bank.sealed);
+        assertFalse(FarColumn.cut(bank, 1, -64));
+        assertEquals(70, bank.ground);
+        assertTrue(bank.sealed, "a cut ending on the water's top");
+
+        // Water keeps its bed: a lake's cut is the lake pass's plug, not a lower bed.
+        FarColumn.Shape lakeShape = shape(Water.Kind.LAKE, 60, 62, 0);
+        assertFalse(FarColumn.cut(lakeShape, 3, -64));
+        assertEquals(60, lakeShape.ground);
+        // A cut never takes the ground below the build range.
+        FarColumn.Shape low = shape(Water.Kind.NONE, -62, Integer.MIN_VALUE, 0);
+        FarColumn.cut(low, 10, -64);
+        assertEquals(-65, low.ground);
+
+        // A wider column's shape has no minGround (no bank rule).
+        FarColumn.Shape core = new FarColumn.Shape();
+        core.minGround = 5;
+        FarColumn.shape(Water.core(planet, spec(planet), 0, 0, planet.height(0, 0), Rivers.Sample.NONE), 0, -64, 319, core);
+        assertEquals(Integer.MIN_VALUE, core.minGround);
+
+        // The neighbour beside a cut shows its side down to the cut ground.
+        FarColumn.Shape[] grid = shapes(1);
+        for (FarColumn.Shape s : grid) {
+            s.kind = Water.Kind.NONE;
+            s.ground = 72;
+            s.waterTop = Integer.MIN_VALUE;
+        }
+        assertEquals(0, FarColumn.exposure(grid, 1, 0, 0));
+        FarColumn.cut(grid[1 * 3 + 2], 5, -64);   // the east neighbour
+        assertEquals(5, FarColumn.exposure(grid, 1, 0, 0), "the cut neighbour's drop");
+        FarColumn.Layers l = new FarColumn.Layers();
+        FarColumn.layers(-64, 319, grid[1 * 3 + 2], soil(4, true, false), null, 8, null, l);
+        assertFills(l, -64, 319, "a cut column");
+        assertEquals(67, l.top[l.topSolid()] - 1, "drawn at the cut ground");
+    }
+
     // ---- Threads and time ----
 
     /** A hash of every layer of a section, built the way the game builds it (without the biome). */

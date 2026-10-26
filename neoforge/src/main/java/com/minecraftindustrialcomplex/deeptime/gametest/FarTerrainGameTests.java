@@ -5,13 +5,25 @@ import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.minecraftindustrialcomplex.deeptime.compat.dh.DhFarTerrain;
 import com.minecraftindustrialcomplex.deeptime.farterrain.FarTerrain;
 import com.minecraftindustrialcomplex.deeptime.farterrain.FarTerrainCheck;
+import com.minecraftindustrialcomplex.deeptime.farterrain.PackSurfaceRule;
 import com.minecraftindustrialcomplex.deeptime.worlddata.FarColumn;
+import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.BiomeManager;
+import net.minecraft.world.level.biome.Biomes;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.NoiseSettings;
+import net.minecraft.world.level.levelgen.RandomState;
+import net.minecraft.world.level.levelgen.SurfaceRules;
+import net.minecraft.world.level.levelgen.VerticalAnchor;
+import net.minecraft.world.level.levelgen.WorldGenerationContext;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.neoforged.neoforge.gametest.GameTestHolder;
@@ -286,6 +298,75 @@ public final class FarTerrainGameTests {
                         + warmTally.groundBlockSame + " of " + warmTally.columns + " warm-ocean columns: " + warmTally.toJson().get("ground_block_differences"));
             helper.succeed();
         });
+    }
+
+    /** The y above which {@link #farTerrainDrawsTheSurfaceRulesAirCut}'s rule cuts the floor (Expanded Ecosphere's is 63). */
+    static final int CUT_ABOVE = 100;
+
+    /**
+     * A surface rule's air cut (ledger BAK-068) on a rule of the test's own, run through far
+     * terrain's {@link PackSurfaceRule} on the real planet's level: Expanded Ecosphere 3.4.7's
+     * windswept savanna path (every block within the floor's surface depth painted air at or above
+     * y {@link #CUT_ABOVE}) behind a first rule that reads the chunk, so the whole rule is run on dry
+     * ground, then dirt under the floor. A top at or above the line is cut by
+     * min(1 + surface depth, top − line + 1) blocks: where the cut ends inside the floor its new top
+     * is dirt with the floor's rest under it as soil, else the stone. A top under the line is not cut
+     * (the probe of the paths to air leaves it). An air path only {@code steep} reaches is not drawn.
+     */
+    @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 200)
+    public static void farTerrainDrawsTheSurfaceRulesAirCut(GameTestHelper helper) {   // ledger: BAK-068
+        ServerLevel level = RealPlanetGameTests.level(helper);
+        if (!(level.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g)) {
+            helper.fail("test_planet_real has no Deep Time generator");
+            return;
+        }
+        BlockState air = Blocks.AIR.defaultBlockState(), dirt = Blocks.DIRT.defaultBlockState();
+        SurfaceRules.RuleSource readsTheChunk = SurfaceRules.ifTrue(SurfaceRules.abovePreliminarySurface(),
+                SurfaceRules.ifTrue(SurfaceRules.yBlockCheck(VerticalAnchor.absolute(10_000), 0), SurfaceRules.state(Blocks.GLASS.defaultBlockState())));
+        SurfaceRules.RuleSource savanna = SurfaceRules.sequence(readsTheChunk,
+                SurfaceRules.ifTrue(SurfaceRules.UNDER_FLOOR,
+                        SurfaceRules.ifTrue(SurfaceRules.yBlockCheck(VerticalAnchor.absolute(CUT_ABOVE), 0), SurfaceRules.state(air))),
+                SurfaceRules.ifTrue(SurfaceRules.UNDER_FLOOR, SurfaceRules.state(dirt)));
+        SurfaceRules.RuleSource steepOnly = SurfaceRules.sequence(readsTheChunk,
+                SurfaceRules.ifTrue(SurfaceRules.steep(), SurfaceRules.ifTrue(SurfaceRules.UNDER_FLOOR, SurfaceRules.state(air))),
+                SurfaceRules.ifTrue(SurfaceRules.UNDER_FLOOR, SurfaceRules.state(dirt)));
+        Registry<Biome> biomes = level.registryAccess().registryOrThrow(Registries.BIOME);
+        Holder<Biome> plains = biomes.getHolderOrThrow(Biomes.PLAINS);
+        BiomeManager.NoiseBiomeSource quarts = (qx, qy, qz) -> plains;
+        NoiseSettings noise = g.sourceSettings().value().noiseSettings();
+        PackSurfaceRule rule = PackSurfaceRule.of(level, g, noise, savanna, quarts);
+        PackSurfaceRule steep = PackSurfaceRule.of(level, g, noise, steepOnly, quarts);
+        // The column's surface depth as the chunk's surface system gives it.
+        RandomState random = level.getChunkSource().randomState();
+        SurfaceRules.Context context = new SurfaceRules.Context(random.surfaceSystem(), random, null, null, p -> plains, biomes,
+                new WorldGenerationContext(g, level));
+        int[] seen = new int[3];   // cut to the stone, cut onto the floor's dirt, not cut
+        for (int k = 0; k < 96; k++) {
+            int x = 37 * k - 1_000, z = 53 * k - 700, top = CUT_ABOVE - 4 + k % 16;
+            context.updateXZ(x, z);
+            int sd = context.surfaceDepth;
+            BlockState t = rule.top(x, top, z, Integer.MIN_VALUE);
+            PackSurfaceRule.Cut cut = rule.cut(x, top, z);
+            String at = "(" + x + ", " + top + ", " + z + ") surface depth " + sd + ": ";
+            helper.assertTrue(steep.top(x, top, z, Integer.MIN_VALUE) == null, at + "an air path behind steep alone is drawn");
+            if (top < CUT_ABOVE) {
+                helper.assertTrue(t == null && cut == null, at + "cut under the line: top " + t + " cut " + cut);
+                seen[2]++;
+                continue;
+            }
+            helper.assertTrue(t == PackSurfaceRule.AIR, at + "the top block is " + t + ", not the rule's air");
+            helper.assertTrue(cut != null, at + "no cut");
+            int depth = Math.min(1 + sd, top - CUT_ABOVE + 1);
+            boolean onDirt = depth < 1 + sd;
+            helper.assertTrue(cut.depth() == depth, at + "cut " + cut.depth() + " blocks, the chunk's rule " + depth);
+            helper.assertTrue(cut.top().is(onDirt ? Blocks.DIRT : Blocks.STONE), at + "the new top is " + cut.top());
+            int soil = onDirt ? sd + CUT_ABOVE - top : 0;
+            helper.assertTrue(cut.soil() == soil, at + "soil " + cut.soil() + " under the cut, the chunk's rule " + soil);
+            seen[onDirt ? 1 : 0]++;
+        }
+        DeepTime.LOGGER.info("[gametest] farTerrainDrawsTheSurfaceRulesAirCut cut to the stone {} onto dirt {} not cut {}", seen[0], seen[1], seen[2]);
+        helper.assertTrue(seen[0] > 0 && seen[1] > 0 && seen[2] > 0, "the columns did not reach every case: " + java.util.Arrays.toString(seen));
+        helper.succeed();
     }
 
     /** Column k (0 to 15) of a side of the seam: 4 blocks apart, west of x = C/2 or east of x = −C/2. */

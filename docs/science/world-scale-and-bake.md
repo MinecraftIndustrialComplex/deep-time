@@ -18,7 +18,7 @@ A Deep Time planet is small. Its circumference is 16,384 or 32,768 blocks, and o
 | [BAK](ledger/BAK.md) | spawn placement | BAK-014 to BAK-016 (3) |
 | [BAK](ledger/BAK.md) | satellite view | BAK-017 to BAK-032 (16) |
 | [BAK](ledger/BAK.md) | synthetic worlds | BAK-033 to BAK-038 (6) |
-| [BAK](ledger/BAK.md) | far terrain | BAK-039 to BAK-042, BAK-048, BAK-050, BAK-065, BAK-067 (8) |
+| [BAK](ledger/BAK.md) | far terrain | BAK-039 to BAK-042, BAK-048, BAK-050, BAK-065, BAK-067, BAK-068 (9) |
 | [BAK](ledger/BAK.md) | Distant Horizons curvature | BAK-043 to BAK-047 (5) |
 
 Rows by status: `verified` 2, `cited-unverified` 6, `calibrated` 2, `game-choice` 80, `uncited` 12.
@@ -153,7 +153,7 @@ carries plutonic rock to the world's floor where a pluton's layer is the lowest 
 
 Far terrain (P3-04) gives Distant Horizons its distant LODs from the baked world data instead of
 from chunks generated far away. Nothing physical is decided here; the rows (BAK-039 to BAK-042,
-BAK-048, BAK-050, BAK-065 and BAK-067) are game choices about how far terrain stays the same terrain as the chunks.
+BAK-048, BAK-050, BAK-065, BAK-067 and BAK-068) are game choices about how far terrain stays the same terrain as the chunks.
 
 - **The seam.** Every far column folds x into the planet's lap [-C/2, C/2), the period at which
   the world data wraps and at which Toroidal World loops the level, so a section west of x = C/2,
@@ -245,6 +245,29 @@ BAK-048, BAK-050, BAK-065 and BAK-067) are game choices about how far terrain st
   changed. The one flooded-forest column east of the seam that is still dirt in the chunk where far
   terrain draws grass (y 63) was so before the change. The probe and the rule it lets through cost
   about 0.25 ms of a 42 ms section at detail 3 and next to nothing at full detail.
+- **Ground the rule cuts away** (BAK-068). A surface rule can paint air in place of ground, and
+  the chunk keeps the cut: Expanded Ecosphere 3.4.7 makes every block of a windswept savanna (and
+  `wythers:guelta`) within the floor's surface depth air at or above y 63, behind
+  `above_preliminary_surface`, so such a floor stands 1 + surface depth blocks lower than the
+  terrain the column rule draws; a leading rule makes every block at or above y 63 of its beaches,
+  rivers and oceans air, so those columns drop to y 62; and a frozen ocean's hole above the water
+  and a volcanic crater's floor lose their top block (vanilla cuts only the frozen ocean's hole).
+  Far terrain dropped the air and drew the table's grass at the column rule's height. The gate
+  batch met it on the cube world (C = 4096) with Expanded Ecosphere: west of the seam far
+  terrain's dry ground was within a block of the chunk's in only 64 of 80 columns, under the test's
+  nine in ten, the worst a windswept savanna column at (1998, 519), far y 72 and the chunk 67.
+  Since 2026-10-26 far terrain draws the
+  cut: where the rule gives air at the top block of dry ground (the leading part, or the whole rule
+  asked as for its water, `steep` both ways and the probe now covering the paths to air), it walks
+  down the column as `SurfaceSystem.buildSurface` does, one more block of stone above at each step
+  and the same surface depth, until the rule gives a block, and draws the ground that much lower
+  with that block on top (the strata's rock where the rule leaves the stone) and the soil the rule
+  paints under it. The ring of columns around each area is run too, so the side a cut opens shows
+  from the column beside it. A bank the cut takes below the water beside it is raised again by the
+  bank pass, as in the chunk. A lake's bed is not lowered: the lake pass plugs a bed the rule left
+  open (cut to air, or painted water) with dirt at the bed, and far terrain now draws that dirt, where
+  before it drew a painted lake bed one block lower under a block of water. A cut under the sea is
+  not drawn. RESULT_PENDING
 - **Ties in the biome search** (2026-10-21, a game choice). Vanilla's climate search
   (`Climate.RTree.search`) starts from the entry the thread found last and replaces it only with a
   strictly nearer one, so where a climate point is equally near two entries the thread's history
