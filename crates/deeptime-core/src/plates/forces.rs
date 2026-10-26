@@ -379,11 +379,24 @@ pub fn ridge_coefficient(gravity: f64) -> f64 {
         * (1.0 + 2.0 * rm * a / (std::f64::consts::PI * (rm - rw)))
 }
 
+/// The thermal subsidence of sea floor `age_myr` old below its ridge crest, m: GDH1's depth less
+/// its crest's (Stein & Stein 1992, PLT-352), 0 at the ridge, 1,632 m at 20 Myr, 2,898 m at
+/// 100 Myr and towards 3,051 m on old floor, where the plate model's floor levels off. The depth
+/// of the column whose cooling Turcotte & Schubert's ridge push counts (FRC-012, FRC-036).
+pub fn thermal_subsidence_m(age_myr: f64) -> f64 {
+    super::pools::gdh1_depth_m(age_myr) - super::pools::GDH1_RIDGE_M // ledger: PLT-352, FRC-036
+}
+
 /// The gravitational potential energy of a column standing at `z_m` under a sea at `sea_m` (both
 /// in the plate model's frame, m), N/m, relative to a ridge crest (`ridge_m`) and to continental
 /// crust standing at the sea, which are taken to be equal (ledger FRC-013).
 /// - Sea floor: `−C d²`, `d` its depth below the crest, at most the old floor's (`floor_m`):
-///   deeper ground (a trench) is held down by the slab and by flexure, not by its own column.
+///   deeper ground (a trench) is held down by the slab and by flexure, not by its own column
+///   (FRC-021). At most `thermal_m` too, the subsidence of the floor's own cooling
+///   ([`thermal_subsidence_m`] of its age with `tectonics.ridge_push_by_age`, else infinite):
+///   the ridge push is the cooled lithosphere's, so ground deeper than its age's thermal
+///   subsidence, whatever holds it there (a young trench, the plate-only presets' floor relaxing
+///   towards Cortial's -10 km), has its age's energy (FRC-036).
 /// - Continental crust (ledger FRC-014): `ρ g h (H + h (1 + ρ/(ρ_m − ρ_c))/2)` for an
 ///   Airy-compensated column `h = z − sea` above the sea on the crust that stands at the sea,
 ///   `H` thick; `ρ` is the crust's density above the sea and the crust's less the water's below
@@ -396,6 +409,7 @@ pub fn column_energy(
     continental: bool,
     ridge_m: f64,
     floor_m: f64,
+    thermal_m: f64,
     sea_m: f64,
     g: f64,
 ) -> f64 {
@@ -412,7 +426,8 @@ pub fn column_energy(
         let root = 1.0 + rho / (RHO_MANTLE - RHO_CRUST);
         rho * g * h * (crust_m + 0.5 * h * root)
     } else {
-        let d = (ridge_m - z_m).clamp(0.0, (ridge_m - floor_m).max(0.0)); // ledger: FRC-012, FRC-021
+        let deepest = (ridge_m - floor_m).min(thermal_m).max(0.0); // ledger: FRC-021, FRC-036
+        let d = (ridge_m - z_m).clamp(0.0, deepest); // ledger: FRC-012
         -ridge_coefficient(g) * d * d
     }
 }
@@ -470,6 +485,9 @@ pub struct Coeffs {
     /// The sea floor's crest and old-floor elevations, m (the column energy's reference).
     pub ridge_m: f64,
     pub floor_m: f64,
+    /// The sea floor's depth below the crest read at most as its age's thermal subsidence
+    /// (`tectonics.ridge_push_by_age`, PLT-684).
+    pub by_age: bool,
     /// The sea the step stands under, m: the land's column energy is taken from it.
     pub sea_m: f64,
 }
@@ -559,17 +577,25 @@ impl Coeffs {
             gravity,
             ridge_m: k.ridge_elevation_m,
             floor_m: k.oceanic_floor_elevation_m,
+            by_age: k.ridge_push_by_age,
             sea_m,
         }
     }
 
-    /// The column energy of a sample ([`column_energy`]).
-    pub fn energy(&self, z_m: f64, continental: bool) -> f64 {
+    /// The column energy of a sample ([`column_energy`]); `age_myr` is its crust's age, which
+    /// bounds the sea floor's depth with `by_age` (PLT-684).
+    pub fn energy(&self, z_m: f64, continental: bool, age_myr: f64) -> f64 {
+        let thermal_m = if self.by_age && !continental {
+            thermal_subsidence_m(age_myr) // ledger: FRC-036
+        } else {
+            f64::INFINITY
+        };
         column_energy(
             z_m,
             continental,
             self.ridge_m,
             self.floor_m,
+            thermal_m,
             self.sea_m,
             self.gravity,
         )
@@ -1682,7 +1708,7 @@ fn balance_step(
                 let p = plate_of[i] as usize;
                 let cont = s.kind == CONTINENTAL;
                 bal.area_into(&mut acc[p], p, pos[i], cont);
-                energy[p].0 += c.energy(f64::from(s.elevation_m), cont);
+                energy[p].0 += c.energy(f64::from(s.elevation_m), cont, s.age_myr(env.t_myr));
                 energy[p].1 += 1;
             }
             (acc, energy)
@@ -1725,8 +1751,11 @@ fn balance_step(
                 if su.kind == CONTINENTAL {
                     // The belt's weight against the convergence (design §3.4) …
                     collision = true;
-                    let du = c.energy(f64::from(sv.elevation_m), sv.kind == CONTINENTAL)
-                        - c.energy(f64::from(su.elevation_m), true);
+                    let du = c.energy(
+                        f64::from(sv.elevation_m),
+                        sv.kind == CONTINENTAL,
+                        sv.age_myr(env.t_myr),
+                    ) - c.energy(f64::from(su.elevation_m), true, 0.0);
                     let shortened = st.contacts[ci]
                         .collision
                         .as_ref()
@@ -1834,8 +1863,11 @@ fn balance_step(
         if !collision {
             let out = e.out.normalize_or_zero();
             if out != DVec3::ZERO {
-                let du = c.energy(f64::from(sv.elevation_m), sv.kind == CONTINENTAL)
-                    - mean_u[p as usize];
+                let du = c.energy(
+                    f64::from(sv.elevation_m),
+                    sv.kind == CONTINENTAL,
+                    sv.age_myr(env.t_myr),
+                ) - mean_u[p as usize];
                 let f = c.edge_scale * du * ell;
                 if f != 0.0 {
                     bal.add_force(p, x, -out * f, Drive::Edge);
@@ -2250,7 +2282,8 @@ mod tests {
         let (_, pts, rim) = reference_cap(&c);
         let rim_m =
             2.0 * std::f64::consts::PI * c.radius_m * rim[0].0.z.acos().sin() / rim.len() as f64;
-        let model_push = c.edge_scale * (c.energy(-2600.0, false) - c.energy(-5651.0, false));
+        let model_push =
+            c.edge_scale * (c.energy(-2600.0, false, 0.0) - c.energy(-5651.0, false, 400.0));
         assert!(
             (0.08..0.12).contains(&(model_push / c.pull_n_m)),
             "{model_push:e}"
@@ -2382,31 +2415,91 @@ mod tests {
     #[test]
     fn the_column_energy_gives_ridge_push_and_plateau_weight_of_earths_size() {
         let g = 9.81;
+        let inf = f64::INFINITY;
         // Ridge push between a crest at -2.5 km and 100-Myr floor 3.5 km lower: about 4e12 N/m
         // (Turcotte & Schubert's formula at 100 Myr; 2-3.5e12 quoted, design §3.2).
-        let push = column_energy(-2500.0, false, -2500.0, -6000.0, 0.0, g)
-            - column_energy(-6000.0, false, -2500.0, -6000.0, 0.0, g);
+        let push = column_energy(-2500.0, false, -2500.0, -6000.0, inf, 0.0, g)
+            - column_energy(-6000.0, false, -2500.0, -6000.0, inf, 0.0, g);
         assert!((3.5e12..4.5e12).contains(&push), "{push:e}");
         // A trench is no deeper in energy than the old floor.
         assert_eq!(
-            column_energy(-9000.0, false, -2500.0, -6000.0, 0.0, g),
-            column_energy(-6000.0, false, -2500.0, -6000.0, 0.0, g)
+            column_energy(-9000.0, false, -2500.0, -6000.0, inf, 0.0, g),
+            column_energy(-6000.0, false, -2500.0, -6000.0, inf, 0.0, g)
         );
         // A 5 km belt: 6.7e12 N/m (design §3.2).
-        let belt = column_energy(5000.0, true, -2500.0, -6000.0, 0.0, g);
+        let belt = column_energy(5000.0, true, -2500.0, -6000.0, inf, 0.0, g);
         assert!((6.6e12..6.8e12).contains(&belt), "{belt:e}");
         // Sea level, the ridge crest: the shared reference.
-        assert_eq!(column_energy(0.0, true, -2500.0, -6000.0, 0.0, g), 0.0);
-        assert_eq!(column_energy(-2500.0, false, -2500.0, -6000.0, 0.0, g), 0.0);
+        assert_eq!(column_energy(0.0, true, -2500.0, -6000.0, inf, 0.0, g), 0.0);
+        assert_eq!(
+            column_energy(-2500.0, false, -2500.0, -6000.0, inf, 0.0, g),
+            0.0
+        );
         // Everything scales with gravity.
-        let mars = column_energy(5000.0, true, -2500.0, -6000.0, 0.0, 3.71);
+        let mars = column_energy(5000.0, true, -2500.0, -6000.0, inf, 0.0, 3.71);
         assert!((mars / belt - 3.71 / 9.81).abs() < 1e-12);
+    }
+
+    /// FRC-036 (PLT-684) against its sources: the subsidence is GDH1's (Stein & Stein 1992,
+    /// PLT-352: 2,600 + 365 √t m to 20 Myr, 5,651 − 2,473 e^(−0.0278 t) after); old floor's
+    /// ridge push is then C × 3,051² = 3.1 × 10¹² N/m, the size Forsyth & Uyeda 1975 quote from
+    /// McKenzie 1972 ("of the order of 300 bars" over their 80 km lithosphere, 2.4 × 10¹²) and
+    /// Copley et al. 2010's abstract (about 2.5 × 10¹²). The plate-only presets' floor (ridge
+    /// -1,000 m, floor -10,000 m, PLT-129's relaxation) read as subsidence gave 9 km of it,
+    /// 8.7 times that.
+    #[test]
+    fn the_sea_floor_s_ridge_push_is_its_age_s_thermal_subsidence() {
+        let g = 9.81;
+        let c = ridge_coefficient(g);
+        assert_eq!(thermal_subsidence_m(0.0), 0.0);
+        assert!((thermal_subsidence_m(10.0) - 365.0 * 10f64.sqrt()).abs() < 1e-9);
+        // The branches meet at 20 Myr within 0.3 m (PLT-352).
+        assert!((thermal_subsidence_m(20.0) - 365.0 * 20f64.sqrt()).abs() < 0.5);
+        let at100 = 5651.0 - 2473.0 * (-0.0278f64 * 100.0).exp() - 2600.0;
+        assert!((thermal_subsidence_m(100.0) - at100).abs() < 1e-9);
+        assert!((2897.0..2899.0).contains(&at100), "{at100}");
+        assert!((thermal_subsidence_m(1000.0) - 3051.0).abs() < 1e-6);
+        // Old floor's ridge push: 3.05e12 N/m, inside the quoted 2.4-3.5e12.
+        let old = -column_energy(-5651.0, false, -2600.0, -5651.0, 3051.0, 0.0, g);
+        assert!((old - c * 3051.0 * 3051.0).abs() < 1.0);
+        assert!((2.4e12..3.5e12).contains(&old), "{old:e}");
+        // The plate-only presets' old floor, 9 km below its crest: its age's energy, not 9 km's.
+        let deep =
+            |thermal: f64| column_energy(-10000.0, false, -1000.0, -10000.0, thermal, 0.0, g);
+        assert!(((deep(thermal_subsidence_m(400.0)) + old) / old).abs() < 1e-4);
+        assert!((deep(f64::INFINITY) / deep(thermal_subsidence_m(400.0)) - 8.70).abs() < 0.01);
+        // A trench in 10-Myr floor has 10-Myr floor's energy, not the old floor's.
+        let th10 = thermal_subsidence_m(10.0);
+        let young = column_energy(-8000.0, false, -2600.0, -5651.0, th10, 0.0, g);
+        assert!(((young + c * 365.0 * 365.0 * 10.0) / young).abs() < 1e-12);
+        // Floor standing higher than its age's subsidence (a load, an arc) keeps its depth's.
+        let loaded = column_energy(-4000.0, false, -2600.0, -5651.0, at100, 0.0, g);
+        assert_eq!(loaded, -c * 1400.0 * 1400.0);
+        // Land takes no bound.
+        assert_eq!(
+            column_energy(3000.0, true, -2600.0, -5651.0, 0.0, 0.0, g),
+            column_energy(3000.0, true, -2600.0, -5651.0, f64::INFINITY, 0.0, g)
+        );
+        // The switch: `Coeffs::energy` bounds by age on, and reads the depth to the floor off.
+        let mut k = TectonicParams {
+            ridge_elevation_m: -1000.0,
+            oceanic_floor_elevation_m: -10000.0,
+            ..TectonicParams::default()
+        };
+        assert!(k.ridge_push_by_age);
+        let on = coeffs(&k).energy(-10000.0, false, 400.0);
+        k.ridge_push_by_age = false;
+        let off = coeffs(&k).energy(-10000.0, false, 400.0);
+        assert_eq!(off, -c * 9000.0 * 9000.0);
+        assert!(((on + old) / old).abs() < 1e-4, "{on:e}");
     }
 
     #[test]
     fn the_land_s_column_energy_is_taken_from_the_sea() {
         let g = 9.81;
-        let u = |z: f64, cont: bool, sea: f64| column_energy(z, cont, -2600.0, -5651.0, sea, g);
+        let u = |z: f64, cont: bool, sea: f64| {
+            column_energy(z, cont, -2600.0, -5651.0, f64::INFINITY, sea, g)
+        };
         for sea in [-800.0, -250.0, 300.0, 450.0] {
             // Crust standing at the sea is the reference, as the ridge crest is.
             assert_eq!(u(sea, true, sea), 0.0);

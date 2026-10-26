@@ -9832,7 +9832,8 @@ a guard that should never bind, and PLT-585 was kept off for the same reason. Br
 `speed-scale-75-parked` holds the 75 in params.rs and the 13 presets, with the two tests that now
 read the scale instead of pinning 45. (PLT-582's amendment cleared the guard on the pool later the
 same day, but on the test planet 75 still binds it on many seeds where 45 binds on none, so 75
-stays parked: "The force balance's front on the current geometry" below.)
+stays parked: "The force balance's front on the current geometry" below. 75 went on later that day
+with the ridge push by the floor's age: "The ridge push by the floor's age (PLT-684, 2026-10-26)".)
 
 **What binds** (measured from the arm's records; no fix built). Three of the four plates that bound
 were born by subduction initiation and were being consumed down their own trench: scattered 1 plates
@@ -10040,7 +10041,9 @@ did nothing sets no motion). PLT-080's note.
 the pool, and a bind under the full combination where master binds on none is evidence about 75,
 not noise in the test). The amendment and the motion fix are on by default; the speed scale stays
 45 in params.rs and every built-in preset, and branch `speed-scale-75-parked` keeps the 75 (PLT-181,
-PLT-022). The arm that decides the amendment is read at 45 on master's A and B below.
+PLT-022). The arm that decides the amendment is read at 45 on master's A and B below. (The test
+planet's binds were the edge term's, and 75 went on with PLT-684: "The ridge push by the floor's
+age (PLT-684, 2026-10-26)" below.)
 
 **The arm on master's A and B** (the coordinator's rule of 2026-10-26: the amendment and the motion
 fix at 45, on master's A and B). `fx582-m19`: this branch merged with master (f182f189 and the
@@ -10104,6 +10107,179 @@ to 0.46, sediment subduction 0.81 to 0.80, subduction erosion 0.37 to 0.37, the 
 to 1.22 (Earth 0.7), the net change of the continental volume −1.26 to −1.31, the continental crust
 at the end 0.366 to 0.367; the island-arc front 46.4k to 48.1k km, the continental-arc front 22.8k to
 22.6k, the collision front 8,275 to 8,268 km.
+
+## The ridge push by the floor's age (PLT-684, 2026-10-26)
+
+**What it answers.** At a speed scale of 75 the test planet's sweep bound PLT-022's guard on small
+plates whose balance asked 111 to 600 mm/yr of them (above, "The test planet's guard"). The
+coordinator's brief for the stage (2026-10-26): find the physics the balance gets wrong on small
+plates and fix it from sources, so that 75 can go on with the guard clean; no cap, no speed limit,
+no forcing term and no size-dependent factor, since the bind is the symptom.
+
+**The decomposition.** The sweep's 56 binds (PLT-582, the scale at 75, A and B, the motion fix;
+`plates_quick_16k` at 8,000 samples, 300 Myr, seeds 1 to 24, each start) were taken apart with a
+test-only trace of `balance_step`: per plate-step the visible samples, the boundary by class
+(trench, overriding, collision, incipient, transform, opening), each term's force (slab pull,
+suction, the edge term's net force), each resistance's coefficient (basal drag, slab resistance,
+boundary resistance, collision, suction) and the speed each term alone would give against the
+plate's total resistance. The same trace ran at 45 for every plate-step, the comparison of a free
+plate of the same size.
+
+- The edge term carried the bound plates: its median share of the balance's answer along its
+  direction was 0.79, the slab pull's 0.16, and 44 of the 56 had the edge term as their largest
+  driver (12 the pull). The bound plates were small (median 45 visible samples) with long boundaries
+  for their area.
+- The model already resists a small plate by its boundary, as Forsyth & Uyeda's balance does
+  (PLT-585): under 50 visible samples the boundary resistance (PLT-189, per metre of boundary) is
+  17.7 times the basal drag (per area) and the slab resistance (PLT-185, per metre of trench) 54
+  times; over 1,000 samples 1.1 and 0.5 times. No resistance that scales with boundary length was
+  missing.
+- Later work on small plates agrees that their edges, not their base, hold them (a Sonnet lookup,
+  abstracts only: the full texts were behind publishers' walls). Conrad & Hager 1999: "Earth's
+  plate velocities are not correlated to plate size". Neves, Searle & Bott 2003, on oceanic
+  microplates: "At most, the basal drag comprises 20% of the force resisting microplate rotation".
+  Schouten, Klitgord & Gallo 1993: a microplate's rotation "could be driven by the drag of the Nazca
+  and Pacific plates on the microplate's edges". Forsyth & Uyeda 1975: slab-attached plates move at
+  a terminal velocity "regardless of the other features of the trailing horizontal part of the
+  plates". Becker & O'Connell 2001: parameterized edge forces "does not significantly improve the
+  model fit". The abstracts of Conrad & Lithgow-Bertelloni 2002 and 2004 say nothing of size.
+- What the source scales otherwise is a driving term counted per metre of boundary: the edge term's
+  column energy. `plates_quick_16k` (the test planet's preset) has its crest at −1,000 m and sinks
+  its floor by Cortial's dampening towards −10,000 m (PLT-129), and the edge term read the depth
+  below the crest down to that old floor (FRC-021). Old floor counted 9 km below its crest, a ridge
+  push of 2.7 × 10¹³ N/m, 8.7 times what 3,051 m of thermal subsidence gives (3.05 × 10¹² N/m) and
+  about ten times Copley et al.'s figure. Every plate with a ridge on one side and old floor
+  elsewhere took that edge force per metre of its boundary, while its drag went with its area.
+
+Variants on the same sweep (the trace's switches, test-only; guarded plate-steps at 75, all 0 at 45):
+
+| Variant | binds at 75 |
+|---|---|
+| the test planet as it was (PLT-582 + 75 + A and B) | 56 (20 scattered, 36 supercontinent) |
+| the depth below the crest clamped at 3,051 m | 1 |
+| GDH1's crest and floor in the preset (−2,600 and −5,651 m) | 2 |
+| `earthlike_quick_16k`'s tectonics on the test planet | 3, on 2 seeds |
+
+**What the sources say.** Turcotte & Schubert's ridge push, which FRC-012 writes as −C d², is the
+cooled lithosphere's: d is the column's thermal subsidence, which the plate model stops at about
+80 Myr. Read for this stage (a Sonnet sub-agent, full texts unless noted):
+
+- Copley, Avouac & Royer 2010 (JGR 115, B03410): the ridge push "estimated using a plate cooling
+  model", "integrating ... the potential energy differences due to cooling (using the seafloor age
+  distribution)"; "line force is taken to be 3 x 10^12 N per unit length", "2.5 - 3 x 10^12 N/m".
+- ETH Zurich lecture notes, chapter 6.2: "ridge push force is linearly proportional to the age t",
+  "80 Ma ... 3.1 x 10^12 N/m".
+- Doin & Fleitout 1996 (EPSL 142:121): "In the plate model the subsidence is stopped at an age of
+  about 80 Ma".
+- Clennett et al. 2023 (Sci. Rep. 13:10191): ΔU from the age-depth law and isostasy, not from
+  measured bathymetry; the plate model leaves half-space cooling after 81 Ma.
+- Sandiford, "trench pull" (EarthArXiv preprint): "2-4 TN m^-1 ... applicable to the subsidence of
+  old lithosphere"; the trench's flexure is a force of its own, measured against "an isostatic
+  reference column of the same age".
+- Sandwell's lecture notes: the ridge push is the force of isostatically compensated topography.
+- Against the age form: Zoback & Zoback (Treatise on Geophysics 6.06), 1 to 5 × 10¹² N/m
+  "calculated directly from bathymetry". On Earth's floor away from trenches the two agree, since
+  bathymetry follows the age-depth law; on the plate-only presets the floor follows Cortial's
+  game-choice relaxation instead, and at a trench the depth is the slab's and flexure's.
+- Forsyth & Uyeda 1975 (read before): McKenzie 1972's ridge push "of the order of 300 bars", 2.4 ×
+  10¹² N/m over 80 km.
+- Not reachable: Parsons & Richter 1980, Lister 1975, Turcotte & Schubert.
+
+**The law (`tectonics.ridge_push_by_age`, on by default).** The sea floor's column energy reads its
+depth below the crest at most as deep as GDH1 sinks floor of its age, d ≤ d_GDH1(t) − 2,600 m
+(PLT-352, FRC-036): 0 at the ridge, 1,154 m at 10 Myr, 1,632 m at 20, 2,898 m at 100, towards
+3,051 m. Ground deeper than that (a trench in young floor, a flexural moat, the plate-only presets'
+deep floor) has its age's energy; ground shallower (sediment, a seamount, a plateau) keeps its own
+depth, so a load on old floor still pushes less. The age is the sample's crust age at the step.
+Land keeps its Airy column (FRC-014). The bound acts in the plate's mean energy, at each boundary
+sample and in a belt's weight. On the Earth-like presets the old bound (the preset's floor, 3,051 m
+below the crest) and the new one meet on old floor, so there the law changes only young floor that
+stands deeper than its age. Off, the depth is read down to the preset's old floor, as before.
+
+The unit test `the_sea_floor_s_ridge_push_is_its_age_s_thermal_subsidence`: the subsidence 0 at the
+ridge, 365 √10 m at 10 Myr, within 0.5 m of 365 √20 at 20, 2,897 to 2,899 m at 100 and 3,051 m at
+1,000; old floor's push C × 3,051² = 3.05 × 10¹² N/m, inside 2.4 to 3.5 × 10¹²; the plate-only
+presets' −10 km floor at 400 Myr has old floor's energy (to 1e-4) and, unbounded, 8.70 ± 0.01 times
+it; a 10-Myr trench at −8,000 m has −C × 365² × 10; a loaded floor at −4,000 m keeps −C × 1,400²;
+land is unchanged; through the switch, off gives −C × 9,000² for the deep floor.
+`friction_holds_back_a_plate_with_no_slab` reads the model's push from the same energy.
+
+**The sweep with the law** (the same planet, seeds and starts; the trace's switches as above):
+
+| Variant | `scattered_continents` | `supercontinent` |
+|---|---|---|
+| master (45, A and B) | 0 | 0 |
+| PLT-582 + 75 + A and B, before | 20, on 12 of 24 | 36, on 11 of 24 |
+| PLT-582 + 75 + A and B + PLT-684 | 0 | 3, on 2 of 24 (seeds 20 and 21) |
+| the same on `earthlike_quick_16k`'s tectonics | 1 (seed 21) | 1 (seed 2) |
+| PLT-684 at 45 | 0 | 0 |
+
+By size (visible samples), the share of plate-steps whose fastest point passes 250 mm/yr and the
+edge term's median share of the speed:
+
+| Visible samples | 45, before | 75, before | 75, with PLT-684 |
+|---|---|---|---|
+| under 50 | 0.000, 0.20 | 0.012, 0.19 | 0.003, 0.03 |
+| 50 to 150 | 0.000, 0.27 | 0.010, 0.25 | 0.001, 0.06 |
+| 150 to 400 | 0.000, 0.27 | 0.002, 0.25 | 0.000, 0.07 |
+| 400 to 1,000 | 0.000, 0.29 | 0.000, 0.26 | 0.000, 0.08 |
+| over 1,000 | 0.000, 0.34 | 0.000, 0.33 | 0.000, 0.09 |
+
+The law lowers the test planet's speeds at every size (median centroid speed at 75 under 50 samples
+98 to 82 mm/yr, over 1,000 samples 41 to 26), since its edge term had been about ten times Earth's
+ridge push everywhere, not only on small plates.
+
+**The three binds left** are not the edge term's. Each is a slab plate (20 to 52 visible samples)
+whose pull alone gives its speed (the pull's share 1.03, the edge term's 0.01) at the old law's
+terminal velocity, pull over slab resistance 240 to 248 mm/yr, and whose rotation takes a point past
+250 mm/yr (fastest points 298 to 342). The old law's terminal velocity is the scale × 7/3 × the
+slab's weight (PLT-185, FRC-016), 175 to 262 mm/yr at 75; Forsyth & Uyeda's is 72 mm/yr (FRC-034),
+"independent of the surface geometry", and their balance (PLT-585) has no speed scale. These binds
+are the scale's own terminal velocity on a small plate with an old slab, not a missing or mis-scaled
+small-plate term, so the stage builds nothing for them.
+
+**The arm** sp75-fix: the law on, `--set tectonics.plate_speed_scale_mm_yr=75`, on master 7546a670
+(front-loaded island arcs on) at 640b5afe; key d986a3616d61, argkey d0cd1773; seeds 1 to 4, both
+starts, the crust-budget envs. Read against base21-s4 (base21's seeds 1 to 4, key 8e2115301833,
+argkey cd665cef) with `pool.sh table` (v1census; guard after `pool.sh measure --measures guard`;
+islab with `--registry tools/review/islfront/measures_islab.json`) and the lane's readers
+(speed3, diag3, speed5 and budget1 in build/front/cr/, outside the repo's tracked files). Medians of
+8 runs, Mann-Whitney p:
+
+| | base21-s4 (45) | sp75-fix (75, PLT-684) | p |
+|---|---|---|---|
+| PLT-022's guard, runs bound | 0 | 0 | |
+| relief guard's worst, m from the sea | 10,230 | 10,098 | 0.23 |
+| largest excess over Airy, m | 2,458 | 2,663 | 0.28 |
+| CHK-020's RMS speed, mm/yr (40 to 100) | 26.2 | 40.6 (37.8 to 42.9) | < 0.001 |
+| CHK-028's plate-steps over 150 mm/yr, % (≤ 0.5) | 0.000 | 0.456 (3 of 8 past 0.5) | < 0.001 |
+| floor's mean age, Myr (Earth 64) | 145.1 | 108.3 | 0.001 |
+| floor older than 180 Myr (Earth 0.006) | 0.311 | 0.187 | 0.001 |
+| slab plates / in a collision / free, mm/yr | 61.6 / 24.2 / 20.9 | 79.4 / 37.6 / 35.1 | |
+| slab-attached over the rest (Earth 3 to 4) | 2.24 | 2.11 | |
+| island / continental front, km a step | 48,657 / 32,935 | 40,468 / 33,465 | |
+| island incipient share of the front | 0.499 | 0.348 | |
+| land | 0.270 | 0.274 | 0.65 |
+| largest landmass | 0.100 | 0.161 | 0.19 |
+| continental crust under the sea | 0.364 | 0.275 | 0.083 |
+| coast with high ground (≤ 0.11) | 0.155 | 0.139 | 1.0 |
+| land under ice | 0.076 | 0.038 | 0.083 |
+| collisions per 100 Myr | 5.15 | 4.55 | 0.082 |
+| continental crust's net change | −0.045 | −0.097 | < 0.001 |
+| criteria met: median, mean | 6, 6.38 | 6, 6.12 | 0.29 |
+
+The guard is clean on the pool, so by Ben's standing order (75 goes on once the guard is clean,
+whatever it does to V1) the default and the 13 built-in presets go to 75 on this branch (PLT-181).
+The plates of every class speed up by 1.3 to 1.7 times (at 75 the slab plates' pull is 88.6 % of
+their drive, the free plates' suction 65 % and the edge term 17 %). The faster plates
+make young floor (mean age 145 to 108 Myr, still older than Earth's 64) and consume more crust: the
+crust budget's net loss goes from 1.05 to 2.27 km³ a year, island arcs 1.16 to 1.50 (Stern & Scholl
+1.5), continental arcs 0.44 to 0.62 (1.0), sediment subduction 0.82 to 1.25 (1.1), subduction
+erosion 0.32 to 0.50 (1.4), and the crust-suturing zones' loss 1.06 to 2.10 (Earth 0.7) as the crust
+crossing collision fronts goes from 5.8 to 10.3 km³ a year. Plate-check's `continental_min` (the
+smallest continental share over the run, 0.372 to 0.317) fails in all 8 runs against 4 on the base,
+and `plate_life_p50_myr` (80 to 62.5 Myr) in all 8 against 3. No V1 number leaves its target; coast
+with high ground was outside it on the base too.
 
 ## The overriding plate's share (PLT-652, 2026-10-25)
 
