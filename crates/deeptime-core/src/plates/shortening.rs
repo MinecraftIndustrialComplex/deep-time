@@ -701,6 +701,7 @@ mod tests {
                 cont_in: 0,
                 reversed: false,
                 carried: false,
+                arc_onset_myr: None,
             }],
             hotspots: Vec::new(),
             ridges: Vec::new(),

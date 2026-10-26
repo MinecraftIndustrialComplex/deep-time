@@ -867,6 +867,17 @@ pub struct TectonicParams {
     /// Vannucchi's tables (28,775 km; Stern & Scholl's continental margin arcs are 27,500 km).
     /// ledger: PLT-666
     pub continental_arc_convergence_ref_mm_yr: f64,
+    /// Front-loaded island arcs (the M5 lane, 2026-10-25; off by default): an island arc adds 500
+    /// km³ per km per Myr at any convergence for its first 10 Myr, its age from its contact's
+    /// `arc_onset_myr` (the first step its slab is past incipient, PLT-669), then 30 × v_n /
+    /// `island_arc_convergence_ref_mm_yr`, in place of `island_arc_km3_per_km_myr`'s one rate
+    /// (`subduction::island_arc_law`). Stern & Scholl (2010, p. 11): "500 km3/million years for
+    /// first 10 million years plus 30 km3/million years for 60 million years thereafter", about
+    /// 100 over the 70 Myr; the pulse is driven by the young slab's sinking and the forearc's
+    /// spreading, not by the convergence. The continental arcs keep their one rate (S&S measured
+    /// the split on intra-oceanic arcs). The young fronts are measured either way (PLT-670).
+    /// ledger: PLT-668
+    pub arc_front_loaded: bool,
     /// Island-arc crust counts as continental once it is this thick, km: an oceanic sample turns
     /// continental once the arc crust it has built (`arc_oceanic_m`) on top of normal ocean crust
     /// (7 km) reaches it, whatever its height. Cloos (1993): crust thicker than about 15 km is
@@ -1254,6 +1265,7 @@ impl Default for TectonicParams {
             continental_arc_km3_per_km_myr: 35.0, // ledger: PLT-285
             island_arc_convergence_ref_mm_yr: 86.6, // ledger: PLT-666
             continental_arc_convergence_ref_mm_yr: 58.6, // ledger: PLT-666
+            arc_front_loaded: false, // ledger: PLT-668 (built 2026-10-25, off)
             arc_mature_crust_km: 15.0, // ledger: PLT-047
             cordillera_shortening_mm_yr: 0.0, // ledger: PLT-048
             cordillera_width_km: 120.0,
