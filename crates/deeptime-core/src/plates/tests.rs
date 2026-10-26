@@ -6726,22 +6726,30 @@ fn the_front_cross_tabs_add_up() {
 
 /// Only a weld or a transfer sets its plates' motion for the step (PLT-080), so only their two
 /// plates skip the step's relaxation towards the balance (PLT-191). A deferred collision (a
-/// continent converging that has not stalled) sets nothing (the M5 lane, 2026-10-25).
+/// continent converging that has not stalled) sets nothing (the M5 lane, 2026-10-25), nor does
+/// one that could do nothing (its plate welded away earlier in the step, or its terrane gone:
+/// `collide`'s early returns, 2026-10-26).
 #[test]
 fn only_a_weld_or_a_transfer_holds_its_plates_motion_for_the_step() {
     use super::collision::Collided;
     let weld = Collided {
         sutured: true,
+        moved: true,
         ..Collided::default()
     };
-    let transfer = Collided::default();
+    let transfer = Collided {
+        moved: true,
+        ..Collided::default()
+    };
     let deferred = Collided {
         deferred: true,
         ..Collided::default()
     };
+    let nothing = Collided::default();
     assert_eq!(super::motion_set_by(&weld, 3, 5), Some([3, 5]));
     assert_eq!(super::motion_set_by(&transfer, 3, 5), Some([3, 5]));
     assert_eq!(super::motion_set_by(&deferred, 3, 5), None);
+    assert_eq!(super::motion_set_by(&nothing, 3, 5), None);
 }
 
 /// A continental collision past `collision_threshold_km` that has not stalled is handed to
