@@ -1489,6 +1489,7 @@ fn record_margins(st: &PlateState, world: &mut WorldState, pos: &[DVec3], env: &
         &env.norm,
         &|p| initiated.contains(&p),
         forces::incipient_km(env.k),
+        forces::slab_floor_mm_yr(env.k),
     );
     let mut note: serde_json::Value = world
         .notes

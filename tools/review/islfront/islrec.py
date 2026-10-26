@@ -6,7 +6,11 @@ Per run, the mean over every step with front bands of the dynamics record's boun
 setting 0 (ocean-ocean: the overriding sample oceanic with no continental crust of its own plate
 within the arc's distance, PLT-370; the crust budget's island front) and setting 1. Beside them
 the crust budget's front_o / front_c (straight km, PLT-530) as run means and per 100 Myr window
-(the cb_globals lines are cumulative at each snapshot).
+(the cb_globals lines are cumulative at each snapshot). Records made since PLT-683 (2026-10-26) add the
+cross-tabs: the part of the incipient front that is incipient by the slab's thermal floor alone (`slow`,
+PLT-681), the incipient front by its convergence band, the subducting front by its sample's convergence
+band against its pair of plates' mean (`normal_pair`), the island front by pair origin and band, the
+front's turnover per step (`gain`, `loss`, `gain_slab`) and the contacts maturing (`matured`).
 """
 import glob
 import importlib.util
@@ -54,6 +58,68 @@ def globals_series(path):
     return out
 
 
+def add(acc, b):
+    """Adds the record's nested lists of numbers into `acc`, key by key."""
+    def rec(a, v):
+        for i in range(len(a)):
+            if isinstance(a[i], list):
+                rec(a[i], v[i])
+            else:
+                a[i] += v[i]
+    for k in acc:
+        rec(acc[k], b[k])
+
+
+def scale(acc, f):
+    def rec(a):
+        return [rec(v) for v in a] if isinstance(a, list) else a * f
+    return {k: rec(v) for k, v in acc.items()}
+
+
+def mean_nested(xs):
+    if isinstance(xs[0], list):
+        return [mean_nested([x[i] for x in xs]) for i in range(len(xs[0]))]
+    return statistics.mean(xs)
+
+
+def cross_tabs(rows):
+    """Run means of the cross-tabs (PLT-683), printed as km per step and shares."""
+    rows = [r for r in rows if "x" in r]
+    if not rows:
+        return
+    m = {k: mean_nested([r["x"][k] for r in rows]) for k in rows[0]["x"]}
+    print(f"  cross-tabs over {len(rows)} runs (km per step, run means):")
+    print("    slow (incipient by the floor alone): island %.0f, continental %.0f" % tuple(m["slow"]))
+    for k, name in ((0, "island"), (1, "continental")):
+        print(f"    {name} incipient by v_n band: " + "  ".join(
+            f"{e}: {v:.0f}" for e, v in zip(NORMAL, m["incipient_normal"][k])))
+        t = m["normal_pair"][k]
+        print(f"    {name} subducting, rows the sample's v_n band, columns the pair's mean band:")
+        print("      " + " ".join(f"{e:>7}" for e in NORMAL))
+        for i, e in enumerate(NORMAL):
+            print(f"  {e:>4}" + " ".join(f"{v:7.0f}" for v in t[i]))
+        u10 = sum(sum(t[i]) for i in range(2))
+        u10_fast = sum(sum(t[i][2:]) for i in range(2))
+        o10 = sum(sum(t[i]) for i in range(2, 6))
+        o10_slow = sum(sum(t[i][:2]) for i in range(2, 6))
+        print(f"      under 10 on a pair at 10+: {u10_fast / u10 if u10 else 0:.3f} of {u10:.0f} km;"
+              f" at 10+ on a pair under 10: {o10_slow / o10 if o10 else 0:.3f} of {o10:.0f} km")
+    for j, name in enumerate(PAIR):
+        print(f"    island subducting by origin {name}: " + "  ".join(
+            f"{e}: {v:.0f}" for e, v in zip(NORMAL, m["oo_normal_pair"][j])))
+    for k, name in ((0, "island"), (1, "continental")):
+        print(f"    {name} turnover per step: subducting +{m['gain'][k][1]:.0f} -{m['loss'][k][1]:.0f},"
+              f" incipient +{m['gain'][k][0]:.0f} -{m['loss'][k][0]:.0f}; subducting gain by slab band: "
+              + "  ".join(f"{e}: {v:.0f}" for e, v in zip(SLAB, m["gain_slab"][k])))
+    ev = [e for r in rows for e in r["matured"]]
+    rate = statistics.mean([r["matured_per_100myr"] for r in rows])
+    if ev:
+        print(f"    maturing: {rate:.1f} contacts per 100 Myr; at the step, median front v_n"
+              f" {statistics.median([e[0] for e in ev]):.1f} mm/yr, contact age"
+              f" {statistics.median([e[1] for e in ev]):.1f} Myr, oceanic front samples"
+              f" {statistics.median([e[2] for e in ev]):.0f}")
+
+
 def one(run):
     d = json.load(open(f"{run}/rec.json"))
     steps = [s for s in d["steps"] if "front_bands" in s]
@@ -66,6 +132,13 @@ def one(run):
     oo = {k: [0.0] * 6 for k in ("oo_over_cont", "oo_under_cont", "oo_coast")}
     pair = [0.0] * 3
     other_conv = 0.0
+    xt = {"slow": [0.0, 0.0], "incipient_normal": [[0.0] * 6, [0.0] * 6],
+          "normal_pair": [[[0.0] * 6 for _ in range(6)] for _ in range(2)],
+          "oo_normal_pair": [[0.0] * 6 for _ in range(3)],
+          "gain": [[0.0, 0.0], [0.0, 0.0]], "loss": [[0.0, 0.0], [0.0, 0.0]],
+          "gain_slab": [[0.0] * 6, [0.0] * 6]}
+    has_x = False
+    matured = []
     win = {}
     for s in steps:
         b = s["front_bands"]
@@ -84,6 +157,10 @@ def one(run):
         for j in range(3):
             pair[j] += b.get("oo_pair", [0] * 3)[j]
         other_conv += b.get("other_converging", 0.0)
+        if "normal_pair" in b:
+            has_x = True
+            add(xt, b)
+        matured.extend(s.get("matured", []))
         w = int((s["t"] - d["t0_myr"]) // 100)
         x = win.setdefault(w, [0, 0.0, 0.0])
         x[0] += 1
@@ -108,6 +185,11 @@ def one(run):
     o["oo_pair"] = [x / sub0 if sub0 else 0.0 for x in pair]
     o["win_front0"] = {w: x[1] / x[0] for w, x in sorted(win.items())}
     o["win_front1"] = {w: x[2] / x[0] for w, x in sorted(win.items())}
+    if has_x:
+        o["x"] = scale(xt, 1.0 / n)
+        o["matured"] = matured
+        span = steps[-1]["t"] - steps[0]["t"] if n > 1 else 0.0
+        o["matured_per_100myr"] = 100.0 * len(matured) / span if span else 0.0
     gs = globals_series(f"{run}/summary.txt")
     if gs:
         t_first = d["t0_myr"]
@@ -161,6 +243,7 @@ def main():
             f"{statistics.mean([r['win_front0'].get(w, 0.0) for r in rows]):.0f}" for w in ws))
         print("  continental front (mix, km) by window:   " + " ".join(
             f"{statistics.mean([r['win_front1'].get(w, 0.0) for r in rows]):.0f}" for w in ws))
+        cross_tabs(rows)
         if "cb_series" in rows[0]:
             ts = sorted(rows[0]["cb_series"])
             print("  crust budget front_o by 50 Myr window: " + " ".join(
