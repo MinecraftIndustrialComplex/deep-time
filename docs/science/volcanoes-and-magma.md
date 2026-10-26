@@ -136,7 +136,10 @@ catalogue of individual volcanoes that ride on their plates.
    the threshold flux to 2 km at full flux (VOL-019); its radius follows height to the power 0.8
    (VOL-020); its life is drawn between 2 and 8 Myr (VOL-038). If the crust under it is continental
    and at least 42 km thick it is silicic: richer in silica, explosive, and able to form a caldera
-   (VOL-005).
+   (VOL-005). The grid's last rows run a quantum past the poles and a vent is jittered over its
+   whole cell, so a vent drawn at a point past a pole is not born (VOL-164): the planet holds such a
+   point at the pole, and a segment's centroid and its events would be off the map. The draw is
+   dropped after its random draws and counted (`counts.arc_past_pole`).
 3. **Birth of hotspot volcanoes.** At each live hotspot a new volcano starts once the previous one
    has drifted 70 km away (VOL-007): a shield on oceanic crust, a low silicic centre on continental
    crust (VOL-006). It stays active while it is within 70 km of the plume.
