@@ -1037,6 +1037,27 @@ pub struct TectonicParams {
     /// Old crust can start subducting only this far from every trench, km (Earth-normalized;
     /// a new subduction zone does not open beside a working one).
     pub subduction_initiation_clearance_km: f64,
+    /// Subduction initiation where Crameri et al. 2020 find it (fix C, the M5 lane, 2026-10-26):
+    /// "All SZI events start less than 1500 km away from other active subduction zones", none is
+    /// spontaneous, and the subducting plates' mean ages at initiation run from 31.7 to 117.4 Myr
+    /// (Supplementary Data 1), so neither PLT-062's 150 Myr gate nor PLT-064's 1,000 km clearance
+    /// holds. On: the floor an initiation may take is the visible ocean floor within
+    /// `subduction_initiation_reach_km` of an active trench, of any age, and the planet's hazard
+    /// is `subduction_initiation_per_trench_km_myr` × its trench length × the step ("subduction
+    /// breeds subduction"), shared between the plates by that floor and PLT-505's compression
+    /// weight; no trench, no initiation. PLT-503's margin, PLT-066's sizes, the split and
+    /// PLT-655's polarity are unchanged. Off: PLT-062 to PLT-064 as before. ledger: PLT-690
+    pub initiation_near_trenches: bool,
+    /// The reach of an active trench within which a subduction initiation may start, km
+    /// (Earth-normalized; Crameri et al. 2020: "All SZI events start less than 1500 km away from
+    /// other active subduction zones"). ledger: PLT-691
+    pub subduction_initiation_reach_km: f64,
+    /// Subduction initiations per km of active trench per Myr with `initiation_near_trenches`:
+    /// Crameri et al. 2020's newly destructive initiations since about 105 Ma (Table 1: South
+    /// Sandwich, Izu-Bonin-Mariana, Anatolia, Oman; polarity reversals and episodic jumps are
+    /// other laws here) over Bird 2003's 51,310 km of subduction zones (PLT-213).
+    /// ledger: PLT-692
+    pub subduction_initiation_per_trench_km_myr: f64,
     /// The slab a subduction initiation plants on the old floor it splits off, km: the plate
     /// moves only by the force balance, and the planted slab pulls it towards its parent until
     /// the trench forms and the slab grows by the convergence (design §3.3). Subduction becomes
@@ -1350,6 +1371,10 @@ impl Default for TectonicParams {
             subduction_initiation_age_myr: 150.0,
             subduction_initiation_per_myr: 0.15, // ledger: PLT-063
             subduction_initiation_clearance_km: 1000.0,
+            initiation_near_trenches: true,         // ledger: PLT-690
+            subduction_initiation_reach_km: 1500.0, // ledger: PLT-691
+            // 4 newly destructive initiations in 105 Myr over 51,310 km. ledger: PLT-692
+            subduction_initiation_per_trench_km_myr: 4.0 / (105.0 * 51_310.0),
             initiation_slab_km: 150.0,                // ledger: PLT-270
             incipient_subduction: true,               // ledger: PLT-610 (on since 2026-10-25)
             initiation_polarity_by_age: true,         // ledger: PLT-655
@@ -1839,6 +1864,14 @@ impl PlanetPreset {
             (
                 k.subduction_initiation_clearance_km,
                 "$.tectonics.subduction_initiation_clearance_km",
+            ),
+            (
+                k.subduction_initiation_reach_km,
+                "$.tectonics.subduction_initiation_reach_km",
+            ),
+            (
+                k.subduction_initiation_per_trench_km_myr,
+                "$.tectonics.subduction_initiation_per_trench_km_myr",
             ),
             (k.ridge_segment_km, "$.tectonics.ridge_segment_km"),
             (k.rift_stress_mpa, "$.tectonics.rift_stress_mpa"),
