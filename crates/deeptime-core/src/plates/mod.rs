@@ -1612,8 +1612,11 @@ fn surface(st: &mut PlateState, geo: &Geo, env: &Env<'_>, held_floor: &[f32], se
 /// towards the balance, whose collision resistance is what slows and stalls them (force-balance
 /// design, task 7). Until 2026-10-25 they were skipped too, so every continental collision past
 /// `collision_threshold_km` held both plates' rotations until it stalled (the M5 lane's fix).
+/// Nor does a collision that could do nothing (`Collided::moved` false): one whose plate a weld
+/// killed earlier in the step, or whose terrane is gone so that it ends emptied. Until
+/// 2026-10-26 those held both plates' rotations for the step too.
 fn motion_set_by(done: &collision::Collided, under: u32, over: u32) -> Option<[u32; 2]> {
-    (!done.deferred).then_some([under, over])
+    done.moved.then_some([under, over])
 }
 
 /// Adds one pass of the thickening limit (`rate.rs`) to the run's globals, km³.
