@@ -5184,6 +5184,11 @@ What they say:
    the sea falls to 200 to 900 m below the datum, the floor deeper than 6 km to 0.0105 (Earth
    0.0073), deeper than 8 km to Earth's 0.0003 and the 99th percentile to Earth's 6,000 m; but the
    land falls to 0.16 to 0.19 and half the continental crust is under the sea (the next section).
+   Note (the M5 lane, 2026-10-25): these arms ran before the motion fix (PLT-191), on plates a
+   deferred collision held still, so the drowning is not a reading of the share; the section
+   "Sediment by margin type and the margin's sediment" reads Clift & Vannucchi's share again on
+   moving plates (PLT-660), together with the margin rule (PLT-661), whose ratchet drowns the land
+   there for its own reason; the share alone is not read again.
 3. *Erosion alone* (2 runs) lowers the sea and keeps the land: continental crust under the sea
    0.177 (p 0.044), land 0.328.
 4. *PLT-312* (arcn) on the release, the erosion and the sheet: the arcs' crust falls from 4.25 to
@@ -9664,6 +9669,761 @@ interior's largest share. The law has no free value to close that gap, and none 
 by default since this arm: the law is built and tested against its sources, it conserves crust, and
 the guard is clean (the rule of 2026-10-23: the V1 numbers are realism checks, not a gate).
 
+## Sediment by margin type and the margin's sediment (PLT-660 to PLT-662, 2026-10-25)
+
+The drowning diagnosis (build log 2026-10-25, "M5 lane: why the land drowns on m5-unfreeze") found the
+sea standing about 700 m over the datum because oceanic-labelled crust of 15 km and more takes the
+basins' volume. That crust is built mostly from the continents' sediment, on ocean floor next to the
+continents that never recycles. On base15's seeds 1 to 4 it is 0.269 of the oceanic samples at the
+end (m5thickoc), and refilling the oceanic crust of 10 km and more as a normal ocean column lowers the
+counterfactual sea by about 1,000 m (m5sea). Earth keeps that rock out of the ocean basins two ways:
+the margin's own sediment lies on thinned continental crust, and a trench sends most of what reaches it
+down. Two stages were asked for, each behind its own switch, with tests written first:
+
+- (a) margin material within Brune et al. 2014's 70 to 200 km stays continental, the width taken from
+  the source, and the spread path labelled by its rock;
+- (b) PLT-440's flat 0.12 replaced by Clift & Vannucchi 2004's share by the margin's type.
+
+### The rules
+
+- **(b) Sediment subduction by the margin's type** (PLT-660, `tectonics.sediment_subduction_sourced`).
+  At a resampling the slab takes 0.83 of the sediment and sedimentary pools of the floor that went
+  under where the pile is thicker than 1 km and the convergence is slower than 76 mm/yr, and all of
+  it otherwise. Clift & Vannucchi 2004: accretion works "when convergent rates are <76 mm yr-1 and
+  where the sedimentary cover is >1 km thick", and "Even at the accretionary margins, typically 83% of
+  the incoming sedimentary pile is subducted". von Huene & Scholl 1991: at erosive margins
+  "effectively all incoming sediment is subducted". The rule holds whatever the top's crust, so an
+  intra-oceanic margin's thin pile (the Mariana, Tonga) goes down whole, where PLT-440 accreted 88 %
+  of it to the top.
+- **(a) The margin's sediment is continental** (PLT-661, `tectonics.margin_sediment_continental`).
+  The rifted-margin taper's ocean side (PLT-261, −W/2 < d < 0, the crust thinning from 20 to 7 km) is
+  where Earth's margins have their necking and hyper-extended domains: continental crust thinned to
+  under 10 km, "slivers that vary in widths between 70 km offshore Iberia and 200 km off Angola"
+  (Brune et al. 2014). A member there that is ocean floor and holds rock from the continents
+  (sediment and sedimentary rock beyond the open ocean's pile for its age and latitude) turns
+  continental at the end of the step, over its own ocean crust as its basement (PLT-331). Members with
+  the rain alone, at a trench, in a subduction zone or on an arc stay oceanic. The line was the
+  plates' pelagic rain, 5 m/Myr times the age (PLT-103); since that was retired (the pelagic lane,
+  2026-10-25) the surface stage lays the rain, and the line is GlobSed's eq. 2a less its pore water
+  (`surface::pelagic::open_floor_solid_m`, ERO-215; erosion-and-sediment.md "The pelagic rain"),
+  which the rain lies 14 to 42 m in place under.
+- **The side rule.** So that a converted member is never the next member's margin, the taper takes a
+  continental column with under 10 km of its own crystalline crust (`hyper_extended`) as its ocean
+  side, not its continental side, and ocean crust the taper adds to it joins its basement. A matured
+  island arc (8 km of its own over its basement) falls under the same test, so with the switch on it
+  is the ocean side too. The zone is found as the step begins, so a step's conversions do not move it
+  within the step.
+- **The spread's rock** (PLT-662, the same switch). The collapse, the founder and a rate release fill
+  ocean floor up to the normal column before it turns continental (PLT-277), so up to 32 km of
+  continental rock stood under the oceanic label. With the switch on the receiver turns continental at
+  once when the rock is continental (always for the collapse and the founder, and for a rate release
+  when continental columns gave more than half of it). This is a bookkeeping rule (`game-choice`).
+
+No value was chosen: 1 km, 76 mm/yr, 0.83 and 10 km are read in the sources, and W is PLT-262's 200
+km. On the quick planet's 68 to 71 km spacing, W/2 reaches ring 1 only. Unit tests (written first):
+`sediment_goes_down_by_the_margins_type` and `a_resampling_subducts_sediment_by_the_margins_type` for
+(b); `the_margins_sediment_turns_its_distal_margin_continental` (every member with 2,500 m of pile in
+the zone turns, none with the rain alone, none on the subducting plate, and over 30 steps the crust
+and heights equal the switch-off run's) and `spread_continental_rock_is_continental_at_once_with_the_margin_switch`
+for (a). deeptime-core's tests pass (1,079).
+
+One deviation from the source, on the first arm: PLT-660 read the top sample's `convergence_mm_yr`,
+which subduction.rs stamps as the plates' whole relative speed at the front (the normal component
+only with `DEEPTIME_ARC_NORMAL=1`). Clift & Vannucchi's 76 mm/yr is an orthogonal rate, so an oblique
+margin read faster and its pile went down whole where the normal component alone would accrete 17 %
+of it. Fixed for the second arm ("The blend closed (PLT-663)" below): the front stamps the normal
+component as its own field and PLT-660 reads it.
+
+### Where the stock lies (the ring split, before the arm)
+
+The diagnostic run (base15's supercontinent-1 with the pools maps, key fb136aadfe68, argkey cd665cef;
+its world matches base15's run) split the oceanic-labelled stock beyond the 7 km ocean column with
+m5pools.py. The stock is 3,216 m planet-mean, of it 1,494 m of the continents' sediment. By
+distance to the plate's own continent, in sample spacings, it lies:
+
+| ring 1 | ring 2 | ring 3 | ring 4 and beyond | on plates with no continent |
+|---|---|---|---|---|
+| 0.46 | 0.19 | 0.11 | 0.18 | 0.06 |
+
+So (a) at Brune's taper can reach under half of it. The rest is sediment on ocean floor farther out,
+Earth's continental rise and abyssal fans, which lie on oceanic crust on Earth too and stay oceanic.
+On that run, m5margins.py's converted-margin reading (continental crust over a basement with under
+10 km of its own, no arc magma) finds 0.0001 of the planet with no relabel: that is the reading's
+floor, and the share with and without the converted margins is the same there (0.401, 0.401).
+
+### The arm (m5-margins, 2026-10-25)
+
+Key cba2ba6afb66, argkey 5818ecce: 8 runs (supercontinent and scattered_continents, seeds 1 to 4,
+earthlike_quick_16k, 1,000 Myr, 2 threads), `--set tectonics.sediment_subduction_sourced=true
+tectonics.margin_sediment_continental=true` and the crust budget's two envs. The base is base15's seeds
+1 to 4 (e5e78994377c, cd665cef, `@4`, the same envs). Both stages run together, as one cumulative arm.
+
+| v1census, medians of 8 (Mann-Whitney p) | target | base15 seeds 1 to 4 | m5-margins |
+|---|---|---|---|
+| land | 0.13 to 0.36 | 0.191 | 0.114 (<0.001), out |
+| largest landmass | ≥ 0.06 | 0.060 | 0.027 (0.065), out |
+| continental crust under the sea (M3) | ≤ 0.56 | 0.552 | 0.816 (<0.001), out |
+| land above 2 km (M4; Earth 0.047) | ≤ 0.07 | 0.026 | 0.003 (<0.001) |
+| coast with high ground | ≤ 0.11 | 0.129 | 0.040 (0.003), now in |
+| land under ice | ≤ 0.32 | 0.073 | 0.008 (<0.001) |
+| collisions per 100 Myr | ≤ 6 | 5.00 | 5.35 (0.92) |
+| continental crust's net change (area) | | −0.039 | +0.211 (<0.001) |
+| sea over the datum, after 100 Myr / end, m | | 486 / 710 | 174 / 244 |
+| criteria met per run, median and mean | of 7 | 5.5, 5.38 | 4, 4.12 (0.012) |
+
+The guard stays clean. Its worst is 9,831 m against 10,251 (p 0.10). No step goes beyond two Earth
+reliefs, and no continental plate cell stands 5 km over its Airy height. The largest excess over Airy
+is 1,938 m against 2,403 (p <0.001), the highest plate elevation 3,340 m against 5,321 (p <0.001).
+M4 (m4table, p50) falls from 0.0261 to 0.0026: young belts 0.0131 to 0.0015 of the land, arcs and
+Andean belts 0.0058 to 0.0010.
+
+What the stages were meant to fix moved as intended. The thick oceanic-labelled crust (m5thickoc,
+share of the oceanic samples) falls from 0.175 to 0.047 at 15 to 25 km and from 0.094 to 0.001 at 25
+km and more, so the crust of 15 km and more falls from about 0.166 of the planet to 0.018. Its hold on
+the sea (m5sea, the counterfactual sea with the oceanic crust of 10 km and more refilled as a normal
+column, against the sea refilled on the run's own cells) falls from about 1,000 m to 117 m. The sea
+ends 244 m over the datum against 710.
+
+### The continental share with and without the converted margins (t0000, plate samples)
+
+| | Earth (Cogley 1984) | switch-off run | m5-margins with | m5-margins without |
+|---|---|---|---|---|
+| continental share | 0.41 | 0.401 | 0.634 | 0.567 |
+| under the sea | 0.306 | 0.462 | 0.808 | 0.785 |
+
+The converted margins are 0.0656 of the planet, all under the sea, at a median depth of 3,405 m, crust
+16.5 km and sediment 4.1 km: Earth's distal margins, and the right label for them. Columns with under 10
+km of their own and 1 km or more of island-arc magma (matured arcs, or converted margins that took arc
+magma; the maps do not tell them apart) are 0.0475 against the switch-off run's 0.0037, and the
+"without" reading keeps them. The census's M3 (0.816) is on its grid, these on the plate samples.
+
+The converted margins explain little of the rise. The "without" share is still 0.567 against 0.401, and
+0.785 of it is under the sea against 0.462. The rest of the new continental crust is the next section's.
+
+### The ratchet: the continents spread, they do not grow
+
+m5cont.py splits the continental plate samples by their own crystalline crust (metamorphic, felsic and
+mafic pools less the basement). As shares of the planet at the end (the arm's 8 runs; the switch-off
+run alone):
+
+| own crystalline crust | switch-off run | m5-margins | m5-margins, depth below the sea (p50) |
+|---|---|---|---|
+| 0 to 10 km (the converted margins and the arcs above) | 0.004 | 0.113 | 3,472 m |
+| 10 to 15 km | 0.006 | 0.073 | 2,535 m |
+| 15 to 20 km | 0.007 | 0.076 | 1,705 m |
+| 20 to 25 km | 0.015 | 0.085 | 940 m |
+| 25 to 30 km | 0.061 | 0.118 | 190 m |
+| 30 km and more (the cores) | 0.309 | 0.159 | −16 m |
+
+Both runs start with 0.423 of cores at 33 km of their own (felsic plutonic 21, metamorphic 6, mafic
+plutonic 4.5). In the arm the 10 to 30 km bands lie on a mixing line between a converted margin (own 7
+km, basement 6.0, felsic plutonic 4.6) and a core (own 32 km, felsic plutonic 21.4): across the bands the
+basement falls from 5.1 to 1.8 km and the felsic plutonic rock rises from 8.6 to 19.5 km. The own
+crystalline rock is about 13.3 km spread over the planet against 12.5 on the switch-off run, so the same
+rock covers 1.5 times the area. The mean continental thickness falls from 36.1 to 26.9 km (m5sea); the
+cores thin from 35 to 40 km to 30 to 35 km of crust and still sit at the sea.
+
+The growth comes right after a resampling (m5resample.py, from the record: the change in the continental
+count by steps since the last resampling, about 70 resamplings a run):
+
+| steps since the resampling | base15, per 100 steps | m5-margins |
+|---|---|---|
+| 0 (the resampling's own step) | +0.027 | +0.016 |
+| 1 | −0.035 | +0.296 |
+| 2 | −0.016 | +0.010 |
+| 3 and later | about −0.008 | about −0.008 |
+| net over the run | −0.038 | +0.204 |
+| of it in the first 3 steps after a resampling | −0.019 | +0.220 |
+
+The reading that fits all of it: the resampling's blend takes a continental sample's conserved pools
+and basement from its continental corners only (ridges.rs), so a new sample that falls between a
+converted margin and the core it borders gets a mix of their crust, 10 km or more of its own. It is then
+no longer hyper-extended, so it is the taper's continental side, and in the next step the ring beyond
+it, which holds the continents' sediment (the ring split above), is in the zone and converts. Each
+resampling moves the boundary out a ring. The crust budget's parts agree (supercontinent-1, the arm's
+run against base15's): over the run the transition added 0.321 of the planet to the continents' area,
+against no entry on base15, while subduction took 0.292 against 0.310. The collapse added 0.006 against
+0.061, and moved 1.9 × 10⁸ km³ against 9.5 × 10⁸, so PLT-662's path is not the route. The channel flow
+fell from 9.2 × 10⁸ to 1.9 × 10⁸ km³, and the ocean floor's felsic rock accreted at resamplings from
+5.6 × 10⁹ to 7.9 × 10⁸.
+
+This is numerical diffusion through the blend, not a physical law and not Brune's width: Earth's
+hyper-extended crust does not take the craton's crust each time the model renumbers its samples. It is
+the leading reading, not yet isolated by an arm or a unit test of a resampling.
+
+### Why the measures went out
+
+Land, the largest landmass and M3 go out for one reason. The continents' crystalline rock is spread
+over 1.5 times the area, so the crust is thinner and stands lower: 0.35 of the planet is continental
+crust with 10 to 30 km of its own, 190 to 2,535 m under the sea. The sea fell 466 m, but the
+continents fell further. M4 and the ice fall with the relief: the crust that crosses a collision front
+is 18.9 km against 30.6, the collision's loss per km halves (62 against 128 km³ per km and Myr), and
+the share of crossing crust above the normal column falls from 0.022 to 0.003, so the belts stand
+lower. The coast with high ground comes in for the same reason. The route is the ratchet, so these are
+findings about the blend, not readings of either stage's physics. No knob was added to hold a margin,
+and the taper was not widened to reach rings 2 and beyond.
+
+### The crust cycle against Stern & Scholl and Clift
+
+loss-budget.py, km³ a year over the run (means of 8):
+
+| | base15 | m5-margins | Earth |
+|---|---|---|---|
+| island arcs | 1.20 | 0.86 | 1.5 (Stern & Scholl 2010) |
+| continental arcs | 0.34 | 0.28 | 1.0 |
+| arcs together | 1.54 | 1.14 | 2.5; 3.8 to keep the volume (Clift et al. 2009) |
+| rifts and hotspots | 0.04 | 0.04 | 0.5 |
+| ocean floor's own crust made continental | 0.04 | 0.04 | |
+| sediment subduction | 1.05 | 2.03 | 1.1; 1.65 (Clift et al. 2009) |
+| subduction erosion | 0.33 | 0.27 | 1.4; 1.33 (Clift et al. 2009) |
+| suturing (all three) | 1.21 | 0.62 | 0.7 |
+| resampling drops | 0.12 | 0.11 | |
+| net change of the continental volume | −0.80 | +0.09 | 0 |
+
+(Clift et al. 2009's sediment subduction and erosion as Stern & Scholl 2010's Table 1 quotes them.)
+The losses together are 3.03 against Earth's 3.2, the additions 1.22 against 3.2. Sediment subduction
+is now above both Earth figures: the share is Earth's, and the pile it acts on is thicker than Earth's.
+The suturing loss halves to Earth's, with the thinner crust at the fronts. The continental volume holds
+(+0.09) through relabel flows, not made crust: crust made continental 1.92, the ocean floor kept under
+it as basement and not counted 1.98, and the transition taking 0.81 onto the continents.
+
+So the arcs are now the binding gap: 1.14 km³ a year against 2.5 to 3.8, worse than base15's 1.54. They
+fell with their fronts, the island-arc front from 44,237 to 37,541 km and the continental-arc front
+from 25,736 to 21,301, and the island arcs per km from 27.1 to 22.8 km³ per km and Myr (Clift et al.
+2009: 125 for oceanic arcs; continental arcs 13.1 against 81). Reported, not fixed.
+
+### The sea's sediment
+
+m5cont.py's count of the sediment and sedimentary rock under the sea, both kinds of crust (GlobSed's
+grid covers the margins too): 2,099 m planet-mean, 1.07 × 10⁹ km³, in the arm against 2,136 m,
+1.09 × 10⁹ km³, on the switch-off run, about 3.2 times GlobSed's 3.37 × 10⁸ km³ (Straume et al. 2019).
+On continental crust: 1,530 m against 404. The stock was relabelled, not reduced. (b) cannot reach it,
+since it acts on oceanic floor only, and the margins (a) turned continental now hold it.
+
+### What it is not
+
+- Not on by default. Both switches stay off: the arm's measures move through the ratchet, a numerical
+  route, so they read the blend, not the stages.
+- Not a reading of (b) alone. No arm ran it alone, and the land PLT-440's note said it drowned (on
+  frozen plates) is not read again by this arm.
+- Not a tuned width. (a) stays at Brune's taper, ring 1 on the quick planet.
+- The next step proposed to the coordinator: close the blend, so that a resampling blends a continental
+  sample's pools within its class (hyper-extended or not) and a converted margin stays one, tested on a
+  resampling first; then one (a)+(b) arm against base15.
+
+### The blend closed (PLT-663) and the orthogonal rate (2026-10-25)
+
+The coordinator approved both: close the blend, with or without the switches, and read PLT-660 on the
+orthogonal convergence; then one cumulative arm (the blend fix, the orthogonal rate, (a) and (b))
+and a switch-off arm, with no arm of (b) alone, both on master c5203e38 (Law 1, PLT-655) and read
+against base16's seeds 1 to 4.
+
+**The class blend** (PLT-663, `ridges::interpolate`). A resampling blends a continental sample's rock
+pools and its basement over the corners of its own class only: hyper-extended (under 10 km of its own
+crystalline crust, PLT-661's line from Brune et al. 2014) or not, the class of its major corner, as
+the kind already is (PLT-293). A column's own crystalline crust is its crystalline pools less its
+basement, both blended with the same weights, so a blend over one class is a convex mean of columns
+on one side of the 10 km line and stays there. The sediment pool still blends over all three corners,
+the heat flow over the kind. There is no switch: with the switches off it keeps an old arc's thin
+continental crust apart from the thick crust beside it too.
+
+The unit test `a_resampling_keeps_a_converted_margin_apart_from_its_core` (written first, failing on
+the old blend) puts a continent (z > 0) and its own ocean floor out to z = −0.3 under 2,500 m of its
+sediment on one plate. The first transition step turns 271 columns of the zone and a second turns
+none. Then:
+
+| | old blend | class blend |
+|---|---|---|
+| hyper-extended columns after one resampling (6 lattices; 271 before) | 213 to 224 | 265 to 280 |
+| columns mixing the classes (a basement under 10 km or more of own crust) | 177 to 194 | 0 |
+| the core after six resamplings in a row, each followed by a step (9,998 before) | 10,117 (+1.2 %) | 10,002 (+0.04 %) |
+| mixed columns after the six | 975 | 0 |
+| columns turned at the step after each of the six | 69, 32, 43, 25, 10, 20 | 40, 29, 27, 31, 14, 29 |
+
+| hyper-extended columns at the step after each of the six | | 314, 343, 364, 393, 411, 441 |
+| the zone's lowest z after each of the six (−0.031 before) | | −0.043, −0.054, −0.062, −0.071, −0.074, −0.074 |
+
+The class blend closes the mixing and keeps the core, but not the zone: it still grows, by the
+columns the step after each resampling turns, and reaches about a ring past where the rule puts it
+(the rule's zone is the ring beside the core, as on the quick planet). This is a residual ratchet, and the first reading of the last row (the zone's edge
+refilled, the zone in place) was wrong. A new sample takes the class of its major corner, so the
+lattice's noise both drops oceanic samples into the ring beside the core, which the next step turns,
+and carries hyper-extended ones past that ring, which nothing turns back: the conversion is one-way.
+The resamplings themselves keep the count (271 to 274, 314, 343 to 337, 364 to 362, 393 to 397, 411
+to 412); every step adds. The test prints the count and the reach and does not assert on them.
+
+**The orthogonal rate** (PLT-660). Clift & Vannucchi's 76 mm/yr is an orthogonal rate, so the
+resampling's share now reads the convergence normal to the boundary (PLT-312's `across`):
+`subduction::orthogonal_convergence_mm_yr`, the stamped speed times the cosine of the stamped
+obliquity. For that the front now measures the obliquity from the boundary's normal whatever
+`DEEPTIME_ARC_NORMAL` sets; until now, with the switch off, it was measured from the lattice edge to
+the converging neighbour, which zigzags about the normal. A field of its own was tried first and
+dropped: 4 B more on every plate sample took full 16k's memory estimate to 5,370,649,280 B, 1.85 MiB
+past its 5 GiB cap (`the_estimate_covers_the_measured_hold_closely`). The unit test
+`a_front_stamps_its_orthogonal_convergence`: an ocean coming in at 50 mm/yr on a straight 40-degree
+front gives a median normal over whole rate of 0.998 head-on and 0.557 turned 60 degrees towards the
+front (cos 60° = 0.5; 0.48 at the front's ends).
+
+The arcs, the uplift and the losses do not read the obliquity, so the plates' state is unchanged by
+it; what changes is the obliquity the samples carry out of the plate stage: the L1 field
+`plates/obliquity_deg`, which the structure stage's strike-slip shear (DEF-029, above 30°) and the
+porphyry deposits' obliquity curve (ORE-033, peak near 15°) read. Both now get the angle CRE-018 and
+the deposit field's description (`deeptime:obliquity_deg`, "convergence obliquity to the trench
+normal") already said they got.
+
+#### The arms m5-blend and m5-blendoff against base16 (2026-10-25)
+
+Two arms on the branch merged with master c5203e38: m5-blend (key 7f14a0031e94, argkey 5818ecce:
+`tectonics.sediment_subduction_sourced` and `tectonics.margin_sediment_continental` on) and
+m5-blendoff (the same key, argkey cd665cef: both off), each both starts by seeds 1 to 4,
+earthlike_quick_16k, 1,000 Myr, with the crust-budget maps. Both are read against base16's seeds 1
+to 4 (fdb71fad7135, cd665cef): medians of 8, Mann-Whitney p against base16 in brackets.
+
+| | target | base16 | m5-blendoff | m5-blend |
+|---|---|---|---|---|
+| land | 0.13 to 0.36 | 0.226 | 0.244 (0.80) | 0.105 (< 0.001) |
+| largest landmass | ≥ 0.06 | 0.095 | 0.065 (0.57) | 0.027 (0.015) |
+| continental crust under the sea (M3) | ≤ 0.56 | 0.448 | 0.405 (0.65) | 0.836 (< 0.001) |
+| land above 2 km | ≤ 0.07 | 0.031 | 0.030 (0.80) | 0.004 (< 0.001) |
+| coast with high ground | ≤ 0.11 | 0.099 | 0.134 (0.065) | 0.034 (0.002) |
+| land under ice | ≤ 0.32 | 0.079 | 0.053 (0.96) | 0.013 (0.001) |
+| collisions per 100 Myr | ≤ 6 | 4.25 | 5.00 (0.082) | 5.55 (0.009) |
+| continental crust's net change | | −0.043 | −0.062 (0.083) | +0.214 (< 0.001) |
+| criteria met: median, mean | of 7 | 6, 6.12 | 6, 5.50 (0.11) | 4, 4.00 (< 0.001) |
+| sea over the datum after 100 Myr / end, m | | 428 / 564 | 425 / 537 | 142 / 190 |
+| guard's worst, m | | 10,014 | 9,992 (0.87) | 9,640 (0.040) |
+| highest plate elevation, m | | 5,064 | 5,354 (0.51) | 2,857 (< 0.001) |
+| M4 p50 (m4table) | | 0.0312 | 0.0305 | 0.0036 |
+
+**The switch-off planet.** Its world state and its dynamics record differ from base16's in every run
+(106 or 107 of the 109 state files): the class blend acts with the switches off, on the thin
+continental crust of matured arcs, and the plates take another path from there. No census measure
+moves at p < 0.05; the coast with high ground goes past its 0.11 (p 0.065). Its loss budget is
+base16's within the runs' spread (island arcs 1.29 against 1.31 km³ a year, sediment subduction 1.10
+against 1.12, collisions 1.80 against 1.66, net −1.25 against −0.99), and so is the share of the
+continental change in the steps after a resampling (m5resample: −0.040 against −0.038 of the planet
+per 100 steps at the first step). It is the arm the stages are measured from: it has the pools maps
+base16 lacks.
+
+**The cumulative arm** comes out as m5-margins did on the old blend (land 0.114, M3 0.816): closing
+the blend did not change what the stages do to the planet. By part:
+
+- *The relabel.* Continental share 0.361 (switch-off) to 0.637 with the converted margins, 0.508
+  without them (m5margins, plate samples, t0000; Cogley 1984 0.41). M3 0.350 to 0.816 with, 0.765
+  without (Cogley 0.306). The converted margins are 0.126 of the planet, all wet, 2,983 m deep, crust
+  17.5 km, sediment 7.8 km. Continental crust under 10 km of its own crust with 1 km or more of
+  island-arc magma is 0.079 against 0.005 off: the maturity rule (15 km, PLT-331) is the same on both
+  arms, so most of it is likely arc-flank ocean floor (b) turned for its arc-derived sediment. Less
+  both, the share is about 0.43 (by difference of medians).
+- *The cores thin.* Share of the planet by own crystalline crust (m5cont):
+
+| map | arm | 0-10 km | 10-15 | 15-20 | 20-25 | 25-30 | ≥ 30 (the core) |
+|---|---|---|---|---|---|---|---|
+| t-1000 | both | 0 | 0 | 0 | 0 | 0 | 0.423 |
+| t-500 | off | 0.006 | 0.005 | 0.007 | 0.017 | 0.057 | 0.318 |
+| t-500 | m5-blend | 0.124 | 0.011 | 0.021 | 0.042 | 0.104 | 0.261 |
+| t0 | off | 0.005 | 0.004 | 0.006 | 0.021 | 0.073 | 0.254 |
+| t0 | m5-blend | 0.202 | 0.013 | 0.037 | 0.087 | 0.147 | 0.152 |
+
+  The arm's 0-10 km band at t0 lies 3,051 m deep under 7.3 km of sediment on a 7.6 km basement. The
+  sea's sediment and sedimentary rock is 2,432 m planet-mean (1.24e9 km³), 1,881 m of it on
+  continental crust; off, 1,996 m (1.02e9 km³), 290 m of it on continental crust. Both are about three
+  to four times GlobSed's 3.37e8 km³: the stages move the excess into the continental count, they do
+  not make it.
+- *The thick oceanic crust goes* (m5thickoc, share of the ocean, base16 against m5-blend): 0-8 km
+  0.494 to 0.550, 8-10 0.120 to 0.204, 10-15 0.149 to 0.188, 15-25 0.159 to 0.041, 25 and more 0.082
+  to 0.001. Its hold on the sea (m5sea, the sea with the oceanic crust of 10 km and more at the bare
+  floor's height) falls from 844 m (base16) to 89 m, so the sea falls to 190 m.
+- *The growth comes after the resamplings* (m5resample, the continental change at the first step
+  after one, share of the planet per 100 steps): base16 −0.038, off −0.040, m5-blend +0.347
+  (m5-margins on the old blend +0.296); the resampling's own step +0.002. Of the arm's +0.216 net over
+  the run, +0.254 comes in the first 3 steps after a resampling. That is the residual ratchet's
+  pattern in the unit test above: the resampling keeps the count and the step after it adds.
+- *The zone's reach* (`tools/review/m5diag/m5hxreach.py`, hyper-extended continental crust by its
+  distance from 10 km of its continent's own crust, km past the boundary half a spacing out, the
+  quick planet's spacing 68 km): at t0 0.202 of the planet, 0.079 of it arcs; of the rest 0.090
+  within 100 km (the rule's W/2), 0.028 at 100 to 200 km, 0.007 at 200 to 500 km. Beyond W/2 0.002 at
+  t-900, 0.016 at t-500, 0.036 at t0, 3,331 m deep. The maps cannot split this between the ratchet
+  and a core edge thinned under 10 km. Off, 0.005, nearly all arcs.
+
+**The crust cycle** (loss-budget.py, km³ a year; base16, m5-blend; Stern & Scholl 2010 Table 1 and
+Clift et al. 2009):
+
+| | base16 | m5-blend | Stern & Scholl | Clift et al. |
+|---|---|---|---|---|
+| island arcs | 1.31 | 0.91 | 1.5 | |
+| continental arcs | 0.37 | 0.29 | 1.0 | |
+| arcs together | 1.68 | 1.20 | 2.5 | 3.8 needed |
+| rifts, hotspots, rifted margins | 0.04 | 0.05 | 0.5 | |
+| sediment subduction | 1.12 | 2.01 | 1.1 | 1.65 |
+| subduction erosion | 0.34 | 0.28 | 1.4 | 1.33 |
+| collisions | 1.66 | 0.78 | 0.7 | |
+| ocean-floor felsic rock accreted at resamplings (a flow) | 6.36 | 0.77 | | |
+| off the continents by the surface stage (a flow) | 4.05 | 1.66 | | |
+| net change of the continental volume | −0.99 | −0.26 | 0 | |
+
+The island-arc front shrinks from 42,258 to 33,094 km (Earth 14,500), the continental share having
+grown, and collisions lose 67 km³/km/Myr against 187 (Earth about 115) over a front of 11,554 km
+against 8,860. Sediment subduction doubles to 2.01, past Clift's 1.65: PLT-660 sends 0.83 to all of
+a pile down where PLT-440 sent 0.12, and the piles are the three-to-four-fold sediment stock above.
+
+**The physical reading.** The stages close what they were built for: the oceanic crust of 15 km and
+more (0.24 of the ocean to 0.04) and its hold on the sea. They also cut base16's return path. In
+base16 the surface stage carries 4.05 km³ a year off the continents and trench accretion at the
+resamplings (PLT-440's 0.88 kept) brings 6.36 back to the continents' edges. With (a) the slab takes
+0.83 or all of a pile and with (b) the margins' sediment is continental crust where it lies, so the
+return is 0.77. Eroded crust stays on the converted margins, under 10 km of its own crust at 3 km
+depth, or goes down the slab. The cores thin (the 30 km band 0.423 to 0.152, against 0.254 off), and
+their land drowns although the sea falls 374 m: land over continental crust 0.165 against 0.68 off.
+The arm moves the measures out through a real loss of thick crust, not a bookkeeping one, with the
+residual ratchet adding to the converted area at each resampling. No knob was added.
+
+#### What sets the arc rate (research, 2026-10-25; nothing built)
+
+**In the code** (`subduction.rs`, the fronts' plan loop). A sample in an oceanic slab's distance
+field gets magma R / (√π × 60 km) × w_arc(d) × g a Myr: R 100 km³/km/Myr over ocean crust (PLT-045),
+35 over continental crust (PLT-285), a Gaussian band 60 km wide at 200 km from the trench, g =
+min(conv / 100 mm/yr, 1) (PLT-037) with conv the whole relative speed (the normal component only
+with `DEEPTIME_ARC_NORMAL`, PLT-312). Nothing past the slab's ends (PLT-561), over an incipient slab
+(PLT-610) or at a collision front; less the felsic cones (PLT-286). The global addition is the sum of
+front length × R × g. Nothing reads the arc's age, the slab's age or dip, the sediment coming in, the
+water flux, the overriding lid's thickness or back-arc extension. On base16 the island arcs add 30.9
+km³/km/Myr at a mean g of 0.467 (0.383 on the normal component), the continental arcs 13.8 at 0.299.
+Stern & Scholl's 100 and 35 are averages over Earth's arcs at Earth's convergences, so multiplying
+them by g counts the convergence a second time unless Earth's mean convergence were 100 mm/yr.
+
+**In the sources** (read by a research sub-agent, 2026-10-25; bibliography: SternScholl2010,
+Clift2009, JichaJagoutz2015, Parcutela2023, Bai2019):
+
+- *Arc age*, the main argument of Stern & Scholl 2010 (pp. 8, 11-12, 25): growth is front-loaded,
+  "perhaps several hundred to as much as 500-600 km3/km-million years" for a few Myr after
+  initiation, then "a few tens or less" for mature arcs; the conclusions give 300-500 then 30-35.
+  Their long-term intra-oceanic 100 is 500 for 10 Myr then 30 for 60 Myr. Clift et al. 2009 (p. 97)
+  name "pulses of enhanced mafic accretion ... associated with subduction initiation and
+  arc-extension events", with the Mariana arc's back-arc splits as their case, and no numbers.
+- *Convergence.* Stern & Scholl (p. 7) cite a model (Cagnioncle 2007) in which melting "increases
+  with increasing convergence rate", with slab dip, mantle temperature and fluid flux as other
+  controls, and test none. Clift et al. take it as a premise (p. 84, "based on the premise that
+  production rates are linked to the supply of aqueous fluids ... and thus to the rates of
+  convergence"): their Table 1's productivity is about 1.3 to 1.4 times the convergence row by row,
+  so it encodes the premise rather than testing it. On a melting-column premise the oceanic arcs'
+  share is 37 % against 40 %.
+- *The overriding lid.* Clift et al. (p. 98): a thin lid "allows significant upwelling under the arc
+  and thus more melting compared to a mature continental arc". Stern & Scholl put the oceanic
+  against continental difference down to lifespan (p. 13), not the crust.
+- *Slab age, dip and sediment.* Not in Stern & Scholl or Clift et al. as controls on the rate.
+  Parcutela et al. 2023 attribute the Western Pacific arcs' higher rates (28-60 against 12-25) to
+  "the variation in the ages of the subducting plates". Bai et al. 2019 (a discussion preprint) find
+  the Aleutian rate (37 to 89, mean 61) follows the slab's dip, "The correlation coefficient between
+  the rates and dips is 0.83", where the convergence and the plate's age run the other way along the
+  arc.
+- *Size.* Clift et al.'s 3.8 km³ a year (94 km³/km/Myr over 40,225 km) is a mass balance against
+  their losses, "on the high side of what is tenable", 2.0 at the low end; their seismic arcs give
+  Aleutians 55-82 and Izu 66, 106 with Izu's lost forearc. Jicha & Jagoutz 2015 (abstract only)
+  find intra-oceanic arcs' rates "consistent with those calculated for mid-ocean ridge segments that
+  have slow to moderate spreading rates"; Bai et al. cite them for the Aleutians' 89.
+
+So the sources agree on arc age (a front-loaded or pulsed rate) and on a per-km rate times the
+arcs' length, put convergence in by a model or a premise, and leave slab age, dip and back-arc
+extension to single studies. The code has the length and a convergence factor on top of averages
+that already hold Earth's convergences, and no arc age.
+
+#### The arc rate counts the convergence once (PLT-665, PLT-666; 2026-10-25)
+
+The coordinator's call after the research above, a correctness fix: rate = R × v_n / v_ref, with v_n
+the orthogonal convergence at the arc's front and v_ref the mean orthogonal convergence of the arcs
+the averages were taken over, ledgered as verified or from-memory, and no min(., 1) cap unless a
+source gives one.
+
+**The law** (PLT-665, `subduction.rs`, the fronts' plan loop). An arc sample's magma a Myr is its
+type's rate per km (island 100, continental 35 km³/km/Myr) over the band's integral, times w_arc(d),
+times v_n / v_ref,type. v_n is `Source::normal`, the component of the relative velocity along the
+front's normal, the same one `DEEPTIME_ARC_NORMAL` stamps (PLT-312); the switch now sets only the
+uplift's convergence and the stamped one, and the arcs read v_n either way. There is no cap: none of
+the sources read gives one, and an arc at twice its type's mean convergence makes twice the rate.
+Cortial's uplift keeps g = min(v / 100, 1) (PLT-037), which is its own law. Clift & Vannucchi 2004
+distribute the global arc budget the same way, their Table 2 note e: "Magmatic productivity is
+calculated by prorating the total global magmatic budget in proportion to the orthogonal convergence
+rate at each arc"; their [14] takes the "trench-perpendicular convergence rate" from DeMets et al.
+(1990). So the premise is theirs (Clift et al. 2009 p. 84 repeat it, "linked to the supply of aqueous
+fluids ... and thus to the rates of convergence"), and the linear form is their bookkeeping, not a
+law they derive.
+
+**The references** (PLT-666, `params.rs`). v_ref is the length-weighted mean of Clift & Vannucchi
+2004's orthogonal convergence over their 32 margins (Tables 1 and 2, every row read), split by Stern &
+Scholl 2010's list of intra-oceanic arcs (p. 11: "Aleutian, South Sandwich, Kermadec, Tonga, Vanuatu,
+Solomon, New Britain, Izu-Bonin-Mariana, Banda, Lesser Antilles"; C&V have 8 of them). The means are
+the agent's arithmetic (`build/m4b/vref.py`):
+
+| set | margins | length, km | mean convergence, mm/yr | mean orthogonal, mm/yr |
+|---|---|---|---|---|
+| island (Stern & Scholl's list) | 8 | 11,450 | 89.3 | **86.6** |
+| continental (the rest) | 24 | 28,775 | 65.2 | **58.6** |
+| all | 32 | 40,225 | 72.1 | 66.6 |
+
+Checked against: Clift et al. 2009's Table 1, whose convergence column is C&V's full rate (29 of 32
+rows; Costa Rica, Nicaragua and Guatemala carry the orthogonal one; their text gives Izu-Bonin 90
+where the table has 95), and Bird 2003's subduction boundaries, 53.2 mm/yr normal and 62.3 speed over
+51,310 km, not split by type. A split that matches Clift et al.'s 31 % oceanic share would give 92.9
+and 62.2 on the full column. The table, from C&V 2004 (km/Myr = mm/yr):
+
+| margin | length, km | convergence, mm/yr | orthogonal, mm/yr | type (Stern & Scholl's list) |
+|---|---|---|---|---|
+| South Chile | 2,000 | 20 | 20 | continental |
+| Lesser Antilles | 850 | 40 | 40 | island |
+| Oregon-Washington | 850 | 38 | 34 | continental |
+| British Columbia | 550 | 42 | 38 | continental |
+| Aleutians | 1,500 | 75 | 61 | island |
+| Alaska | 2,050 | 64 | 60 | continental |
+| Taiwan-north Luzon | 700 | 30 | 30 | continental |
+| SW Japan-Nankai | 900 | 40 | 39 | continental |
+| Sumatra | 1,800 | 60 | 52 | continental |
+| Java | 2,100 | 77 | 76 | continental |
+| Burma-Andaman | 1,800 | 65 | 27 | continental |
+| Makran | 1,000 | 38 | 38 | continental |
+| Aegean | 1,200 | 20 | 20 | continental |
+| North Chile | 2,000 | 90 | 89 | continental |
+| Peru | 2,200 | 82 | 77 | continental |
+| Ecuador-Colombia | 1,100 | 70 | 63 | continental |
+| Costa Rica | 450 | 88 | 80 | continental |
+| Nicaragua | 275 | 85 | 78 | continental |
+| Guatemala | 500 | 83 | 74 | continental |
+| Mexico | 1,700 | 70 | 68 | continental |
+| Kurile | 1,100 | 85 | 85 | continental |
+| Kamchatka | 1,100 | 80 | 80 | continental |
+| NE Japan | 1,000 | 100 | 100 | continental |
+| Mariana | 1,600 | 90 | 90 | island |
+| Izu-Bonin | 1,300 | 95 | 89 | island |
+| Ryukyu | 1,000 | 70 | 69 | continental |
+| South Luzon | 400 | 90 | 90 | continental |
+| Philippine | 1,000 | 95 | 40 | continental |
+| Tonga | 1,500 | 110 | 110 | island |
+| Kermadec | 1,250 | 70 | 68 | island |
+| Solomons | 2,750 | 110 | 110 | island |
+| South Sandwich | 700 | 77 | 77 | island |
+
+**What it changes.** On base16 the island arcs ran at a mean g of 0.467 (0.383 on the normal
+component) and the continental at 0.299, so they added 30.9 and 13.8 km³/km/Myr. Read on the normal
+component against the new references, an island arc's factor is about 0.383 × 100 / 86.6 = 0.44 and
+a continental arc's about 0.43 against 0.299, roughly 40 % more continental arc crust and the island
+arcs where they were, before the planet answers. The arm measures it (below). Two globals
+(`plates/arc_front_normal_continental` and `plates/arc_front_normal_oceanic`, front length × dt × v_n)
+give the mean v_n at the arcs, which base16 lacks.
+
+**Unit test** (`an_arcs_rate_is_its_types_rate_at_earths_convergence_scaled_by_its_own`). The
+two-plate continental arc of `converging_plates` at 50 and at 200 mm/yr, past both references and
+the old cap's 100: four times the convergence gives four times the magma (within 1e-6), and at each
+speed the step's magma is the type's rate over its reference times the band at the fronts' v_n
+within 10 %.
+
+#### The obliquity's convention (DEF-029, ORE-033; 2026-10-25)
+
+The coordinator asked whether DEF-029's and ORE-033's sources define obliquity from the boundary
+normal. The code's obliquity is acos(v · (−n) / |v|), the angle between the convergence and the
+front's normal, 0 to 180° and unsigned. ORE-033's source, Butterworth et al. 2016, measures it from
+the trench normal, 0° when the subducting plate moves square to the trench (search summaries of its
+section 3; the paper itself is paywalled and not read) and the EarthByte PlateTectonicTools code from
+the authors' group says so verbatim (`ptt/subduction_convergence.py`: "angle between trench normal
+vector and convergence velocity vector"). DEF-029 has no source: its numbers are the design's, which
+assume the same convention. So nothing is converted; both rows carry the note, and the field being
+unsigned means an angle past 90° (a front opening) sits at the ramp's cap.
+
+#### Which old sample a new one follows (PLT-664, PLT-667, 2026-10-25)
+
+A resampling builds a new lattice and fills each new sample from the old one: the blends from the
+three corners of the old triangle that covers the point, with their barycentric weights, and the
+categorical labels (the kind, PLT-663's class and the rest) from one corner. Until
+2026-10-25 that corner was the one with the largest weight. In a triangle that is not equilateral
+that corner's region is not its Voronoi cell, so a label did not follow the material at the point.
+Since PLT-664 the labels come from the old sample nearest the new point in the group's frame (the
+coordinator's call: "a categorical label follows the material, not the corner vote").
+
+##### The residual ratchet
+
+The ratchet test of plates/tests.rs (`ratchet`: a 20k planet, a continent's own ocean floor ring of
+271 columns under 2,500 m of its sediment, the margins switch on, each resampling followed by a
+transition step) kept growing the zone with either corner. With the nearest old sample the
+hyper-extended count goes 271, 316, 349, 372, 398, 421, 442 over six resamplings (major corner 314,
+343, 364, 393, 411, 441), and over 24 it reaches 470 at a lowest z of −0.142. With no step after
+each resampling the count stays 257 to 302 while the lowest z still wanders to −0.110. A label
+copied from one old sample keeps a class's area on average (the union of a stationary lattice's
+cells over a shape has the shape's area as its mean) but moves its edge by a fraction of a spacing
+each time, without bias, so the edge walks. PLT-661's conversion was one-way and kept every move
+that put an ocean-side column in the zone. PLT-667 makes it two-way: a sediment margin outside the
+zone turns back to ocean floor with all its rock, 16 to 50 columns a step against the 21 to 65
+PLT-661 turns. The zone still grows, because it follows the core's own edge, and that edge walks
+too: 27 of the core's columns stand past the start's edge after one resampling and 130 after 24,
+the farthest at z −0.012 and then −0.118, with the steps or without them.
+
+##### Four rules on the quick planet's lattice
+
+The coordinator asked for the rule with the smallest physical error, judged by the felsic mass kept
+first, then area and edge width, then flecks, and no knob either way. Four rules were built behind
+a temporary switch (removed after) and run on the quick planet's lattice (100,000 samples on the
+6,370 km model sphere, spacing h 71.4 km, one cell 5,099 km²) through 70 resamplings with no plate
+motion and no steps, one 1000 Myr run's worth (the base runs have 67 to 72). The shapes, on one
+plate with their ocean: a supercontinent of 0.3 of the planet, a continent 2,000 km across, five
+microcontinents 500 km across, and nine strips 1,000 km long, three each 1, 2 and 3 spacings wide.
+An island arc's band (a Gaussian of `arc_width_km` 60, about 100 km wide at half height) is about
+1.4 spacings. Each rule ran on 32 lattice sequences, so each number below is a mean ± standard
+deviation over 32 supercontinents and continents, 160 micros and 96 strips of each width.
+
+- **nearest** (PLT-664): a new sample takes the labels of the old sample nearest it.
+- **median** (a vote): core if the core corners' weight is over half the live weight, continental
+  if the continental corners' is. A barycentric threshold at one half is the Merriman, Bence and
+  Osher scheme, which moves an edge by its curvature. On the ratchet planet it gives the same
+  labels as a vote by class level, since no triangle there holds three classes.
+- **conserve**: the median's labels, with the rock pools blended over all corners whatever their
+  kind, so no rock is lost at a label's change.
+- **conserve_volume**: the kind from the corners' crust volume, the pools as conserve. Its
+  effective threshold is a continental weight of about 1/6. It ran on one sequence only.
+
+The change after 70 resamplings, in % of the start:
+
+| rule | super felsic | continent felsic | micro felsic | strip 3 / 2 / 1 felsic | continental-kind volume (continent, micro) | farthest crust past the edge (super, continent, micro) | flecks / holes (super) |
+|---|---|---|---|---|---|---|---|
+| nearest | −0.00 ± 0.27 | +0.05 ± 5.4 | −4.9 ± 37 | +0.5 ± 42 / +1.6 ± 52 / +9.0 ± 89 | −0.02, −5.1 | 465, 403, 286 km | 143 / 138 |
+| median | +0.03 ± 0.24 | −3.05 ± 5.0 | −50 ± 29 | −61 / −84 / −98 | −3.1, −50 | 242, 149, 38 km | 15.5 / 14.5 |
+| conserve | −0.06 ± 0.09 | −0.68 ± 1.4 | −3.7 ± 16 | −2.4 / −2.0 / −1.7 | −22, −82 | as median | as median |
+| conserve_volume (one sequence) | −0.05 | −1.4 | −14 | not run | area +5, +40, +84 | | 462 flecks |
+
+Flecks are continental samples more than 2h outside their shape and holes ocean samples more than 2h
+inside it; "felsic" is the felsic plutonic pool of every column within 1,500 km of the shape,
+whatever its kind.
+
+- **Felsic mass.** The nearest rule is unbiased within the noise: every mean is within 1.7
+  standard errors of zero (an 8-sequence run had put the narrowest strips at +50 %, which the 32
+  sequences show was noise). The median loses rock systematically. The micro lost 19.4 cells and
+  the continent 18.8 by the 70th resampling, a quarter of a cell per resampling for any closed body
+  whatever its size, as motion by curvature gives (Gauss-Bonnet: every simple closed edge has the
+  same total turning). So a run takes about 19 cells, 97,000 km², from every body: half a 500 km
+  micro, and the strips are eaten from both sides, 97 % of the one-spacing strips gone by the 70th
+  resampling and 76 % by the 24th. An island arc would not survive. Conserve keeps the felsic rock
+  but puts it on ocean-kind columns: the continental-kind crust volume falls 22 % on the continent
+  and 82 % on a micro, which PLT-293's own-kind rule forbids; on the ratchet planet the core grew
+  (2.3 % over a chain of 24 resamplings) and `a_resampling_keeps_a_converted_margin_apart_from_its_core`
+  failed.
+  Conserve_volume grows every continent.
+- **Area and edge width.** The nearest rule keeps the area on average. Its cost is the walk: one
+  standard deviation of the edge's position after 70 resamplings is about 46 km on a micro, 27 km on
+  the continent and 11 km on the supercontinent, all under a spacing; the edge's band widens, the
+  farthest crust standing 465 km past the supercontinent's edge against the median's 242.
+- **Flecks.** The median wins, with a tenth of the flecks and holes.
+
+Nearest kept the mass and its label, the first two criteria; the median and conserve each failed
+one. It stays, and no rule was added. A rule with no flecks that also keeps the mass would track the
+interface itself (a volume-of-fluid or front-tracking remap), a design question left open.
+`a_resampling_keeps_thin_crust_on_average` (plates/tests.rs) now asserts the unbiasedness: twelve
+strips one spacing wide and eight caps two spacings in radius on a 20k planet, one resampling on
+each of 24 lattices, the continental count's mean change within three standard errors of zero. The
+flatness test `a_converted_margins_zone_stays_flat_over_six_resamplings` fails under every rule,
+since it reads the core edge's roughness (with the vote the zone went 274 to 337 over 24 and its
+lowest z still to −0.121, and 84 core columns stood past the start's edge at −0.092). It stays
+ignored as the margins stage's acceptance test (the coordinator's call, 2026-10-25): the margins
+stage (PLT-661), and anything else with a one-way conversion measured from the core's edge, cannot
+go on until a remap passes it, and that remap is interface-tracking or volume-of-fluid, with the
+nearest rule's unbiased mass. The margins switch is off in the shipped presets, so the ratchet does
+not run on the pool; PLT-667 acts with it off as well, where a collapse's spread or a resampling's accretion
+leaves a sediment margin.
+
+#### The cumulative arm m5-cum (PLT-663 to PLT-667, 2026-10-25)
+
+Branch head f468a76f with the switches off: the class blend (PLT-663), the nearest-old-sample labels
+(PLT-664), the arc rate R × v_n / v_ref with no cap (PLT-665, PLT-666) and the margin class from the
+current state (PLT-667); no new source rule. `pool.sh run m5-cum` (key 411f799c9d94, argkey
+cd665cef), `earthlike_quick_16k`, 1000 Myr, both starts, seeds 1 to 4, against base16's same eight
+runs (master c5203e38) and m5-blendoff (7f14a0031e94, the blend alone, switches off); read with
+`build/m4b/m5cumread.sh` (v1census, guard, crust-budget globals, loss-budget.py, m5resample,
+m5hxreach, m5cont, sedstock).
+
+V1 census (medians of 8, Mann-Whitney p against base16's 8 in brackets): land 0.220 (0.80), largest
+landmass 0.069 (0.44), continental crust under the sea 0.464 (0.96), land above 2 km 0.026 (0.57),
+coast with high ground 0.110 (0.65), land under ice 0.086 (0.33), collisions per 100 Myr 5.55
+(0.016), the continental crust's net change −0.056 (0.021) against base16's −0.043 and m5-blendoff's
+−0.062; criteria met 6 of 7 at the median as base16 (mean 5.75 against 6.12, p 0.33). No V1
+criterion is lost at the median, so nothing was split. The guard is unchanged: worst 10,026 m from
+the sea against 10,014, no step past two Earth reliefs.
+
+The crust cycle (loss-budget.py, km³ a year, means of 8):
+
+| | base16 | m5-blendoff | m5-cum | Earth |
+|---|---|---|---|---|
+| island arcs | 1.31 | 1.29 | 1.26 | 1.5 (Stern & Scholl 2010) |
+| continental arcs | 0.37 | 0.36 | 0.56 | 1.0 |
+| arcs together | 1.68 | 1.65 | 1.82 | 2.5; 3.8 to keep the volume (Clift et al. 2009) |
+| rifts and hotspots | 0.04 | 0.04 | 0.03 | 0.5 |
+| sediment subduction | 1.12 | 1.10 | 1.21 | 1.1; 1.65 (Clift et al. 2009) |
+| subduction erosion | 0.34 | 0.34 | 0.34 | 1.4; 1.33 (Clift et al. 2009) |
+| suturing (all three) | 1.66 | 1.80 | 1.81 | 0.7 |
+| resampling drops | 0.12 | 0.11 | 0.13 | |
+| net change of the continental volume | −0.99 | −1.25 | −1.26 | 0 |
+| continental crust at the end, share of the planet | 0.380 | 0.368 | 0.365 | |
+
+The arcs' rate per km of front and the mean v_n at the arcs (crust-budget globals, medians of 8):
+
+| | base16 | m5-cum | Stern & Scholl | v_ref (PLT-666) |
+|---|---|---|---|---|
+| island arcs, km³/km/Myr | 30.9 | 29.4 | 100 | |
+| continental arcs, km³/km/Myr | 13.8 | 20.9 | 35 | |
+| mean v_n at island arcs, mm/yr | | 32.1 | | 86.6 |
+| mean v_n at continental arcs, mm/yr | | 49.4 | | 58.6 |
+| island front, km | 42,020 | 42,520 | 14,500 | |
+| continental front, km | 27,360 | 27,140 | 27,500 | |
+
+Counting the convergence once lifted the continental arcs by half (their v_n / v_ref, 0.84, is well
+above the old g's 0.30) and left the island arcs where they were (0.37 against the old g's 0.47 on
+the whole speed). At those v_n the law gives 37.0 and 29.5; the arcs make 0.79 and 0.71 of that.
+The gap was not split here; fronts that count length and make no arc (an incipient slab, PLT-610;
+past the slab's ends, PLT-561) and the felsic cones taken off (PLT-286) are the candidates. The island
+arcs' slow convergence, 0.37 of Earth's, is now the island rate's gap; their long front (2.9 times
+Earth's) carries the island total to 0.84 of Stern & Scholl's.
+
+PLT-667 with the switches off: the margins it turns back to ocean floor are 0.027 km³ a year (median,
+0.023 to 0.039), 2.7 × 10⁷ km³ over the run, of which more than half is sediment and sedimentary rock
+by the margin's definition. That is 2 % of the arm's net change of the continental volume and a
+thirty-fifth of its range (−1.86 to −0.91), so the budget's net change is the same with and without
+PLT-667 within the arm's noise; m5-cum's −1.26 sits on m5-blendoff's −1.25. On the sediment stock
+(sedstock.py, map t0000, Earth-normalised km³, medians; base16 has no pool maps, so against
+m5-blendoff): the sea's sediment 1.03 × 10⁹ against 1.02 × 10⁹ (seed range 0.89 to 1.13 × 10⁹), on
+oceanic crust 9.11 × 10⁸ against 8.69 × 10⁸, on continental crust 1.27 × 10⁸ against 1.48 × 10⁸.
+PLT-667 alone moves at most 2.7 × 10⁷, 1.5 to 3 % of the oceanic stock, inside the seed spread. The
+ocean's excess over GlobSed stands as it was: within 200 km of a continent 4.87 × 10⁸ against
+GlobSed's 7.6 × 10⁷, beyond it 4.0 × 10⁸ against 1.13 × 10⁸.
+
+The sediment reaching the trenches (`plates/sediment_reaching_trench_km3`, measure only, before
+PLT-440's share): 5.95 km³ a year (5.22 to 7.11), of it under continental crust 2.24 (38 %), under
+oceanic crust 3.21 (54 %) and the one-way slab's 0.53 (9 %). Sediment subduction takes 1.21, the
+whole slab path and 0.12 of the rest, so 4.7 km³ a year accretes back onto the overriding columns,
+2.0 onto continental and 2.8 onto oceanic crust. The field counts what goes under at each
+resampling, so a forearc pile that accretes and goes under again is counted each time: it is the
+resampling's trench flux, not Earth's trench input.
+
+The resampling's own loss (m5resample, share of the planet, net over the run and the first three
+steps after a resampling): base16 −0.0445 and −0.0282, m5-blendoff −0.0578 and −0.0328, m5-cum
+−0.0610 and −0.0286. The nearest labels bring the resampling's share back to base16's; the loss
+between resamplings grew from −0.0163 to −0.0324, and is not split here. m5hxreach: hyper-extended
+continental crust is 0.0029 of the planet, all of it matured island arcs, none at any distance past
+its continent's crust.
+
+##### Toward front-loaded arcs (a design, not built)
+
+Stern & Scholl's intra-oceanic 100 is "500 km3/million years for first 10 million years plus 30
+km3/million years for 60 million years thereafter" (PLT-045's quote, p. 11). Clift et al. 2009's
+pulses at initiation and at back-arc extension come with no numbers, so they are not buildable from
+the sources. How long the planet's contacts live sets what the burst would do. From the record's
+collisions and partings (`build/m4b/contactage.py`, start_myr − contact_onset_myr, count-weighted,
+the contacts that end in a collision record or a parting): base16's 4,314 ends live 55.8 Myr on
+average (median 30 to 46 by kind), 10 to 14 % under 10 Myr and 66 to 76 % under 70; m5-blendoff's
+4,094 live 52.7. Over those lives the 500-then-30 law gives 109 and 113 km³/km/Myr against 97 at
+Earth's 70 Myr. With no v_n factor on the burst, the planet's island front (42,500 km at about 55 Myr
+a life) would start about 770 km of arc a Myr, which at 5,000 km³ a km (0.92 of it, for the lives
+under 10 Myr) is about 3.6 km³ a year from the bursts, 3.9 with the mature rate, against today's 1.26
+and Stern & Scholl's 1.5, near Clift's 3.8 for all arcs. The continental front (27,140 km, Earth's
+length) under the same law would add about 2.5 km³ a year against Stern & Scholl's 1.0: Stern &
+Scholl put the continental arcs' lower average down to their longer lives (p. 13), and the planet's
+continental contacts live as briefly as its island ones. The burst's crust is 5,000 km³ a km; on the
+arc band (106 km) that is 47 km at the axis in 10 Myr.
+
 ## The sea floor's age and the initiation's polarity (2026-10-25)
 
 The floor-age diagnosis (build log 2026-10-25, "Front lane: why floor older than 180 Myr does not go
@@ -9784,3 +10544,165 @@ floor each resampling takes is 0.81 of the standing mean age against 0.75. The a
 snapshots from -500 Myr, against fl-agemap's 33, base15's seeds 1 and 2): older than 180 Myr 0.202
 of the ocean against 0.234, 0.791 of it in the margin zone against 0.809; the margin zone holds
 0.419 of all the floor against 0.440.
+
+### Law 2: a subduction zone propagates along a passive margin (PLT-656 to PLT-659)
+
+The age map's answer (above): the old floor is passive-margin floor that no trench reaches along the
+margin. Zhou, Li, Gerya & Stern 2020 model how one does: "With increasing slab pull, the subduction
+zone propagates laterally and leads to SI in neighboring passive continental margins", at "about 17
+cm/year", because "slab pull is partially applied to bend the adjacent region". Hall 2019 reads Banda
+the same way: the Java trench propagated "into an oceanic embayment by tearing along a former
+ocean-continent boundary. The earlier subducted slab provided the driving force". Govers & Wortel
+2005 give the tear at a slab's end, the STEP fault. The model had no such law; PLT-064's 1,000 km
+clearance stood in for the missing propagation by keeping new zones away from working ones, which
+Crameri et al. 2020 contradict (new zones start within 500 km of working ones).
+
+With `tectonics.margin_propagation` (off by default since 2026-10-26, parked: see "Parked" below;
+`propagation.rs`, run after the step's initiations):
+
+- **Where.** A plate U's trench (its visible floor with a hidden neighbour of its own group, so U is
+  the plate going under) within 1.5 spacings (PLT-534) of U's own coast floor (its visible floor
+  beside its own continental crust), on floor at least 10 Myr old (FRC-005), with U's slab under the
+  overriding plate O active and past the critical convergence (100 km, PLT-611).
+- **The force test.** The slab's pull across the margin, FRC-002 (3 × 10^13 N/m) × `slab_pull` ×
+  FRC-004's weight at the trench floor's age × min(L, 700 km) / 700 km × max(cos θ, 0), where θ is
+  the angle between the pull (across the strike of U's trench within 4 spacings of the trench
+  sample, towards O) and the margin's inward normal at the end of the stretch to break (towards U's
+  continent), against the margin's strength there (PLT-658, below). A pull along the coast does not
+  break it. The pull is read across the trench, not towards O's visible samples: near the trench's
+  end those lie mostly past it, where no hidden slab covers O's edge, and leaned a pull along the
+  coast to cos 0.74 in a test (0.12 across the trench). The normal is taken across the margin's strike, the principal
+  direction of the coast floor within 2 spacings, where that floor reads as a line (PLT-659); a
+  point of the margin sees only one or two samples of its continent within 1.5 spacings, and the
+  direction to them alone tilted the test's tear 22° off the normal.
+- **The start (geometry A, the coordinator's choice).** The stretch's end P is U's coast floor within
+  1.6 spacings of the trench sample, the farthest from U's trench. A tear runs from P along the
+  great circle of the normal, away from the continent, to the first sample of another plate. The continent C and the
+  floor beyond the tear become a new plate K' with U's motion (plate_birth, `origin`
+  `margin_propagation`); U keeps the trench, the slab that pulls and the floor between the trench and
+  the tear. The cut must leave K' in one piece, U with at most one piece more, at least
+  max(32, `min_plate_area_frac` × n) samples on each side, and its broken stretch short (PLT-659);
+  otherwise it is a stall.
+- **The advance.** U now converges on K' along the broken stretch. The convergence across the margin
+  at the tip (K''s coast floor within 1.5 spacings of U's crust, visible or hidden) is summed; at
+  each critical convergence (100 km), the pull of U's slab beside the tip (its length, the age of
+  U's crust there, the cosine between its pull and the margin's normal at the tip) is tested
+  against the strength at the tip. That slab is the one under the plate covering U's crust nearest
+  the tip: K' (the slab U forms under K', pulling across the broken stretch) while that crust is
+  visible, the nearest other plate once it is hidden (pulling across U's trench, as at the start), and if it wins the next stretch of
+  K''s margin floor goes to U: its end is K''s coast floor within 1.6 spacings of the tip, the
+  farthest from U, and K''s floor from the tip to a tear from that end, away from C, changes plate.
+  C stays on K'. The tip moves to the stretch's end and rides K''s rotation between steps. A propagation ends when U or K' dies (absorbed, sutured) or no
+  tip is found; a passed test the lattice cannot cut is a stall and ends it.
+- **PLT-064 replaced.** With law 2 on, an initiation may start anywhere beyond one lattice spacing of
+  a trench, in place of 1,000 km (Crameri et al. 2020 source both together); with it off, the
+  default, the 1,000 km holds. The records count
+  `initiations_near_fronts`, the initiations the old clearance would have refused.
+
+Records: `propagation_starts`, `propagations` (starts and advances) and `propagation_stalls` (the
+counters and the stats line), and the world globals `plates/propagation_km` (margin broken, planet
+km) and `plates/propagation_myr` (Myr summed over live propagations; the ratio is the mean speed).
+
+**The margin's strength is a fallback (PLT-658).** The coordinator's order (2026-10-25) was to use a
+verified integrated N/m strength of a passive margin if the sources give one. They do not: Cloetingh,
+Wortel & Vlaar 1989's Fig. 5 is a tensional failure force (about 0.6, 1.4 and 2.0 × 10^13 N/m at 30,
+70 and 100 Ma, read off the plot), with compression "even higher"; Mueller & Phillips 1991's
+3 × 10^13 N/m was seen only as Niu et al. 2003's citation; Nikolaeva et al. 2010 give no figure in
+their abstract; Candioti et al. 2022's 14 to 15 TN/m was a fetch summary. All of them are the
+failure of a whole lithosphere under far-field stress, not a margin pulled down beside a working
+trench, for which Zhou et al. give no force. So the strength is PLT-517's Gurnis value, 3 × 10^12
+N/m, scaled with the floor's elastic thickness by law 3: 1.4 × 10^12 at 10 Myr, 5.9 at 80, 10.4 at
+180 Myr. **Under it, Zhou et al.'s age dependence (old slabs propagate, 30 Myr slabs break off) does
+not appear**: the strength grows with age as the slab's weight does, so the slab length a start needs
+grows with age (114 km at 30 Myr, 138 at 80, 162 at 180, for a pull straight across the margin), and
+the oldest margins are the hardest to break. No strength is to be picked to bring the dependence
+back.
+
+**Limits.**
+
+- Zhou et al.'s margins propagate only with a preexisting weak zone ("SP is never predicted ... for
+  passive continental margins lacking a lithospheric weak zone"). The model has no weak zones: every
+  margin is taken as weak enough, and the strength stands in for the difference.
+- A step breaks about one lattice spacing of margin (about 180 km on the quick lattice), so the
+  propagation's speed is about one spacing per 100 km of convergence: set by the lattice and the
+  critical convergence, not resolved below them, and different on another lattice.
+- Stern & Gerya 2018 find no Cenozoic subduction zone formed at a passive margin, and Puysegur has
+  not propagated in 11 Myr: Earth's rate of the process is low or unknown, and the law is checked
+  against its sources' mechanism, not a rate.
+
+Tests (`propagation.rs`, on the 16,000-sample lattice): `a_trench_that_reaches_its_margin_cuts_it_off`
+(a trench along the equator meeting a continent end on: K' takes all of C and the floor east of a
+tear that runs straight south to U's boundary, U keeps the trench and the slab, one plate_birth with
+the origin, no orphan samples), `a_pull_along_the_margin_or_a_short_slab_starts_nothing` (a trench
+meeting the margin at a right angle, the switch off, slabs of 60 and 120 km: no start; 160 km: a
+start, at 80 Myr where the threshold is 138 km), `the_convergence_moves_the_tip_along_the_margin` (U
+converging on K' at 40 mm/yr: no advance after one step's 76 km, one after the second, K' gives U
+a strip of floor about two spacings wide from the margin to its southern boundary (42 samples), C
+stays on K', the tip moves 2.9° east along the margin, nothing when diverging) and
+`an_absorbed_sliver_ends_its_propagation_cleanly` (K' buried below the minimum plate area: the
+propagation ends, no sample on a dead plate or cut off its plate), and `a_tip_beside_u_s_slab_carries_on`
+(U's floor within 2.5 spacings of the tip hidden: the propagation carries on beside U's crust and
+advances under U's slab, the tip about 1.8 spacings east). `plates::tests::why_law_2_propagations_end`
+(ignored) runs one planet of the pool's preset at 100k samples and prints why starts stall and
+propagations wait or end, with `LAW2_DIAG_TRACE` a sketch of the lattice at each start and visit.
+
+**Arm fl-law2 (2026-10-26, 3ccf9e13, against fl-law1, base16's seeds 1 to 4): no advance.** 116
+starts per run and not one advance in 8 runs; 1,055 stalls a run. Two V1 breaches, findings and not
+targets: the largest landmass 0.059 (fl-law1 0.095, base16 0.079) and the collisions 6.50 per 100
+Myr (4.25; 4.90), with sutures 65 a run against 42.5; criteria met 5, mean 5.38 (6, 6.12). The
+other five measures within their targets; sea over the datum 461 / 571 m (428 / 564); guard worst
+10,090 m. Initiations 189 a run (118.5), 91 of them within PLT-064's old 1,000 km, dead within 20
+Myr 0.32 (0.13); plates at the end 28.5 (24). Floor (not a criterion): older than 180 Myr 0.186 of
+the ocean (0.202), mean age 104.6 Myr (110.9), the margin zone's share of the old floor 0.837
+(0.791). The diagnosis: starts fire where the trench meets the margin at 45 to 90°, often where a
+basin closes with O's land already beside C, and many at "continents" of 1 to 11 samples; the tear,
+across the margin, runs nearly along the trench, so U keeps a wedge one or two spacings wide at the
+tip (and K' takes 88 to 97 % of U); U's slab takes that wedge down within a step or two, U's crust
+moves on along its trench, and the convergence across the margin at the tip is 0 to 15 km a step,
+short of the 100 km an advance needs. Zhou et al.'s geometry, a trench running on along the margin,
+is the one the law advances in (the unit tests), and the planet rarely makes it. The tip's hidden
+crust and the pull across the trench came after the arm; with them one diagnosis planet has 17
+starts (14) and still no advance.
+
+**Parked (2026-10-26, the coordinator's call).** `tectonics.margin_propagation` is off by default.
+The reason is correctness, not the V1 breaches (V1 is not a gate): under geometry A and Gurnis's
+100 km gate (PLT-611) law 2 does not advance in this sim, so the built mechanism never does the
+sourced process, propagation. Its starts alone are half a process: they fire at closing basins and
+at specks of land, and they cut slivers that are consumed within one or two steps. The code, the
+two fixes after the arm, the unit tests, the ignored diagnosis and the counters stay; PLT-064's
+1,000 km clearance is the default again. Law 3, built inside law 2's stage, is off with it: it acts
+at every incipient front, not only at law 2's margins, so on alone it would need an arm of its own.
+Off, the branch gives base16's planet: arm fl-law2off (ea0a9bc1, key 2d939be5b5aa, seed 1 of both
+starts, base16's arguments) has base16's world state (all 109 files of the full dump), dynamics
+record and dumped fields, sha256 for sha256.
+
+**For whoever picks this up.** Zhou et al. 2020's setup has the passive margin continuing the
+trench's strike, so the tear across the margin is a STEP at the trench's end; the starts here fire
+where the coast meets the trench at 45 to 90°, a configuration the source does not model. A start
+rule restricted to Zhou's geometry can be stated with no new constant, though not with no
+tolerance: start only where U's trench samples within 4 spacings of the trench sample
+(`TRENCH_STRIKE_SPACINGS`) all lie within 1.5 spacings (PLT-534's border) of the margin's strike
+line through the stretch's end, so that at the lattice's resolution the trench reads as the
+margin's own line (at most about 20°, an angle the lattice sets and no source gives), and only where
+C holds at least `min_samples` continental samples (PLT-659), which drops the "continents" of 1 to
+11 samples. No arm has run it, and the diagnosis planets suggest such junctions are rare, so it may
+start little.
+
+### Law 3: the incipient front's resistance grows with the plate's thickness (PLT-657)
+
+Gurnis, Hall & Lavier 2004 ([46]): "Case 1, with an age of 30 Myr, He ... is 15 km. For 7 Myr
+lithosphere, this thickness is 8.5 km. With both friction and cohesion, the force required ...
+increases by a factor of 2.2 as He increases (Figure 9a)". PLT-612 took the middle of their 2 to 3 ×
+10^12 N/m at every age. With `tectonics.incipient_resistance_by_thickness` (off by default since
+2026-10-26: built inside law 2's stage and parked with it) the
+resistance is Case 1's 3 × 10^12 N/m × (Te(age) / Te(30 Myr))^n × g / 9.81, with n = ln 2.2 /
+ln(15 / 8.5) ≈ 1.39 and Te the model's own flexure law, min(2.7 √age, 40) km (ISO-048, ISO-049):
+0.47 times Case 1 at 10 Myr, 1.98 at 80, 3.46 at 180 and 3.98 from 219 Myr. Floor younger than 10 Myr
+keeps the ridge's 5 × 10^11 N/m (PLT-613). The same scale sets law 2's margin strength. The power
+law through Gurnis's two thicknesses and its use past 30 Myr are the agent's: the model's Te grows √3
+= 1.73 times from 10 to 30 Myr, Gurnis's He 1.76 times from 7 to 30 Myr. Open: [59] and [64] read the
+peak at a fracture zone of two ages, where it may follow the younger or the overriding plate; the
+model reads the subducting floor's age. Test: `law_3_scales_the_incipient_resistance_with_the_elastic_thickness`
+(`forces.rs`: Case 1 at 30 Myr, the 2.2 factor between the two thicknesses, the ridge below 10 Myr,
+the cap, off as PLT-612; law 2's strength, PLT-517 at 30 Myr and constant off, and its pull, FRC-002
+for a full 80 Myr slab straight across the margin).

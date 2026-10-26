@@ -97,6 +97,35 @@ pub fn opal_m3_per_mol() -> f64 {
     SIO2_KG_PER_MOL / (1.0 - OPAL_WATER) / OPAL_KG_M3
 }
 
+/// GlobSed's eq. 2a (Straume et al. 2019, sec. 3.3): the sediment on ocean floor `age_myr` old at
+/// latitude `lat_deg`, more than 200 km from the margins, in place (pore water included), m:
+/// Z = √τ (52 − 2.46 |φ| + 0.045 φ²), fitted on floor younger than 82 Myr below 72°.
+pub fn globsed_eq_2a_m(age_myr: f64, lat_deg: f64) -> f64 {
+    let phi = lat_deg.abs();
+    age_myr.max(0.0).sqrt() * (52.0 - 2.46 * phi + 0.045 * phi * phi) // ledger: ERO-215
+}
+
+/// Kominz et al. 2011's average ocean-floor sediment, as pyBacktrack's lithology table gives it:
+/// the porosity at the sea floor, and the depth over which it falls by a factor e, m.
+pub const OCEAN_SEDIMENT_POROSITY: f64 = 0.66; // ledger: ERO-215
+pub const OCEAN_SEDIMENT_DECAY_M: f64 = 1333.0; // ledger: ERO-215
+
+/// The rock in a pile `z_m` thick in place under that porosity (φ₀ e^(−depth/λ)), m: the pile
+/// less its pore water, z − φ₀ λ (1 − e^(−z/λ)).
+pub fn solid_of_in_place_m(z_m: f64) -> f64 {
+    let (phi0, lam) = (OCEAN_SEDIMENT_POROSITY, OCEAN_SEDIMENT_DECAY_M);
+    let z = z_m.max(0.0);
+    z - phi0 * lam * (1.0 - (-z / lam).exp())
+}
+
+/// The open ocean's pile on floor `age_myr` old at `lat_deg`, as rock the way the model's pools
+/// hold it, m: GlobSed's eq. 2a less its pore water. The line PLT-661 draws between floor with the
+/// pelagic rain alone and floor holding the continents' rock (the rain lies 14 to 42 m in place
+/// under eq. 2a, ERO-215). Past the fit's 82 Myr and 72° it is eq. 2a carried on.
+pub fn open_floor_solid_m(age_myr: f64, lat_deg: f64) -> f64 {
+    solid_of_in_place_m(globsed_eq_2a_m(age_myr, lat_deg))
+}
+
 /// A plate step's supply to the rain.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Supply {
@@ -676,16 +705,16 @@ mod tests {
         for i in 0..720 {
             let phi = (i as f64 + 0.5) * 0.1;
             let w = phi.to_radians().cos();
-            num += w * (52.0 - 2.46 * phi + 0.045 * phi * phi);
+            num += w * globsed_eq_2a_m(1.0, phi);
             den += w;
         }
         let lat_mean = num / den;
-        // In-place height of a solid pile: H − φ₀λ(1 − e^(−H/λ)) = pile.
-        let (phi0, lam) = (0.66, 1333.0);
+        // In-place height of a solid pile: the H with solid_of_in_place_m(H) = pile.
+        let (phi0, lam) = (OCEAN_SEDIMENT_POROSITY, OCEAN_SEDIMENT_DECAY_M);
         let in_place = |pile: f64| -> f64 {
             let mut h = pile.max(1e-9);
             for _ in 0..60 {
-                let f = h - phi0 * lam * (1.0 - (-h / lam).exp()) - pile;
+                let f = solid_of_in_place_m(h) - pile;
                 h = (h - f / (1.0 - phi0 * (-h / lam).exp())).max(1e-12);
             }
             h
@@ -717,5 +746,27 @@ mod tests {
             }
         }
         eprintln!("{report:?}");
+    }
+
+    /// The open floor's line (PLT-661): GlobSed's eq. 2a in place, less its pore water. A thin
+    /// pile is (1 − φ₀) rock, a thick one loses φ₀ λ of water at most; eq. 2a's average young floor
+    /// (267 m in place, Straume et al. 2019) is about 110 m of rock; the line grows with age and is
+    /// least near 27° (the quadratic's low point, 2.46 / 0.09).
+    #[test]
+    fn the_open_floor_line_is_globsed_less_its_pore_water() {
+        let thin = solid_of_in_place_m(1.0e-3);
+        assert!((thin / 1.0e-3 - (1.0 - OCEAN_SEDIMENT_POROSITY)).abs() < 1e-6, "{thin}");
+        let thick = 50_000.0 - solid_of_in_place_m(50_000.0);
+        let most = OCEAN_SEDIMENT_POROSITY * OCEAN_SEDIMENT_DECAY_M;
+        assert!((thick - most).abs() < 1e-6 * most, "{thick} {most}");
+        let young = solid_of_in_place_m(267.0);
+        assert!((100.0..120.0).contains(&young), "{young}");
+        assert_eq!(globsed_eq_2a_m(100.0, -30.0), globsed_eq_2a_m(100.0, 30.0));
+        assert!((globsed_eq_2a_m(100.0, 0.0) - 520.0).abs() < 1e-9);
+        assert!(open_floor_solid_m(80.0, 10.0) > open_floor_solid_m(40.0, 10.0));
+        let low = open_floor_solid_m(100.0, 27.3);
+        for lat in [0.0, 20.0, 35.0, 60.0, 90.0] {
+            assert!(open_floor_solid_m(100.0, lat) > low, "{lat}");
+        }
     }
 }

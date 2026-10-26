@@ -31,9 +31,10 @@
 //! snapshot is not at a resampling) for
 //! `tools/review/continent-budget.py`, and the same samples' plate ids to
 //! `plate/t<Myr>.bin` (little-endian u32, one per record; [`CrustBudget::write_plates`]) for the
-//! front lane's boundary geometry (`tools/review/pool/measure_boundgeom.py`), and their sea-floor
+//! front lane's boundary geometry (`tools/review/pool/measure_boundgeom.py`), their sea-floor
 //! ages to `age/t<Myr>.bin` (little-endian f32, one per record, NaN on continental crust;
-//! [`CrustBudget::write_ages`]) for the floor-age lane (`tools/review/floorage/`). Each snapshot also splits the land by the origin of its
+//! [`CrustBudget::write_ages`]) for the floor-age lane (`tools/review/floorage/`), and their rock
+//! pools to `pools/t<Myr>.bin` ([`POOL_FIELDS`]). Each snapshot also splits the land by the origin of its
 //! crust (`cb_origin`: island arc, collision, Andean margin, the rest).
 //!
 //! Off unless [`ON_ENV`] is set; it changes nothing the model does.
@@ -119,7 +120,7 @@ pub const EDGES_KM: [f64; 10] = [
 ];
 
 /// The globals each snapshot copies (cumulative over the run, km³ or km² Earth-normalized).
-const GLOBALS: [(&str, &str); 60] = [
+const GLOBALS: [(&str, &str); 66] = [
     ("flow_steps", super::flow::STEPS_GLOBAL),
     ("flow_substeps", super::flow::SUBSTEPS_GLOBAL),
     ("flow_short_myr", super::flow::SHORT_GLOBAL),
@@ -174,7 +175,29 @@ const GLOBALS: [(&str, &str); 60] = [
         super::subduction::FRONT_G_CONTINENTAL_NORMAL_GLOBAL,
     ),
     ("transition_moved", super::transition::MOVED_GLOBAL),
+    ("margins_left", super::transition::MARGINS_LEFT_GLOBAL),
     ("sed_subducted", super::ridges::SEDIMENT_SUBDUCTED_GLOBAL),
+    // Measurement only: the floor's sediment reaching the trenches, before the share the slab
+    // takes, by the crust on top (the sediment diagnosis, tools/review/seddiag/).
+    ("sed_trench", super::ridges::SEDIMENT_REACHING_TRENCH_GLOBAL),
+    (
+        "sed_trench_c",
+        super::ridges::SEDIMENT_REACHING_TRENCH_CONTINENTAL_GLOBAL,
+    ),
+    (
+        "sed_trench_o",
+        super::ridges::SEDIMENT_REACHING_TRENCH_OCEANIC_GLOBAL,
+    ),
+    // The arcs' fronts' length × dt × normal convergence (PLT-665): over front_c and front_o,
+    // the mean v_n at the arcs.
+    (
+        "front_n_c",
+        super::subduction::ARC_FRONT_NORMAL_CONTINENTAL_GLOBAL,
+    ),
+    (
+        "front_n_o",
+        super::subduction::ARC_FRONT_NORMAL_OCEANIC_GLOBAL,
+    ),
     ("forearc_c", super::subduction::FOREARC_CONTINENTAL_GLOBAL),
     ("forearc_o", super::subduction::FOREARC_OTHER_GLOBAL),
     ("forearc_short", super::subduction::FOREARC_SHORT_GLOBAL),
@@ -756,6 +779,38 @@ fn write_map(
     }
     let path = dir.join(format!("t{:04.0}.bin", t_myr.round()));
     if let Err(e) = std::fs::create_dir_all(dir).and_then(|()| std::fs::write(&path, &buf)) {
+        eprintln!("crust_budget: cannot write {}: {e}", path.display());
+    }
+    write_pools(dir, samples, t_myr);
+}
+
+/// The f32 fields of a pools record (`pools/t<Myr>.bin`, the map's records in order): the rock
+/// pools ([`pool::NAMES`]), the basement ([`Sample::basement`]) and when the crust formed.
+pub const POOL_FIELDS: [&str; pool::COUNT + 2] = [
+    "sediment",
+    "sedimentary",
+    "metamorphic",
+    "felsic_plutonic",
+    "felsic_volcanic",
+    "mafic_volcanic",
+    "mafic_plutonic",
+    "basement",
+    "formed_myr",
+];
+
+/// Writes the visible samples' rock pools to `<dir>/pools/t<Myr>.bin`, little-endian f32 records
+/// of [`POOL_FIELDS`] in the map's order (the drowning diagnosis: what the thick ocean crust is
+/// made of; measurement only, a failure is reported and ignored).
+fn write_pools(dir: &std::path::Path, samples: &[Sample], t_myr: f64) {
+    let mut buf: Vec<u8> = Vec::with_capacity(samples.len() * 4 * POOL_FIELDS.len());
+    for s in samples.iter().filter(|s| !s.is_hidden()) {
+        for x in s.pools.iter().copied().chain([s.basement(), s.formed_myr]) {
+            buf.extend_from_slice(&x.to_le_bytes());
+        }
+    }
+    let dir = dir.join("pools");
+    let path = dir.join(format!("t{:04.0}.bin", t_myr.round()));
+    if let Err(e) = std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&path, &buf)) {
         eprintln!("crust_budget: cannot write {}: {e}", path.display());
     }
 }

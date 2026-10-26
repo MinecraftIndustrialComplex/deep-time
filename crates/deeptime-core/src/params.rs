@@ -471,9 +471,12 @@ pub struct TectonicParams {
     /// and `plates/guard_bound_plate_steps`) and should never bind (design
     /// `docs/design/plate-force-balance.md` §6; ledger PLT-022).
     pub max_plate_speed_mm_yr: f64,
-    /// v_0 of Cortial et al. 2019 (100 mm/yr): the convergence at which subduction uplift, island
-    /// arcs and arc magma run at their full rate (g(v) = min(1, v / v_0)). Until the switch to the
-    /// force balance it was also the speed cap. Ledger PLT-037.
+    /// v_0 of Cortial et al. 2019 (100 mm/yr): the convergence at which the subduction uplift runs
+    /// at its full rate (g(v) = min(1, v / v_0)). Until 2026-10-25 it scaled the arcs' magma too,
+    /// which counted Earth's convergence twice (their rates are averages over Earth's arcs at
+    /// Earth's convergences): the arcs now scale by `island_arc_convergence_ref_mm_yr` and
+    /// `continental_arc_convergence_ref_mm_yr` (PLT-665). Until the switch to the force balance it
+    /// was also the speed cap. Ledger PLT-037.
     pub convergence_ref_mm_yr: f64,
     /// ε_o (0.04 mm/yr), the dampening law's rate (ledger ISO-013); unused under
     /// `ocean_depth: gdh1`, the shipped presets' law, which carry no rate.
@@ -841,16 +844,29 @@ pub struct TectonicParams {
     /// no forearc, no arc crust thickening and no slab-driven shortening. Off, they run round each
     /// end of a front on the whole distance field. ledger: PLT-562
     pub margin_slab_ends: bool,
-    /// New crust an island arc (an arc on oceanic crust) adds per km of arc per Myr at
-    /// v = v_0, km³ (Earth-normalized): magma intruded and erupted, spread across the arc band
+    /// New crust an island arc (an arc on oceanic crust) adds per km of arc per Myr at Earth's
+    /// mean orthogonal convergence of intra-oceanic arcs (`island_arc_convergence_ref_mm_yr`),
+    /// km³ (Earth-normalized): magma intruded and erupted, spread across the arc band
     /// (`arc_width_km`). Stern & Scholl (2010) put the long-term average of the intra-oceanic
     /// arcs at about 100 (90–180 for Izu-Bonin-Mariana and the Aleutians; 1.5 km³ a year over
     /// 14,500 km of arc). The arc stands up by its thickness (`plates::subduction`). ledger: PLT-045
     pub island_arc_km3_per_km_myr: f64,
     /// … and a continental arc (an arc on continental crust, including an island arc grown
-    /// continental), km³ per km per Myr at v = v_0: about 35 (Stern & Scholl 2010 after
+    /// continental), km³ per km per Myr at Earth's mean orthogonal convergence of continental
+    /// arcs (`continental_arc_convergence_ref_mm_yr`): about 35 (Stern & Scholl 2010 after
     /// Haschke & Günther 2003; 1.0 km³ a year over 27,500 km). ledger: PLT-285
     pub continental_arc_km3_per_km_myr: f64,
+    /// The orthogonal convergence at which an island arc adds `island_arc_km3_per_km_myr`, mm/yr:
+    /// an arc's rate is that times v_n / this, v_n the convergence normal to its front, no cap
+    /// (PLT-665). Stern & Scholl's 100 is a mean over Earth's intra-oceanic arcs, so it holds at
+    /// their mean orthogonal convergence: 86.6 mm/yr, the length-weighted mean of Clift &
+    /// Vannucchi 2004's orthogonal convergence (Tables 1 and 2) over the margins of Stern &
+    /// Scholl's list of intra-oceanic arcs (11,450 km). ledger: PLT-666
+    pub island_arc_convergence_ref_mm_yr: f64,
+    /// … and a continental arc's, mm/yr: 58.6, the same mean over the other 24 margins of Clift &
+    /// Vannucchi's tables (28,775 km; Stern & Scholl's continental margin arcs are 27,500 km).
+    /// ledger: PLT-666
+    pub continental_arc_convergence_ref_mm_yr: f64,
     /// Island-arc crust counts as continental once it is this thick, km: an oceanic sample turns
     /// continental once the arc crust it has built (`arc_oceanic_m`) on top of normal ocean crust
     /// (7 km) reaches it, whatever its height. Cloos (1993): crust thicker than about 15 km is
@@ -890,6 +906,23 @@ pub struct TectonicParams {
     /// and every built-in preset's since 2026-10-23; 0 accretes all of it (the model before the
     /// trench budget, 2026-10-22). ledger: PLT-440
     pub sediment_subduction_share: f64,
+    /// Sediment subduction by margin type (the M5 lane, 2026-10-25): `true` replaces
+    /// `sediment_subduction_share` with Clift & Vannucchi's (2004) share for the margin the
+    /// floor goes under (`ridges::sediment_subducted_share`): 0.83 of the incoming pile where it
+    /// is over 1 km and the convergence under 76 mm/yr (an accretionary margin), all of it
+    /// elsewhere (an erosive margin; von Huene & Scholl 1991's type 2), whatever the overriding
+    /// plate is made of. Off by default. ledger: PLT-660
+    pub sediment_subduction_sourced: bool,
+    /// The rifted margin's sediment stays continental (the M5 lane, 2026-10-25;
+    /// `transition::margin_continental`): ocean floor on the ocean side of a margin's taper
+    /// (within W/2, `transition_width_km`, of its plate's continental crust that is not itself
+    /// hyper-extended), not at a trench, in a subduction zone or on an arc, that holds rock from
+    /// the continents (sediment beyond the pelagic rain for its age, or felsic or metamorphic
+    /// rock) is the distal margin's thinned continental crust (Brune et al. 2014) and becomes
+    /// continental crust over its own ocean crust (PLT-331); and ocean floor that crust spread
+    /// from continental columns onto (`collapse::spread`) becomes continental at once rather
+    /// than when filled to the normal column. Off by default. ledger: PLT-661, PLT-662
+    pub margin_sediment_continental: bool,
     /// Subduction erosion: the crust a front's overriding plate loses from below, km³ per km of
     /// front and Myr (Earth-normalized), where the front erodes (the two keys below); taken
     /// from the front sample's crust beyond a normal ocean floor's (`subduction::erode_forearcs`).
@@ -1021,6 +1054,32 @@ pub struct TectonicParams {
     /// overlap, which put the parent under in 1,494 of 1,998 such contacts on base15 (build log
     /// 2026-10-25). ledger: PLT-655
     pub initiation_polarity_by_age: bool,
+    /// Along-strike propagation of subduction onto a passive margin (the floor-age lane's law 2,
+    /// 2026-10-25; Zhou, Li, Gerya & Stern 2020: "With increasing slab pull, the subduction zone
+    /// propagates laterally"; Govers & Wortel 2005's STEP tear): where a plate's trench reaches
+    /// within reach of the plate's own continental margin and its slab is past the critical
+    /// convergence, the margin's ocean floor is cut off the continent along the margin, with a
+    /// tear from the margin to the plate's nearest other boundary, when the slab's pull along
+    /// the cut beats the margin's strength (`forces::margin_strength_n_m`, the fallback of
+    /// PLT-658). The continent and the floor beyond the cut become a new plate K' that the
+    /// trench's plate U keeps converging on; each further critical convergence (100 km) past the
+    /// cut, under the same force test, moves the next stretch of the margin's floor from K' to U.
+    /// The rule replaces PLT-064's clearance: with it on, a new subduction initiation keeps one
+    /// lattice spacing from a front, not `subduction_initiation_clearance_km` (Crameri et al.
+    /// 2020: most initiations start within 500 km of another subduction zone). Off by default
+    /// (parked 2026-10-26, the coordinator's call): under these starts and the 100 km gate it
+    /// never advances in the sim, so it does not do the sourced process; off, PLT-064's 1,000 km
+    /// holds. ledger: PLT-656
+    pub margin_propagation: bool,
+    /// Law 3: the resistance an incipient subduction zone pushes against scales with the elastic
+    /// thickness of the floor going under (Gurnis, Hall & Lavier 2004 [46]: the force to start
+    /// underthrusting "increases by a factor of 2.2" from 7 Myr to 30 Myr floor, elastic thickness
+    /// 8.5 km to 15 km, anchored on their Case 1 peak of 3 × 10¹² N/m for 30 Myr floor, [59]),
+    /// with the model's elastic thickness law (ISO-048, ISO-049). It replaces PLT-612's single
+    /// 2.5 × 10¹² N/m above the ridge floor (PLT-613, kept) and scales law 2's margin strength.
+    /// Off, PLT-612 as before. Off by default: built inside law 2's stage and parked with it
+    /// (2026-10-26). ledger: PLT-657
+    pub incipient_resistance_by_thickness: bool,
     /// Subduction initiation off the passive margin (V1 gap 2's stage C1): the old floor within
     /// the reach of the arc the new trench builds (`arc_distance_km` + `arc_width_km`, and one
     /// lattice spacing for where on the lattice the front falls; great circle) of the plate's
@@ -1217,21 +1276,25 @@ impl Default for TectonicParams {
             margin_slab_ends: true, // ledger: PLT-562 (on since 2026-10-24)
             island_arc_km3_per_km_myr: 100.0, // ledger: PLT-045
             continental_arc_km3_per_km_myr: 35.0, // ledger: PLT-285
+            island_arc_convergence_ref_mm_yr: 86.6, // ledger: PLT-666
+            continental_arc_convergence_ref_mm_yr: 58.6, // ledger: PLT-666
             arc_mature_crust_km: 15.0, // ledger: PLT-047
             cordillera_shortening_mm_yr: 0.0, // ledger: PLT-048
             cordillera_width_km: 120.0,
-            cordillera_height_m: 2500.0,               // ledger: PLT-050
-            trench_half_life_myr: 2.0,                 // ledger: PLT-053
-            trench_release_half_life_myr: 2.0,         // ledger: PLT-443 (on since 2026-10-23)
-            sediment_subduction_share: 0.12,           // ledger: PLT-440
-            subduction_erosion_km3_per_km_myr: 90.0,   // ledger: PLT-441
-            subduction_erosion_min_mm_yr: 60.0,        // ledger: PLT-442
+            cordillera_height_m: 2500.0,       // ledger: PLT-050
+            trench_half_life_myr: 2.0,         // ledger: PLT-053
+            trench_release_half_life_myr: 2.0, // ledger: PLT-443 (on since 2026-10-23)
+            sediment_subduction_share: 0.12,    // ledger: PLT-440
+            sediment_subduction_sourced: false, // ledger: PLT-660
+            margin_sediment_continental: false, // ledger: PLT-661, PLT-662
+            subduction_erosion_km3_per_km_myr: 90.0, // ledger: PLT-441
+            subduction_erosion_min_mm_yr: 60.0, // ledger: PLT-442
             subduction_erosion_max_sediment_m: 1000.0, // ledger: PLT-442
-            erosion_retreat: false,                    // ledger: PLT-523
-            front_share: true,                         // ledger: PLT-530
-            plate_fission: true,                       // ledger: PLT-532
-            split_inheritance: true,                   // ledger: PLT-534
-            level_set_membership: true,                // ledger: PLT-536
+            erosion_retreat: false,             // ledger: PLT-523
+            front_share: true,                  // ledger: PLT-530
+            plate_fission: true,                // ledger: PLT-532
+            split_inheritance: true,            // ledger: PLT-534
+            level_set_membership: true,         // ledger: PLT-536
             hotspots_initial: 8,
             hotspot_births_per_100myr: 3.0,
             hotspot_lifetime_myr: [40.0, 150.0],
@@ -1248,13 +1311,15 @@ impl Default for TectonicParams {
             subduction_initiation_age_myr: 150.0,
             subduction_initiation_per_myr: 0.15, // ledger: PLT-063
             subduction_initiation_clearance_km: 1000.0,
-            initiation_slab_km: 150.0,            // ledger: PLT-270
-            incipient_subduction: true,           // ledger: PLT-610 (on since 2026-10-25)
-            initiation_polarity_by_age: true,     // ledger: PLT-655
+            initiation_slab_km: 150.0,                // ledger: PLT-270
+            incipient_subduction: true,               // ledger: PLT-610 (on since 2026-10-25)
+            initiation_polarity_by_age: true,         // ledger: PLT-655
+            margin_propagation: false, // ledger: PLT-656 (parked 2026-10-26: no advance)
+            incipient_resistance_by_thickness: false, // ledger: PLT-657 (parked with law 2)
             subduction_initiation_offshore: true, // ledger: PLT-503 (on since 2026-10-23)
             initiation_stress_mpa: 20.0, // ledger: PLT-505 (game-choice; on since 2026-10-23)
-            transference: false,         // ledger: PLT-516
-            contact_timeout_myr: 24.0,   // ledger: PLT-059
+            transference: false,       // ledger: PLT-516
+            contact_timeout_myr: 24.0, // ledger: PLT-059
             collision_orogeny_myr: 30.0,
             l1_every_steps: 0,
             forsyth_uyeda_balance: false, // ledger: PLT-585 (built 2026-10-25, off)
@@ -1526,6 +1591,14 @@ impl PlanetPreset {
         pos(k.model_radius_km, "$.tectonics.model_radius_km")?;
         pos(k.max_plate_speed_mm_yr, "$.tectonics.max_plate_speed_mm_yr")?;
         pos(k.convergence_ref_mm_yr, "$.tectonics.convergence_ref_mm_yr")?;
+        pos(
+            k.island_arc_convergence_ref_mm_yr,
+            "$.tectonics.island_arc_convergence_ref_mm_yr",
+        )?;
+        pos(
+            k.continental_arc_convergence_ref_mm_yr,
+            "$.tectonics.continental_arc_convergence_ref_mm_yr",
+        )?;
         pos(
             k.subduction_distance_km,
             "$.tectonics.subduction_distance_km",
