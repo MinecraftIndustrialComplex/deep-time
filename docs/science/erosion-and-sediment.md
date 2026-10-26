@@ -1162,4 +1162,52 @@ floor the age grid leaves out). Two findings, noted in the ledger and not acted 
   never counts the opal or the dust. The step's end is where its arrays fit the memory budget:
   laid in the first substep, they would be held through all the substeps, beside the tracer's.
 
-**Measured.** The 8-run arm against base16 (seeds 1 to 4) waits for the coordinator's slot.
+**Measured** (2026-10-25). The arm pel-rain (key 4c55ab83c7a1: master 1c2946f2 with this lane, merged
+at ef274941) against base17-s4 (base17's seeds 1 to 4 on 1c2946f2, key 8aaddf52958a):
+earthlike_quick_16k, 1,000 Myr, both starts, 8 runs a side, argkey cd665cef, the crust budget's maps.
+Medians and the two-sided Mann-Whitney p, from `tools/review/seddiag/sedab.py` on the present map
+(sedstock.py's stock and sedflow.py's flows run by run; the base's pelagic allowance 5 m/Myr, the arm's 0).
+GlobSed is Straume et al. 2019 in place, as in the sediment diagnosis (plates.md's loss budget).
+
+| | base17-s4 | pel-rain | p | GlobSed |
+|---|---|---|---|---|
+| the sea's sediment, solid | 1.05e9 km3 | 7.19e8 km3 | 0.0002 | 3.37e8 km3 |
+| on oceanic crust, solid (in place, Kominz) | 9.00e8 (1.07e9) | 6.45e8 (7.71e8) | 0.0002 | 1.89e8 |
+| that over GlobSed, solid (in place) | 4.76 (5.65) | 3.41 (4.08) | 0.0002 | 1 |
+| ocean floor within 200 km of continental crust | 5.13e8 km3, 5,834 m | 3.71e8 km3, 4,639 m | 0.0003 | 7.6e7 km3, 2,049 m |
+| ocean floor beyond 200 km: mean pile, solid (in place) | 1,786 m (2,342) | 1,138 m (1,491) | 0.0002 | 404 m |
+| young floor (eq. 2a's domain), in place over eq. 2a | 4.64 | 3.06 | 0.0003 | 1 |
+| wet continental crust (GlobSed's margins) | 1.49e8 km3, 6.86e7 km2, 2,073 m | 8.86e7 km3, 4.76e7 km2, 1,796 m | 0.05 | 1.43e8 km3, 4.69e7 km2, 3,044 m |
+
+- *By share.* The arm takes 0.21 of the ocean floor's log excess over GlobSed away (ln 1.561 to
+  1.228; 0.19 in place) and 0.33 of the whole sea's (0.28 in place). The diagnosis gave PLT-103
+  about a tenth of the floor's excess (x1.2, from its allowance of 5 m/Myr times the age); the
+  arm removes x1.39, 2.55e8 km3 against the base's 1.74e8 km3 allowance. The rest is the plates'
+  rain's own fate downstream: it was accreted onto oceanic tops at resamplings (6.58 to 5.19 km3 a
+  year, p 0.0002), buried into metamorphic rock (on wet oceanic crust 2.03e8 to 1.30e8 km3, p
+  0.0002) and subducted (sediment subduction 1.17 to 0.87 km3 a year, p 0.0002) like the rest.
+- *By floor age* (mean pile, 0-20, 20-60, 60-120, 120-180, 180-300, over 300 Myr): 156, 1,052,
+  2,314, 4,145, 6,401, 9,242 m to 128, 774, 1,823, 3,078, 5,100, 8,105 m (p 0.33, 0.03, 0.003,
+  0.0006, 0.02, 0.0006).
+- *Flows* (km3 a year over the run). The plates' rain 1.39 to 0. The surface stage's net
+  material onto oceanic samples 4.74 to 4.81 (p 0.72); over all samples 0.43 to 1.03 (p 0.0002),
+  since the dissolved load is laid again instead of leaving. Carbonate 0.26 to 0.39, chalk 0.092
+  to 0.026 (both p 0.0002: the old fixed 4 m/Myr chalk is gone and the chalk now survives only
+  above the CCD). The dissolved load 1.05 to 1.20 Gt a year (p 0.1).
+- *What is left.* The ocean floor still holds 3.4 times GlobSed (4.1 in place). Floor in eq.
+  2a's domain holds 3.1 times eq. 2a in place, where the rain alone lies 14 to 42 m under eq. 2a
+  (the unit test above), so what is left there came from the land. The floor within 200 km
+  of continental crust holds 4.9 times GlobSed's. The diagnosis's other shares (the land's supply
+  about 0.4, the floor's age about a quarter, the trenches keeping what reaches them about a fifth)
+  are not touched by this lane. The margins now hold less than GlobSed's: their wet area is
+  GlobSed's (the change, -2.1e7 km2, has p 0.28 and goes with the sea 160 m lower, 579 to 419 m
+  over the datum, p 0.007), and their mean pile fell 277 m (p 0.015) to 1,796 m of rock against
+  GlobSed's 3,044 m in place.
+- *Census and guard.* v1census moves no measure at p < 0.05 but the continental crust's net change
+  over the run, -0.049 to -0.064 (p 0.015; the oceanic share 0.626 to 0.642). That change is
+  spread over the crust budget's collapse (-0.010, p 0.2), rate (-0.009, p 0.1), founder (-0.003,
+  p 0.07) and collision (-0.002, p 0.03) parts; no one route carries it. Land 0.236 to 0.254 (p
+  0.38), the largest landmass 0.067 to 0.122 (p 0.13), continental crust under the sea 0.428 to
+  0.334 (p 0.19), coast with high ground 0.103 to 0.096 (p 0.96), criteria met 6 to 6.5 of 7 (p
+  0.47). The guard is clean: worst 10,046 to 9,962 m from the sea (p 0.72), no step beyond two
+  Earth reliefs, the plates' largest excess over Airy 2,408 to 2,591 m (p 0.10).
