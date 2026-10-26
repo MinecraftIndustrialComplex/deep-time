@@ -2224,6 +2224,25 @@ pub(in crate::plates) mod tests {
         assert!((0.019..0.021).contains(&h), "{h}");
     }
 
+    /// The sliver list goes into checkpoints (postcard, which is not self-describing): with no
+    /// sliver and with one the plate state reads back as it was written. A field skipped when
+    /// empty broke the read of a run that ended with no sliver (arm trench3, 2026-10-26).
+    #[test]
+    fn the_sliver_list_round_trips_a_checkpoint() {
+        let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let (mut st, ..) = backarc_planet(&geo, 80.0, 30.0, 400.0);
+        for _ in 0..2 {
+            let bytes = postcard::to_allocvec(&st).unwrap();
+            let back: PlateState = postcard::from_bytes(&bytes).unwrap();
+            assert_eq!(back, st);
+            st.backarcs.push(BackArc {
+                plate: 1,
+                parent: 0,
+                born_myr: 2.0,
+            });
+        }
+    }
+
     /// Bird 2003's back-arc microplates are 0.0002 to 0.016 sr (Table 1: Mariana 0.01037, Tonga
     /// 0.00625, South Sandwich 0.00317, Futuna 0.00079), below PLT-091's 0.003 of the sphere
     /// (0.0377 sr) but for the largest. A sliver on the list is kept below the size at a
