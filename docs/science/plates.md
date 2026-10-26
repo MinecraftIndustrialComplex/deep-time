@@ -11156,8 +11156,8 @@ arc band (106 km) that is 47 km at the axis in 10 Myr.
 
 #### Front-loaded island arcs (PLT-668 to PLT-670, 2026-10-25)
 
-Built behind `tectonics.arc_front_loaded`, off by default and in every preset; no arm run yet (the
-coordinator's calls 1 to 5, 2026-10-25). Off, no rule reads the new contact field: the island
+Built behind `tectonics.arc_front_loaded` (the coordinator's calls 1 to 5, 2026-10-25), on by default
+since 2026-10-26 (no preset sets it; the arm is at the end of this section). Off, no rule reads the new contact field: the island
 rate's code path is unchanged, and the field and the two new globals only measure (the state and
 the summary carry them, so their hashes are new).
 
@@ -11218,6 +11218,34 @@ planet's island front about three times Stern & Scholl's 14,500 km, the pulses w
 or triple the island arcs' crust (2.5 to 3.9 km³ a year against 1.26 off and Stern & Scholl's 1.4).
 The coordinator's call: if the burst overshoots because of the front's length, it stays off until the
 front is fixed.
+
+**On by default since 2026-10-26** (the coordinator's rule for this stage: "it goes on by default if
+it is built, correct and the guard is clean, whatever the V1 numbers do"). Arm `burst-b20`
+(`--set tectonics.arc_front_loaded=true`, `earthlike_quick_16k`, 1,000 Myr, seeds 1 to 4, both
+starts, the crust budget on, source key b28aff01c5a7, argkey b0d7c3a6) against `base20-s4` (master
+8dd6440b's base20, seeds 1 to 4, argkey cd665cef); medians of 8 runs, two-sided Mann-Whitney p in
+brackets:
+
+- **Guard: clean.** Worst 10,230 m from the sea against 10,067 (0.33); no step beyond two Earth
+  reliefs in either arm; the largest excess of a plate cell over Airy 2,458 m against 2,301 (0.28);
+  the highest plate elevation 5,313 m against 5,237 (0.57).
+- **The estimate did not happen.** The island arcs' crust (the crust budget's `arc_o`, summed over
+  the run) is 1.17 km³ a year against 1.04 (every burst run above seven of the eight base runs), not
+  2.5 to 3.9, against Stern & Scholl's 1.4; the continental arcs' (`arc_c`) 0.44 against 0.47. The
+  young island front (`front_young_o`, PLT-670) fell from 3.8 to 2.4 × 10⁶ km × Myr over the run.
+  The agent's reading: the burst builds 4.7 km of crust a Myr at the arc's axis, so the 8 km of arc
+  crust over normal ocean crust that PLT-047 needs to call a sample continental comes within a step
+  or two, the overriding floor turns continental, the front leaves the island class (PLT-370) and
+  its arc takes the continental arcs' rate (PLT-285), so the pulse ends early. The fronts
+  moved class, not length: island front 48,657 km a step against 51,833 (0.007), continental 32,935
+  against 27,400 (0.0002), together 81,592 against 79,233; island subducting front 23,728 against
+  29,192 (0.0002), continental 28,469 against 23,704 (0.0002); the island front's overriding samples
+  with no continental crust within the arc's distance 0.108 of it against 0.235; contacts maturing
+  59.0 per 100 Myr against 54.0 (0.050).
+- **V1 (realism, not a gate):** land 0.270 against 0.244 (0.16), largest landmass 0.100 against
+  0.105 (0.80), continental crust under the sea 0.364 against 0.406 (0.19), coast with high ground
+  0.155 against 0.106 (0.23; target at most 0.11), land under ice 0.076 against 0.050 (0.88),
+  collisions 5.15 against 4.85 per 100 Myr (0.32), criteria met per run 6 (mean 6.38) in both.
 
 ## The sea floor's age and the initiation's polarity (2026-10-25)
 
