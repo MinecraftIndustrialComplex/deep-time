@@ -22,10 +22,13 @@ Counterfactuals (measurement only):
     triangular area-age distribution dA/dt ~ (1 - t/t_m) with t_m = 3 x the mean age given (default Seton et al.
     2020's 64.2 Myr), over the model's own wet oceanic area. The ratio to the model's oceanic total is the part the
     age distribution explains (with the model's thickness-age relation kept).
-  - "compacted": each wet sample's pile compacted with an exponential porosity-depth law phi = phi0 exp(-z/lam)
-    from a deposited porosity phi0 (the model never compacts: pools.rs diagenesis moves sediment to sedimentary rock
-    metre for metre, and GlobSed's thickness is the compacted pile in place). phi0 and lam on the command line:
-    PHI0=0.63 LAM_KM=1.96 (shale, Sclater & Christie 1980, from memory until read).
+  - "in place": the model moves rock metre for metre (the surface stage conserves volume, mass_residual_km3 ~ 0; no
+    bulking, porosity or compaction anywhere in plates/ or surface/, and pools.rs diagenesis turns sediment into
+    sedimentary rock metre for metre), so its pile is the solid's volume, while GlobSed's thickness is the porous pile
+    in place. Each wet sample's pile is stood up as the porous pile holding that solid under an exponential
+    porosity-depth law phi = phi0 exp(-z/lam): H - phi0 lam (1 - exp(-H/lam)) = pile. PHI0=0.63 LAM_KM=1.96 (shale,
+    Sclater & Christie 1980, from memory until read) by default. The plates' own pelagic rain (PLT-103) states no
+    porosity; it is taken as solid like the rest.
 Medians over runs. Needs numpy and scipy."""
 import json
 import os
@@ -60,15 +63,15 @@ def sea_at(run, t):
     return float(best["sea_m"]), float(best["t"])
 
 
-def compacted_km(d_km):
-    """Height a pile deposited d_km thick at porosity PHI0 stands at once compacted: the solid it holds,
-    d (1 - phi0), equals the integral of 1 - phi0 exp(-z/lam) from 0 to H (Newton's method, vectorised)."""
-    s = d_km * (1.0 - PHI0)
+def in_place_km(s_km):
+    """Height of the porous pile holding s_km of solid: the integral of 1 - phi0 exp(-z/lam) from 0 to H equals s
+    (Newton's method, vectorised)."""
+    s = s_km
     h = np.maximum(s, 1e-9)
     for _ in range(40):
         f = h - PHI0 * LAM_KM * (1.0 - np.exp(-h / LAM_KM)) - s
         h = np.maximum(h - f / (1.0 - PHI0 * np.exp(-h / LAM_KM)), 1e-12)
-    return np.where(d_km > 0, h, 0.0)
+    return np.where(s_km > 0, h, 0.0)
 
 
 def one(run, name):
@@ -91,6 +94,17 @@ def one(run, name):
         d, _ = cKDTree(p[cont]).query(p[oc])
         dist[oc] = 2 * R_KM * np.arcsin(np.minimum(d / 2, 1.0))
     pel = np.where(oc, np.minimum(pile, PELAGIC * np.nan_to_num(agef)), 0.0)
+    # The margin's type: an oceanic sample whose own plate holds a continental sample within 500 km lies on a
+    # passive margin's floor (it moves with that continent); one with a continent of another plate within 500 km
+    # and none of its own faces an active margin or a plate boundary; the rest is open ocean.
+    pl = np.fromfile(run / "maps" / "plate" / name, "<u4")
+    d_same = np.full(n, np.inf)
+    for q in np.unique(pl[oc]):
+        c, o = cont & (pl == q), oc & (pl == q)
+        if c.any() and o.any():
+            d, _ = cKDTree(p[c]).query(p[o])
+            d_same[o] = 2 * R_KM * np.arcsin(np.minimum(d / 2, 1.0))
+    flags = np.rint(a[:, 10]).astype(np.int64)
     km3 = lambda m: float(m.sum()) / n * KM3_PER_M
     w = wet
     out = {"t": t, "t_rec": t_rec, "sea_m": sea, "wet": float(w.mean()), "oc": float(oc.mean()),
@@ -115,6 +129,15 @@ def one(run, name):
         out[f"D{lo}"] = km3(pile * m)
         out[f"D{lo}:n"] = float(m.sum()) / max(int((w & oc).sum()), 1)
         out[f"D{lo}:pile"] = float(pile[m].mean()) if m.any() else float("nan")
+    near = dist < 500.0
+    sets = {"passive": w & oc & (d_same < 500.0), "active": w & oc & near & ~(d_same < 500.0),
+            "open": w & oc & ~near, "forearc": w & oc & ((flags & 128) != 0), "arc": w & oc & ((flags & 4) != 0),
+            "sz": w & oc & ((flags & (2 | 64)) != 0)}
+    for key, m in sets.items():
+        out[f"M{key}"] = km3(pile * m)
+        out[f"M{key}:n"] = float(m.sum()) / max(int((w & oc).sum()), 1)
+        out[f"M{key}:age"] = float(np.nanmedian(agef[m])) if m.any() else float("nan")
+        out[f"M{key}:pile"] = float(pile[m].mean()) if m.any() else float("nan")
     for lo, hi in PILE:
         m = w & (pile >= lo * 1e3) & (pile < hi * 1e3)
         out[f"P{lo}"] = km3(pile * m)
@@ -134,10 +157,15 @@ def one(run, name):
     out["earth_ages_oc"] = earth_mean_pile * float(mo.sum()) / n * KM3_PER_M
     out["earth_ages_ratio"] = out["earth_ages_oc"] / max(out["sea_sed_oc"], 1e-9)
     out["pel_earth_ages"] = PELAGIC * EARTH_MEAN_AGE * float(mo.sum()) / n * KM3_PER_M
-    # Compaction: the pile as it would stand compacted in place.
-    comp = compacted_km(pile / 1e3) * 1e3
+    # The pile as a porous pile in place, as GlobSed measures it.
+    comp = in_place_km(pile / 1e3) * 1e3
     out["sea_sed_compacted"] = km3(comp * w)
     out["compacted_ratio"] = out["sea_sed_compacted"] / max(out["sea_sed"], 1e-9)
+    # Both: the in-place pile-by-age curve on Earth's area-age distribution, plus the continental part in place.
+    csum = np.bincount(idx, weights=comp[mo], minlength=len(edges) - 1)
+    cbin = np.where(cnt > 0, csum / np.maximum(cnt, 1), np.nan)
+    out["earth_ages_compacted"] = float((cbin[ok] * wt[ok]).sum() / wt[ok].sum()) * float(mo.sum()) / n * KM3_PER_M \
+        + km3(comp * (w & cont))
     # Thick oceanic-labelled crust (15 km and more): its share of the sea's sediment, its arc magma.
     m = w & oc & (T >= 15e3)
     out["thick_iarc_km"] = float(a[m, 7].mean() / 1e3) if m.any() else float("nan")
@@ -169,11 +197,15 @@ def table(rows, name):
         for lo, hi in AGES))
     print("  wet oceanic by distance to a continent, km: " + "; ".join(
         f"{lo}-{hi:g} share {md[f'D{lo}:n']:.3f} pile {md[f'D{lo}:pile']:.0f} m {md[f'D{lo}']:.3g}" for lo, hi in DIST))
+    print("  wet oceanic by margin (500 km): " + "; ".join(
+        f"{k} share {md[f'M{k}:n']:.3f} age p50 {md[f'M{k}:age']:.0f} pile {md[f'M{k}:pile']:.0f} m {md[f'M{k}']:.3g}"
+        for k in ("passive", "active", "open", "forearc", "arc", "sz")))
     print("  wet samples by their own pile, km: " + "; ".join(
         f"{lo}-{hi:g} share {md[f'P{lo}:n']:.3f} {md[f'P{lo}']:.3g}" for lo, hi in PILE))
     print(f"  earth ages (triangular, mean {EARTH_MEAN_AGE} Myr): oceanic {md['earth_ages_oc']:.3g}, ratio"
           f" {md['earth_ages_ratio']:.3f}; pelagic rain at that mean age {md['pel_earth_ages']:.3g}")
-    print(f"  compacted (phi0 {PHI0}, lambda {LAM_KM} km): {md['sea_sed_compacted']:.3g}, ratio {md['compacted_ratio']:.3f}")
+    print(f"  in place, porous (phi0 {PHI0}, lambda {LAM_KM} km): {md['sea_sed_compacted']:.3g}, ratio {md['compacted_ratio']:.3f};"
+          f" earth ages and in place, with the continental part: {md['earth_ages_compacted']:.3g}")
     print(f"  oceanic crust 15 km and more: island-arc magma {md['thick_iarc_km']:.1f} km, metamorphic"
           f" {md['thick_meta_km']:.1f} km, felsic {md['thick_felsic_km']:.1f} km, distance p50 {md['thick_dist_p50']:.0f} km,"
           f" floor age p50 {md['thick_age_p50']:.0f} Myr")
