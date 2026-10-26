@@ -631,6 +631,22 @@ pub struct Counters {
     /// trench: possible only with law 2's one-spacing clearance (measurement, PLT-064).
     #[serde(default)]
     pub initiations_near_fronts: u32,
+    /// Subduction initiations whose new plate's fracture came within 250, 500, 1,000 and 1,500
+    /// km of a trench that was there before it (measurement, PLT-690: Crameri et al. 2020's
+    /// distance classes, Table 1's freshness code).
+    #[serde(default)]
+    pub initiations_reach_250: u32,
+    #[serde(default)]
+    pub initiations_reach_500: u32,
+    #[serde(default)]
+    pub initiations_reach_1000: u32,
+    #[serde(default)]
+    pub initiations_reach_1500: u32,
+    /// Subduction initiations drawn but not made: no seed beyond PLT-503's margin, or a fracture
+    /// leaving fewer than 32 samples on a side (`rifting::maybe_initiate_subduction`), so the
+    /// realized rate reads against PLT-692's hazard.
+    #[serde(default)]
+    pub initiations_refused: u32,
 }
 
 /// A subduction zone propagating along a passive margin (law 2, `tectonics.margin_propagation`,

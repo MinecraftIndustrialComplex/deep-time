@@ -906,7 +906,15 @@ impl PlatesStage {
         book(st, gap_budget::Part::Other);
         rifting::maybe_rift(st, world, &cache.geo, &pos, &env, &balance.stress_mpa)?;
         cut_trace::mark(st, &cache.geo, "rift");
-        rifting::maybe_initiate_subduction(st, world, &cache.geo, &pos, &env, &balance.stress_mpa)?;
+        rifting::maybe_initiate_subduction(
+            st,
+            world,
+            &cache.geo,
+            &pos,
+            &env,
+            &balance.stress_mpa,
+            &pull.subducting_fronts,
+        )?;
         cut_trace::mark(st, &cache.geo, "initiate");
         // Along-strike propagation to a passive margin (law 2; ledger: PLT-656).
         propagation::step(st, world, &cache.geo, &pos, &env)?;
