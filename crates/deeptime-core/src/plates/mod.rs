@@ -941,7 +941,7 @@ impl PlatesStage {
             &pull.subducting_fronts,
         )?;
         cut_trace::mark(st, &cache.geo, "initiate");
-        // Back-arc rifting, the moving trench (ledger: PLT-700).
+        // Back-arc rifting, the moving trench (ledger: PLT-710).
         rifting::maybe_rift_backarc(
             st,
             world,

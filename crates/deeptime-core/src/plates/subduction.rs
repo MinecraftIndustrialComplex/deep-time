@@ -949,7 +949,7 @@ pub struct Pull {
     pub subducting_fronts: Vec<u32>,
     /// Each of `subducting_fronts` in order: the subducting side's sample across the front and the
     /// front's boundary normal (a unit tangent from the overriding plate towards it, PLT-310), for
-    /// back-arc rifting and its trench-motion measures (ledger: PLT-700, PLT-706).
+    /// back-arc rifting and its trench-motion measures (ledger: PLT-710, PLT-716).
     pub subducting_detail: Vec<(u32, DVec3)>,
     /// Arc crust this step added to continental crust, km³ (Earth-normalized; measurement, for
     /// the crust budget against Stern & Scholl 2010).

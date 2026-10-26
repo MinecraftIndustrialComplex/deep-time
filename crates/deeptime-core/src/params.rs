@@ -1135,7 +1135,7 @@ pub struct TectonicParams {
     /// back-arc that does not open heals (PLT-272). A sliver is kept below
     /// `min_plate_area_frac` while it holds a subducting front (Bird 2003's back-arc
     /// microplates). Off, no back-arc forms: every trench moves with its overriding plate.
-    /// ledger: PLT-700
+    /// ledger: PLT-710
     pub backarc_rifting: bool,
     /// Back-arc rifting's hazard per pair of plates with a qualifying front, per Myr: the share
     /// of Earth's qualifying trench whose back-arc spreads now (Heuret & Lallemand 2005, Table 1:
@@ -1144,7 +1144,7 @@ pub struct TectonicParams {
     /// life of Sdrolias & Müller 2006's Cenozoic back-arc basins (South Fiji 33 to 25 Ma, Parece
     /// Vela and Shikoku 30 to 15 Ma, the Japan Sea 30 to about 15 Ma, the West Philippine Basin
     /// 55 to 30-33 Ma: 15.4 Myr). A draw takes the pair's whole qualifying front, so this is the
-    /// rate the qualifying front converts at. ledger: PLT-701
+    /// rate the qualifying front converts at. ledger: PLT-711
     pub backarc_rifting_per_myr: f64,
     /// Law 3: the resistance an incipient subduction zone pushes against scales with the elastic
     /// thickness of the floor going under (Gurnis, Hall & Lavier 2004 [46]: the force to start
@@ -1432,8 +1432,8 @@ impl Default for TectonicParams {
             incipient_subduction: true,               // ledger: PLT-610 (on since 2026-10-25)
             initiation_polarity_by_age: true,         // ledger: PLT-655
             margin_propagation: false, // ledger: PLT-656 (parked 2026-10-26: no advance)
-            backarc_rifting: false,    // ledger: PLT-700
-            // E3 share 16 / 68 over (1 - 16 / 68) and 15.375 Myr. ledger: PLT-701
+            backarc_rifting: false,    // ledger: PLT-710
+            // E3 share 16 / 68 over (1 - 16 / 68) and 15.375 Myr. ledger: PLT-711
             backarc_rifting_per_myr: 16.0 / (52.0 * ((8.0 + 15.0 + 15.0 + 23.5) / 4.0)),
             incipient_resistance_by_thickness: false, // ledger: PLT-657 (parked with law 2)
             incipient_net_resistance: true, // ledger: PLT-680
