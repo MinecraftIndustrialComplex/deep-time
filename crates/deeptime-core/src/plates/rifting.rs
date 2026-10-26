@@ -2033,6 +2033,10 @@ pub(in crate::plates) mod tests {
         }
     }
 
+    /// A back-arc test planet: the state, the positions, the subducting fronts and their detail.
+    pub(in crate::plates) type BackarcPlanet =
+        (PlateState, Vec<DVec3>, Vec<u32>, Vec<(u32, DVec3)>);
+
     /// Back-arc rifting's test planet: plate 0 (U) south of the equator, plate 1 (O) north of it
     /// on the hemisphere x > 0, plate 2 the rest, all of floor `age_myr` old. O turns about −Y
     /// at `mm_yr` (its front moves north, away from the trench, by up to that; negative, towards
@@ -2044,7 +2048,7 @@ pub(in crate::plates) mod tests {
         age_myr: f64,
         mm_yr: f64,
         slab_km: f64,
-    ) -> (PlateState, Vec<DVec3>, Vec<u32>, Vec<(u32, DVec3)>) {
+    ) -> BackarcPlanet {
         use crate::plates::inherit::tests::{add_plate, contact};
         let mut st = one_plate(geo, 7, |_| {
             let mut s = old_floor();
@@ -2216,12 +2220,16 @@ pub(in crate::plates) mod tests {
     /// back-arc on the share h D / (1 + h D) of its length: Heuret & Lallemand's 16 / 68.
     #[test]
     fn the_backarc_hazard_gives_earth_s_spreading_share() {
-        let h = TectonicParams::default().backarc_rifting_per_myr;
         let d = (8.0 + 15.0 + 15.0 + 23.5) / 4.0;
         assert!((d - 15.375_f64).abs() < 1e-12);
-        let share = h * d / (1.0 + h * d);
+        let exact = 16.0 / (52.0 * d);
+        let share = exact * d / (1.0 + exact * d);
         assert!((share - 16.0 / 68.0).abs() < 1e-12, "{share}");
-        assert!((0.019..0.021).contains(&h), "{h}");
+        // The default is the rate to three figures.
+        let h = TectonicParams::default().backarc_rifting_per_myr;
+        assert!((h / exact - 1.0).abs() < 1e-3, "{h} against {exact}");
+        let share = h * d / (1.0 + h * d);
+        assert!((share - 16.0 / 68.0).abs() < 1e-3, "{share}");
     }
 
     /// The sliver list goes into checkpoints (postcard, which is not self-describing): with no
