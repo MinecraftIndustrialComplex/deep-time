@@ -9032,6 +9032,119 @@ ac619d59fdab, `--set tectonics.incipient_subduction=false`, supercontinent 1, ba
 arguments) has the state_sha256 (adf20d4c...) and fields_sha256 of base13's run. Its rec_sha256
 differs, as it should: the record gains the `incipient` and `benioff` front bands.
 
+### Step 13: the island-front fixes A and B (PLT-680 to PLT-683) (2026-10-26)
+
+The M5 lane's island front diagnosis (`tools/review/islfront/`, decisions log 2026-10-26) found the
+model's island front about 2.75 times Stern & Scholl's intra-oceanic arcs in every v_n band at
+base17's speed level, not a surplus of slow fronts, and the incipient resistance's size (PLT-612,
+Law 3) not the lever. The coordinator's calls (2026-10-26): a measure-only cross-tab of the front,
+and two physics fixes, A and B, on by default once built and correct, with switches for the off
+check.
+
+**A: the incipient front's resistance is the net force** (`tectonics.incipient_net_resistance`,
+PLT-680). Step 12 gave an incipient front Gurnis et al.'s resistance and left its young slab
+pulling beside it. Gurnis, Hall & Lavier 2004 compute the resisting force as what holds the imposed
+convergence ([37]: "The net horizontal force required to maintain the prescribed velocity is
+determined by integrating the horizontal force on each side. A positive value implies an external
+force maintains the plate motion, while a negative force implies the imposed velocities are smaller
+than what would naturally arise from internal forces"), and their models' plates carry their own
+slab ("Forces which drive subduction are the negative buoyancy of the subducting plate and tectonic
+forces"; [61]: "The buoyancy force up until 5-6 Myr is not sufficient to overcome the plate
+bending"). The young slab's buoyancy is inside that net force, so with A an incipient front takes
+the resistance and no slab pull, no slab suction and no slab resistance link (`forces.rs`, the force
+loop's oceanic fronts). The slab still grows by the convergence (FRC-020), and the stage still ends
+at PLT-611's 100 km.
+
+**B: the slab's thermal floor** (`tectonics.slab_thermal_floor`, PLT-681, PLT-682). An oceanic front
+sample converging slower than 10 mm/yr is incipient whatever its contact's slab. Toth & Gurnis 1998,
+p. 18,063: "We concluded that at subduction velocities of <10 mm/yr thermal diffusion inhibits slab
+formation and no substantial slab pull force develops"; p. 18,062, at 4 mm/yr "the rate of
+convergence is so low that diffusive heating does not allow a slab to develop". McKenzie 1977's 13
+mm/yr is read only through Toth & Gurnis (p. 18,064: "also quite consistent with our direct
+calculations") and Gurnis et al. 2004 ("at least 1.3 cm/yr for the thermal anomaly of the slab to
+persist without diffusing away"), so it stays `cited-unverified`. Both are the same physics, the
+slab's heat diffusing away faster than it sinks, and the coordinator's rule takes the one whose
+physics is the rule's, not a midpoint: Toth & Gurnis's 10 mm/yr, computed in their models and read.
+Their criterion is for a slab forming at a new subduction zone; a mature front's slow stretch with
+its slab already sunk is outside it, so B's reach there is an extension (PLT-681 `game-choice`, the
+upper bound of what the source supports).
+
+B acts per sample, each consumer with the convergence it already reads:
+
+- the force balance: the front sample's convergence (`sf.conv`) gives the incipient resistance,
+  no pull, suction or slab link, and no Forsyth & Uyeda friction (Step 12's guard);
+- the arcs (`subduction::fronts_finish`): the convergence across the front gives no arc magma, no
+  arc band weight and no arc onset (PLT-669);
+- the boundary mix: the sample's normal convergence gives class other, `front_bands.incipient`,
+  and the floor's own part in `slow`;
+- the margins (`stats::margins`): the closing speed of the pair of samples gives no front where
+  the side going under is oceanic (a continental side going under is a collision, as before).
+
+The slab is fed as before (FRC-020: the pair's whole front, its slow samples included), so a contact
+still matures by cumulative convergence.
+
+*The fronts A and B act on.* The force balance reads its fronts from the deformation lattice, with
+no PLT-582 check that the subducting plate is still beside the front, while the arcs, the boundary
+mix and the margins read the current geometry. The front lane is adding that check to `forces.rs`
+(the coordinator, 2026-10-26). A's and B's force terms act at the lattice's fronts until then, so
+the island front is read here through the current geometry's fronts (the boundary mix's bands and
+the crust budget's `front_oceanic`), and the `matured` count below, from the force balance's front
+sums, inherits the lattice's fronts.
+
+*Lock-in.* With A and B a slow stretch has no pull and takes a plastic resistance linearised at
+max(convergence, 1 mm/yr), so the balance can hold it, and the next step's convergence (from the
+solved motion) is slower still. The unit tests show it on the reference plate: the 40-km slab's
+trench moves at 0.0000 mm/yr with A (0.59 without), the full slab pushed at 5 mm/yr at 0.000 with B
+(51.73 without), and in `cumulative_convergence_ends_the_incipient_stage` the incipient trench is
+held at 0.000 mm/yr at both pushes (6.28 and 9.25 before A). That test's stage ends at the same
+steps, since the prescribed push grows the slab, but a planet's front has no prescribed push.
+Whether its slow stretches lock in is read on the arm below, by the plate speeds of slab-attached
+and free plates.
+
+**The cross-tab** (PLT-683, measurement only). The record's `front_bands` gain:
+
+- `slow`: B's part of `incipient`;
+- `incipient_normal`: the incipient front by its convergence band;
+- `normal_pair`: the subducting front by its sample's convergence band and by the mean convergence
+  over its pair of plates' front samples that step, which tells a per-sample floor from a
+  per-stretch one;
+- `oo_normal_pair`: the ocean-ocean subducting front by its plates' origin and its band;
+- `gain`, `loss`, `gain_slab`: each pair of plates' front change since the step before, by setting
+  and state, net per pair, and the subducting gain by the pair's slab band.
+
+The step record gains `matured`: the contacts whose slab passed PLT-611 that step, with their
+oceanic front's mean convergence and sample count and the contact's age. A sample's flag byte has no
+bit left, so the pair's front change stands in for a per-stretch front age. Read by
+`tools/review/islfront/measure_islab.py` (the pool's `islab` measure, with
+`--registry tools/review/islfront/measures_islab.json`) and `islrec.py`.
+
+**The tests** (`plates/tests.rs`, 20,000 samples):
+
+- `an_incipient_fronts_resistance_is_net`: the reference plate with a 40-km slab on 80-Myr floor.
+  On, no pull torque on the plate going under and no suction torque on the overriding plate, the
+  incipient resistance 8.1446 × 10^18 N, the trench at 0.0000 mm/yr; off, pull 3.486 × 10^25 N m,
+  suction 1.046 × 10^25 N m, the same resistance, the trench at 0.59 mm/yr. With a full slab on and
+  off are the same, bit for bit.
+- `a_front_too_slow_for_a_slab_is_incipient`: the reference plate with a full slab pushed at 5
+  mm/yr. On, the trench at 0.000 mm/yr, no pull, the incipient resistance 8.1446 × 10^18 N, 3,832 km
+  of incipient front, all of it `slow`, no ocean-continent front, 0 of 127 coastal samples a
+  subduction margin, and on a straight front no arc; off, the trench at 51.73 mm/yr, pull 5.959 ×
+  10^26 N m, 3,832 km of ocean-continent front, 31 margins, 1,101 m of arc magma. Pushed at 40
+  mm/yr, on and off are the same.
+- `the_front_cross_tabs_add_up`: the head-on plates closing in from 0 to about 50 mm/yr with full
+  slabs. Floor off, 21,715 km of ocean-continent front in the bands 1,437 / 1,597 / 3,193 / 6,866 /
+  8,622 km, all of it on a pair whose mean is in the 20 to 40 band; floor on, the 3,034 km under 10
+  mm/yr is incipient and all of it `slow`, the rest unchanged. Every table sums to its band within
+  the rounding of its cells.
+- `recording_does_not_change_the_world_and_matches_the_run`: every step, the front's change equals
+  the gain less the loss, and the gain by slab band sums to the subducting gain.
+- With the floor on by default, `a_slabs_length_survives_a_resampling` (plates closing in from 0 to
+  50 mm/yr) and `an_arcs_rate_is_its_types_rate_at_earths_convergence_scaled_by_its_own` (stretches
+  near the pole under 10 mm/yr at the slow speed) pin it off: they test PLT-550 and PLT-665, not B.
+- The margins' front is decided by the side going under: the first build exempted a sample whose
+  neighbour across the front was continental, which left 30 subduction margins in
+  `a_front_too_slow_for_a_slab_is_incipient` with the floor on; the rule now reads the sample of
+  the side going under.
 
 ## Plate speed (2026-10-25)
 
