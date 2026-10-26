@@ -35,10 +35,13 @@
 //!    stack (`routing.rs`); implicit stream power with erosion–deposition and a critical slope
 //!    (`spl.rs`), runoff-weighted areas, K from the surface rock; river loads fill the sea from
 //!    their mouths (`marine.rs`); carbonate production (`carbonate.rs`) and evaporites in
-//!    restricted arid seas and closed arid lakes; one implicit diffusion over land (hillslope κ
-//!    from the surface rock) and sea (Landlab's depth-dependent D).
+//!    restricted arid seas and closed arid lakes; in the first, the pelagic rain (`pelagic.rs`:
+//!    the arid land's dust, and the dissolved load back as carbonate, chalk and opal); one
+//!    implicit diffusion over land (hillslope κ from the surface rock) and sea (Landlab's
+//!    depth-dependent D).
 //! 4. With the climate's chemical denudation on, the rock its silicate weathering took into
-//!    solution (`climate/dissolved_m`) leaves the ground. The net change of every cell goes into
+//!    solution (`climate/dissolved_m`) leaves the ground, and the dust the rain laid leaves the
+//!    arid land. The net change of every cell goes into
 //!    the strata log with its facies (`facies.rs`, `strata_log.rs`) or erodes regolith, then the
 //!    log; weathering makes regolith (`weathering.rs`); buried regolith becomes a log layer (a
 //!    palaeosol).
@@ -53,9 +56,11 @@
 //!    frame, the events (`events.rs`).
 //!
 //! Mass: routing, stream power, the mouth fill and diffusion conserve material exactly (to
-//! round-off); carbonate, chalk and evaporite are added from the sea, and the dissolved load
-//! leaves in solution. `notes.surface.mass_residual_km3` reports Σ(Δh)·a + dissolved −
-//! (carbonate + chalk + evaporite) for the whole run.
+//! round-off); carbonate, chalk, opal and evaporite are added from the sea, and the dissolved
+//! load leaves in solution (the pelagic rain returns its Ca + Mg and silica as carbonate, chalk
+//! and opal; the rest, Na and K, stays in the sea); the dust moves from the land to the sea.
+//! `notes.surface.mass_residual_km3` reports Σ(Δh)·a + dissolved − (carbonate + chalk + opal +
+//! evaporite) for the whole run.
 
 pub mod advect;
 pub mod amplify;
@@ -79,6 +84,7 @@ pub mod lithology;
 pub mod marine;
 pub mod oracle;
 pub mod params;
+pub mod pelagic;
 pub mod pflood;
 pub mod routing;
 pub mod spl;
@@ -191,9 +197,23 @@ pub struct Totals {
     pub lake_km3: f64,
     pub marine_km3: f64,
     pub carbonate_km3: f64,
-    /// Pelagic chalk (`carbonate::pelagic`; not in `carbonate_km3`).
+    /// Pelagic chalk (the calcifiers' share of the pelagic rain, `pelagic.rs`; not in
+    /// `carbonate_km3`).
     #[serde(default)]
     pub pelagic_km3: f64,
+    /// The pelagic rain (`pelagic.rs`): the carbonate the dissolved load's Ca + Mg came back as
+    /// (chalk and the rest; part of `pelagic_km3` and `carbonate_km3`), its silica as opal, and
+    /// the dust blown off the arid land and laid on the sea.
+    #[serde(default)]
+    pub returned_carbonate_km3: f64,
+    #[serde(default)]
+    pub opal_km3: f64,
+    #[serde(default)]
+    pub dust_km3: f64,
+    /// The part of the pelagic rain's supply not laid: a part with no floor of its kind on the
+    /// planet, or more than the water left above a cell (`pelagic::Rain::lay`), km³.
+    #[serde(default)]
+    pub rain_unlaid_km3: f64,
     /// What limits the photic carbonate factory (measurement only), km² × Myr summed over the
     /// steps: the sea floor in its photic zone (0 to [`carbonate::PHOTIC_M`] deep), that area
     /// weighted by the water's warmth factor, and by warmth times clarity (`carbonate::produce`).
@@ -239,8 +259,8 @@ pub struct Totals {
     /// Sediment moved down submarine slopes by slope failure (`marine::slope_failure`).
     #[serde(default)]
     pub slope_failure_km3: f64,
-    /// Σ(Δh)·a + dissolved − (carbonate + pelagic + evaporite): what the processes created or
-    /// lost, km³.
+    /// Σ(Δh)·a + dissolved − (carbonate + pelagic + opal + evaporite): what the processes
+    /// created or lost, km³.
     pub mass_residual_km3: f64,
     pub steps: u64,
     pub spl_iterations: u64,
@@ -466,8 +486,11 @@ struct Parts {
     lake: Vec<f32>,
     marine: Vec<f32>,
     carbonate: Vec<f32>,
-    /// The open sea's calcareous ooze (`carbonate::pelagic`).
+    /// The open sea's calcareous ooze (the pelagic rain's chalk, `pelagic.rs`).
     pelagic: Vec<f32>,
+    /// The pelagic rain's opal and dust (`pelagic.rs`).
+    siliceous: Vec<f32>,
+    dust: Vec<f32>,
     /// Carbonate the marine diffusion brought off platforms (`carbonate::exported`; taken out of
     /// `marine`, and in neither `carbonate` nor the totals' production).
     periplatform: Vec<f32>,
@@ -486,11 +509,17 @@ struct Parts {
 }
 
 impl Parts {
-    /// What the step laid at cell `c` other than carbonate (river, lake, sea-fill, glacial and
-    /// evaporite sediment), m.
+    /// What the step laid at cell `c` other than carbonate (river, lake, sea-fill, glacial,
+    /// evaporite, opal and dust sediment), m.
     fn laid_other(&self, c: usize) -> f64 {
         f64::from(
-            self.marine[c] + self.till[c] + self.evaporite[c] + self.fluvial[c] + self.lake[c],
+            self.marine[c]
+                + self.till[c]
+                + self.evaporite[c]
+                + self.fluvial[c]
+                + self.lake[c]
+                + self.siliceous[c]
+                + self.dust[c],
         )
     }
 
@@ -504,6 +533,8 @@ impl Parts {
             marine: filled(n, 0.0),
             carbonate: filled(n, 0.0),
             pelagic: filled(n, 0.0),
+            siliceous: filled(n, 0.0),
+            dust: filled(n, 0.0),
             periplatform: filled(n, 0.0),
             evaporite: filled(n, 0.0),
             till: filled(n, 0.0),
@@ -726,7 +757,11 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
         // the laid periplatform and `exported`'s state and share (4 + 8 + 1 + 4 + 8 + 4 + 1 + 4 B;
         // its heap and output hold only the cells the carbonate reaches).
         + 28
-        + 34;
+        + 34
+        // The pelagic rain (ERO-208 to ERO-214): the opal and dust parts through the step, the
+        // arid land's cell list at most every cell, and in its substep the water depths and the
+        // room left (4 + 4 + 4 + 8 + 8 B).
+        + 28;
     let frames = (p.run_myr() / s.frame_every_myr).ceil().max(1.0) as u64;
     let history = frames * cells * 12; // packed frames, ~12 B/cell after LZ4 (measured in P1-04)
     let steps = p.plate_steps() as f64 * f64::from(s.substeps);
@@ -1037,6 +1072,23 @@ impl SurfaceStage {
             .get(crate::climate::field::DISSOLVED)
             .filter(|f| f.data.len() == n)
             .map(|f| f.data.iter().map(|&x| f64::from(x).max(0.0)).collect());
+        // The pelagic rain's share of it (`pelagic.rs`): its mass per mol of Ca + Mg (ERO-206),
+        // and the part of its Ca + Mg the climate's drawdown already laid as cap carbonate.
+        let kg_per_mol = self
+            .preset
+            .climate
+            .as_ref()
+            .map_or(0.0, |c| c.dissolved_kg_per_mol);
+        let cap_share = {
+            let g = |k: &str| world.globals.get(k).copied().filter(|x| x.is_finite());
+            match (
+                g(crate::climate::CAP_CARBONATE_MOL_GLOBAL),
+                g(crate::climate::DISSOLVED_MOL_GLOBAL),
+            ) {
+                (Some(cap), Some(placed)) if placed > 0.0 => (cap / placed).clamp(0.0, 1.0),
+                _ => 0.0,
+            }
+        };
         let lat_of = |j: usize| fields::row_lat(&grid, j);
         // The glaciers' climate (`glacial.rs`): the ELA of the climate stage; none without it.
         // The deep-time surface is physics: glaciers as wide as they are (the valley width is the
@@ -1357,6 +1409,11 @@ impl SurfaceStage {
         // The photic factory's limits over the step's substeps (cells; measurement only).
         let mut photic = [0.0f64; 3];
         let epoch = self.epoch();
+        // The pelagic rain (`pelagic.rs`), laid in the first substep: the arid land its dust
+        // comes off (taken off at the step's end) and what it laid (m × cells).
+        let mut arid: Vec<u32> = Vec::new();
+        let mut rain_laid = pelagic::Laid::default();
+        let mut rain_supply_m3 = 0.0;
         for sub in 0..subs {
             // The first substep's flood ran beside the setup (above).
             if sub > 0 {
@@ -1648,10 +1705,6 @@ impl SurfaceStage {
                     *x += y;
                 }
             }
-            // The planktic calcifiers' rain at the substep's middle (`deposits::clocks`).
-            let calcifiers = epoch.pelagic_calcifiers_at(
-                (t_end_myr - dt_myr + (sub as f64 + 0.5) * dts / 1.0e6) * 1.0e6,
-            );
             // The carbonate laid before this substep: what it lays lies on top (the
             // periplatform tracer below takes it first).
             let carb_before: Vec<f32> = parts
@@ -1662,10 +1715,9 @@ impl SurfaceStage {
                 .collect();
             sc.h.par_iter_mut()
                 .zip(parts.carbonate.par_iter_mut())
-                .zip(parts.pelagic.par_iter_mut())
                 .zip(parts.evaporite.par_iter_mut())
                 .enumerate()
-                .for_each(|(c, (((h, carb), pel), evaporite))| {
+                .for_each(|(c, ((h, carb), evaporite))| {
                     if kind[c] == BASE {
                         let z = sea - *h;
                         let add = carbonate::produce(
@@ -1686,19 +1738,6 @@ impl SurfaceStage {
                             *h += extra;
                             *carb += extra as f32;
                         }
-                        // The open sea's calcareous ooze above the compensation depth (the column
-                        // builder's CCD, RCK-015).
-                        let z = sea - *h;
-                        if calcifiers > 0.0 && z > 0.0 {
-                            let ooze = carbonate::pelagic(
-                                z,
-                                calcifiers,
-                                dts,
-                                crate::structure::columns::CCD_M,
-                            );
-                            *h += ooze;
-                            *pel += ooze as f32;
-                        }
                         let z = sea - *h;
                         if restricted[c]
                             && z > 0.0
@@ -1718,6 +1757,56 @@ impl SurfaceStage {
                         }
                     }
                 });
+            // The pelagic rain of the plate step (`pelagic.rs`), spread over the sea floor as it
+            // stands now: the dust of the arid land, the dissolved load's carbonate (the planktic
+            // calcifiers' share at the step's middle, `deposits::clocks`, as chalk) and silica.
+            if sub == 0 {
+                let ccd = crate::structure::columns::CCD_M;
+                // Each sea cell's water depth now (0 elsewhere): the floor, and the room it has.
+                let z: Vec<f64> = (0..n)
+                    .into_par_iter()
+                    .map(|c| if kind[c] == BASE { sea - sc.h[c] } else { 0.0 })
+                    .collect();
+                let floor = pelagic::Floor::of(&z, ccd);
+                let arid_index = crate::hydro::network::ARID_INDEX; // ledger: BIO-038
+                arid = (0..n)
+                    .into_par_iter()
+                    .filter(|&c| kind[c] != BASE && f64::from(clim.aridity[c]) < arid_index)
+                    .map(|c| c as u32)
+                    .collect();
+                let dissolved_m3 = dissolved.as_ref().map_or(0.0, |dz| dz.iter().sum::<f64>());
+                let supply = pelagic::Supply::new(
+                    dissolved_m3 * a,
+                    kg_per_mol,
+                    cap_share,
+                    arid.len() as f64 * a,
+                    dt_myr * 1.0e6,
+                );
+                rain_supply_m3 = supply.volume_m3();
+                let mid = (t_end_myr - 0.5 * dt_myr) * 1.0e6;
+                let calcifiers = epoch.pelagic_calcifiers_at(mid);
+                let rain = pelagic::Rain::spread(&supply, calcifiers, &floor, a, ccd);
+                // Laid on top of the substep's carbonate and evaporite, each cell at most its
+                // water (what it cannot hold settles where there is room, `pelagic::Rain::fill`).
+                let mut room: Vec<f64> = z.iter().map(|x| x.max(0.0)).collect();
+                rain_laid = rain.fill(
+                    &z,
+                    &mut room,
+                    pelagic::Outs {
+                        chalk: &mut parts.pelagic,
+                        carbonate: &mut parts.carbonate,
+                        opal: &mut parts.siliceous,
+                        dust: &mut parts.dust,
+                    },
+                );
+                sc.h.par_iter_mut()
+                    .zip(z.par_iter().zip(room.par_iter()))
+                    .for_each(|(h, (&z, &r))| {
+                        if z > 0.0 {
+                            *h += z - r;
+                        }
+                    });
+            }
             self.time("carbonate", started);
 
             // Hillslope and marine diffusion.
@@ -1923,6 +2012,14 @@ impl SurfaceStage {
             }
             dissolved_m = dz.iter().sum::<f64>();
         }
+        // The dust the pelagic rain laid on the sea leaves the arid land, evenly (ledger:
+        // ERO-208): what the sea got, so the move conserves the material.
+        if !arid.is_empty() && rain_laid.dust > 0.0 {
+            let off = rain_laid.dust / arid.len() as f64;
+            for &c in &arid {
+                sc.h[c as usize] -= off;
+            }
+        }
         let net: Vec<f64> = (0..n)
             .into_par_iter()
             .map(|c| sc.h[c] - h_start[c])
@@ -1976,6 +2073,8 @@ impl SurfaceStage {
                         evaporite: f64::from(parts.evaporite[c]),
                         glacial: f64::from(parts.till[c]),
                         pelagic: f64::from(parts.pelagic[c]),
+                        siliceous: f64::from(parts.siliceous[c]),
+                        dust: f64::from(parts.dust[c]),
                         rate_m_myr: dm / dt_myr,
                         land_plants,
                     };
@@ -2291,6 +2390,7 @@ impl SurfaceStage {
         let pel: f64 = parts.pelagic.iter().map(|&x| f64::from(x)).sum();
         let peri: f64 = parts.periplatform.iter().map(|&x| f64::from(x)).sum();
         let evap: f64 = parts.evaporite.iter().map(|&x| f64::from(x)).sum();
+        let opal: f64 = parts.siliceous.iter().map(|&x| f64::from(x)).sum();
         let km3 = a / 1.0e9;
         let t = &mut st.totals;
         t.eroded_km3 += parts.eroded.iter().map(|&x| f64::from(x)).sum::<f64>() * km3;
@@ -2299,6 +2399,10 @@ impl SurfaceStage {
         t.marine_km3 += parts.marine.iter().map(|&x| f64::from(x)).sum::<f64>() * km3;
         t.carbonate_km3 += carb * km3;
         t.pelagic_km3 += pel * km3;
+        t.returned_carbonate_km3 += (rain_laid.chalk + rain_laid.carbonate) * km3;
+        t.opal_km3 += opal * km3;
+        t.dust_km3 += rain_laid.dust * km3;
+        t.rain_unlaid_km3 += rain_supply_m3 / 1.0e9 - rain_laid.total() * km3;
         t.periplatform_km3 += peri * km3;
         t.periplatform_source_km3 += peri_source_m_cells * km3;
         let km2_myr = a / 1.0e6 * dts / 1.0e6;
@@ -2318,9 +2422,9 @@ impl SurfaceStage {
             .sum::<f64>()
             * km3;
         t.mass_residual_km3 += if dissolved.is_some() {
-            (sum_net + dissolved_m - carb - pel - evap) * km3
+            (sum_net + dissolved_m - carb - pel - opal - evap) * km3
         } else {
-            (sum_net - carb - pel - evap) * km3
+            (sum_net - carb - pel - opal - evap) * km3
         };
         t.steps += 1;
         t.spl_iterations += iterations;

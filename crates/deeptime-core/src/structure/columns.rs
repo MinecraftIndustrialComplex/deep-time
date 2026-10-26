@@ -83,11 +83,15 @@ use crate::surface::{basement_class, weathering};
 use super::metamorphism::Paths;
 use super::params::StructureParams;
 
-/// Depth of the carbonate compensation depth, m below sea level. Game choice: one value for every
-/// ocean. Today's CCD is about 4.2–4.5 km in the Pacific (about 5 km under the equatorial
-/// upwelling), about 4.3 km in the Indian Ocean and 5–6 km in the Atlantic (secondary sources:
-/// Wikipedia, SEPM Strata, LibreTexts), so 4,500 m is the Pacific figure.
-// ledger: RCK-015 (game choice)
+/// Depth of the carbonate compensation depth, m below sea level: one value for every ocean and
+/// every age. "At present, this depth is approximately 4,500 m" (Coxall et al. 2005, abstract);
+/// Sulpis et al. 2018 (SI table S1, the depth below 10 % CaCO3) give 3,895 to 5,926 m over 17
+/// basins, median 4,439 m; Pälike et al. 2012 give 4.6 km at present. The CCD was shallower in
+/// the past (Pälike: 3.0 to 3.5 km at about 55 Ma, more than 1 km deepening at the
+/// Eocene-Oligocene transition), set by the balance of the weathering's solute flux against the
+/// carbonate buried; the model has no alkalinity budget to move it (erosion-and-sediment.md
+/// "The pelagic rain", Limits).
+// ledger: RCK-015
 pub const CCD_M: f64 = 4500.0;
 
 /// The share of ocean crust's mafic volcanic pool (seismic layer 2) that is lavas, pillows and
