@@ -154,6 +154,20 @@ pub fn hyper_extended(s: &Sample) -> bool {
     s.kind == CONTINENTAL && crystalline_m(&s.own_pools()) < HYPER_EXTENDED_M
 }
 
+/// Whether continental crust `s` is a sediment margin, ocean floor the margin's sediment turned
+/// continental (PLT-661): hyper-extended, on an ocean basement, with a crust of its own (the
+/// column less the basement) that is more sediment and sedimentary rock than crystalline rock.
+/// Crust made from ocean floor otherwise, an emerged arc's or crust a collapse spread or a
+/// resampling stacked onto the floor, is mostly crystalline rock of its own. ledger: PLT-667
+pub fn sediment_margin(s: &Sample) -> bool {
+    if !hyper_extended(s) || s.basement() <= 0.0 {
+        return false;
+    }
+    let own = s.own_pools();
+    let pile = f64::from(own[pool::SEDIMENT].max(0.0)) + f64::from(own[pool::SEDIMENTARY].max(0.0));
+    crystalline_m(&own) < pile
+}
+
 /// Whether ocean floor `s` holds rock from the continents at `t_myr`: sediment and sedimentary
 /// rock beyond the pelagic rain of `pelagic_m_per_myr` over its age. ledger: PLT-661
 pub fn holds_terrigenous(s: &Sample, t_myr: f64, pelagic_m_per_myr: f64) -> bool {
@@ -228,6 +242,9 @@ pub struct Transition {
     /// Ocean floor of the zone's ocean side turned continental this step for the continents'
     /// rock it holds (`margin_sediment_continental`; ledger: PLT-661).
     pub margins: u32,
+    /// Sediment margins ([`sediment_margin`]) outside the zone's ocean side turned ocean floor
+    /// again this step (ledger: PLT-667).
+    pub margins_left: u32,
 }
 
 /// The transition's width W as an angle on the unit sphere: `transition_width_km` is a length on
@@ -535,12 +552,25 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
     // from the samples as the step began, so a column turned now is the ocean side's next step
     // too and the next ring out is no margin of it.
     if margins {
+        let mut in_zone = vec![false; n];
         for m in &members {
+            in_zone[m.i] = side[m.i] == OCEANIC;
             let s = &mut state.samples[m.i];
             if holds_terrigenous(s, env.t_myr, k.pelagic_m_per_myr) {
                 // Its own ocean crust stays under it as its basement (ledger: PLT-331).
                 s.make_continental();
                 out.margins += 1;
+            }
+        }
+        // The margin is the zone's, measured on this lattice from the continent's own crust as
+        // it is now: a sediment margin outside the zone's ocean side is ocean floor (ledger:
+        // PLT-667). A resampling moves a class's edge without bias, a fraction of a spacing each
+        // time, and a margin kept wherever the zone once reached grew with every move outward
+        // (the residual ratchet, plates.md "The residual ratchet").
+        for (i, s) in state.samples.iter_mut().enumerate() {
+            if eligible[i] && !in_zone[i] && sediment_margin(s) {
+                s.make_oceanic();
+                out.margins_left += 1;
             }
         }
     }

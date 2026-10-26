@@ -254,6 +254,18 @@ impl Sample {
         self.basement_m = own.min(self.mafic_m());
     }
 
+    /// Continental crust made from ocean floor is ocean floor again (a sediment margin outside
+    /// the transition's zone, `transition::step`): its pools stay as they are, its basement is
+    /// the floor's own crust once more. The inverse of [`make_continental`](Sample::make_continental).
+    /// ledger: PLT-667
+    pub fn make_oceanic(&mut self) {
+        if self.kind == OCEANIC {
+            return;
+        }
+        self.kind = OCEANIC;
+        self.basement_m = 0.0;
+    }
+
     /// The column's mafic rock, m.
     fn mafic_m(&self) -> f32 {
         self.pools[pool::MAFIC_VOLCANIC].max(0.0) + self.pools[pool::MAFIC_PLUTONIC].max(0.0)
