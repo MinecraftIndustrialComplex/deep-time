@@ -5006,8 +5006,12 @@ fn a_front_stamps_its_orthogonal_convergence() {
 /// resampling took the 271 hyper-extended columns to 213 to 224 and made 177 to 194 mixed ones,
 /// and six in a row grew the core from 9,998 columns to 10,117 (+1.2 %) and the mixed ones to
 /// 975; on the class blend the count stays 265 to 280, no column mixes, and the core ends at
-/// 10,002 (+0.04 %). The lattice's noise still turns 14 to 40 columns at the step after each
-/// resampling: the zone's edge refilled, the zone where it was.
+/// 10,002 (+0.04 %). The zone itself still grows, and the test prints it without asserting on
+/// it: the step after each of the six turns 14 to 40 columns, the hyper-extended count goes 271,
+/// 314, 343, 364, 393, 411, 441 and the zone's lowest z −0.031 to −0.074, about a ring further
+/// out than the rule reaches (a residual ratchet: a new sample takes its major corner's class, so
+/// the lattice's noise drops oceanic samples into the ring beside the core, which the next step
+/// turns, and carries hyper-extended ones past that ring, which nothing turns back).
 #[test]
 fn a_resampling_keeps_a_converted_margin_apart_from_its_core() {
     let mut p = preset(20_000, 20.0, "supercontinent", 5);
@@ -5089,17 +5093,33 @@ fn a_resampling_keeps_a_converted_margin_apart_from_its_core() {
         kept.push(hyper(&s2) as f64);
         mixes.push(mixed(&s2));
     }
-    // Six resamplings in a row, each followed by a transition step, as a run has them: the
-    // ratchet grows the core at each, where the lattice's noise only refills the zone's edge
-    // (a new sample inside the zone whose nearest old one lay outside it comes out oceanic and
-    // turns again), which leaves the core as it was.
-    let (mut cores, mut turned) = (Vec::new(), Vec::new());
+    // Six resamplings in a row, each followed by a transition step, as a run has them: the old
+    // blend's ratchet grew the core at each; on the class blend the core stays, but the zone's
+    // outer edge creeps out (printed: the count and the lowest z at each, not asserted).
+    // How far down the ocean the zone reaches: the hyper-extended columns' lowest z.
+    let reach = |st: &PlateState, pos: &[DVec3]| {
+        let z = st
+            .samples
+            .iter()
+            .zip(pos)
+            .filter(|(s, _)| !s.is_hidden() && transition::hyper_extended(s))
+            .map(|(_, q)| q.z)
+            .fold(f64::INFINITY, f64::min);
+        (z * 1000.0).round() / 1000.0
+    };
+    eprintln!(
+        "the zone reaches z {} before the resamplings",
+        reach(&st, &pos)
+    );
+    let (mut cores, mut turned, mut zone) = (Vec::new(), Vec::new(), Vec::new());
     let mut chain = resampled(&st, &geo, &pos, 100);
     for k in 1..=6 {
         let (s2, geo2, pos2) = &mut chain;
         mixes.push(mixed(s2));
+        let at_resampling = hyper(s2);
         turned.push(transition::step(s2, geo2, pos2, &env).margins);
         cores.push(core(s2));
+        zone.push((at_resampling, hyper(s2), reach(s2, pos2)));
         if k < 6 {
             chain = resampled(&chain.0, &chain.1, &chain.2, 100 + k);
         }
@@ -5107,7 +5127,8 @@ fn a_resampling_keeps_a_converted_margin_apart_from_its_core() {
     let mean = |v: &[f64]| v.iter().sum::<f64>() / v.len() as f64;
     eprintln!(
         "first step turned {}, hyper-extended {before}, core {core0}; after one resampling: \
-         hyper-extended {kept:?}; six in a row: core {cores:?}, turned {turned:?}; mixed {mixes:?}",
+         hyper-extended {kept:?}; six in a row: core {cores:?}, turned {turned:?}, \
+         hyper-extended (at the resampling, after its step) {zone:?}; mixed {mixes:?}",
         first.margins
     );
     let change = mean(&kept) / before as f64 - 1.0;
