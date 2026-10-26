@@ -178,6 +178,12 @@ public final class RiverGameTests {
      * and holds no water is a mismatch, as is any river column below its top. Water over a column
      * that should be dry is {@code outside}, unless the column is in a hot-spring pool of
      * {@code geothermal} and the water's top is the pool's level ({@code pools}).
+     *
+     * <p>Only columns on the cube's faces are read ({@link ChunkSampling#onFaces}): off them a chunk is a
+     * turned copy of its partner face's terrain, so {@link Water#column} at the column's own net position
+     * says nothing about its blocks. Until 2026-10-26 every column of a box was read; on the planet of
+     * master 9fd6f43c a lake mouth lay at (2049, 508), 4 blocks inside its face's edge, and 4 columns of its
+     * box past that edge (z 512 to 518) read as lake columns with grass at the waterline.
      */
     static Tally count(ServerLevel level, WorldData wd, Water.Spec spec, Geothermal geothermal, List<Site> sites) {
         Tally t = new Tally();
@@ -186,6 +192,8 @@ public final class RiverGameTests {
         for (Site s : sites) {
             for (int x = s.x() - HALF + 1; x < s.x() + HALF - 1; x++) {
                 for (int z = s.z() - HALF + 1; z < s.z() + HALF - 1; z++) {
+                    if (!ChunkSampling.onFaces(wd, x, z))
+                        continue;
                     Water.Column col = Water.column(wd, spec, x, z);
                     LevelChunk chunk = level.getChunk(x >> 4, z >> 4);
                     int top = chunk.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, x & 15, z & 15);

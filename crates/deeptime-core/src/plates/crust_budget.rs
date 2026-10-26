@@ -120,7 +120,7 @@ pub const EDGES_KM: [f64; 10] = [
 ];
 
 /// The globals each snapshot copies (cumulative over the run, km³ or km² Earth-normalized).
-const GLOBALS: [(&str, &str); 68] = [
+const GLOBALS: [(&str, &str); 69] = [
     ("flow_steps", super::flow::STEPS_GLOBAL),
     ("flow_substeps", super::flow::SUBSTEPS_GLOBAL),
     ("flow_short_myr", super::flow::SHORT_GLOBAL),
@@ -138,6 +138,7 @@ const GLOBALS: [(&str, &str); 68] = [
     ("noroom_sliver", super::belts::SLIVER_GLOBAL),
     ("noroom_capped", super::belts::CAPPED_GLOBAL),
     ("noroom_clipped", super::belts::CLIPPED_GLOBAL),
+    ("noroom_stays", super::belts::STAYS_GLOBAL),
     ("taper_toe", super::belts::TOE_GLOBAL),
     // The overriding plate's share (ledger: PLT-652; zero without the switch).
     ("upper", super::belts::UPPER_GLOBAL),

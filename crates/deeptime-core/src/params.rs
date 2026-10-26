@@ -536,6 +536,17 @@ pub struct TectonicParams {
     /// where the thickening lands moves. `false`: the profile `1 − (d/W)²`, highest at the front
     /// (ledger PLT-243). ledger: PLT-600, PLT-601
     pub collision_belt_taper: bool,
+    /// `true` (the default since 2026-10-26, the suture-loss lane): the crust a collision belt
+    /// has no room for stays in the crust. The belt's passes run until its crust is placed or
+    /// every sample stands at the strength height (no pass limit and no half-belt floor), and
+    /// what is left is stacked on the belt by its profile anyway (on the overriding plate's edge
+    /// at the front when no continental crust is within the belt's reach: an arc in collision).
+    /// The step's own rules then move it: the thickening ceiling's and the thickest crust's
+    /// spreading to the nearest room on the plate (PLT-287, PLT-277), and what finds none goes
+    /// down from the bottom of its column. Only `collision_stacking_share`'s loss leaves at the
+    /// front. `false`: what the belt cannot take goes down with the slab at once (PLT-243's room
+    /// share and floor, PLT-253's six passes). ledger: PLT-700
+    pub collision_noroom_stays: bool,
     /// Two plates in collision weld into one when the convergence across their front has stayed
     /// below this, mm/yr …
     pub weld_speed_mm_yr: f64,
@@ -1315,6 +1326,7 @@ impl Default for TectonicParams {
             collision_restack_whole: true,    // ledger: PLT-400 (game-choice; on since 2026-10-22)
             wedge_slope_deg: 1.5,             // ledger: PLT-192
             collision_belt_taper: true,       // ledger: PLT-600, PLT-601 (on since 2026-10-25)
+            collision_noroom_stays: true,     // ledger: PLT-700 (on since 2026-10-26)
             weld_speed_mm_yr: 5.0,            // ledger: PLT-246
             weld_after_myr: 10.0,             // ledger: PLT-246
             reversal_by_arc_crust: true,      // ledger: PLT-371 (on since 2026-10-23)

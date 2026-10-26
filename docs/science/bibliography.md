@@ -9424,3 +9424,29 @@ walls, not worked around.
 - Library: not fetched.
 - Read so far (by the project): the abstract, 2026-10-26: "The main reason for the nonuniqueness of the inversions is plate boundary geometry since all plate motions are dominated by the trench-ridge system, and plates move from ridges to trenches"; parameterized edge forces "does not significantly improve the model fit".
 - Reference check: DOI, volume and article number as fetched.
+
+## The collision fronts' no-room loss (PLT-700, PLT-701), added 2026-10-26
+
+The sources of the suture-loss lane (build log 2026-10-26 "Suture loss"; plates.md "The collision fronts' loss at speed scale 75"). Read again for it, by a research sub-agent on 2026-10-26, entries above: SternScholl2010 (the author copy, p. 12, 16, 18-19), ScholvonHuene2009 (the abstract), SchollvonHuene2010 (the Gale text, the suture passages below), Ingalls2016 (the abstract and the addendum), YakovlevClark2014 (the abstract), MolnarLyonCaen1988 (the abstract, below), Clift2009 (the abstract). Clift & Vannucchi 2004 and Scholl & von Huene 2007 were not reached (403s; no open copy).
+
+- SchollvonHuene2010, read again 2026-10-26 (PLT-700, PLT-242): "During a protracted period of suturing (20-50 million years), a 100-200 km wide (or wider) band of the seaward edge of each plate can be removed subductively. Truncation of the upper plate is effected by subduction erosion, and that of the lower plate by the necking and break-off of its subducted edge. The average linear rate of crustal loss for each plate is estimated at ~1.5 km/Ma, or ~3 km/Ma combined"; the field cases: Wopmay, "a crustal width of missing lower plate between 200 and 400 km" over "~20 million years"; Papua New Guinea "~300 km in ~20 million years"; the Urals "~100 km ... in ~30 million years". The sub-agent's arithmetic: the Wopmay and New Guinea figures give 10 to 20 km/Ma, not the 1.5 printed; only the Urals' is consistent. Stern & Scholl's 115 km³ per km and Myr is this retreat rate times a crust about 33 km thick, plus 15 of sediment: a rate per km of suture with no convergence in it. Ledger ids added: PLT-700.
+- MolnarLyonCaen1988, the abstract read 2026-10-26 (Crossref; PLT-700): "the range should reach a maximum mean elevation related to the force at which the plates are pushed together ... When the maximum elevations are reached, crustal shortening need not cease; convergence can continue as the range builds outward, growing laterally into a high plateau." Ledger ids added: PLT-700.
+- ReyTeyssierWhitney2010: not read again; cited by PLT-700 for the thickened crust's outward flow that PLT-277's spreading stands for. Ledger ids added: PLT-700.
+
+### Wang2022
+- Reference: Wang et al. (2022). Communications Earth & Environment (authors and title as the sub-agent's page gave them, not checked here).
+- DOI or URL: 10.1038/s43247-022-00493-8 (open access, https://www.nature.com/articles/s43247-022-00493-8).
+- Cited as: "Wang et al. 2022".
+- Ledger ids: PLT-700 (the India loss scaled by the convergence), PLT-242 (note).
+- Access: open access; the text read by a research sub-agent, 2026-10-26.
+- Library: not fetched.
+- Read so far (by the project): "~20-47% of the felsic crust is missing"; "Assuming an average convergence of 5 cm/yr along a ~2500 km long suture zone, we estimate that the average recycling rate of Indian UCC and MCC is about 0.58-1.35 AU (km3/yr)". The sub-agent's check: 0.05 km/yr x 2,500 km x 23 km x 20 to 47 % gives 0.58 to 1.35, so the figure scales with the convergence.
+
+### Zhu2024
+- Reference: Zhu et al. (2024). Earth and Planetary Science Letters 648:119070 (authors and title not read).
+- DOI or URL: not read (EPSL article 119070).
+- Cited as: "Zhu et al. 2024".
+- Ledger ids: PLT-242 (note).
+- Access: paywalled; the abstract and highlights only, as a search tool rendered them (the PDF behind a challenge, not solved).
+- Library: not fetched.
+- Read so far (by the project): 2026-10-26 (`abstract-only`, through a search tool's rendering): "Crustal loss into the mantle accounts for at least 30% of the shortened crust" (Himalaya-Tibet and Zagros), the Alps 15 to 50 %, and a highlight "~20-50% of crust shortening ... is unaccounted for".

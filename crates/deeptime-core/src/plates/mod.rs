@@ -428,6 +428,20 @@ impl PlatesStage {
         book(st, gap_budget::Part::Belts);
         // The fronts by what stands on either side (`dock_tally.rs`, measurement only).
         if let Some(b) = cb.borrow_mut().as_mut() {
+            for s in stacked.values() {
+                // The no-room split by the belt's class (PLT-701), over the whole run.
+                b.dock.add_noroom(
+                    s.belt_class.index(),
+                    s.length_km * env.dt_myr,
+                    [
+                        s.crossed_km2 * s.thickness_m,
+                        s.sliver_km2_m,
+                        s.capped_km2_m,
+                        s.stays_km2_m,
+                    ]
+                    .map(|x| x / 1000.0),
+                );
+            }
             for (&c, s) in &stacked {
                 if let Some(col) = st.contacts[c].collision.as_ref() {
                     b.dock.add(
@@ -522,6 +536,17 @@ impl PlatesStage {
             ),
         ] {
             *world.globals.entry(name.to_owned()).or_insert(0.0) += x;
+        }
+        // The crust the belts had no room for and kept (PLT-700, measurement only; written only
+        // with the switch so a run without it keeps its globals list).
+        if env.k.collision_noroom_stays {
+            *world
+                .globals
+                .entry(belts::STAYS_GLOBAL.to_owned())
+                .or_insert(0.0) += stacked
+                .values()
+                .map(|s| s.stays_km2_m / 1000.0)
+                .sum::<f64>();
         }
         // The overriding plate's share (PLT-652, measurement only; written only with the switch so
         // a run without it keeps its globals list).

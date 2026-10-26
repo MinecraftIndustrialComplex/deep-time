@@ -13,6 +13,11 @@
 //! overriding plate's edge on it, above the sea; the convergence across the front; and the
 //! incoming continental samples at the front. Over the run after its first [`SKIP_MYR`].
 //!
+//! It also splits, over the whole run, the crust the belts found no room for by the belt's class
+//! (`belts::BeltClass`: no continental crust within the belt's reach, narrower than half a full
+//! belt, wider; ledger PLT-701), with each class's front-time and crossing, so the collision
+//! fronts' loss can be read by where it happens.
+//!
 //! The question it answers: is a front in collision a continent meeting a continent (the
 //! incoming side continental far in front of the front), a small body on an ocean plate (the
 //! incoming side oceanic beyond the body), or an arc on an ocean plate jammed by a continent (the
@@ -25,6 +30,9 @@ use std::fmt::Write as _;
 pub const NEAR_KM: f64 = 300.0;
 /// The run's first stretch left out, Myr (as the pool's measures).
 pub const SKIP_MYR: f64 = 100.0;
+/// The no-room split's belt classes (`belts::BeltClass`) and columns (ledger: PLT-701).
+pub const NOROOM_CLASSES: [&str; 3] = ["empty", "narrow", "wide"];
+const NOROOM_COLUMNS: [&str; 5] = ["front_km_myr", "crossed", "sliver", "capped", "stays"];
 /// The state-age bins' lower edges, Myr.
 const AGES: [f64; 4] = [0.0, 10.0, 30.0, 60.0];
 /// The overriding side's oceanic-share bins' lower edges.
@@ -66,6 +74,10 @@ pub struct DockTally {
     km_myr: [[f64; 4]; 4],
     /// Per state age, the [`SUMS`] weighted by km x Myr.
     sums: [[f64; 6]; 4],
+    /// Per belt class ([`NOROOM_CLASSES`]), over the whole run: the front's km x Myr, the crust
+    /// that crossed, and what found no room in the belt (left over with room, at the strength
+    /// height, kept by PLT-700), km³ ([`NOROOM_COLUMNS`]).
+    noroom: [[f64; 5]; 3],
 }
 
 fn bin(edges: &[f64; 4], x: f64) -> usize {
@@ -98,6 +110,17 @@ impl DockTally {
         }
     }
 
+    /// Adds one front's step to the no-room split (PLT-701; every step of the run): its belt
+    /// class (`belts::BeltClass::index`), km x Myr, and km³ crossed, left over with room, at the
+    /// strength height and kept.
+    pub fn add_noroom(&mut self, class: usize, km_myr: f64, km3: [f64; 4]) {
+        let row = &mut self.noroom[class.min(2)];
+        row[0] += km_myr;
+        for (r, x) in row[1..].iter_mut().zip(km3) {
+            *r += x;
+        }
+    }
+
     /// The summary's lines: a header, then one per state-age bin with its km x Myr by the
     /// overriding side's oceanic share and its weighted means.
     pub fn lines(&self) -> String {
@@ -127,6 +150,22 @@ impl DockTally {
                     .collect::<Vec<_>>()
                     .join(","),
                 means.join(",")
+            );
+        }
+        let _ = write!(
+            out,
+            "\ndock_noroom classes={} columns={}",
+            NOROOM_CLASSES.join(","),
+            NOROOM_COLUMNS.join(",")
+        );
+        for (name, row) in NOROOM_CLASSES.iter().zip(&self.noroom) {
+            let _ = write!(
+                out,
+                "\ndock_noroom_{name} {}",
+                row.iter()
+                    .map(|x| format!("{x:.4e}"))
+                    .collect::<Vec<_>>()
+                    .join(",")
             );
         }
         out
@@ -173,5 +212,22 @@ mod tests {
             l.contains("dock_age=0 km_myr=0,0,0,100 means=0.500,1.000,0.250,1.000,20.000,4.000")
         );
         assert!(l.contains("dock_age=10 km_myr=0,0,0,0 means=nan"));
+        // The no-room split counts from the run's start, by class.
+        t.add_noroom(0, 10.0, [5.0, 0.0, 2.0, 0.0]);
+        t.add_noroom(2, 20.0, [8.0, 1.0, 0.5, 0.0]);
+        t.add_noroom(2, 20.0, [8.0, 0.0, 0.0, 3.0]);
+        let l = t.lines();
+        assert!(
+            l.contains("dock_noroom_empty 1.0000e1,5.0000e0,0.0000e0,2.0000e0,0.0000e0"),
+            "{l}"
+        );
+        assert!(
+            l.contains("dock_noroom_narrow 0.0000e0,0.0000e0,0.0000e0,0.0000e0,0.0000e0"),
+            "{l}"
+        );
+        assert!(
+            l.contains("dock_noroom_wide 4.0000e1,1.6000e1,1.0000e0,5.0000e-1,3.0000e0"),
+            "{l}"
+        );
     }
 }
