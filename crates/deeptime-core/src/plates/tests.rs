@@ -3456,7 +3456,7 @@ fn the_reference_plate_on_the_lattice_moves_at_the_speed_scale() {
         }
         // The speed per the definition's trench. With the pull counted as the definition counts
         // it (on), the drag the definition gives moves the plate at the speed scale but for the
-        // sphere's cap (the ring's 49.5 mm/yr for its 45, its own test's reading).
+        // sphere's cap (the ring's 49.5 mm/yr at 45 and 82.6 at 75, its own test's readings).
         let per_trench = speed * rim.length() / by_share.length();
         speeds.push((speed, per_trench));
     }
@@ -4430,6 +4430,116 @@ fn a_consumed_slab_leaves_no_front() {
         n1.1,
         o1.1
     );
+}
+
+/// The force balance's front on the current geometry (the front lane, 2026-10-26; PLT-582's
+/// amendment; plates.md, "The force balance's front on the current geometry"):
+/// [`a_consumed_slab_leaves_no_front`]'s ocean plate, given a slab at full depth, driven under the
+/// continent until all of it is under, its slab pull and the continent's suction read at every
+/// step with the rule off and on. Until 2026-10-26 the force balance read its fronts from the
+/// lattice alone, so the pull held at full size after the trench had gone (the pool's arm sp-v75:
+/// three plates consumed down their own trench bound PLT-022's guard, pulling 5.5 to 14.3 × 10¹³
+/// N/m of current front against the law's most of 4.5 × 10¹³). On, the pull falls with the
+/// visible trench (the arcs' fronts, `subduction::fronts_begin`) and is gone with it, and on the
+/// live margin of the first step it is the same as off.
+#[test]
+fn a_consumed_plates_pull_falls_with_its_visible_trench() {
+    let mut p = preset(20_000, 20.0, "supercontinent", 5);
+    // As in `a_consumed_slab_leaves_no_front`: no incipient stage (PLT-610), the slab given.
+    p.tectonics.incipient_subduction = false;
+    let mut off = p.tectonics.clone();
+    off.front_current_geometry = false;
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    assert!(env.k.front_current_geometry, "on by default");
+    let spacing = env.norm.spacing_rad();
+    let box_deg = (3.0 * spacing).to_degrees();
+    let (mut st, geo, mut pos) = a_front_of_known_length(
+        &p,
+        &env,
+        glam::DQuat::IDENTITY,
+        30.0,
+        box_deg,
+        0.5 * spacing,
+        50.0,
+    );
+    st.dynamics = Some(dynamics::Dynamics::default());
+    st.slabs = vec![state::SlabTrack {
+        under: 1,
+        over: 0,
+        km: p.tectonics.slab_depth_km,
+        ..state::SlabTrack::default()
+    }];
+    let mut world = WorldState::new(1, 16_384, p.t_start_years());
+    let mut cones = vec![[0.0; 2]; st.samples.len()];
+    // Off and on: the ocean plate's pull torque and the continent's suction torque (N m), and the
+    // arcs' fronts on the current geometry.
+    let read = |st: &PlateState, pos: &[DVec3], k: u64| -> ([[f64; 2]; 2], usize) {
+        let on = stage.env(&p.tectonics, k);
+        let torques = [stage.env(&off, k), stage.env(&p.tectonics, k)].map(|env| {
+            let t = forces::slab_torques(st, &geo, pos, &env);
+            [t[1].0.length(), t[0].1.length()]
+        });
+        let tree = Tree::over(pos, |_| true);
+        let fronts = subduction::fronts_begin(st, &geo, pos, &tree, &on).front_count();
+        (torques, fronts)
+    };
+    let mut seen = vec![read(&st, &pos, 1)];
+    subduction::fronts_and_uplift(&mut st, &geo, &pos, &env, &mut cones, 0.0);
+    let per_step = env.norm.omega_of_speed(50.0) * env.dt_yr;
+    let steps = (5.0 * spacing / per_step).ceil() as u64;
+    for k in 2..=steps + 1 {
+        let env = stage.env(&p.tectonics, k);
+        pos = move_and_resolve(&mut st, &mut world, &geo, &env);
+        seen.push(read(&st, &pos, k));
+        subduction::fronts_and_uplift(&mut st, &geo, &pos, &env, &mut cones, 0.0);
+    }
+    let visible = (0..st.samples.len())
+        .filter(|&i| st.plate_of(i) == 1 && !st.samples[i].is_hidden())
+        .count();
+    for (k, ([o, n], fronts)) in seen.iter().enumerate() {
+        eprintln!(
+            "step {}: pull off {:.3e} on {:.3e}, suction off {:.3e} on {:.3e} (N m), fronts {fronts}",
+            k + 1,
+            o[0],
+            n[0],
+            o[1],
+            n[1]
+        );
+    }
+    let ([o0, n0], f0) = seen[0];
+    let ([o1, n1], f1) = seen[seen.len() - 1];
+    assert!(f0 > 20 && o0[0] > 0.0, "a front and a pull to begin with");
+    for (o, n) in o0.iter().zip(&n0) {
+        assert!(
+            (n - o).abs() <= 1.0e-9 * o,
+            "the live margin's pull and suction are the same off and on: {o0:?} {n0:?}"
+        );
+    }
+    assert_eq!(visible, 0, "the slab all under");
+    assert_eq!(f1, 0, "no visible trench at the end");
+    assert!(
+        2.0 * o1[0] > o0[0],
+        "off, the pull of a trench that has gone: {:.3e} of {:.3e}",
+        o1[0],
+        o0[0]
+    );
+    assert_eq!(
+        n1,
+        [0.0, 0.0],
+        "on, no pull and no suction without the trench"
+    );
+    // On the way, the pull is the visible trench's: not above its share of the first front (a
+    // spacing's slack for the front's ends).
+    for (k, &([_, n], fronts)) in seen.iter().enumerate() {
+        let most = n0[0] * (fronts + 2) as f64 / f0 as f64;
+        assert!(
+            n[0] <= most,
+            "step {}: the pull {:.3e} with {fronts} fronts of {f0}, at most {most:.3e}",
+            k + 1,
+            n[0]
+        );
+    }
 }
 
 /// The front on the current geometry asks only of a front's neighbour (the front lane, 2026-10-25;
@@ -6616,22 +6726,30 @@ fn the_front_cross_tabs_add_up() {
 
 /// Only a weld or a transfer sets its plates' motion for the step (PLT-080), so only their two
 /// plates skip the step's relaxation towards the balance (PLT-191). A deferred collision (a
-/// continent converging that has not stalled) sets nothing (the M5 lane, 2026-10-25).
+/// continent converging that has not stalled) sets nothing (the M5 lane, 2026-10-25), nor does
+/// one that could do nothing (its plate welded away earlier in the step, or its terrane gone:
+/// `collide`'s early returns, 2026-10-26).
 #[test]
 fn only_a_weld_or_a_transfer_holds_its_plates_motion_for_the_step() {
     use super::collision::Collided;
     let weld = Collided {
         sutured: true,
+        moved: true,
         ..Collided::default()
     };
-    let transfer = Collided::default();
+    let transfer = Collided {
+        moved: true,
+        ..Collided::default()
+    };
     let deferred = Collided {
         deferred: true,
         ..Collided::default()
     };
+    let nothing = Collided::default();
     assert_eq!(super::motion_set_by(&weld, 3, 5), Some([3, 5]));
     assert_eq!(super::motion_set_by(&transfer, 3, 5), Some([3, 5]));
     assert_eq!(super::motion_set_by(&deferred, 3, 5), None);
+    assert_eq!(super::motion_set_by(&nothing, 3, 5), None);
 }
 
 /// A continental collision past `collision_threshold_km` that has not stalled is handed to
