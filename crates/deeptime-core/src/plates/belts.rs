@@ -49,6 +49,20 @@
 //!    the metre (the sliver rule above and the strength height's passes): only where it lands
 //!    moves.
 //!
+//!    With `collision_noroom_stays` (PLT-700, on) nothing goes down for want of room: the belt's
+//!    passes run until the crust is placed or every sample stands at the strength height (no
+//!    sliver floor, no fixed number of passes), and what is left stays in the crust, stacked on
+//!    the belt by its profile, or on the overriding plate's edge at the front where no
+//!    continental crust stands within the belt's reach (an arc in collision, which PLT-289 turns
+//!    continental once it holds a continent's crystalline crust). The step's thickening ceiling
+//!    and the thickest crust (PLT-287, PLT-277) then move it on to the nearest room on the plate
+//!    and send down only what finds none: thickened crust flows outward and widens its orogen
+//!    (Rey, Teyssier & Whitney 2010; Molnar & Lyon-Caen 1988, "convergence can continue as the
+//!    range builds outward, growing laterally into a high plateau"). Only the share leaves at
+//!    the front (Stern & Scholl 2010's deep loss of lower-plate crust at sutures, PLT-242). Off,
+//!    the belt's floor and six passes sent 79 % of the collision fronts' loss down
+//!    (`noroom_sliver` and `noroom_capped`, build log 2026-10-26 "Suture loss").
+//!
 //! Both are stamped as a collision orogeny where they rose by more than 5 m/Myr (the subduction
 //! fronts' rule): the `collision` regime the structure stage folds and thrusts, the orogen
 //! provinces, the young-orogen weakness of the flexure. The fold direction is the shortening
@@ -163,6 +177,10 @@ pub const SLIVER_GLOBAL: &str = "plates/collision_noroom_sliver_km3";
 pub const CAPPED_GLOBAL: &str = "plates/collision_noroom_capped_km3";
 /// … and what the ceiling and the highest elevation clipped off the rises.
 pub const CLIPPED_GLOBAL: &str = "plates/collision_noroom_clipped_km3";
+/// With `collision_noroom_stays` (PLT-700): what found no room under the strength height and
+/// was stacked anyway, km³ of crust (in [`KEPT_GLOBAL`] too; measurement only, written only with
+/// the switch so a run without it keeps its globals list).
+pub const STAYS_GLOBAL: &str = "plates/collision_noroom_stays_km3";
 /// Crust the critical-taper belt took after it was full to its width, km³ of crust (measurement
 /// only; ledger: PLT-601): the toe advancing, so whether the width `collision_belt_km` (PLT-241)
 /// bounds the belt at all. Zero without `collision_belt_taper`.
@@ -193,6 +211,29 @@ pub struct Foredeep {
     pub depth_m: f64,
 }
 
+/// A front's belt by the room its overriding plate offers (the no-room split, measurement only;
+/// ledger: PLT-701): no continental crust within `collision_belt_km` of the front (an arc or
+/// ocean floor in collision), continental crust narrower than half a full belt (PLT-243's
+/// floor), or wider.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum BeltClass {
+    Empty,
+    Narrow,
+    #[default]
+    Wide,
+}
+
+impl BeltClass {
+    /// Its index in the no-room split's columns (`dock_tally::NOROOM_CLASSES`).
+    pub fn index(self) -> usize {
+        match self {
+            BeltClass::Empty => 0,
+            BeltClass::Narrow => 1,
+            BeltClass::Wide => 2,
+        }
+    }
+}
+
 /// What a step's stacking did at one collision front.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Stacked {
@@ -214,6 +255,11 @@ pub struct Stacked {
     pub sliver_km2_m: f64,
     pub capped_km2_m: f64,
     pub clipped_km2_m: f64,
+    /// What found no room under the strength height and stayed in the crust anyway
+    /// (`collision_noroom_stays`, PLT-700), km² × m of crust (measurement only; in
+    /// `belt_km2_m` too), and the belt's class (PLT-701).
+    pub stays_km2_m: f64,
+    pub belt_class: BeltClass,
     /// What the critical-taper belt took after it was full to its width, km² × m of crust
     /// (measurement only, [`TOE_GLOBAL`]).
     pub toe_km2_m: f64,
@@ -693,15 +739,35 @@ fn stack_front(
         if in_wedge { norm.km(d) } else { -norm.km(d) }
     };
     let (mut sliver_km2_m, mut capped_km2_m, mut toe_km2_m) = (0.0, 0.0, 0.0);
+    let mut stays_km2_m = 0.0;
+    // The belt's class for the no-room split (measurement only, PLT-701): no continental crust
+    // within its reach (an arc in collision), narrower than half a full belt, or wider.
+    let profile_sum: f64 = belt.iter().map(|&(_, w)| w).sum();
+    let belt_class = if belt.is_empty() {
+        BeltClass::Empty
+    } else if profile_sum * area < belt_weight {
+        BeltClass::Narrow
+    } else {
+        BeltClass::Wide
+    };
     if belt_weight > 0.0 && belt_rise_km2_m > 0.0 {
         let cap_m = k.strength_height_m(env.gravity);
         let z_of: Vec<f64> = belt
             .iter()
             .map(|&(i, _)| f64::from(samples[i].elevation_m))
             .collect();
-        // The old fill: how much the belt keeps (PLT-243's room share, PLT-253's passes) and, with
-        // the taper off, where it lands.
-        let old = fill_belt(&belt, &z_of, belt_rise_km2_m, belt_weight, area, cap_m);
+        // The old fill: how much the belt keeps (PLT-243's room share, PLT-253's passes; with
+        // `collision_noroom_stays` the passes run to the end, PLT-700) and, with the taper off,
+        // where it lands.
+        let old = fill_belt(
+            &belt,
+            &z_of,
+            belt_rise_km2_m,
+            belt_weight,
+            area,
+            cap_m,
+            k.collision_noroom_stays,
+        );
         let kept_km2_m = old.iter().sum::<f64>() * area;
         // What was left over, and whether any sample still had room (measurement only).
         let left = (belt_rise_km2_m - kept_km2_m).max(0.0) * COLUMN_ISOSTATIC_FACTOR;
@@ -732,6 +798,37 @@ fn stack_front(
         } else {
             old
         };
+        let mut given = given;
+        // ledger: PLT-700. What found no room under the strength height stays in the crust:
+        // stacked on the belt by its profile (on the overriding edge at the front when the belt
+        // has no continental crust), where the step's thickening ceiling and the thickest crust
+        // move it on to the nearest room on the plate (PLT-287, PLT-277) and send down only what
+        // finds none. Thickened crust flows outward and widens its orogen (Rey, Teyssier &
+        // Whitney 2010); Stern & Scholl 2010's suture losses are the share's (PLT-242).
+        let mut edge_rise: Vec<(usize, f64)> = Vec::new();
+        if k.collision_noroom_stays {
+            let left_km2_m = (belt_rise_km2_m - given.iter().sum::<f64>() * area).max(0.0);
+            let edge: Vec<usize> = f
+                .edge
+                .iter()
+                .map(|&i| i as usize)
+                .filter(|&i| plate_of[i] == side.over && !samples[i].is_hidden())
+                .collect();
+            if left_km2_m > 0.0 && profile_sum > 0.0 {
+                for (g, &(_, w)) in given.iter_mut().zip(&belt) {
+                    *g += left_km2_m * w / (profile_sum * area);
+                }
+                stays_km2_m = left_km2_m * COLUMN_ISOSTATIC_FACTOR;
+            } else if left_km2_m > 0.0 && !edge.is_empty() {
+                let each = left_km2_m / (edge.len() as f64 * area);
+                edge_rise = edge.into_iter().map(|i| (i, each)).collect();
+                stays_km2_m = left_km2_m * COLUMN_ISOSTATIC_FACTOR;
+            }
+            if stays_km2_m > 0.0 {
+                sliver_km2_m = 0.0;
+                capped_km2_m = 0.0;
+            }
+        }
         rises.extend(
             belt_d
                 .iter()
@@ -739,6 +836,7 @@ fn stack_front(
                 .filter(|&(_, g)| g > 0.0)
                 .map(|(&(i, _, d), g)| (i, g, Part::Belt, d)),
         );
+        rises.extend(edge_rise.into_iter().map(|(i, g)| (i, g, Part::Belt, 0.0)));
     }
     // The interior's share, in proportion to T ε̇ on its columns (PLT-652): no strength height
     // here, the crust above it spreads in the surface stage as a plateau's does.
@@ -764,6 +862,8 @@ fn stack_front(
             restack_m,
             sliver_km2_m,
             capped_km2_m,
+            stays_km2_m,
+            belt_class,
             toe_km2_m,
             wedge_km,
             upper_share: upper.as_ref().map_or(0.0, |u| u.share),
@@ -941,6 +1041,14 @@ fn stack_front(
 /// by a long slab: the resistance's reach is the front's share of the plate's drive) then piled
 /// crust 200–290 km thick on an overriding sliver, and the surface stood 14 km high there
 /// (`earthlike_quick_16k`, scattered start, seed 1, 500 Myr, after the continental crust fix).
+///
+/// `complete` (`collision_noroom_stays`, ledger PLT-700): the passes go on until the crust is
+/// placed or no sample has room, and a narrow belt is not held to half a full belt's share (no
+/// floor on the weight): each pass places all that is left over the samples with room, so it
+/// either places everything or fills at least one more sample to the strength height, and at
+/// most one pass per sample (plus one) is needed. Without it, six passes, each sample of a belt
+/// narrower than half a full one taking at most what half a belt would give it per pass: what
+/// is left after them depends on the number of passes, not on any process.
 // ledger: PLT-253 (the stack rises no higher than the strength height).
 fn fill_belt(
     belt: &[(usize, f64)],
@@ -949,18 +1057,24 @@ fn fill_belt(
     weight: f64,
     area: f64,
     cap_m: f64,
+    complete: bool,
 ) -> Vec<f64> {
     let mut given = vec![0.0f64; belt.len()];
+    let profile: f64 = belt.iter().map(|&(_, w)| w).sum();
     if cap_m <= 0.0 {
-        for (g, &(_, w)) in given.iter_mut().zip(belt) {
-            *g = rise_km2_m * w / weight;
+        let weight = if complete { profile * area } else { weight };
+        if weight > 0.0 {
+            for (g, &(_, w)) in given.iter_mut().zip(belt) {
+                *g = rise_km2_m * w / weight;
+            }
         }
         return given;
     }
     let room = |j: usize, given: &[f64]| (cap_m - z[j] - given[j]).max(0.0);
     let mut left = rise_km2_m;
-    let full = weight / area;
-    for _ in 0..6 {
+    let full = if complete { 0.0 } else { weight / area };
+    let passes = if complete { belt.len() + 1 } else { 6 };
+    for _ in 0..passes {
         let open: f64 = belt
             .iter()
             .enumerate()
@@ -1006,7 +1120,7 @@ fn fill_belt(
 /// under the surface and crust is left, the surface rises in place, `min(cap, H + d tan α)` with
 /// `H` by bisection: the toe advances onto the incoming plate (ledger PLT-601). What the belt
 /// cannot hold with every sample at the strength height is not placed (the caller sends it down
-/// with the slab).
+/// with the slab, or with `collision_noroom_stays` stacks it by the profile, PLT-700).
 // ledger: PLT-600 (the surface and its fill), PLT-601 (the toe advances).
 fn fill_taper(
     d_km: &[f64],
@@ -2369,15 +2483,15 @@ mod tests {
         let weight: f64 = belt.iter().map(|&(_, w)| w).sum::<f64>() * area;
         let low = [0.0; 5];
         // Below the limit: the profile's shares, all of it placed.
-        let g = fill_belt(&belt, &low, 30_000.0, weight, area, 5000.0);
-        let unlimited = fill_belt(&belt, &low, 30_000.0, weight, area, 0.0);
+        let g = fill_belt(&belt, &low, 30_000.0, weight, area, 5000.0, false);
+        let unlimited = fill_belt(&belt, &low, 30_000.0, weight, area, 0.0, false);
         for (a, b) in g.iter().zip(&unlimited) {
             assert!((a - b).abs() < 1e-9, "{g:?} vs {unlimited:?}");
         }
         assert!((g.iter().sum::<f64>() * area - 30_000.0).abs() < 1e-6);
         // The front already at 4.9 km: it takes 100 m, the rest goes behind, up to the limit.
         let high = [4900.0, 1000.0, 1000.0, 1000.0, 1000.0];
-        let g = fill_belt(&belt, &high, 150_000.0, weight, area, 5000.0);
+        let g = fill_belt(&belt, &high, 150_000.0, weight, area, 5000.0, false);
         assert!((g[0] - 100.0).abs() < 1e-6, "{g:?}");
         for (j, &x) in g.iter().enumerate() {
             assert!(high[j] + x <= 5000.0 + 1e-6, "{g:?}");
@@ -2393,7 +2507,7 @@ mod tests {
         // Everything at the limit: nothing rises.
         let full = [5000.0; 5];
         assert!(
-            fill_belt(&belt, &full, 150_000.0, weight, area, 5000.0)
+            fill_belt(&belt, &full, 150_000.0, weight, area, 5000.0, false)
                 .iter()
                 .all(|&x| x == 0.0)
         );
@@ -2557,15 +2671,9 @@ mod tests {
             fx.preset.tectonics.collision_threshold_km = 1.0e9;
             fx.preset.tectonics.collision_belt_km = 2000.0;
             fx.preset.tectonics.collision_belt_taper = taper;
-            let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
-            let pts = fx.geo.points();
-            for (i, s) in st.samples.iter_mut().enumerate() {
-                if s.kind == CONTINENTAL && fx.norm.km(pts[i].x.asin()) < -250.0 {
-                    let mut ocean = Sample::blank(0);
-                    ocean.elevation_m = -4000.0;
-                    *s = ocean;
-                }
-            }
+            // The sliver rule itself (PLT-700 off).
+            fx.preset.tectonics.collision_noroom_stays = false;
+            let mut st = sliver_plates(&fx);
             let (stacked, _) = fx.step(&mut st, 1, None);
             let s = &stacked[&0];
             out.push((
@@ -2582,6 +2690,151 @@ mod tests {
         assert!(
             close(out[1].0, out[0].0) && close(out[1].1, out[0].1),
             "the crust kept, and sent down: {out:?}"
+        );
+    }
+
+    /// The head-on plates with the overriding continent cut back to one row of samples behind
+    /// the front (ocean floor beyond 250 km), under a 2,000 km belt: a narrow overriding plate.
+    fn sliver_plates(fx: &Fixture) -> PlateState {
+        let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
+        let pts = fx.geo.points();
+        for (i, s) in st.samples.iter_mut().enumerate() {
+            if s.kind == CONTINENTAL && fx.norm.km(pts[i].x.asin()) < -250.0 {
+                let mut ocean = Sample::blank(0);
+                ocean.elevation_m = -4000.0;
+                *s = ocean;
+            }
+        }
+        st
+    }
+
+    /// PLT-700: with `complete` the belt's passes run to the end. Two samples behind a front
+    /// whose full belt is ten times their profile's area: six passes of a tenth each leave
+    /// 0.9⁶ = 53 % of the crust with the samples far from the strength height (the sliver rule's
+    /// loss is set by the number of passes), the complete fill places all of it by the profile.
+    /// With the front sample near the strength height, the rest goes behind it until every
+    /// sample is full, and no further.
+    #[test]
+    fn the_belts_passes_run_to_the_end_with_the_switch() {
+        let belt = vec![(0usize, 1.0), (1usize, 0.5)];
+        let area = 100.0;
+        let weight = 10.0 * 1.5 * area;
+        let (rise, cap) = (30_000.0, 5000.0);
+        let low = [0.0, 0.0];
+        let old = fill_belt(&belt, &low, rise, weight, area, cap, false);
+        let left = rise - old.iter().sum::<f64>() * area;
+        assert!(
+            (left - rise * 0.9f64.powi(6)).abs() < 1e-6 * rise,
+            "six passes leave {left} of {rise}"
+        );
+        let new = fill_belt(&belt, &low, rise, weight, area, cap, true);
+        assert!((new.iter().sum::<f64>() * area - rise).abs() < 1e-6 * rise);
+        assert!((new[0] / new[1] - 2.0).abs() < 1e-9, "the profile: {new:?}");
+        // Without a strength height the complete fill spreads over the profile, not the floor.
+        let free = fill_belt(&belt, &low, rise, weight, area, 0.0, true);
+        assert!((free.iter().sum::<f64>() * area - rise).abs() < 1e-6 * rise);
+        // 100 m of room at the front, 1,000 m behind it: 110,000 km² × m placed of 150,000.
+        let high = [4900.0, 4000.0];
+        let g = fill_belt(&belt, &high, 150_000.0, weight, area, cap, true);
+        assert!(
+            (g[0] - 100.0).abs() < 1e-6 && (g[1] - 1000.0).abs() < 1e-6,
+            "{g:?}"
+        );
+    }
+
+    /// PLT-700 (`collision_noroom_stays`): behind a narrow overriding continent the crust the
+    /// belt has no room for stays in the crust. The front loses only the share (PLT-242, Stern &
+    /// Scholl 2010's deep loss of lower-plate crust at sutures): the crust added is the share of
+    /// what crossed, under either belt surface, and none of it is booked as sent down for want
+    /// of room; the old rule sends part of it down on the same plates.
+    #[test]
+    fn crust_with_no_room_in_the_belt_stays_in_the_crust() {
+        for taper in [false, true] {
+            let mut lost = Vec::new();
+            for on in [false, true] {
+                let mut fx = Fixture::new();
+                fx.preset.tectonics.collision_threshold_km = 1.0e9;
+                fx.preset.tectonics.collision_belt_km = 2000.0;
+                fx.preset.tectonics.collision_belt_taper = taper;
+                fx.preset.tectonics.collision_noroom_stays = on;
+                let mut st = sliver_plates(&fx);
+                let area = fx.norm.sample_area_km2();
+                let before = crust_km2_m(&st, area);
+                let (stacked, _) = fx.step(&mut st, 1, None);
+                let s = &stacked[&0];
+                let share = fx.preset.tectonics.collision_stacking_share;
+                let crossed = s.crossed_km2 * s.thickness_m;
+                let kept = s.belt_km2_m + s.wedge_km2_m + s.upper_km2_m;
+                let added = crust_km2_m(&st, area) - before;
+                assert!(
+                    (added - kept).abs() < 1e-4 * added.max(1.0),
+                    "the record is the crust added: {added} vs {kept}"
+                );
+                assert_eq!(s.belt_class, BeltClass::Narrow);
+                if on {
+                    assert!(
+                        (kept + s.clipped_km2_m - share * crossed).abs() < 1e-4 * crossed,
+                        "taper {taper}: kept {kept:.4e} of {crossed:.4e} crossed, share {share}"
+                    );
+                    assert_eq!(s.sliver_km2_m + s.capped_km2_m, 0.0);
+                } else {
+                    assert_eq!(s.stays_km2_m, 0.0);
+                }
+                lost.push(share * crossed - kept - s.clipped_km2_m);
+            }
+            assert!(
+                lost[0] > 0.02 * lost[0].abs().max(1.0) && lost[1].abs() < 1e-4 * lost[0],
+                "taper {taper}: lost for want of room, off and on: {lost:?}"
+            );
+        }
+    }
+
+    /// PLT-700: an arc in collision (no continental crust on the overriding plate within the
+    /// belt's reach) takes the crust on its edge at the front with the switch, where the old
+    /// rule sends all of the belt's part down (`noroom_capped`).
+    #[test]
+    fn an_arc_in_collision_takes_the_crust_on_its_edge() {
+        let mut out = Vec::new();
+        for on in [false, true] {
+            let mut fx = Fixture::new();
+            fx.preset.tectonics.collision_threshold_km = 1.0e9;
+            fx.preset.tectonics.collision_noroom_stays = on;
+            // The interior's share (PLT-652) rises elsewhere on the plate: the front alone here.
+            fx.preset.tectonics.collision_upper_plate_shortening = false;
+            let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
+            for s in st.samples.iter_mut().filter(|s| s.group == 0) {
+                let mut ocean = Sample::blank(0);
+                ocean.elevation_m = -2000.0;
+                *s = ocean;
+            }
+            let t0: Vec<f32> = st.samples.iter().map(|s| s.thickness_m).collect();
+            let area = fx.norm.sample_area_km2();
+            let (stacked, _) = fx.step(&mut st, 1, None);
+            let s = stacked[&0].clone();
+            assert_eq!(s.belt_class, BeltClass::Empty);
+            let over: f64 = st
+                .samples
+                .iter()
+                .zip(&t0)
+                .filter(|(s, _)| s.group == 0)
+                .map(|(s, &t)| f64::from(s.thickness_m - t) * area)
+                .sum();
+            out.push((s, over));
+        }
+        let (off, on) = (&out[0], &out[1]);
+        assert!(off.0.capped_km2_m > 0.0 && off.1.abs() < 1e-3 * off.0.capped_km2_m);
+        assert!(on.0.capped_km2_m == 0.0 && on.0.stays_km2_m > 0.0, "{on:?}");
+        assert!(
+            (on.1 - on.0.stays_km2_m).abs() < 1e-3 * on.0.stays_km2_m,
+            "the edge took what the old rule sent down: {} vs {}",
+            on.1,
+            on.0.stays_km2_m
+        );
+        assert!(
+            (on.0.stays_km2_m - off.0.capped_km2_m).abs() < 1e-6 * off.0.capped_km2_m,
+            "{} vs {}",
+            on.0.stays_km2_m,
+            off.0.capped_km2_m
         );
     }
 
