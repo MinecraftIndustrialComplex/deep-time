@@ -1206,6 +1206,16 @@ pub struct TectonicParams {
     /// 0.1 is the gravitational potential energy as computed (a ridge's push is then about 0.1 of
     /// the reference slab pull). PLT-187.
     pub edge_energy: f64,
+    /// The ridge push from the floor's age (the speed-scale stage, 2026-10-26): Turcotte &
+    /// Schubert's ridge push is the cooled lithosphere's, growing with the floor's age and
+    /// levelling off where the plate model's floor does, so the sea floor's column energy
+    /// (FRC-012) reads its depth below the crest at most as deep as GDH1 sinks floor of its age
+    /// (PLT-352): ground deeper than its age's thermal subsidence (a trench in young floor, a
+    /// flexural moat, the plate-only presets' floor relaxing towards Cortial's -10 km) has its
+    /// age's energy (FRC-036). Off, the depth is read down to the preset's old floor (FRC-021),
+    /// 9 km on the plate-only presets: a ridge push up to 2.7e13 N/m, 8.7 times old floor's.
+    /// ledger: PLT-684
+    pub ridge_push_by_age: bool,
     /// The buoyancy of continental crust dragged down a collision front, relative to its physical
     /// size (1): continental crust is lighter than the mantle, so the deeper a collision drags it
     /// the harder it pushes back against the convergence (Cloos 1993). A term of the collision
@@ -1372,6 +1382,7 @@ impl Default for TectonicParams {
             suction_saturates: true,      // ledger: PLT-540
             front_pull: true,             // ledger: PLT-560 (on since 2026-10-24)
             edge_energy: 0.1,             // ledger: PLT-187
+            ridge_push_by_age: true,      // ledger: PLT-684
             collision_buoyancy: 1.0,      // ledger: PLT-275
             keel_drag: 3.0,               // ledger: PLT-188
             boundary_resistance: 3.0,     // ledger: PLT-189
