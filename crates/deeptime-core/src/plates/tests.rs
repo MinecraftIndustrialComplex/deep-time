@@ -3433,7 +3433,7 @@ fn the_reference_plate_on_the_lattice_moves_at_the_speed_scale() {
         }
         // The speed per the definition's trench. With the pull counted as the definition counts
         // it (on), the drag the definition gives moves the plate at the speed scale but for the
-        // sphere's cap (the ring's 49.5 mm/yr for its 45, its own test's reading).
+        // sphere's cap (the ring's 49.5 mm/yr at 45 and 82.6 at 75, its own test's readings).
         let per_trench = speed * rim.length() / by_share.length();
         speeds.push((speed, per_trench));
     }
