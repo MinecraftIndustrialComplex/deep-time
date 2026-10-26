@@ -4091,14 +4091,14 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 
 ### SternGerya2018
 - Reference: Stern, R. J., Gerya, T. (2018). Subduction initiation in nature and models: a review. Tectonophysics 746:173-198.
-- DOI or URL: 10.1016/j.tecto.2017.10.014.
+- DOI or URL: 10.1016/j.tecto.2017.10.014; the author's copy, personal.utdallas.edu/~rjstern/pdfs/SternGeryaTctnphys18.pdf.
 - Cited as: "Stern & Gerya 2018, Tectonophysics 746:173".
-- Ledger ids: PLT-067
-- Access: paywalled (not tested for an open copy).
-- Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
-- Substitute: none found.
-- Read so far (by the project): not stated.
-- Read in this pass: metadata only.
+- Ledger ids: PLT-067, PLT-656 (2026-10-25, the floor-age lane's law 2)
+- Access: open (the author's copy).
+- Library (the project's source library, not distributed): not fetched (read from the author's copy).
+- Substitute: none needed.
+- Read so far (by the project): full text, 2026-10-25 (the floor-age lane, a sub-agent): the abstract, "two proposed types of subduction initiation are not well supported by natural observations: (induced) transference and (spontaneous) passive margin collapse"; section 6.2, "SI must nucleate at a point ... then propagate along the weakness at plate tectonic rates (perhaps on the order of 100 mm/yr; Fig. 8G)", and Fig. 8, the 3,000 km Bitlis-Zagros ophiolite belt, "SI propagation rate ~ 100 mm/y"; section 6.3.1, Puysegur, "SI began ~11 Ma and has not propagated significantly since that time"; p. 190, the Cenozoic's new subduction zones do "not include any examples that formed at a passive continental margin (with one possible exception)", and "Cloetingh et al. (1989) ... concluded that if a passive margin did not turn into a convergent margin in the first 20 Ma of its existence, the growing strength of the lithosphere beneath it made it increasingly unlikely to ever do so".
+- Read in this pass: full text.
 - Reference check: correct.
 
 ### Stern2002
@@ -7717,7 +7717,7 @@ The sources of the plate-geometry task (build log 2026-10-21 "The plate geometry
 - Reference: Gurnis, M., Hall, C. and Lavier, L. (2004). Evolving force balance during incipient subduction. Geochemistry, Geophysics, Geosystems 5(7):Q07001.
 - DOI or URL: 10.1029/2003GC000681 (open, the author's site).
 - Cited as: "Gurnis et al. 2004".
-- Ledger ids: PLT-062, PLT-064 (2026-10-21 notes), PLT-270 (2026-10-23: `from-memory` to `verified`), PLT-505 (2026-10-23), PLT-516 to PLT-518 (2026-10-23, the docking lane: transference's force and critical convergence, read again in full: "reaching a maximum value dependent on plate thickness, but typically ranging from 2 to 3 × 10^12 N/m for cases that become self-sustaining", "Cumulative convergence, not the rate of convergence, is the dominant control", the critical convergence "only varies between 100 and 130 km (Table 3)", "initial elastic bending force ... between 10^12 and 10^13 N/m"), PLT-610 to PLT-613 (2026-10-25, the front lane: incipient subduction built on the same passages, the resistance 2.5 × 10^12 N/m, the critical convergence 100 km, and at a ridge "The entire initial hump in resisting force is eliminated when lithosphere with a typical thermal model of a spreading center is subject to compression", the topography's "additional 5 × 10^11 N/m"), PLT-655 (2026-10-25, the floor-age lane: the older side of an initiation's fracture goes under, [60] "the older plate is thrust beneath the younger" and [78] "the weak zone overlies the thicker plate or where the negative buoyancy is localized", read again)
+- Ledger ids: PLT-062, PLT-064 (2026-10-21 notes), PLT-270 (2026-10-23: `from-memory` to `verified`), PLT-505 (2026-10-23), PLT-516 to PLT-518 (2026-10-23, the docking lane: transference's force and critical convergence, read again in full: "reaching a maximum value dependent on plate thickness, but typically ranging from 2 to 3 × 10^12 N/m for cases that become self-sustaining", "Cumulative convergence, not the rate of convergence, is the dominant control", the critical convergence "only varies between 100 and 130 km (Table 3)", "initial elastic bending force ... between 10^12 and 10^13 N/m"), PLT-610 to PLT-613 (2026-10-25, the front lane: incipient subduction built on the same passages, the resistance 2.5 × 10^12 N/m, the critical convergence 100 km, and at a ridge "The entire initial hump in resisting force is eliminated when lithosphere with a typical thermal model of a spreading center is subject to compression", the topography's "additional 5 × 10^11 N/m"), PLT-655 (2026-10-25, the floor-age lane: the older side of an initiation's fracture goes under, [60] "the older plate is thrust beneath the younger" and [78] "the weak zone overlies the thicker plate or where the negative buoyancy is localized", read again), PLT-657 and PLT-658 (2026-10-25, the floor-age lane's law 3 and law 2's fallback strength: [46] "Case 1, with an age of 30 Myr, He ... is 15 km. For 7 Myr lithosphere, this thickness is 8.5 km. With both friction and cohesion, the force required ... increases by a factor of 2.2 as He increases (Figure 9a), not 3.1 which would have been expected for lithosphere for no cohesion"; [59] a fracture zone of 10 and 40 Myr floor in compression; [64] "The force required to initiate subduction depends strongly in the age of the oceanic lithosphere on either side of the fracture zone (Figure 15)"; [67] "The initial elastic bending force, per unit length of a nucleating subduction zone (between 10^12 and 10^13 N/m) is large", read again)
 - Access: open.
 - Library (the project's source library, not distributed): fetched 2026-10-21. Files: `Gurnis2004/GURggg04.pdf`, `GURggg04.txt`.
 - Read so far (by the project): full text, 2026-10-21. Abstract: "Nearly half of all active subduction zones initiated during the Cenozoic"; "Subduction initiation is known to have occurred in a variety of tectonic settings: old fracture zones, transform faults, and extinct spreading centers and through polarity reversal behind active subduction zones" ("Izu-Bonin-Mariana (IBM) along a fracture zone, Tonga-Kermadec along an extinct subduction boundary, New Hebrides within a back arc, and Puysegur-Fiordland along a spreading center"); "The large initial bending resistance can be entirely eliminated in ridge models, explaining the propensity for new subduction zones to form through polarity reversals"; "A FZ must be underthrust by the older plate for 100–150 km before a transition from forced to self-sustaining" subduction. Table 1 "Cenozoic Subduction Initiation": eleven zones, their heritage fracture zone, transform, spreading centre, extinct subduction zone or polarity reversal (New Britain-San Cristobal, New Hebrides); none from old floor far from a plate boundary.
@@ -9089,3 +9089,88 @@ Earth's convergence after India touched Asia, the readout the collision-duration
 - Access: open (Caltech's repository).
 - Library: not kept.
 - Read so far (by the project): full text, 2026-10-25 (a Sonnet sub-agent): "India's convergence rate with Eurasia slowed by more than 40% between 20 and 10 Ma"; "India collided with southern Eurasia at 45-55 Ma"; "drops in convergence rates of 30-38% (118 to 83 mm a-1 in northeastern India and 109 to 59 mm a-1 in northwestern India) at 40-45 Ma and of 45% (59-34 and 83-44 mm a-1) between 10 and 20 Ma"; "the essentially constant rate since 11 Ma".
+
+## Along-strike propagation and a passive margin's strength (PLT-656 to PLT-659; notes on PLT-064, PLT-517, PLT-612), added 2026-10-25
+
+The sources of the floor-age lane's law 2 (a subduction zone propagates along a passive margin) and law 3 (incipient subduction's resistance grows with the plate's thickness), and of the search for a passive margin's integrated strength the coordinator ordered (2026-10-25: use a verified number if the sources give one, else PLT-517's Gurnis value scaled by law 3). Read by the lane's sub-agents on 2026-10-25 (the texts of public copies, never kept in the repository); Gurnis et al. 2004 (above) read again in the project library. Stern & Gerya 2018 (above) read in full this time.
+
+### Zhou2020
+- Reference: Zhou, X., Li, Z.-H., Gerya, T. V. and Stern, R. J. (2020). Lateral propagation-induced subduction initiation at passive continental margins controlled by preexisting lithospheric weakness. Science Advances 6(10):eaaz1048 (title from memory).
+- DOI or URL: 10.1126/sciadv.aaz1048; Europe PMC PMC7056308.
+- Cited as: "Zhou et al. 2020".
+- Ledger ids: PLT-656, PLT-658 (the age dependence the fallback does not give)
+- Access: open.
+- Library: not kept (read from Europe PMC's XML and the Supplementary PDF).
+- Read so far (by the project): full text and Table S2, 2026-10-25. Abstract: "Passive margin SP requires a significant preexisting lithospheric weakness and a strong slab pull from neighboring subduction zones." Results: "After about 4 million years (Ma), subduction commences in the adjacent OCT regions"; "After about 7 Ma, the whole plate begins to subduct"; "The rate of lateral propagation–induced SI at passive margins is about 17 cm/year"; "With increasing slab pull, the subduction zone propagates laterally and leads to SI in neighboring passive continental margins"; "subduction and trench retreat rates slow significantly during SI at passive margins because slab pull is partially applied to bend the adjacent region to initiate subduction"; "SP is never predicted in existing numerical models for passive continental margins lacking a lithospheric weak zone"; "weaker zones at passive margins allow the large slab pull from older subducting slab to drag down the neighboring plate"; with young slabs "subduction will be aborted by break-off of the subducted young slab"; "The longer subducted slab leads to faster SP; however, it plays a minor role in determining whether or not subduction propagates". Table S2: slabs of 60 Ma and older propagate (friction 0, a 50 km weak zone), 30 Ma slabs break off. No force in N/m.
+
+### GoversWortel2005
+- Reference: Govers, R. and Wortel, M. J. R. (2005). Lithosphere tearing at STEP faults: response to edges of subduction zones. Earth and Planetary Science Letters 236:505-523 (title from memory).
+- DOI or URL: 10.1016/j.epsl.2005.03.022.
+- Cited as: "Govers & Wortel 2005".
+- Ledger ids: PLT-656 (the tear)
+- Access: paywalled.
+- Library: not fetched.
+- Read so far (by the project): the introduction only, 2026-10-25: "STEP propagation acts like a wave traveling through the landscape". A later paper's summary (not read) says the outcome depends on whether the resistance to STEP propagation exceeds the resistance to slab break-off. No numbers.
+
+### Hall2019
+- Reference: Hall, R. (2019). The subduction initiation stage of the Wilson cycle. Geological Society, London, Special Publications 470:415-437 (title from memory).
+- DOI or URL: 10.1144/SP470.3.
+- Cited as: "Hall 2019".
+- Ledger ids: PLT-656
+- Access: open access by the publisher, but the PDF returned 403 to the lookups.
+- Library: not fetched.
+- Read so far (by the project): the abstract (OpenAlex), 2026-10-25: "Banda subduction developed by the eastwards propagation of the Java trench into an oceanic embayment by tearing along a former ocean-continent boundary. The earlier subducted slab provided the driving force to drag down unsubducted oceanic lithosphere." No rate in the abstract.
+
+### CloetinghWortelVlaar1989
+- Reference: Cloetingh, S., Wortel, R. and Vlaar, N. J. (1989). On the initiation of subduction zones. Pure and Applied Geophysics 129:7-25 (title from memory).
+- DOI or URL: 10.1007/BF00874622; a scan in the VU Research Portal, https://research.vu.nl/ws/files/74115751/7087 (its cover page names other authors).
+- Cited as: "Cloetingh, Wortel & Vlaar 1989".
+- Ledger ids: PLT-658 (not used: a tensional failure force)
+- Access: paywalled at the publisher; the repository's scan open.
+- Library: not kept (OCR of the scan, read 2026-10-25).
+- Read so far (by the project): full text, 2026-10-25 (a sub-agent, OCR; Fig. 5 read by eye). p. 9: thickness and strength "increase according to a square-root-of-age function from a few kilometers and a few kilobars, respectively, for young lithosphere to values of approximately 50 km and 10 kilobar for old oceanic lithosphere"; p. 12: "To induce complete lithospheric failure, the integrated force F = ∫σ dz must exceed the integrated depth-dependent strength A = ∫σ_y dz", and "The ratio of the maximum stress generated to the maximum strength is essentially independent of lithospheric age"; p. 13: "full loading on passive margins with ages below 20 Ma leads to complete failure of the lithosphere. For ages in excess of 20 Ma the relative amount of failure decreases rapidly with age"; p. 15, Fig. 5, "The force required to induce tensional failure in oceanic lithosphere plotted as a function of lithospheric age" (about 0.6 × 10^13 N/m at 30 Ma, 1.4 at 70, 2.0 at 100, read off the plot); pp. 14-15, in compression "even higher stress levels are required to exceed lithospheric strength"; conclusions: "Aging of passive margins will not in itself lead to a spontaneous initiation of subduction. In general, the formation of new subduction zones at passive margins requires a focusing of external plate-tectonic forces."
+
+### CloetinghWortelVlaar1982
+- Reference: Cloetingh, S. A. P. L., Wortel, M. J. R. and Vlaar, N. J. (1982). Evolution of passive continental margins and initiation of subduction zones. Nature 297:139-142 (title from memory).
+- DOI or URL: 10.1038/297139a0; Cloetingh's 1982 Utrecht thesis in the VU Research Portal, https://research.vu.nl/ws/files/74118124/7114 (it reprints the Nature paper and the AAPG Memoir 34 paper).
+- Cited as: "Cloetingh, Wortel & Vlaar 1982".
+- Ledger ids: PLT-658 (not used)
+- Access: paywalled at the publisher; the thesis open.
+- Library: not kept (OCR of the thesis, read 2026-10-25).
+- Read so far (by the project): full text through the thesis, 2026-10-25 (a sub-agent, OCR): "stresses of the order of kilobars are required to fracture oceanic lithosphere"; "ageing of passive margins alone does not make them more suitable sites for initiation of subduction"; "full loading on a young passive margin (age below 20 Myr) leads to complete failure of the lithosphere"; the thesis, p. 20: "The integrated pressure gradient per unit width along the ridge for oceanic lithosphere with an age of 100 m.y. is 2.3 x 10^12 N/m".
+
+### MuellerPhillips1991
+- Reference: Mueller, S. and Phillips, R. J. (1991). On the initiation of subduction. Journal of Geophysical Research 96(B1):651-665 (title from memory).
+- DOI or URL: 10.1029/90JB02237.
+- Cited as: "Mueller & Phillips 1991".
+- Ledger ids: PLT-658 (not used: the number seen only through Niu et al. 2003)
+- Access: paywalled (Wiley returned 403).
+- Library: not fetched.
+- Read so far (by the project): the abstract through a fetch summary, 2026-10-25: shear resistance estimates "represent lower bounds"; "Subduction cannot initiate through the foundering of dense oceanic lithosphere" beside passive margins. No N/m figure in the abstract; its 3 × 10^13 N/m is Niu et al. 2003's citation.
+
+### Niu2003
+- Reference: Niu, Y., O'Hara, M. J. and Pearce, J. A. (2003). Initiation of subduction zones as a consequence of lateral compositional buoyancy contrast within the lithosphere: a petrological perspective. Journal of Petrology 44(5):851-866 (authors and title from memory).
+- DOI or URL: 10.1093/petrology/44.5.851.
+- Cited as: "Niu et al. 2003".
+- Ledger ids: PLT-658 (a secondary citation of Mueller & Phillips 1991)
+- Access: open (the PDF's text read).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-25 (a sub-agent): "the minimum deviatoric compression of 3 × 10^13 N/m needed to initiate subduction at passive margins (Mueller & Phillips, 1991) is unavailable unless there is an exceptional situation"; "stress in excess of 400 MPa is needed to overcome the model strength of oceanic lithosphere (Cloetingh et al., 1982; Mueller & Phillips, 1991)".
+
+### Nikolaeva2010
+- Reference: Nikolaeva, K., Gerya, T. V. and Marques, F. O. (2010). Subduction initiation at passive margins: numerical modeling. Journal of Geophysical Research 115:B03406 (title from memory).
+- DOI or URL: 10.1029/2009JB006549.
+- Cited as: "Nikolaeva et al. 2010".
+- Ledger ids: PLT-658 (no number)
+- Access: paywalled.
+- Library: not fetched.
+- Read so far (by the project): the abstract through a fetch summary, 2026-10-25: at most passive margins elastic and frictional resistance outweigh the gravitational instability and ridge push; the oceanic plate's age is a secondary factor, which matters only near the critical values of the others; a Moho hotter than 660°C favours subduction. No N/m figure.
+
+### Candioti2022
+- Reference: Candioti, L. G. et al. (2022). Frontiers in Earth Science 10:785418 (as the fetch summary gave it; the authors after the first and the title not recorded).
+- DOI or URL: not checked.
+- Cited as: "Candioti et al. 2022".
+- Ledger ids: PLT-658 (not used: fetch summary only)
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): a fetch summary only, 2026-10-25: a minimum horizontal force of 14 to 15 TN/m for subduction initiation by shear heating, and 30 to 37 TN/m for a homogeneous margin (citing Kiss et al. 2020, not read).

@@ -146,6 +146,9 @@ pub struct Counts {
     pub emplaced: u64,
     pub eroded: u64,
     pub subducted: u64,
+    /// Not emplaced because drawn past a pole, in the grid row that straddles it (RCK-097).
+    #[serde(default)]
+    pub past_pole: u64,
 }
 
 /// The L1 cell nearest block (x, z).
@@ -199,7 +202,11 @@ pub fn aureole_width_m(p: &StructureParams, t: &Tables, size_m: f64, host: Optio
 }
 
 /// Draws this step's new plutons. `host_at(c, depth)` gives the host class at depth `depth`
-/// (m) below the surface of cell `c` (for the aureole's width).
+/// (m) below the surface of cell `c` (for the aureole's width). A pluton drawn past a pole (the
+/// grid's rows run on past it, and the row that straddles it is drawn from over its whole cell)
+/// is not emplaced, after all its random draws, so the stream and every other pluton's place and
+/// size stay as they were (ids after it shift down by one); it is counted in `counts.past_pole`
+/// (ledger: RCK-097).
 #[allow(clippy::too_many_arguments)]
 pub fn emplace(
     grid: &GridDesc,
@@ -211,6 +218,7 @@ pub fn emplace(
     t_myr: f64,
     rng: &mut Rng,
     next_id: &mut u32,
+    counts: &mut Counts,
     host_at: impl Fn(usize, f64) -> Option<u16>,
 ) -> Vec<Pluton> {
     let w = grid.w as usize;
@@ -265,6 +273,17 @@ pub fn emplace(
         let roof_km =
             p.pluton_roof_km[0] + rng.uniform() * (p.pluton_roof_km[1] - p.pluton_roof_km[0]);
         let yaw = rng.uniform() * std::f64::consts::PI;
+        if !frame.projection().inside_poles(bz) {
+            // Drawn past the pole: no ground there, and the cube bake's Jacobian, singular at the
+            // pole, turns a body centred at or past it into a window of 10^7 to 10^10 blocks (a
+            // 6 by 4 km pluton comes out 1.4e7 by 5e8 blocks; one centred 0.1 block inside the
+            // pole bakes to 9 by 28). The cell's weight already holds the share of it on the
+            // planet, so this thins the straddling row a second time by that share (under one
+            // row of 2R / r at each pole).
+            // ledger: RCK-097
+            counts.past_pole += 1;
+            continue;
+        }
         let aureole_m = aureole_width_m(p, t, 2.0 * b_m, host_at(c, roof_km * 1000.0));
         out.push(Pluton {
             id: *next_id,
@@ -1038,6 +1057,7 @@ mod tests {
             0.0,
             &mut rng,
             &mut next,
+            &mut Counts::default(),
             |_, _| None,
         );
         assert!(out.len() > 20, "{} plutons", out.len());
@@ -1543,5 +1563,76 @@ mod tests {
             );
         }
         assert!(bands.iter().all(|b| b.class == index("hornfels")));
+    }
+
+    /// A pluton drawn past a pole is not emplaced (RCK-097). The grid's rows run on past the pole
+    /// R = C / 2π to ±Zo (651.9 and 704 blocks on this 4,096-block planet, rows of 16), the row
+    /// that straddles the pole weighs in by its share of the planet (`GridDesc::area_share`), and a
+    /// pluton is placed at a random point of its cell, so most of the straddling row's draws lay
+    /// past the pole, where the cube bake's Jacobian is singular.
+    #[test]
+    fn no_pluton_is_emplaced_past_the_poles() {
+        let c = 4096;
+        let grid = GridDesc::for_planet("L1", c, 16).unwrap();
+        let pole = deeptime_format::Projection::new(c).pole_z();
+        assert!(
+            (0..grid.h).any(|j| {
+                let s = grid.area_share(j);
+                s > 0.0 && s < 1.0 && grid.block_z(i64::from(j)) as f64 > 0.0
+            }) && (0..grid.h).any(|j| grid.area_share(j) == 0.0),
+            "the fixture's grid has a row straddling the pole and rows wholly past it"
+        );
+        let n = grid.cells();
+        let flags = vec![f32::from(ARC); n];
+        let convergence = vec![80.0f32; n];
+        let crust = vec![f32::from(CONTINENTAL); n];
+        let regime_f = vec![0.0f32; n];
+        let plate = vec![0.0f32; n];
+        let x = ArcInputs {
+            flags: &flags,
+            convergence: &convergence,
+            crust_type: &crust,
+            regime: &regime_f,
+            plate_id: &plate,
+        };
+        let p = StructureParams {
+            pluton_rate_km2_myr: 1.0e-4,
+            ..StructureParams::default()
+        };
+        let t = Tables::get();
+        let (mut total, mut near) = (0usize, 0usize);
+        let mut counts = Counts::default();
+        for seed in 0..120 {
+            let (mut rng, mut next) = (Rng::new(seed), 0u32);
+            let out = emplace(
+                &grid,
+                300.0,
+                &x,
+                &p,
+                &t,
+                1.0,
+                0.0,
+                &mut rng,
+                &mut next,
+                &mut counts,
+                |_, _| None,
+            );
+            total += out.len();
+            for pl in &out {
+                near += usize::from(pl.z.abs() > pole - 8.0);
+                assert!(
+                    pl.z.abs() < pole,
+                    "pluton {} at z {} (pole {pole})",
+                    pl.id,
+                    pl.z
+                );
+            }
+        }
+        // Plutons do form in the last 8 blocks before a pole, and the draws past it are counted,
+        // so the test is not empty.
+        assert!(
+            total > 1000 && near > 0 && counts.past_pole > 0,
+            "{total} plutons, {near} near a pole, {counts:?}"
+        );
     }
 }

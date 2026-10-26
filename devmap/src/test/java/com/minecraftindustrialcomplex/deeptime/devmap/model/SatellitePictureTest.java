@@ -70,7 +70,9 @@ class SatellitePictureTest {
                 f.w(), f.h(), f.blocksPerPx(), ms, here[1], here[0], here[3], here[2], east[1], east[0], east[3], east[2],
                 sat.info());
         System.out.println("[junit] SatellitePictureTest " + line);
-        assertTrue(here[0] > 2000 && here[2] > 2000, "enough deep sea and dry land to judge: " + line);
+        // A sample-size floor, not a property of the planet: the test planet is mostly sea, and since
+        // Law 1 (PLT-655) its dry land below 50 degrees is some 1,400 pixels of this frame.
+        assertTrue(here[0] > 1000 && here[2] > 1000, "enough deep sea and dry land to judge: " + line);
         assertTrue(here[1] >= 0.95 * here[0], "deep sea is sea blue: " + line);
         assertTrue(here[3] >= 0.90 * here[2], "dry land is not sea blue: " + line);
         double hereScore = (double) here[1] / here[0] + (double) here[3] / here[2];

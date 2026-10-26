@@ -1356,6 +1356,8 @@ struct Finish {
     /// The surface's sea level step by step, (years, m), oldest first (`SurfaceState::
     /// sea_history`); empty without it.
     sea_history: Vec<(f64, f64)>,
+    /// Land cells the playability pass set aside because their centre lies past a pole (DEP-223).
+    guarantee_past_pole: u64,
 }
 
 /// Where the crust now at each of `cells` was at the end of every frame: `[i][k]`, [`NO_ORIGIN`]
@@ -1689,6 +1691,7 @@ impl DepositStage {
                     .map(|&[t, m]| (f64::from(t) * 1.0e6, f64::from(m)))
                     .collect()
             }),
+            guarantee_past_pole: 0,
             cover: self.planet.as_deref().and_then(|p| {
                 // In the session's pool: the horizon bake is parallel, and outside an `install`
                 // it ran on Rayon's global pool, every core of the machine whatever the session's
@@ -2345,6 +2348,9 @@ impl DepositStage {
             "province_km": self.params.province_km,
             "provinces": provinces.count,
             "types": f.census,
+            // Land cells the playability pass never chose among: their centre lies past a pole
+            // (DEP-223).
+            "guarantee_past_pole": f.guarantee_past_pole,
             "sites": world.sites.len(),
             "bodies": world.bodies.len(),
             "max_formed_per_survivor": self.params.max_formed_per_survivor,
@@ -3701,6 +3707,19 @@ impl DepositStage {
                 })
                 .collect()
         });
+        // The cells whose centre lies inside the poles (ledger: DEP-223). The grid's rows run on
+        // to ±Zo, a quantum past the poles at ±R, so the row that straddles a pole has its centre
+        // past it and the rows beyond lie wholly past it. A guaranteed body stands at its cell's
+        // centre, and the cube bake maps a body through the map's Jacobian there, which is
+        // singular at a pole: a body centred past one bakes into a box of 10⁷ to 10¹⁰ blocks
+        // (RCK-097). Such a cell is no candidate; the pass counts the land it sets aside.
+        let planet = f.grid.projection();
+        let on_planet: Vec<bool> = (0..f.grid.cells())
+            .map(|cell| planet.inside_poles(cluster::cell_xz(&f.grid, cell as u32).1))
+            .collect();
+        f.guarantee_past_pole = (0..f.grid.cells())
+            .filter(|&cell| !on_planet[cell] && f.elev[cell] >= 0.0)
+            .count() as u64;
         // The world's x period, blocks.
         let world_c = frame.regions(ESSENTIAL_REGION_PROBE).c;
         // The land cells at least INLAND_MARGIN_BLOCKS of the world from the sea (DEP-222): the
@@ -3788,7 +3807,10 @@ impl DepositStage {
                         let mut ranked: Vec<(f64, f64, usize, u32)> = Vec::new();
                         for (k, &ti) in producers.iter().enumerate() {
                             for (cell, a) in self.state.acc[ti].iter().enumerate() {
-                                if f.elev[cell] < 0.0 || (strict && !inland[cell]) {
+                                if f.elev[cell] < 0.0
+                                    || !on_planet[cell]
+                                    || (strict && !inland[cell])
+                                {
                                     continue;
                                 }
                                 let (wx, wz) = world_xz[cell];

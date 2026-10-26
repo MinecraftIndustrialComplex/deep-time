@@ -675,6 +675,15 @@ fn arcs_build_a_cordillera() {
     );
 }
 
+/// The collision states a run's splits handed to a piece with their front (`inherit`, PLT-534).
+fn moved_collisions(world: &WorldState) -> u32 {
+    world
+        .globals
+        .get(inherit::COLLISIONS_GLOBAL)
+        .copied()
+        .unwrap_or(0.0) as u32
+}
+
 /// The life cycle of the collision states over a run (`shortening.rs`): checked after every step
 /// and against the dynamics record at the end.
 #[derive(Default)]
@@ -727,8 +736,9 @@ impl CollisionLives {
 
     /// Every collision state ended exactly once: in a transfer or weld (a collision record that
     /// carries the state's onset) or without one (a parting record; the run's end closes those
-    /// still under way).
-    fn finish(&self, st: &PlateState, d: &dynamics::Dynamics) {
+    /// still under way). `moved` is the run's collision states that went with their front to a
+    /// piece of a split plate (`inherit`, PLT-534): such a state is one life seen under two pairs.
+    fn finish(&self, st: &PlateState, d: &dynamics::Dynamics, moved: u32) {
         assert!(st.contacts.is_empty(), "the run's end closes every contact");
         assert!(st.counters.collision_onsets > 0);
         let with_state = d
@@ -740,7 +750,12 @@ impl CollisionLives {
             (with_state + d.partings.len()) as u32,
             st.counters.collision_onsets
         );
-        assert!(self.states.len() as u32 <= st.counters.collision_onsets);
+        assert!(
+            self.states.len() as u32 <= st.counters.collision_onsets + moved,
+            "{} states seen, {} onsets, {moved} moved with their front",
+            self.states.len(),
+            st.counters.collision_onsets
+        );
         assert!(
             self.longest >= 2,
             "no collision state outlived its first step"
@@ -858,7 +873,7 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     });
     let st = world.plates.as_ref().unwrap();
     let d = st.dynamics.as_ref().unwrap();
-    life.finish(st, d);
+    life.finish(st, d, moved_collisions(&world));
     assert!(!d.collisions.is_empty(), "no transfer or weld in 300 Myr");
     assert_eq!(d.collisions.len() as u32, st.counters.accretions);
     for c in &d.collisions {
@@ -1312,7 +1327,7 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
         d.collisions.iter().any(|c| c.sutured),
         "no suture in 300 Myr: the collision record is untested"
     );
-    life.finish(st, d);
+    life.finish(st, d, moved_collisions(&with));
     for c in &d.collisions {
         assert!(c.front_shortening_km >= 0.0 && c.area_km2 >= 0.0);
         assert!(c.end_myr >= c.start_myr && c.start_myr >= c.contact_onset_myr - 1e-9);
@@ -6035,12 +6050,23 @@ fn cumulative_convergence_ends_the_incipient_stage() {
 #[test]
 fn a_ridge_under_compression_resists_less() {
     let g = forces::G_EARTH;
-    assert_eq!(forces::incipient_resistance_n_m(80.0, g), 2.5e12);
-    assert_eq!(forces::incipient_resistance_n_m(5.0, g), 5.0e11);
-    assert_eq!(
-        forces::incipient_resistance_n_m(80.0, 0.5 * g),
-        0.5 * forces::incipient_resistance_n_m(80.0, g)
-    );
+    let on = crate::params::TectonicParams {
+        incipient_resistance_by_thickness: true,
+        ..crate::params::TectonicParams::default()
+    };
+    let off = crate::params::TectonicParams {
+        incipient_resistance_by_thickness: false,
+        ..on.clone()
+    };
+    assert_eq!(forces::incipient_resistance_n_m(&off, 80.0, g), 2.5e12);
+    assert_eq!(forces::incipient_resistance_n_m(&off, 5.0, g), 5.0e11);
+    assert_eq!(forces::incipient_resistance_n_m(&on, 5.0, g), 5.0e11);
+    for k in [&on, &off] {
+        assert_eq!(
+            forces::incipient_resistance_n_m(k, 80.0, 0.5 * g),
+            0.5 * forces::incipient_resistance_n_m(k, 80.0, g)
+        );
+    }
     let resistance = |age: f64| {
         let (p, mut st, geo, pos, _) = an_incipient_reference(true, 40.0, 0.5, age);
         let stage = PlatesStage::new(p.clone());
@@ -6051,7 +6077,12 @@ fn a_ridge_under_compression_resists_less() {
     let (ridge, old) = (resistance(5.0), resistance(forces::SLAB_AGE_REF_MYR));
     eprintln!("the incipient resistance: floor 5 Myr old {ridge:.4e} N, 80 Myr {old:.4e} N");
     assert!(old > 0.0);
-    let want = forces::INCIPIENT_RIDGE_N_M / forces::INCIPIENT_RESISTANCE_N_M;
+    let want = forces::INCIPIENT_RIDGE_N_M
+        / forces::incipient_resistance_n_m(
+            &crate::params::TectonicParams::default(),
+            forces::SLAB_AGE_REF_MYR,
+            g,
+        );
     assert!(
         (ridge / old - want).abs() < 1e-9,
         "{} of the old floor's",
@@ -6259,7 +6290,11 @@ fn an_incipient_front_takes_no_forsyth_uyeda_friction() {
     // Incipient: the incipient resistance alone.
     assert_eq!(fr(&young, over, under), 0.0);
     assert_eq!(fr(&young, under, over), 0.0);
-    let expect = forces::incipient_resistance_n_m(forces::SLAB_AGE_REF_MYR, g) * front_m;
+    let expect = forces::incipient_resistance_n_m(
+        &crate::params::TectonicParams::default(),
+        forces::SLAB_AGE_REF_MYR,
+        g,
+    ) * front_m;
     assert!(
         ((incip - expect) / expect).abs() < 1e-9,
         "{incip} against {expect}"
@@ -6408,6 +6443,35 @@ fn a_deferred_collision_leaves_both_plates_to_the_balance() {
         frozen.len(),
         &frozen[..frozen.len().min(20)]
     );
+}
+
+/// Why law 2's propagations end (PLT-656; the floor-age lane, 2026-10-26): arm fl-law2 had as
+/// many propagation events as starts in all 8 runs (no advance) and about nine stalls per start.
+/// One planet of the pool's preset (`LAW2_DIAG_START`, default the scattered continents;
+/// `LAW2_DIAG_SEED`, default 1; `LAW2_DIAG_MYR`, default 200), the plate stage alone; prints the
+/// counters and `propagation::TALLY` (why starts stall, why live propagations wait or end), and
+/// with `LAW2_DIAG_TRACE` set each start and visit with a sketch of the lattice around the tip.
+/// What it showed: U keeps a wedge of floor one or two spacings wide at the tip, its slab takes
+/// it down within a step or two, and U's crust leaves the tip long before 100 km of convergence.
+#[test]
+#[ignore = "diagnosis: 200 Myr at 100k samples; run with --release -- --ignored --nocapture"]
+fn why_law_2_propagations_end() {
+    let var = |k: &str| std::env::var(k).ok();
+    let start = var("LAW2_DIAG_START").unwrap_or_else(|| "scattered_continents".to_owned());
+    let seed: u64 = var("LAW2_DIAG_SEED").map_or(1, |x| x.parse().unwrap());
+    let myr: f64 = var("LAW2_DIAG_MYR").map_or(200.0, |x| x.parse().unwrap());
+    let mut p = builtin_preset("earthlike_quick_16k", 100_000, myr, &start, seed);
+    p.tectonics.margin_propagation = true;
+    p.tectonics.incipient_resistance_by_thickness = true;
+    let world = run_stage(&p, |_, _, _| {});
+    let c = &world.plates.as_ref().unwrap().counters;
+    eprintln!(
+        "{start} seed {seed}, {myr} Myr: starts {}, events {}, stalls {}, initiations near fronts {}",
+        c.propagation_starts, c.propagations, c.propagation_stalls, c.initiations_near_fronts
+    );
+    for (name, n) in propagation::TALLY_NAMES.iter().zip(&propagation::TALLY) {
+        eprintln!("  {name}: {}", n.load(std::sync::atomic::Ordering::Relaxed));
+    }
 }
 
 /// A resampling keeps thin continental crust on average (ledger: PLT-664). Twelve strips one

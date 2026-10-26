@@ -54,7 +54,10 @@ The structure stage runs each step after the surface stage has laid down or stri
 5. **Plutons.** Under arcs, and weakly in collision zones, a Poisson number of plutons is emplaced each step. Each is an
    ellipsoid with a roof 2 to 6 km below the surface, a lognormal length (median 25 km), a width of 0.5 to 1 times that, and a
    thickness from the Cruden-McCaffrey power law. They ride their plate, are unroofed by erosion, and are lost if the oceanic
-   crust carrying them is subducted (RCK-056 to RCK-067).
+   crust carrying them is subducted (RCK-056 to RCK-067). A pluton is placed at a random point of its cell, and the grid's
+   last rows lie past the poles, so a draw can land where there is no ground: it is not emplaced, after all its random draws
+   are made, so every other pluton keeps its place and size (RCK-097). Emplaced there, the cube bake's Jacobian, singular at
+   a pole, would have made it a window of 10^7 to 10^10 blocks.
 6. **Aureoles.** Every pluton and every stock bakes a shell of its host rock: the contact aureole. Its width is 0.3 of the
    intrusion's smallest dimension (a pluton's thickness; a stock's height or width, whichever is less), 1.5 times that where the
    host at the roof is a carbonate (RCK-053, RCK-091). The shell is read band by band down the column at the intrusion's
