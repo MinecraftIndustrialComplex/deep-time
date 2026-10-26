@@ -5054,6 +5054,8 @@ struct Ratchet {
     /// (its count at the resampling, after the step, and its lowest z after the step).
     cores: Vec<usize>,
     turned: Vec<u32>,
+    /// Sediment margins each step turned back to ocean floor, outside the zone (PLT-667).
+    left: Vec<u32>,
     zone: Vec<(usize, usize, f64)>,
     /// The core after each of the chain's steps: its columns south of the start's edge (z < 0), and its
     /// lowest z.
@@ -5170,17 +5172,17 @@ fn ratchet(chain: u64, steps: bool) -> Ratchet {
         (out, zs.iter().copied().fold(f64::INFINITY, f64::min))
     };
     let (mut cores, mut turned, mut zone) = (Vec::new(), Vec::new(), Vec::new());
-    let mut core_out = Vec::new();
+    let (mut left, mut core_out) = (Vec::new(), Vec::new());
     let mut lattice = resampled(&st, &geo, &pos, 100);
     for k in 1..=chain {
         let (s2, geo2, pos2) = &mut lattice;
         mixes.push(mixed(s2));
         let at_resampling = hyper(s2);
-        turned.push(if steps {
-            transition::step(s2, geo2, pos2, &env).margins
-        } else {
-            0
-        });
+        if steps {
+            let tr = transition::step(s2, geo2, pos2, &env);
+            turned.push(tr.margins);
+            left.push(tr.margins_left);
+        }
         cores.push(core(s2));
         zone.push((at_resampling, hyper(s2), reach(s2, pos2)));
         core_out.push(core_reach(s2, pos2));
@@ -5198,13 +5200,14 @@ fn ratchet(chain: u64, steps: bool) -> Ratchet {
         mixes,
         cores,
         turned,
+        left,
         zone,
         core_out,
     };
     eprintln!(
         "first step turned {}, hyper-extended {} reaching z {:.4}, core {}; after one \
-         resampling: hyper-extended {:?} reaching z {:.4?}; six in a row: core {:?}, turned \
-         {:?}, hyper-extended (at the resampling, after its step, its lowest z) {:.4?}; mixed \
+         resampling: hyper-extended {:?} reaching z {:.4?}; in a row: core {:?}, turned {:?}, \
+         turned back {:?}, hyper-extended (at the resampling, after its step, its lowest z) {:.4?}; mixed \
          {:?}; the core south of the start's edge (columns, lowest z) {:.4?}",
         r.first,
         r.before,
@@ -5214,6 +5217,7 @@ fn ratchet(chain: u64, steps: bool) -> Ratchet {
         r.reaches,
         r.cores,
         r.turned,
+        r.left,
         r.zone,
         r.mixes,
         r.core_out
@@ -6169,4 +6173,65 @@ fn a_deferred_collision_leaves_both_plates_to_the_balance() {
 fn ratchet_chain_24_diagnosis() {
     ratchet(24, true);
     ratchet(24, false);
+}
+
+/// TEMPORARY (the M5 lane's diagnosis): a small continent (a cap 0.25 rad round +z, on one plate
+/// with its ocean) over 24 resamplings: its columns, and those more than 0.05 rad outside the cap.
+#[test]
+#[ignore = "diagnosis"]
+fn small_continent_24_diagnosis() {
+    let p = preset(20_000, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (mut st, geo, pos) = plates_split(&p, &env, 0.0, |q| q.z > -0.9);
+    let pts = geo.points();
+    let edge = 0.25_f64.cos();
+    for (i, s) in st.samples.iter_mut().enumerate() {
+        if s.group == 0 && pts[i].z < edge {
+            s.kind = state::OCEANIC;
+            s.pools = pools::oceanic_column();
+            s.elevation_m = -4000.0;
+            s.formed_myr = (env.t_myr - 60.0) as f32;
+            s.thickness_m = pools::thickness(&s.pools);
+        }
+    }
+    let count = |st: &PlateState, pos: &[DVec3]| {
+        let c = st
+            .samples
+            .iter()
+            .filter(|s| !s.is_hidden() && s.kind == CONTINENTAL)
+            .count();
+        let far = st
+            .samples
+            .iter()
+            .zip(pos)
+            .filter(|(s, q)| !s.is_hidden() && s.kind == CONTINENTAL && q.z.acos() > 0.30)
+            .count();
+        (c, far)
+    };
+    let resampled = |st: &PlateState, geo: &Geo, pos: &[DVec3], k: u64| {
+        let mut s2 = st.clone();
+        s2.rng = crate::sphere::SplitMix64::new(500 + k);
+        let mut world = WorldState::new(1, 16_384, p.t_start_years());
+        let geo2 = ridges::resample(
+            &mut s2,
+            &mut world,
+            pos,
+            &Tree::over(pos, |_| true),
+            geo,
+            &env,
+        )
+        .unwrap();
+        let pos2 = geometry::positions(&s2, &geo2);
+        s2.recount(&pos2);
+        (s2, geo2, pos2)
+    };
+    let mut out = vec![count(&st, &pos)];
+    let mut cur = resampled(&st, &geo, &pos, 0);
+    out.push(count(&cur.0, &cur.2));
+    for k in 1..24u64 {
+        cur = resampled(&cur.0, &cur.1, &cur.2, k);
+        out.push(count(&cur.0, &cur.2));
+    }
+    eprintln!("small continent (columns, beyond 0.30 rad): {out:?}");
 }

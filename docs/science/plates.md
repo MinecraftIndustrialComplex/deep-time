@@ -10122,6 +10122,106 @@ arcs' length, put convergence in by a model or a premise, and leave slab age, di
 extension to single studies. The code has the length and a convergence factor on top of averages
 that already hold Earth's convergences, and no arc age.
 
+#### The arc rate counts the convergence once (PLT-665, PLT-666; 2026-10-25)
+
+The coordinator's call after the research above, a correctness fix: rate = R × v_n / v_ref, with v_n
+the orthogonal convergence at the arc's front and v_ref the mean orthogonal convergence of the arcs
+the averages were taken over, ledgered as verified or from-memory, and no min(., 1) cap unless a
+source gives one.
+
+**The law** (PLT-665, `subduction.rs`, the fronts' plan loop). An arc sample's magma a Myr is its
+type's rate per km (island 100, continental 35 km³/km/Myr) over the band's integral, times w_arc(d),
+times v_n / v_ref,type. v_n is `Source::normal`, the component of the relative velocity along the
+front's normal, the same one `DEEPTIME_ARC_NORMAL` stamps (PLT-312); the switch now sets only the
+uplift's convergence and the stamped one, and the arcs read v_n either way. There is no cap: none of
+the sources read gives one, and an arc at twice its type's mean convergence makes twice the rate.
+Cortial's uplift keeps g = min(v / 100, 1) (PLT-037), which is its own law. Clift & Vannucchi 2004
+distribute the global arc budget the same way, their Table 2 note e: "Magmatic productivity is
+calculated by prorating the total global magmatic budget in proportion to the orthogonal convergence
+rate at each arc"; their [14] takes the "trench-perpendicular convergence rate" from DeMets et al.
+(1990). So the premise is theirs (Clift et al. 2009 p. 84 repeat it, "linked to the supply of aqueous
+fluids ... and thus to the rates of convergence"), and the linear form is their bookkeeping, not a
+law they derive.
+
+**The references** (PLT-666, `params.rs`). v_ref is the length-weighted mean of Clift & Vannucchi
+2004's orthogonal convergence over their 32 margins (Tables 1 and 2, every row read), split by Stern &
+Scholl 2010's list of intra-oceanic arcs (p. 11: "Aleutian, South Sandwich, Kermadec, Tonga, Vanuatu,
+Solomon, New Britain, Izu-Bonin-Mariana, Banda, Lesser Antilles"; C&V have 8 of them). The means are
+the agent's arithmetic (`build/m4b/vref.py`):
+
+| set | margins | length, km | mean convergence, mm/yr | mean orthogonal, mm/yr |
+|---|---|---|---|---|
+| island (Stern & Scholl's list) | 8 | 11,450 | 89.3 | **86.6** |
+| continental (the rest) | 24 | 28,775 | 65.2 | **58.6** |
+| all | 32 | 40,225 | 72.1 | 66.6 |
+
+Checked against: Clift et al. 2009's Table 1, whose convergence column is C&V's full rate (29 of 32
+rows; Costa Rica, Nicaragua and Guatemala carry the orthogonal one; their text gives Izu-Bonin 90
+where the table has 95), and Bird 2003's subduction boundaries, 53.2 mm/yr normal and 62.3 speed over
+51,310 km, not split by type. A split that matches Clift et al.'s 31 % oceanic share would give 92.9
+and 62.2 on the full column. The table, from C&V 2004 (km/Myr = mm/yr):
+
+| margin | length, km | convergence, mm/yr | orthogonal, mm/yr | type (Stern & Scholl's list) |
+|---|---|---|---|---|
+| South Chile | 2,000 | 20 | 20 | continental |
+| Lesser Antilles | 850 | 40 | 40 | island |
+| Oregon-Washington | 850 | 38 | 34 | continental |
+| British Columbia | 550 | 42 | 38 | continental |
+| Aleutians | 1,500 | 75 | 61 | island |
+| Alaska | 2,050 | 64 | 60 | continental |
+| Taiwan-north Luzon | 700 | 30 | 30 | continental |
+| SW Japan-Nankai | 900 | 40 | 39 | continental |
+| Sumatra | 1,800 | 60 | 52 | continental |
+| Java | 2,100 | 77 | 76 | continental |
+| Burma-Andaman | 1,800 | 65 | 27 | continental |
+| Makran | 1,000 | 38 | 38 | continental |
+| Aegean | 1,200 | 20 | 20 | continental |
+| North Chile | 2,000 | 90 | 89 | continental |
+| Peru | 2,200 | 82 | 77 | continental |
+| Ecuador-Colombia | 1,100 | 70 | 63 | continental |
+| Costa Rica | 450 | 88 | 80 | continental |
+| Nicaragua | 275 | 85 | 78 | continental |
+| Guatemala | 500 | 83 | 74 | continental |
+| Mexico | 1,700 | 70 | 68 | continental |
+| Kurile | 1,100 | 85 | 85 | continental |
+| Kamchatka | 1,100 | 80 | 80 | continental |
+| NE Japan | 1,000 | 100 | 100 | continental |
+| Mariana | 1,600 | 90 | 90 | island |
+| Izu-Bonin | 1,300 | 95 | 89 | island |
+| Ryukyu | 1,000 | 70 | 69 | continental |
+| South Luzon | 400 | 90 | 90 | continental |
+| Philippine | 1,000 | 95 | 40 | continental |
+| Tonga | 1,500 | 110 | 110 | island |
+| Kermadec | 1,250 | 70 | 68 | island |
+| Solomons | 2,750 | 110 | 110 | island |
+| South Sandwich | 700 | 77 | 77 | island |
+
+**What it changes.** On base16 the island arcs ran at a mean g of 0.467 (0.383 on the normal
+component) and the continental at 0.299, so they added 30.9 and 13.8 km³/km/Myr. Read on the normal
+component against the new references, an island arc's factor is about 0.383 × 100 / 86.6 = 0.44 and
+a continental arc's about 0.43 against 0.299, roughly 40 % more continental arc crust and the island
+arcs where they were, before the planet answers. The arm measures it (below). Two globals
+(`plates/arc_front_normal_continental` and `plates/arc_front_normal_oceanic`, front length × dt × v_n)
+give the mean v_n at the arcs, which base16 lacks.
+
+**Unit test** (`an_arcs_rate_is_its_types_rate_at_earths_convergence_scaled_by_its_own`). The
+two-plate continental arc of `converging_plates` at 50 and at 200 mm/yr, past both references and
+the old cap's 100: four times the convergence gives four times the magma (within 1e-6), and at each
+speed the step's magma is the type's rate over its reference times the band at the fronts' v_n
+within 10 %.
+
+#### The obliquity's convention (DEF-029, ORE-033; 2026-10-25)
+
+The coordinator asked whether DEF-029's and ORE-033's sources define obliquity from the boundary
+normal. The code's obliquity is acos(v · (−n) / |v|), the angle between the convergence and the
+front's normal, 0 to 180° and unsigned. ORE-033's source, Butterworth et al. 2016, measures it from
+the trench normal, 0° when the subducting plate moves square to the trench (search summaries of its
+section 3; the paper itself is paywalled and not read) and the EarthByte PlateTectonicTools code from
+the authors' group says so verbatim (`ptt/subduction_convergence.py`: "angle between trench normal
+vector and convergence velocity vector"). DEF-029 has no source: its numbers are the design's, which
+assume the same convention. So nothing is converted; both rows carry the note, and the field being
+unsigned means an angle past 90° (a front opening) sits at the ramp's cap.
+
 ## The sea floor's age and the initiation's polarity (2026-10-25)
 
 The floor-age diagnosis (build log 2026-10-25, "Front lane: why floor older than 180 Myr does not go
