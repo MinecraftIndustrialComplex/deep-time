@@ -1041,18 +1041,22 @@ pub struct TectonicParams {
     /// "All SZI events start less than 1500 km away from other active subduction zones", none is
     /// spontaneous, and the subducting plates' mean ages at initiation run from 31.7 to 117.4 Myr
     /// (Supplementary Data 1), so neither PLT-062's 150 Myr gate nor PLT-064's 1,000 km clearance
-    /// holds. On: the floor an initiation may take is the visible ocean floor within
-    /// `subduction_initiation_reach_km` of an active trench, of any age, and the planet's hazard
-    /// is `subduction_initiation_per_trench_km_myr` × its trench length × the step ("subduction
-    /// breeds subduction"), shared between the plates by that floor and PLT-505's compression
-    /// weight; no trench, no initiation. PLT-503's margin, PLT-066's sizes, the split and
+    /// holds. On: the active trenches are the step's subduction zones (the oceanic fronts past
+    /// incipient, which the plate check counts as subducting boundary against Bird 2003); the
+    /// floor an initiation may take is the visible ocean floor within
+    /// `subduction_initiation_reach_km` of one, of any age, and the planet's hazard is
+    /// `subduction_initiation_per_trench_km_myr` × their length × the step ("subduction breeds
+    /// subduction"), shared between the plates by that floor and PLT-505's compression weight;
+    /// no subduction zone, no initiation. PLT-503's margin, PLT-066's sizes, the split and
     /// PLT-655's polarity are unchanged. Off: PLT-062 to PLT-064 as before. ledger: PLT-690
     pub initiation_near_trenches: bool,
     /// The reach of an active trench within which a subduction initiation may start, km
     /// (Earth-normalized; Crameri et al. 2020: "All SZI events start less than 1500 km away from
     /// other active subduction zones"). ledger: PLT-691
     pub subduction_initiation_reach_km: f64,
-    /// Subduction initiations per km of active trench per Myr with `initiation_near_trenches`:
+    /// Subduction initiations per km of subduction zone per Myr with `initiation_near_trenches`
+    /// (the length counted as the plate check's `boundary_subduction_km`, one lattice spacing per
+    /// front sample):
     /// Crameri et al. 2020's newly destructive initiations since about 105 Ma (Table 1: South
     /// Sandwich, Izu-Bonin-Mariana, Anatolia, Oman; polarity reversals and episodic jumps are
     /// other laws here) over Bird 2003's 51,310 km of subduction zones (PLT-213).

@@ -389,6 +389,11 @@ pub fn rift(
     Ok(())
 }
 
+/// The world global summing fix C's trench length × step over the run, km × Myr: the realized
+/// initiations' expectation is `subduction_initiation_per_trench_km_myr` × this (measurement,
+/// ledger PLT-692).
+pub const INITIATION_TRENCH_GLOBAL: &str = "plates/initiation_trench_km_myr";
+
 /// Spontaneous subduction initiation at old oceanic lithosphere (design choice, beyond Cortial:
 /// without it, oceanic crust on a plate with no trench ages for ever, while Earth's ocean floor is
 /// recycled within about 200 Myr; Stern 2004, "Subduction initiation: spontaneous and induced").
@@ -407,11 +412,18 @@ pub fn rift(
 /// plate_birth with `origin` "subduction_initiation".
 ///
 /// With `initiation_near_trenches` (fix C, ledger PLT-690 to PLT-692; Crameri et al. 2020) the
-/// floor that qualifies is instead the visible ocean floor within `subduction_initiation_reach_km`
-/// of an active trench (not a trench sample itself), of any age, and the hazard is the planet's: λ
-/// summed over the plates is `subduction_initiation_per_trench_km_myr` × the trench length × the
-/// step, each plate's share its qualifying floor (times PLT-505's weight). No trench, no
-/// initiation. The fracture is the bisector of the seed and its foot on the nearest trench
+/// active trenches are this step's subduction zones, `fronts` (`subduction::Pull::
+/// subducting_fronts`: the overriding side's samples of the oceanic fronts past incipient, the
+/// boundary the plate check measures against Bird 2003's subduction zones); the floor that
+/// qualifies is the visible ocean floor within `subduction_initiation_reach_km` of one (not a
+/// front or TRENCH sample itself), of any age, and the hazard is the planet's: λ summed over the
+/// plates is `subduction_initiation_per_trench_km_myr` × the fronts' length (one lattice spacing
+/// per front sample, as the plate check counts it) × the step, each plate's share its qualifying
+/// floor (times PLT-505's weight). No front, no initiation. The samples flagged TRENCH (the
+/// subducting plates' rims beside their hidden floor) are no measure of that length: they also
+/// mark collisions, incipient and slow fronts and the rims of floor held under after its contact
+/// ended, and on base20 summed to about twice the plate check's subducting boundary. The fracture
+/// is the bisector of the seed and its foot on the nearest trench
 /// (`trench_foot`): parallel to that trench at half the seed's distance (Crameri et al. 2020's
 /// Table 1: ten of thirteen new trenches at a normal offset parallel to the nearest older trench,
 /// three oblique, none along its strike). A draw whose fracture leaves fewer than 32 samples on a
@@ -423,6 +435,7 @@ pub fn maybe_initiate_subduction(
     pos: &[DVec3],
     env: &Env,
     stress: &[Option<f64>],
+    fronts: &[u32],
 ) -> Result<(), CoreError> {
     let k = env.k;
     let near_trenches = k.initiation_near_trenches;
@@ -436,13 +449,25 @@ pub fn maybe_initiate_subduction(
     }
     let t = env.t_myr;
     let area = env.norm.sample_area_km2();
-    let trenches: Vec<DVec3> = state
-        .samples
-        .iter()
-        .enumerate()
-        .filter(|(_, s)| s.flags & TRENCH != 0)
-        .map(|(i, _)| pos[i])
-        .collect();
+    // The trenches: with fix C this step's subduction zones (Crameri et al. 2020's "active
+    // subduction zones", ledger PLT-691); else the samples flagged TRENCH (PLT-064's clearance).
+    let trenches: Vec<DVec3> = if near_trenches {
+        fronts.iter().map(|&v| pos[v as usize]).collect()
+    } else {
+        state
+            .samples
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| s.flags & TRENCH != 0)
+            .map(|(i, _)| pos[i])
+            .collect()
+    };
+    let mut on_front = vec![false; state.samples.len()];
+    if near_trenches {
+        for &v in fronts {
+            on_front[v as usize] = true;
+        }
+    }
     // Subduction breeds subduction (Crameri et al. 2020): with no trench, nothing starts.
     if near_trenches && trenches.is_empty() {
         return Ok(());
@@ -471,7 +496,7 @@ pub fn maybe_initiate_subduction(
     // The fracture's other centre with fix C: the seed's foot on the nearest trench, so the
     // fracture runs parallel to that trench halfway to the seed (PLT-690); else the young floor's
     // centroid. The trench's line is fitted over three lattice spacings (numerical: a few samples
-    // of trench, about 530 km on the quick lattice, not a physical length).
+    // of trench, about 210 km on the quick presets' 100,000 samples, not a physical length).
     let stencil = 3.0 * env.norm.spacing_rad();
     let toward = |seed: u32| {
         trench_tree
@@ -489,10 +514,11 @@ pub fn maybe_initiate_subduction(
     // The floor that may go: old and clear of trenches (PLT-062, PLT-064), or with fix C any
     // floor within reach of one (Crameri et al. 2020: the subducting plates' mean ages at
     // initiation 31.7 to 117.4 Myr, and none spontaneous). ledger: PLT-690
-    // A trench sample itself is no new trench's place (and the split below needs the seed off it).
+    // A front or trench sample itself is no new trench's place (and the split below needs the
+    // seed off the front).
     let qualifies = |i: usize, s: &Sample| {
         if near_trenches {
-            s.flags & TRENCH == 0 && to_trench(i) <= reach
+            s.flags & TRENCH == 0 && !on_front[i] && to_trench(i) <= reach
         } else {
             s.age_myr(t) > k.subduction_initiation_age_myr && to_trench(i) > clearance
         }
@@ -505,9 +531,10 @@ pub fn maybe_initiate_subduction(
     }
     let ids: Vec<u32> = state.alive().map(|p| p.id).collect();
     // The hazard per qualifying sample and step. Fix C: the planet's expected initiations, rate ×
-    // trench length (one lattice spacing per trench sample, Earth-normalized km) × the step,
-    // over the qualifying floor of the plates that can be drawn (ledger: PLT-692); else PLT-063,
-    // per Myr and A_0 of old floor.
+    // the subduction zones' length (one lattice spacing per front sample, Earth-normalized km, as
+    // the plate check's `boundary_subduction_km` counts it against Bird 2003's 51,310 km) × the
+    // step, over the qualifying floor of the plates that can be drawn (ledger: PLT-692); else
+    // PLT-063, per Myr and A_0 of old floor.
     let per_sample = if near_trenches {
         let trench_km = trenches.len() as f64 * env.norm.km(env.norm.spacing_rad());
         let floor: usize = ids
@@ -518,6 +545,12 @@ pub fn maybe_initiate_subduction(
         if floor == 0 {
             return Ok(());
         }
+        // Measurement: the length the hazard read × the step, summed over the run, so the
+        // realized initiations read against the rate × this sum (PLT-692).
+        *world
+            .globals
+            .entry(INITIATION_TRENCH_GLOBAL.to_owned())
+            .or_insert(0.0) += trench_km * env.dt_myr;
         Some(near_trench_hazard(rate, trench_km, env.dt_myr, floor))
     } else {
         None
@@ -1211,7 +1244,8 @@ pub(in crate::plates) mod tests {
             );
             let pos = positions(&state, &geo);
             let mut world = WorldState::new(1, 16_384, 0.0);
-            maybe_initiate_subduction(&mut state, &mut world, &geo, &pos, &env(&k), &[]).unwrap();
+            maybe_initiate_subduction(&mut state, &mut world, &geo, &pos, &env(&k), &[], &[])
+                .unwrap();
             (state, pos)
         };
         let points = geo.points();
@@ -1500,18 +1534,20 @@ pub(in crate::plates) mod tests {
 
     /// Crameri et al. 2020: "All SZI events start less than 1500 km away from other active
     /// subduction zones and, in most cases, less than 500 km", and the subducting plates' mean
-    /// ages at initiation run from 31.7 to 117.4 Myr. A plate of floor 10 Myr old with a trench
-    /// 2,200 km long on the equator: with fix C an initiation starts, its fracture within half the
-    /// reach of the trench (the bisector of a seed within reach and the trench sample nearest it);
-    /// off, floor that young never goes (PLT-062); with no trench, nothing starts on.
-    /// ledger: PLT-690, PLT-691, PLT-692
+    /// ages at initiation run from 31.7 to 117.4 Myr. A plate of floor 10 Myr old with a
+    /// subduction zone 2,200 km long on the equator: with fix C an initiation starts, its fracture
+    /// within half the reach of the trench (the bisector of a seed within reach and its foot on
+    /// the trench); off, floor that young never goes (PLT-062); with no subduction zone nothing
+    /// starts on, and samples flagged TRENCH with no front this step (a collision, an incipient
+    /// front, floor held under after its contact ended) are none. ledger: PLT-690, PLT-691,
+    /// PLT-692
     #[test]
     fn subduction_starts_near_trenches_at_any_age() {
         let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
         let norm = Norm::new(6370.0, 6371.0, N);
         let spacing = norm.spacing_rad();
         let on_trench = |p: DVec3| p.z.asin().abs() < spacing && p.y.atan2(p.x).abs() < 0.17;
-        let run = |near: bool, trench: bool, seed: u64| {
+        let run = |near: bool, flagged: bool, front: bool, seed: u64| {
             let k = TectonicParams {
                 initiation_near_trenches: near,
                 subduction_initiation_per_trench_km_myr: 1.0,
@@ -1522,14 +1558,27 @@ pub(in crate::plates) mod tests {
             let mut st = one_plate(&geo, seed, |p| {
                 let mut s = old_floor();
                 s.formed_myr = -10.0;
-                if trench && on_trench(p) {
+                if flagged && on_trench(p) {
                     s.flags |= TRENCH;
                 }
                 s
             });
             let pos = positions(&st, &geo);
+            let fronts: Vec<u32> = (0..N as u32)
+                .filter(|&i| front && on_trench(pos[i as usize]))
+                .collect();
             let mut world = WorldState::new(1, 16_384, 0.0);
-            maybe_initiate_subduction(&mut st, &mut world, &geo, &pos, &env(&k), &[]).unwrap();
+            maybe_initiate_subduction(&mut st, &mut world, &geo, &pos, &env(&k), &[], &fronts)
+                .unwrap();
+            // The hazard's length, measured: one spacing per front sample × the step.
+            let read = world.globals.get(INITIATION_TRENCH_GLOBAL).copied();
+            let want = fronts.len() as f64 * norm.km(spacing) * env(&k).dt_myr;
+            if near && front {
+                let got = read.unwrap_or(0.0);
+                assert!((got - want).abs() < 1e-6 * want, "{got} km Myr, not {want}");
+            } else {
+                assert_eq!(read, None, "no fix C hazard read");
+            }
             (st, pos)
         };
         let reach = norm.rad(TectonicParams::default().subduction_initiation_reach_km);
@@ -1540,7 +1589,7 @@ pub(in crate::plates) mod tests {
                 .map_or(f64::INFINITY, |(_, d2)| angle_of_chord2(d2))
         };
         for seed in 1..=4 {
-            let (st, pos) = run(true, true, seed);
+            let (st, pos) = run(true, true, true, seed);
             assert_eq!(st.plates.len(), 2, "seed {seed}: an initiation");
             assert_eq!(st.counters.initiations, 1);
             let closest = fracture(&st, &geo)
@@ -1554,13 +1603,19 @@ pub(in crate::plates) mod tests {
             );
             assert_eq!(st.counters.initiations_reach_1000, 1);
             assert_eq!(st.counters.initiations_refused, 0);
-            let (off, _) = run(false, true, seed);
+            let (off, _) = run(false, true, true, seed);
             assert_eq!(off.plates.len(), 1, "seed {seed}: off, young floor stays");
-            let (none, _) = run(true, false, seed);
+            let (none, _) = run(true, false, false, seed);
             assert_eq!(
                 none.plates.len(),
                 1,
                 "seed {seed}: no trench, no initiation"
+            );
+            let (rim, _) = run(true, true, false, seed);
+            assert_eq!(
+                rim.plates.len(),
+                1,
+                "seed {seed}: a TRENCH rim with no front this step, no initiation"
             );
         }
     }
