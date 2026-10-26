@@ -3,8 +3,8 @@
 Status of this page: `stage 2 (constants checked against sources on 2026-10-02)` for the sources
 the project's library holds; the rest is marked `from-memory` in the ledger.
 
-Ledger ids on this page: `FRC-001` to `FRC-030`, `FRC-033` to `FRC-035`, `PLT-181` to `PLT-191`,
-`PLT-022`, `PLT-037`, `PLT-270` to `PLT-273`, `PLT-275` and `PLT-585` (see [claims.md](claims.md)).
+Ledger ids on this page: `FRC-001` to `FRC-030`, `FRC-033` to `FRC-036`, `PLT-181` to `PLT-191`,
+`PLT-022`, `PLT-037`, `PLT-270` to `PLT-273`, `PLT-275`, `PLT-585` and `PLT-684` (see [claims.md](claims.md)).
 
 ## What you see in the world
 
@@ -123,7 +123,9 @@ and 1.21 times it along the normal (PLT-554).
 
 with U the gravitational potential energy of the column (Ū the plate's mean):
 
-    sea floor:         U = −C d²,  d its depth below the ridge crest (no deeper than the old floor)
+    sea floor:         U = −C d²,  d its depth below the ridge crest, no deeper than its age's
+                       thermal subsidence d_GDH1(t) − 2,600 m (`ridge_push_by_age`, PLT-684,
+                       FRC-036; off: no deeper than the preset's old floor, FRC-021)
                        C = g (ρ_m − ρ_w)² π / (4 ρ_m α ΔT) · (1 + 2 ρ_m α ΔT / (π (ρ_m − ρ_w)))
     continental crust: U = ρ g h (H + h (1 + ρ / (ρ_m − ρ_c)) / 2),  h its height above sea level
 
@@ -191,6 +193,7 @@ plate's centroid, f the edge forces at the balance's answer, b the basal drag, h
 | FRC-007 | Reference crust H | 35 | km | design | `from-memory` |
 | FRC-008 | α, ΔT | 3 × 10⁻⁵, 1300 | 1/K, K | Turcotte & Schubert (not read) | `from-memory` |
 | FRC-012 | C at Earth's gravity | 3.3 × 10⁵ | N/m³ | Turcotte & Schubert's ridge push (not read) | `from-memory` |
+| FRC-036, PLT-684 | The depth the ridge push reads: at most the floor's age's thermal subsidence, `ridge_push_by_age` | on; 0 at the ridge, 2,898 m at 100 Myr, towards 3,051 m (old floor 3.05 × 10¹² N/m) | m | Copley et al. 2010 (read: the ridge push from "a plate cooling model" and "the seafloor age distribution", 2.5 to 3 × 10¹² N/m); Sandiford (read: the trench's flexure a force of its own); GDH1 (PLT-352) | `verified` (the law and magnitude; GDH1 `cited-unverified`) |
 | FRC-013 | Ridge crest = continent at sea level | U = 0 for both | — | Coblentz et al. 1994 (not read) | `from-memory` |
 | FRC-014 | Land column energy | 6.7 × 10¹² N/m for a 5 km belt on 35 km crust | N/m | Molnar & Lyon-Caen 1988 (not in the library) | `from-memory` |
 | PLT-188 | Keel drag | 3 | × | Conrad & Lithgow-Bertelloni 2006 (read: 2-5, about 3 on average) | `verified` |
@@ -330,7 +333,9 @@ diagnosis of its own, not traced here.
 - Boundaries are found per sample (about 71 km on the quick planet), so torques jump as samples
   cross: the main source of the step-to-step noise.
 - The sea floor's potential energy is the half-space cooling form, the land's an Airy column; both
-  are from the textbook, not checked here. Trenches are given the old floor's energy.
+  are from the textbook, not checked here. A sample deeper than its age's thermal subsidence (a
+  trench, a moat, the plate-only presets' Cortial floor) is given its age's energy (PLT-684,
+  plates.md "The ridge push by the floor's age (PLT-684, 2026-10-26)").
 - The mantle flow is a fixed degree-2 pattern, a stand-in, not convection.
 
 ## Game choices

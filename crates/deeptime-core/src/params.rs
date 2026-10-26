@@ -1162,12 +1162,12 @@ pub struct TectonicParams {
     /// The overall speed scale of the balance, mm/yr: a reference oceanic plate (the average
     /// starting plate's area, a 3,000 km trench of a full-length 80-Myr slab, its neighbours at
     /// rest) moves at this speed. Sets the basal drag coefficient without
-    /// `forsyth_uyeda_balance`, and the starting plates' speeds (PLT-273). At 45 the area-weighted
-    /// RMS speed is 28.2 mm/yr (base16), under CHK-020's 40; 75 (45 × 47 / 28.2, aiming at
-    /// Forsyth & Uyeda's 47 for Earth today) is parked (2026-10-26): with PLT-582 in the force
-    /// balance it gave 44.4 on the pool with PLT-022 clean (arm fx582-v75), but on the 8,000-sample
-    /// test planet PLT-022 binds on 11 to 12 of 24 seeds per start at 75 where 45 binds on none.
-    /// Ledger PLT-181.
+    /// `forsyth_uyeda_balance`, and the starting plates' speeds (PLT-273). 75 since 2026-10-26,
+    /// calibrated against CHK-020: at 45 the area-weighted RMS speed was 28.2 mm/yr (base16); on
+    /// a linear scaling 45 × 47 / 28.2 = 75 aims at Forsyth & Uyeda's 47 for Earth today. Parked
+    /// twice while PLT-022 bound on small plates; on with the ridge push by the floor's age
+    /// (PLT-684): on the pool (arm sp75-fix) 40.6, inside CHK-020's 40 to 100, PLT-022 bound in
+    /// no run. Ledger PLT-181.
     pub plate_speed_scale_mm_yr: f64,
     /// Slab pull, relative strength (1 = the reference pull, `forces::SLAB_PULL_N_M`). PLT-182.
     pub slab_pull: f64,
@@ -1207,6 +1207,16 @@ pub struct TectonicParams {
     /// 0.1 is the gravitational potential energy as computed (a ridge's push is then about 0.1 of
     /// the reference slab pull). PLT-187.
     pub edge_energy: f64,
+    /// The ridge push from the floor's age (the speed-scale stage, 2026-10-26): Turcotte &
+    /// Schubert's ridge push is the cooled lithosphere's, growing with the floor's age and
+    /// levelling off where the plate model's floor does, so the sea floor's column energy
+    /// (FRC-012) reads its depth below the crest at most as deep as GDH1 sinks floor of its age
+    /// (PLT-352): ground deeper than its age's thermal subsidence (a trench in young floor, a
+    /// flexural moat, the plate-only presets' floor relaxing towards Cortial's -10 km) has its
+    /// age's energy (FRC-036). Off, the depth is read down to the preset's old floor (FRC-021),
+    /// 9 km on the plate-only presets: a ridge push up to 2.7e13 N/m, 8.7 times old floor's.
+    /// ledger: PLT-684
+    pub ridge_push_by_age: bool,
     /// The buoyancy of continental crust dragged down a collision front, relative to its physical
     /// size (1): continental crust is lighter than the mantle, so the deeper a collision drags it
     /// the harder it pushes back against the convergence (Cloos 1993). A term of the collision
@@ -1364,7 +1374,7 @@ impl Default for TectonicParams {
             collision_orogeny_myr: 30.0,
             l1_every_steps: 0,
             forsyth_uyeda_balance: false, // ledger: PLT-585 (built 2026-10-25, off)
-            plate_speed_scale_mm_yr: 45.0, // ledger: PLT-181
+            plate_speed_scale_mm_yr: 75.0, // ledger: PLT-181
             slab_pull: 1.0,               // ledger: PLT-182
             slab_depth_km: 700.0,         // ledger: PLT-184
             slab_breakoff_myr: 10.0,      // ledger: PLT-184
@@ -1373,6 +1383,7 @@ impl Default for TectonicParams {
             suction_saturates: true,      // ledger: PLT-540
             front_pull: true,             // ledger: PLT-560 (on since 2026-10-24)
             edge_energy: 0.1,             // ledger: PLT-187
+            ridge_push_by_age: true,      // ledger: PLT-684
             collision_buoyancy: 1.0,      // ledger: PLT-275
             keel_drag: 3.0,               // ledger: PLT-188
             boundary_resistance: 3.0,     // ledger: PLT-189
