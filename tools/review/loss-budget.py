@@ -28,7 +28,8 @@ The model's rows:
                      and is not counted as continental crust (`o2c_b_km`, PLT-331, since
                      2026-10-20; runs before it have none, so the whole 7 km)
   pelagic            felsic rock the plate step's surface makes (`cb_parts` felsic, part
-                     `plate_surface`: the pelagic sediment, `pelagic_m_per_myr`)
+                     `plate_surface`: the pelagic sediment, `pelagic_m_per_myr`,
+                     until 2026-10-25, when PLT-103 was retired)
   sediment subd.     the share of the slab's sediment and sedimentary rock a resampling sends to the
                      mantle (`sed_subducted`, PLT-440, since 2026-10-22; the rest accretes to the
                      column on top, `accreted`, of it ocean floor's: accreted - accreted_continent)

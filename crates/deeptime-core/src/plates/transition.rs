@@ -111,8 +111,9 @@
 //! have their necking and hyper-extended domains: continental crust thinned to under 10 km over
 //! 70 to 200 km (Brune et al. 2014). The plate model labels it ocean floor. With
 //! `margin_sediment_continental` (off by default) a sample there that holds rock from the
-//! continents, sediment and sedimentary rock beyond the pelagic rain for the floor's age
-//! (`pelagic_m_per_myr`; the surface brings every other metre down from the land), becomes
+//! continents, sediment and sedimentary rock beyond the open ocean's pile for the floor's age
+//! and latitude (GlobSed's eq. 2a less its pore water, `surface::pelagic::open_floor_solid_m`;
+//! the surface's pelagic rain lies under it, and what is beyond came down from the land), becomes
 //! continental crust over its own ocean crust (its basement, PLT-331), so the continent's own
 //! processes act on it: erosion, settling, and being carried into collisions instead of
 //! subducted or stacked under the oceanic label at a resampling.
@@ -168,12 +169,19 @@ pub fn sediment_margin(s: &Sample) -> bool {
     crystalline_m(&own) < pile
 }
 
-/// Whether ocean floor `s` holds rock from the continents at `t_myr`: sediment and sedimentary
-/// rock beyond the pelagic rain of `pelagic_m_per_myr` over its age. ledger: PLT-661
-pub fn holds_terrigenous(s: &Sample, t_myr: f64, pelagic_m_per_myr: f64) -> bool {
+/// Whether ocean floor `s` at latitude `lat_deg` holds rock from the continents at `t_myr`:
+/// sediment and sedimentary rock beyond the open ocean's pile for its age and latitude
+/// (`surface::pelagic::open_floor_solid_m`). ledger: PLT-661, ERO-215
+pub fn holds_terrigenous(s: &Sample, t_myr: f64, lat_deg: f64) -> bool {
     let pile = f64::from(s.pools[pool::SEDIMENT].max(0.0))
         + f64::from(s.pools[pool::SEDIMENTARY].max(0.0));
-    s.kind == OCEANIC && pile > pelagic_m_per_myr.max(0.0) * s.age_myr(t_myr)
+    s.kind == OCEANIC
+        && pile > crate::surface::pelagic::open_floor_solid_m(s.age_myr(t_myr), lat_deg)
+}
+
+/// The latitude of position `p`, degrees (the spin axis is z, as everywhere in the plate model).
+fn lat_deg(p: DVec3) -> f64 {
+    p.normalize_or_zero().z.clamp(-1.0, 1.0).asin().to_degrees()
 }
 
 /// The pools that count as crystalline crust (not sediment or sedimentary rock).
@@ -563,7 +571,7 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
         for m in &members {
             in_zone[m.i] = side[m.i] == OCEANIC;
             let s = &mut state.samples[m.i];
-            if holds_terrigenous(s, env.t_myr, k.pelagic_m_per_myr) {
+            if holds_terrigenous(s, env.t_myr, lat_deg(pos[m.i])) {
                 // Its own ocean crust stays under it as its basement (ledger: PLT-331).
                 s.make_continental();
                 out.margins += 1;
@@ -905,7 +913,6 @@ mod tests {
             erosion_m: 0.0,
             damping_m: fx.k.oceanic_damping_mm_yr * 1.0e-3 * 2.0e6,
             accretion_m: 0.0,
-            pelagic_m: 0.0,
             z_c: fx.k.max_elevation_m,
             z_t: fx.k.trench_elevation_m,
             z_floor: fx.k.oceanic_floor_elevation_m,
@@ -1051,7 +1058,7 @@ mod tests {
     }
 
     /// The margin's sediment (PLT-661): ocean floor on the taper's ocean side (within W/2 of its
-    /// plate's continent) holding sediment beyond the pelagic rain for its age turns continental
+    /// plate's continent) holding sediment beyond the open ocean's pile for its age turns continental
     /// over its own ocean crust, hyper-extended (Brune et al. 2014); floor beyond W/2, floor
     /// with the rain alone and floor in a subduction zone stay oceanic. The taper does not see
     /// the label: over 30 steps every sample's crust and height are those of the run with the
@@ -1061,7 +1068,6 @@ mod tests {
         let base = Fx::new(MODEL_KM).k;
         let k = TectonicParams {
             transition_ocean_crust: true,
-            pelagic_m_per_myr: 5.0,
             ..base
         };
         let on = Fx::with(TectonicParams {
@@ -1073,13 +1079,20 @@ mod tests {
         // The zone is W/2 along the mesh from the boundary samples; the coast's geodesic distance
         // differs from that by up to a sample spacing (22 km here).
         let reach = 0.5 * w + on.norm.spacing_rad() * MODEL_KM;
-        // The floor formed at −200 Myr: 1,010 m of rain at the first step's 2 Myr. Every third
-        // sample holds 1,000 m (the rain alone), the others 2,500 m.
+        // The floor formed at −200 Myr. Every third sample holds 0.9 of the open ocean's pile
+        // for its age at the first step's 2 Myr and its latitude (the rain alone; the line only
+        // grows with age), the others 2,500 m (over the line's 2,001 m at the pole).
         let rain_only = |i: usize| i.is_multiple_of(3);
         let load = |st: &mut PlateState| {
+            let pos = positions(st, &on.geo);
             for (i, s) in st.samples.iter_mut().enumerate() {
                 if s.kind == OCEANIC {
-                    s.pools[pool::SEDIMENTARY] = if rain_only(i) { 1000.0 } else { 2500.0 };
+                    let line = crate::surface::pelagic::open_floor_solid_m(
+                        s.age_myr(2.0),
+                        lat_deg(pos[i]),
+                    );
+                    s.pools[pool::SEDIMENTARY] =
+                        if rain_only(i) { 0.9 * line } else { 2500.0 } as f32;
                     s.thickness_m = s.pools.iter().sum();
                 }
             }

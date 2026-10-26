@@ -102,6 +102,12 @@ pub const STAGE_NAME: &str = "climate";
 /// `WorldState::globals`: the surface stage deposits it (after a snowball: the cap carbonate).
 pub const CAP_CARBONATE_GLOBAL: &str = "climate/cap_carbonate_m";
 
+/// The weathering's drawdown beyond the degassing that `CAP_CARBONATE_GLOBAL` lays, mol of
+/// calcite, in `WorldState::globals`: the surface stage's pelagic rain (`surface::pelagic`)
+/// returns the rest of the dissolved load's Ca + Mg as carbonate, so the two do not count the
+/// same cations twice.
+pub const CAP_CARBONATE_MOL_GLOBAL: &str = "climate/cap_carbonate_mol";
+
 /// The step's eustatic sea level, m, in `WorldState::globals`: where the planet's water, less its
 /// land ice, fills the ground the step starts from (`crate::sea_level`), plus any steering
 /// nudge. The surface stage and the next plate step take it; without the climate stage the
@@ -1836,6 +1842,9 @@ impl ClimateStage {
             0.0
         };
         world.globals.insert(CAP_CARBONATE_GLOBAL.into(), cap_m);
+        world
+            .globals
+            .insert(CAP_CARBONATE_MOL_GLOBAL.into(), out.carbonate_excess_mol);
         self.s.cap_carbonate_m += cap_m;
         self.time("ice", started);
 
