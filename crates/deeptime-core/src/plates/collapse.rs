@@ -556,8 +556,9 @@ pub(super) struct RoomTo {
 /// Moves crust from each plate's `sources` (sample, m of thickness to release) to the nearest
 /// room on the same plate within `collapse_reach_km` (see the module docs, "The rule": continental
 /// crust thinner than `continental_to_m`, filled up to it, and ocean floor, filled up to
-/// `ocean_to_m`, the normal column, and continental once filled; during a plate step never above
-/// a receiver's thickening ceiling, `rate.rs`),
+/// `ocean_to_m`, the normal column, and continental once filled, or at once when the rock is
+/// continental with `margin_sediment_continental`, PLT-662; during a plate step never above a
+/// receiver's thickening ceiling, `rate.rs`),
 /// thinning the sources in proportion to what found room; returns the share of each plate's
 /// release that was placed (sources of a plate whose release found no room keep their crust).
 /// A source's surface sinks by Airy towards its column's height, or, given `floor`, as
@@ -662,6 +663,20 @@ pub(super) fn spread(
         }
         let share = placed / budget;
         shares.insert(p, share);
+        // With the margin's sediment on, rock spread from continental columns is continental
+        // crust wherever it lands: an ocean receiver turns continental at once over its own
+        // ocean crust (PLT-331) instead of once filled to the normal column, 39 km of crust
+        // under the oceanic label until then. The collapse's and the founder's sources are all
+        // continental; a rate release's are of both crusts, and its receivers turn when
+        // continental columns gave most of the plate's release. ledger: PLT-662
+        let continental_rock = k.margin_sediment_continental
+            && 2.0
+                * sources
+                    .iter()
+                    .filter(|&&(i, _)| state.samples[i].kind == CONTINENTAL)
+                    .map(|&(_, q)| q)
+                    .sum::<f64>()
+                > budget;
 
         // Thin the sources in proportion (pure shear) and pool what they gave.
         let mut mix = [0.0f64; pool::COUNT];
@@ -709,7 +724,9 @@ pub(super) fn spread(
             let z = f64::from(s.elevation_m);
             let change = isostatic_change_m(&pools_before, &s.pools, env.gravity);
             s.elevation_m = toward(z, change, iso_height(&s.pools, z_0, env.gravity)) as f32;
-            if s.kind == OCEANIC && f64::from(s.thickness_m) >= ocean_to_m - 1.0 {
+            if s.kind == OCEANIC
+                && ((continental_rock && g > 0.0) || f64::from(s.thickness_m) >= ocean_to_m - 1.0)
+            {
                 // The floor's own crust stays under the crust spread onto it (ledger: PLT-331).
                 s.make_continental();
                 out.converted += 1;
@@ -958,6 +975,60 @@ pub(in crate::plates) mod tests {
     fn step_under(fx: &Fx, st: &mut PlateState, n: u64, sea_m: f64) -> Collapse {
         let env = fx.env(n);
         step(st, &fx.geo, &env, sea_m)
+    }
+
+    /// PLT-662: under the step's thickening ceiling (`rate.rs`, 10 km a step here) the collapse
+    /// fills each ocean receiver part of the way to the normal column. Off, those receivers stay
+    /// ocean floor until filled; with `margin_sediment_continental` each turns continental at
+    /// once over its own ocean crust (PLT-331), as many as the step counts converted, and the
+    /// crust moved is the same.
+    #[test]
+    fn spread_continental_rock_is_continental_at_once_with_the_margin_switch() {
+        let belt = |p: DVec3| p.x < -0.1 && p.y > 0.766 && p.y < 0.85;
+        let mut runs = Vec::new();
+        for on in [false, true] {
+            let mut fx = Fx::new();
+            fx.k.thickening_max_mm_yr = 5.0;
+            fx.k.margin_sediment_continental = on;
+            let mut st = planet(&fx.geo, belt, 26_000.0);
+            let before = st.samples.clone();
+            let env = fx.env(1);
+            let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
+            crate::plates::rate::begin(&mut st, &env, &z0);
+            let c = step(&mut st, &fx.geo, &env, 0.0);
+            let took: Vec<usize> = (0..st.samples.len())
+                .filter(|&i| {
+                    before[i].kind == OCEANIC
+                        && st.samples[i].thickness_m > before[i].thickness_m + 1.0
+                })
+                .collect();
+            assert!(took.len() > 5, "{}", took.len());
+            let turned = took
+                .iter()
+                .filter(|&&i| st.samples[i].kind == CONTINENTAL)
+                .count();
+            for &i in &took {
+                let s = &st.samples[i];
+                assert!(
+                    f64::from(s.thickness_m) < normal_thickness_m() - 1.0,
+                    "{i} filled"
+                );
+                if s.kind == CONTINENTAL {
+                    assert_eq!(s.basement(), 7000.0);
+                }
+            }
+            runs.push((took, turned, c.converted, c.moved_km2_m));
+        }
+        let (off, on) = (&runs[0], &runs[1]);
+        assert_eq!(
+            (off.1, off.2),
+            (0, 0),
+            "off, part-filled floor stays oceanic"
+        );
+        assert_eq!(on.0, off.0, "the same receivers");
+        assert_eq!(on.1, on.0.len());
+        assert_eq!(on.2 as usize, on.0.len());
+        assert!((on.3 - off.3).abs() <= 1e-9 * off.3, "{} {}", on.3, off.3);
     }
 
     /// A belt raised by an orogeny this step is held up by the convergence; a root that never
