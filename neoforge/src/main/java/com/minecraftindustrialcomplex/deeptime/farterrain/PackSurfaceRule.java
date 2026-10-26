@@ -3,6 +3,7 @@ package com.minecraftindustrialcomplex.deeptime.farterrain;
 
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.minecraftindustrialcomplex.deeptime.worldgen.DelegatingRuleSource;
+import com.minecraftindustrialcomplex.deeptime.worldgen.StrataPass;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.core.BlockPos;
@@ -66,9 +67,17 @@ import java.util.Set;
  * floor at y 62 where the swamp noise is positive (Expanded Ecosphere's flooded forests and fens
  * too). {@code above_preliminary_surface} is answered as on a sea bed; {@code steep}, which on dry
  * ground reads the chunk's heightmap round the column, counts only where it does not matter: the
- * water is drawn where the rule paints it with the column steep and not steep alike. A probe of the
- * rule's paths to water ({@link #waterProbe}) leaves out every column none of them can reach, so the
- * whole rule runs on few columns. Thread-safe: one context per thread.
+ * water is drawn where the rule paints it with the column steep and not steep alike.
+ *
+ * <p>It is asked, too, whether it paints air there (BAK-068): Expanded Ecosphere 3.4.7 cuts the
+ * whole surface depth of a windswept savanna above y 63 to air (and, in a leading rule, every block
+ * at or above y 63 of its beaches, rivers and oceans), vanilla the top block of a frozen ocean's hole
+ * above the water. Then {@link #cut} walks down the column as {@code SurfaceSystem.buildSurface}
+ * does, one more block of stone above at each step and the same surface depth, until the rule gives
+ * something other than air; far terrain draws the ground that many blocks lower, with that block (or
+ * the strata's rock where the rule leaves the stone) as its top. A probe of the rule's paths to
+ * water and air ({@link #probe}) leaves out every column none of them can reach, so the whole rule
+ * runs on few columns. Thread-safe: one context per thread.
  */
 public final class PackSurfaceRule {
 
@@ -83,6 +92,15 @@ public final class PackSurfaceRule {
 
     private static final BlockState STONE = Blocks.STONE.defaultBlockState();
     private static final BlockState WATER = Blocks.WATER.defaultBlockState();
+    /** What {@link #top} gives where the rule cuts a dry column's top block to air (BAK-068; {@link #cut} says how deep). */
+    public static final BlockState AIR = Blocks.AIR.defaultBlockState();
+    /**
+     * How far under a cut's new top {@link #cut} looks for the rock (the soil left under it); past
+     * this the surface table's soil depth stands. Game-choice (ledger BAK-068): the soil under a cut
+     * is what is left of the floor's surface depth, at most 6 blocks in vanilla
+     * ({@code SurfaceSystem.getSurfaceDepth}), with a margin for a {@code stone_depth} secondary range.
+     */
+    private static final int MAX_SOIL = 16;
 
     /** What the sea-bed run gives where it reaches a rule or condition it cannot answer without a chunk (never placed). */
     private static final BlockState UNDECIDED = Blocks.STRUCTURE_VOID.defaultBlockState();
@@ -112,7 +130,7 @@ public final class PackSurfaceRule {
     private final SurfaceRules.RuleSource seaAbove, seaBelow;
     /** The whole rule with {@code steep} true, above the preliminary surface or not (BAK-067); null with no rule. */
     private final SurfaceRules.RuleSource steepAbove, steepBelow;
-    /** The rule's paths to water with what a chunk answers left out ({@link #waterProbe}); null where no path ends in water. */
+    /** The rule's paths to water and air past its leading part, with what a chunk answers left out ({@link #probe}); null where none. */
     private final SurfaceRules.RuleSource probe;
     /** The level's noise, for its preliminary surface ({@code NoiseChunk.computePreliminarySurfaceLevel}). */
     private final DensityFunction initial;
@@ -154,15 +172,16 @@ public final class PackSurfaceRule {
         }
     }
 
-    private PackSurfaceRule(SurfaceRules.RuleSource rule, boolean complete, SurfaceRules.RuleSource whole, NoiseSettings noise,
-                            ServerLevel level, ChunkGenerator generator, BiomeManager.NoiseBiomeSource quarts) {
+    private PackSurfaceRule(SurfaceRules.RuleSource rule, boolean complete, SurfaceRules.RuleSource whole, SurfaceRules.RuleSource rest,
+                            NoiseSettings noise, ServerLevel level, ChunkGenerator generator, BiomeManager.NoiseBiomeSource quarts) {
         this.rule = rule;
         this.complete = complete;
         this.seaAbove = whole == null ? null : seaBed(whole, true, false);
         this.seaBelow = whole == null ? null : seaBed(whole, false, false);
         this.steepAbove = whole == null ? null : seaBed(whole, true, true);
         this.steepBelow = whole == null ? null : seaBed(whole, false, true);
-        this.probe = whole == null ? null : waterProbe(whole);
+        // The probe gates the whole rule where the leading part gave nothing, so only the rest's paths count.
+        this.probe = rest == null ? null : probe(rest);
         this.initial = level.getChunkSource().randomState().router().initialDensityWithoutJaggedness();
         this.noiseMinY = noise.minY();
         this.noiseTop = noise.minY() + noise.height();
@@ -205,7 +224,10 @@ public final class PackSurfaceRule {
         DeepTime.LOGGER.info("[deeptime] far terrain: runs {} of the surface rule's {} top-level rules itself{}", run.size(), all.size(),
                 complete ? " (all of them)" : "; the surface table stands for the rest");
         SurfaceRules.RuleSource leading = run.isEmpty() ? null : SurfaceRules.sequence(run.toArray(SurfaceRules.RuleSource[]::new));
-        return new PackSurfaceRule(leading, complete && leading != null, levelRule, noise.clampToHeightAccessor(level), level, generator, quarts);
+        SurfaceRules.RuleSource rest = complete ? null
+                : SurfaceRules.sequence(all.subList(run.size(), all.size()).toArray(SurfaceRules.RuleSource[]::new));
+        return new PackSurfaceRule(leading, complete && leading != null, levelRule, rest, noise.clampToHeightAccessor(level), level, generator,
+                quarts);
     }
 
     /**
@@ -213,11 +235,12 @@ public final class PackSurfaceRule {
      * part run here decides it: a block; stone where the rule leaves the stone (the strata pass
      * paints it, so the rock shows), which only a rule run here in full can say; water where the
      * rule paints water in place of the block (BAK-067: the block is water, the ground under it one
-     * lower); or null where the rest of the rule decides (the surface table stands for it), or where
-     * the block the rule gives is air or another fluid (a cut far terrain does not draw). Under the
-     * sea the whole rule runs (BAK-065), and only a rule or condition a mod adds leaves the block to
-     * the table; on dry ground and a lake's bed the whole rule is asked only whether it paints water
-     * ({@link #paintsWater}).
+     * lower); {@link #AIR} on dry ground and a lake's bed where the rule cuts the block away
+     * (BAK-068: {@link #cut} walks down to the new top); or null where the rest of the rule decides
+     * (the surface table stands for it), where the block the rule gives is another fluid, and where
+     * it is air under the sea (a sea bed is drawn where it lies). Under the sea the whole rule runs
+     * (BAK-065), and only a rule or condition a mod adds leaves the block to the table; on dry ground
+     * and a lake's bed the whole rule is asked only whether it paints water or air ({@link #paints}).
      *
      * @param waterHeight the y just above the sea standing over the block, or {@link Integer#MIN_VALUE} for none
      *                    (SurfaceSystem's own convention; a lake's bed is run dry, as the chunk's rule saw it)
@@ -226,10 +249,11 @@ public final class PackSurfaceRule {
         Runner r = runners.get();
         r.context.updateXZ(x, z);
         r.context.updateY(1, y - minY + 1, waterHeight, x, y, z);
+        boolean dry = waterHeight == Integer.MIN_VALUE;
         BlockState s = r.rule == null ? null : r.rule.tryApply(x, y, z);
         if (s == null && !complete && r.seaAbove != null) {
-            if (waterHeight == Integer.MIN_VALUE)
-                return paintsWater(r, x, y, z) ? WATER : null;   // dry ground or a lake's bed: the table stands in (BAK-067)
+            if (dry)
+                return paints(r, x, y, z);   // dry ground or a lake's bed: the table stands in (BAK-067, BAK-068)
             // A sea bed: the whole rule, with the chunk's two answers there (BAK-065).
             s = (abovePreliminarySurface(r, x, y, z) ? r.seaAbove : r.seaBelow).tryApply(x, y, z);
             if (s == UNDECIDED)
@@ -241,58 +265,144 @@ public final class PackSurfaceRule {
             return complete ? STONE : null;
         if (s.is(Blocks.WATER))
             return WATER;   // ledger: BAK-067
-        if (s.isAir() || !s.getFluidState().isEmpty())
+        if (s.isAir())
+            return dry ? AIR : null;   // ledger: BAK-068
+        if (!s.getFluidState().isEmpty())
             return null;
         return s;
     }
 
     /**
-     * Whether the level's whole rule paints water in place of the top block of a dry column or a
-     * lake's bed (ledger BAK-067), the context updated for it: {@code above_preliminary_surface}
-     * answered as the chunk answers it (BAK-065), and the same water whether the column is steep or
-     * not ({@code steep} reads the chunk's heightmap round the column, which far terrain does not
-     * build). The probe first: a column none of the rule's paths to water can reach is never run.
+     * How the level's surface rule cuts a dry column whose top block (x, y, z) it paints air
+     * ({@link #top} gave {@link #AIR}; ledger BAK-068), or null where it cannot be told here: a rule
+     * or condition only a chunk answers, or {@code steep}, decides a block of the walk first, or the
+     * cut reaches the column's bottom. The walk is {@code SurfaceSystem.buildSurface}'s: each block
+     * is read before the rule writes it, so the column under a cut is still the stone the noise
+     * filled; the block {@code d} under the top has {@code d + 1} blocks of stone above it and the
+     * solid column under it, and the column's surface depth and minimum surface are the top's. The
+     * two chunk reads are answered as for {@link #top}.
      */
-    private boolean paintsWater(Runner r, int x, int y, int z) {
-        if (r.probe == null || r.probe.tryApply(x, y, z) == null)
-            return false;
-        boolean above = abovePreliminarySurface(r, x, y, z);
-        BlockState flat = (above ? r.seaAbove : r.seaBelow).tryApply(x, y, z);
-        if (flat == null || !flat.is(Blocks.WATER))
-            return false;
-        BlockState steep = (above ? r.steepAbove : r.steepBelow).tryApply(x, y, z);
-        return steep != null && steep.is(Blocks.WATER);
+    public Cut cut(int x, int y, int z) {
+        Runner r = runners.get();
+        r.context.updateXZ(x, z);
+        int minSurface = minSurfaceLevel(r, x, z);
+        int d = 0;
+        BlockState top = null;
+        for (; y - d >= minY; d++) {
+            BlockState s = dryBlock(r, x, y - d, z, d + 1, minSurface);
+            if (s == UNDECIDED)
+                return null;
+            if (!s.isAir()) {
+                top = s;
+                break;
+            }
+        }
+        if (top == null || d == 0)
+            return null;
+        // The soil left under the new top: what the rule paints down to the first block it leaves stone.
+        int soil = -1;
+        if (StrataPass.isCrust(top)) {
+            soil = 0;
+        } else if (!top.is(Blocks.WATER)) {
+            for (int k = 1; k <= MAX_SOIL && y - d - k >= minY; k++) {
+                BlockState s = dryBlock(r, x, y - d - k, z, d + k + 1, minSurface);
+                if (s == UNDECIDED || s.isAir() || s.is(Blocks.WATER))
+                    break;
+                if (StrataPass.isCrust(s)) {
+                    soil = k;
+                    break;
+                }
+            }
+        }
+        return new Cut(d, top, soil);
     }
 
     /**
-     * The rule's paths to a water block as one rule ({@link #paintsWater}'s probe): each path the
-     * conditions on it that read no chunk, ending in water. It gives water wherever the rule could
-     * paint water (a path's left-out conditions and the rules before it can only stop it there), so
-     * a column it leaves is one the rule paints no water on. Null where no path ends in water.
+     * A surface rule's cut of a dry column (ledger BAK-068): {@code depth} blocks from the top are air,
+     * the block under them is {@code top} (a block; stone where the rule leaves the stone; water where
+     * it paints water there, BAK-067), and {@code soil} blocks from that one down are what the rule
+     * paints before it leaves the stone (0 when {@code top} is the stone; -1 where the walk cannot
+     * tell, and the surface table's soil depth stands).
      */
-    static SurfaceRules.RuleSource waterProbe(SurfaceRules.RuleSource r) {
+    public record Cut(int depth, BlockState top, int soil) {}
+
+    /**
+     * What the rule leaves at block (x, y, z) of a dry column with {@code above} blocks of stone over
+     * it, the context updated for the column: air, water, a block, stone where the rule leaves the
+     * stone, or {@link #UNDECIDED} where only a chunk can say (the steep and the not steep answers
+     * differ, a rule or condition a mod adds is reached, another fluid).
+     */
+    private BlockState dryBlock(Runner r, int x, int y, int z, int above, int minSurface) {
+        r.context.updateY(above, y - minY + 1, Integer.MIN_VALUE, x, y, z);
+        BlockState s = r.rule == null ? null : r.rule.tryApply(x, y, z);
+        if (s == null) {
+            if (complete || r.seaAbove == null)
+                return complete ? STONE : UNDECIDED;
+            boolean a = y >= minSurface;
+            BlockState flat = (a ? r.seaAbove : r.seaBelow).tryApply(x, y, z);
+            BlockState steep = (a ? r.steepAbove : r.steepBelow).tryApply(x, y, z);
+            if (flat == UNDECIDED || steep == UNDECIDED || flat != steep)
+                return UNDECIDED;
+            s = flat == null ? STONE : flat;
+        }
+        if (s.isAir())
+            return AIR;
+        if (s.is(Blocks.WATER))
+            return WATER;
+        return s.getFluidState().isEmpty() ? s : UNDECIDED;
+    }
+
+    /**
+     * What the level's whole rule paints in place of the top block of a dry column or a lake's bed
+     * where that is water (ledger BAK-067) or air (BAK-068), the context updated for it:
+     * {@code above_preliminary_surface} answered as the chunk answers it (BAK-065), and the same
+     * block whether the column is steep or not ({@code steep} reads the chunk's heightmap round the
+     * column, which far terrain does not build). Null for anything else (the table stands in). The
+     * probe first: a column none of the rule's paths to water or air can reach is never run.
+     */
+    private BlockState paints(Runner r, int x, int y, int z) {
+        if (r.probe == null || r.probe.tryApply(x, y, z) == null)
+            return null;
+        boolean above = abovePreliminarySurface(r, x, y, z);
+        BlockState flat = (above ? r.seaAbove : r.seaBelow).tryApply(x, y, z);
+        BlockState painted = flat == null ? null : flat.is(Blocks.WATER) ? WATER : flat.isAir() ? AIR : null;
+        if (painted == null)
+            return null;
+        BlockState steep = (above ? r.steepAbove : r.steepBelow).tryApply(x, y, z);
+        boolean same = steep != null && (painted == WATER ? steep.is(Blocks.WATER) : steep.isAir());
+        return same ? painted : null;
+    }
+
+    /**
+     * The rule's paths to a water or an air block as one rule ({@link #paints}'s probe): each path
+     * the conditions on it that read no chunk, ending in its block. It gives a block wherever the
+     * rule could paint water or air (a path's left-out conditions and the rules before it can only
+     * stop it there), so a column it leaves is one the rule paints neither on. Null where no path
+     * ends in either.
+     */
+    static SurfaceRules.RuleSource probe(SurfaceRules.RuleSource r) {
         List<SurfaceRules.RuleSource> paths = new ArrayList<>();
-        waterPaths(r, new ArrayList<>(), paths);
+        paths(r, new ArrayList<>(), paths);
         return paths.isEmpty() ? null : SurfaceRules.sequence(paths.toArray(SurfaceRules.RuleSource[]::new));
     }
 
-    private static void waterPaths(SurfaceRules.RuleSource r, List<SurfaceRules.ConditionSource> on, List<SurfaceRules.RuleSource> out) {
+    private static void paths(SurfaceRules.RuleSource r, List<SurfaceRules.ConditionSource> on, List<SurfaceRules.RuleSource> out) {
         if (r instanceof SurfaceRules.SequenceRuleSource s) {
             for (SurfaceRules.RuleSource e : s.sequence())
-                waterPaths(e, on, out);
+                paths(e, on, out);
         } else if (r instanceof SurfaceRules.TestRuleSource t) {
             boolean kept = conditionChunkFree(t.ifTrue());
             if (kept)
                 on.add(t.ifTrue());
-            waterPaths(t.thenRun(), on, out);
+            paths(t.thenRun(), on, out);
             if (kept)
                 on.remove(on.size() - 1);
-        } else if (r instanceof SurfaceRules.BlockRuleSource b && b.resultState().is(Blocks.WATER)) {
+        } else if (r instanceof SurfaceRules.BlockRuleSource b && (b.resultState().is(Blocks.WATER) || b.resultState().isAir())) {
             // The conditions of a path all hold or the path gives nothing, so they are asked cheapest
             // first: a biome read through the zoom costs a climate search a column at low detail.
             List<SurfaceRules.ConditionSource> sorted = new ArrayList<>(on);
             sorted.sort(java.util.Comparator.comparingInt(PackSurfaceRule::probeCost));
-            SurfaceRules.RuleSource path = SurfaceRules.state(WATER);
+            SurfaceRules.RuleSource path = SurfaceRules.state(b.resultState());
             for (int i = sorted.size() - 1; i >= 0; i--)
                 path = SurfaceRules.ifTrue(sorted.get(i), path);
             out.add(path);
@@ -320,11 +430,16 @@ public final class PackSurfaceRule {
      * surface depth, less 8. The context must be updated for the column.
      */
     private boolean abovePreliminarySurface(Runner r, int x, int y, int z) {
+        return y >= minSurfaceLevel(r, x, z);
+    }
+
+    /** The column's minimum surface ({@link #abovePreliminarySurface}); the context must be updated for the column. */
+    private int minSurfaceLevel(Runner r, int x, int z) {
         int cx = x >> 4 << 4, cz = z >> 4 << 4;
         int p00 = preliminarySurface(r, cx, cz), p10 = preliminarySurface(r, cx + 16, cz);
         int p01 = preliminarySurface(r, cx, cz + 16), p11 = preliminarySurface(r, cx + 16, cz + 16);
         int level = Mth.floor(Mth.lerp2((double) ((float) (x & 15) / 16.0F), (double) ((float) (z & 15) / 16.0F), p00, p10, p01, p11));
-        return y >= level + r.context.surfaceDepth - 8;
+        return level + r.context.surfaceDepth - 8;
     }
 
     /**
