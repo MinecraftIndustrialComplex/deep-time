@@ -9910,6 +9910,9 @@ at specks of land, and they cut slivers that are consumed within one or two step
 two fixes after the arm, the unit tests, the ignored diagnosis and the counters stay; PLT-064's
 1,000 km clearance is the default again. Law 3, built inside law 2's stage, is off with it: it acts
 at every incipient front, not only at law 2's margins, so on alone it would need an arm of its own.
+Off, the branch gives base16's planet: arm fl-law2off (ea0a9bc1, key 2d939be5b5aa, seed 1 of both
+starts, base16's arguments) has base16's world state (all 109 files of the full dump), dynamics
+record and dumped fields, sha256 for sha256.
 
 **For whoever picks this up.** Zhou et al. 2020's setup has the passive margin continuing the
 trench's strike, so the tear across the margin is a STEP at the trench's end; the starts here fire
