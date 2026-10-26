@@ -9503,6 +9503,97 @@ contacts are the ones the arcs and the boundary mix read, by the slab before the
 continental sample at an incipient contact's front takes no incipient resistance (it is a
 collision's, PLT-610), so it keeps the front's friction there as at a mature contact.
 
+## Speed scale 75, the calibration's first read (2026-10-26)
+
+The speed scale (PLT-181) was calibrated against CHK-020. base16's area-weighted RMS was 28.2 mm/yr
+at 45, and the level is linear in the scale (×1.5 gives ×1.49, "Plate speed" above), so 45 × 47 /
+28.2 = 75 aims at Forsyth & Uyeda's 47 mm/yr for Earth today. One 8-run arm, `sp-v75`: `--set
+tectonics.plate_speed_scale_mm_yr=75` on master 1c2946f2 (key 8aaddf52958a, argkey d0cd1773),
+`earthlike_quick_16k`, both starts, seeds 1 to 4, 1,000 Myr, 2 threads, `+DEEPTIME_CRUST_BUDGET=1
++DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`. It was read against base17-s4 (base17's seeds 1 to 4, from
+the cached runs) with `pool.sh table --base base17-s4 --arm sp-v75` (and `--measure guard`) and with
+the lane's readers over the run folders (build/front/cr/speed3.py to speed5.py, budget1.py, diag2.py
+to diag4.py, gitignored). The table gives medians and exact Mann-Whitney p:
+
+| Measure | base17-s4 (8) | sp-v75 (8) | p |
+|---|---|---|---|
+| CHK-020 RMS plate speed, mm/yr (40 to 100) | 28.1 | 42.3 (42.1 to 43.4) | < 0.001 |
+| CHK-028 plate-steps over 150 mm/yr, % (at most 0.5) | 0.000 | 0.883 (0.454 to 1.121); past 0.5 in 7 of 8 | < 0.001 |
+| PLT-022's guard, steps that bind | 0 in all 8 | 4, 2 and 2, in 3 of 8 (scattered 1, supercontinent 1 and 4) | |
+| big plates' median and 90th percentile, mm/yr | 27.0 and 67.8 | 39.6 and 99.6 | |
+| slab plates' speed over free plates' | 3.24 | 2.85 | 0.007 |
+| ocean floor's mean age, Myr (Earth 64) | 115.3 | 96.0 | < 0.001 |
+| floor older than 180 Myr (Earth 0.006) | 0.208 | 0.144 | < 0.001 |
+| floor older than 250 Myr | 0.126 | 0.071 | |
+| A/C0, Myr | 128.7 | 109.7 | |
+| plates at the end | 22.0 | 17.5 | < 0.001 |
+| collisions per 100 Myr | 4.80 | 4.05 | 0.035 |
+
+The relief guard: worst 9,916 m against 10,046 (p 0.29), no step beyond 2 Earth reliefs, the highest
+plate elevation 5,617 against 4,836 m (p 0.038). The census, sp-v75's medians with p: land 0.300
+(0.010), the largest landmass 0.146 (0.021), continental crust under the sea 0.208 (0.001), land
+above 2 km 0.035 (0.050), coast with high ground 0.164 (0.083), the crust's net change −0.083
+against −0.049 (0.003), criteria met (means) 6.12 against 5.88 (0.73). The sea over the datum after
+100 Myr and at the end is 374 / 386 m against 449 / 579.
+
+The level moved ×1.50 for the scale's ×1.67. The plates of each class moved ×1.43 to ×1.63 (slab
+plates 44.6 to 64.0 mm/yr, plates in a collision 25.6 to 39.7, free plates 20.2 to 32.7), and the
+mix moved to fewer and bigger plates (big plates' share of the area 0.718 to 0.781), which takes the
+whole from about ×1.57 to ×1.52. The collision resistance is plastic and does not scale: its share
+of the colliding plates' resistance rose from 15.7 to 21.0 %. The floor's age fell less than the
+forecast of 68 Myr and 0.07. The subducting front shortened (island-arc front 42.7k to 36.5k km,
+continental-arc 27.3k to 23.2k), so the floor's consumption rose about ×1.28, not ×1.5.
+
+The crust's net change, km³/yr, the means of the crust budget over the 8 runs: arcs and the ocean
+floor add 0.35 more (island arcs 1.25 to 1.43, continental arcs 0.58 to 0.72, the ocean floor's own
+crust made continental 0.04 to 0.07), and the losses grow by about 1.2. Collisions take 0.70 of
+that: the suturing zones 1.75 to 2.45, of it PLT-242's share 0.30 to 0.50, "no room" left over 0.41
+to 0.68 and "no room" at the strength height 1.04 to 1.27. The collision front at any time grew from
+9,419 to 12,153 km, its convergence from 21.0 to 26.5 mm/yr and the area crossing it from 0.198 to
+0.322 km²/yr. Sediment subduction takes 0.30 (1.18 to 1.48), subduction erosion 0.16 (0.35 to 0.51;
+erosive fronts 7,530 to 12,062 km), and resampling 0.06. Net −1.12 to −1.79 km³/yr, the budget's
+other parts making up the rest. Coast with high ground rose with the belts (the felsic rock they
+make 3.75 to 6.66 km³/yr, the continental volume they add 4.30 to 7.68), with the higher continental
+arcs (their median 814 to 1,062 m) and with less continental crust under a lower sea.
+
+**Parked.** The guard is not clean, so by Ben's condition the default stays 45 (the coordinator's
+ruling of 2026-10-26). CLAUDE.md's default-on rule asks for no guard failure on the pool, PLT-022 is
+a guard that should never bind, and PLT-585 was kept off for the same reason. Branch
+`speed-scale-75-parked` holds the 75 in params.rs and the 13 presets, with the two tests that now
+read the scale instead of pinning 45.
+
+**What binds** (measured from the arm's records; no fix built). Three of the four plates that bound
+were born by subduction initiation and were being consumed down their own trench: scattered 1 plates
+68 and 81, supercontinent 1 plate 201. Their slab pull stayed at full size while the visible front
+fell 5 to 7 times and the area 10 to 300 times. Plate 68 pulled 2,175 × 10²⁴ N m on a 10,854 km
+front at 2,691 samples, and 1,496 on 1,642 km at 95 samples. At the binds their pull per metre of
+current front was 5.5 to 14.3 × 10¹³ N/m. That is beyond the law's most, FRC-002's 3 × 10¹³ times
+FRC-004's 1.5. At two binds plate 201 had no current front at all (2 samples).
+
+The cause is in the code. The force balance (forces.rs) reads a front from any lattice neighbour of
+a plate with an active contact, hidden or carried away. PLT-582's test (a visible sample of the
+subducting plate within two spacings now) is applied by the arcs' fronts (subduction.rs) and by the
+boundary mix, but not by the force balance. Between resamplings the lattice is frozen, so a consumed
+plate keeps pulling along its trench as it stood at the last resampling, while its basal drag goes
+with its area. Its slab resistance sits on the same stale front, so the remnant moves at the old
+trench's terminal velocity (pull × speed / slab resistance 180 to 213 mm/yr for plate 68). It also
+turns: plate 68 from about 8 to about 39 degrees per Myr as it went from 408 to 95 samples, and
+plate 201 at 2 samples some 2,000 to 3,000 before the guard (an RMS of 2,034 mm/yr on a plate of
+about 57 km radius) and 250 under it.
+
+The fourth plate (supercontinent 4 plate 197, 1,258 to 1,636 samples) pulls inside the law (3.2 ×
+10¹³ N/m). It is a slab plate at the old law's terminal velocity, the scale × (1 + 3 + 3) / 3 × the
+slab's weight (175 × about 1.3 at 75). Its centroid moves at 166 to 190 mm/yr and its basal drag is
+3 to 6 % of its resistance. Forsyth & Uyeda's slab plates move at about one speed whatever their
+area (Table 1: Cocos 8.6 cm/yr at 2.9 × 10⁶ km², Nazca 7.6 at 15, Pacific 8.0 at 108; p. 177: "The
+Nazca, Cocos and Pacific plates are moving about the same velocity"). The old law's basal drag, a
+seventh of the reference plate's resistance, instead spreads the slab plates from the scale (the
+reference plate) up to 7/3 of it times the weight (a plate with a long trench for its area).
+
+Over all plate-steps, the pull beyond the law's most on the current front is small: 1.7 % of all
+pull on base17-s4 and 2.7 % on the arm. The sp-fu arms above (PLT-585) were read with this force
+balance; PLT-582 did not reach it.
+
 ## The overriding plate's share (PLT-652, 2026-10-25)
 
 The collision-front diagnosis (build log 2026-10-25, "Front lane: what sets the crust added per km of

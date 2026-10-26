@@ -1142,10 +1142,11 @@ pub struct TectonicParams {
     /// The overall speed scale of the balance, mm/yr: a reference oceanic plate (the average
     /// starting plate's area, a 3,000 km trench of a full-length 80-Myr slab, its neighbours at
     /// rest) moves at this speed. Sets the basal drag coefficient without
-    /// `forsyth_uyeda_balance`, and the starting plates' speeds (PLT-273). 75 since 2026-10-26,
-    /// calibrated against CHK-020: at 45 the area-weighted RMS speed was 28.2 mm/yr (base16); on
-    /// a linear scaling 45 × 47 / 28.2 = 75 aims at Forsyth & Uyeda's 47 for Earth today. On the
-    /// pool (arm sp-v75) it gave 42.3, inside CHK-020's 40 to 100. Ledger PLT-181.
+    /// `forsyth_uyeda_balance`, and the starting plates' speeds (PLT-273). 75 on this parked
+    /// branch (2026-10-26; master keeps 45), the calibration's first read against CHK-020: at 45
+    /// the area-weighted RMS speed was 28.2 mm/yr (base16); on a linear scaling 45 × 47 / 28.2 =
+    /// 75 aims at Forsyth & Uyeda's 47 for Earth today. On the pool (arm sp-v75) it gave 42.3,
+    /// inside CHK-020's 40 to 100, but PLT-022's guard bound in 3 of 8 runs. Ledger PLT-181.
     pub plate_speed_scale_mm_yr: f64,
     /// Slab pull, relative strength (1 = the reference pull, `forces::SLAB_PULL_N_M`). PLT-182.
     pub slab_pull: f64,
