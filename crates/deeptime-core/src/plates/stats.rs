@@ -518,7 +518,8 @@ impl Summary {
              deaths={} lips={} resamplings={} emerged={} buoyant={} reversals_confirmed={} \
              transferences={} propagation_starts={} propagations={} propagation_stalls={} \
              initiations_near_fronts={} initiations_reach_250={} initiations_reach_500={} \
-             initiations_reach_1000={} initiations_reach_1500={} initiations_refused={}",
+             initiations_reach_1000={} initiations_reach_1500={} initiations_refused={} \
+             backarc_rifts={} backarc_refused={}",
             self.plates,
             self.ocean_age_p90_myr,
             self.ocean_age_p50_myr,
@@ -552,7 +553,9 @@ impl Summary {
             self.counters.initiations_reach_500,
             self.counters.initiations_reach_1000,
             self.counters.initiations_reach_1500,
-            self.counters.initiations_refused
+            self.counters.initiations_refused,
+            self.counters.backarc_rifts,
+            self.counters.backarc_refused
         )
     }
 }
