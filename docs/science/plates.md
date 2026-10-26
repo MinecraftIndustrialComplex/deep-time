@@ -9832,7 +9832,8 @@ a guard that should never bind, and PLT-585 was kept off for the same reason. Br
 `speed-scale-75-parked` holds the 75 in params.rs and the 13 presets, with the two tests that now
 read the scale instead of pinning 45. (PLT-582's amendment cleared the guard on the pool later the
 same day, but on the test planet 75 still binds it on many seeds where 45 binds on none, so 75
-stays parked: "The force balance's front on the current geometry" below.)
+stays parked: "The force balance's front on the current geometry" below. 75 went on later that day
+with the ridge push by the floor's age: "The ridge push by the floor's age (PLT-684, 2026-10-26)".)
 
 **What binds** (measured from the arm's records; no fix built). Three of the four plates that bound
 were born by subduction initiation and were being consumed down their own trench: scattered 1 plates
@@ -10040,7 +10041,9 @@ did nothing sets no motion). PLT-080's note.
 the pool, and a bind under the full combination where master binds on none is evidence about 75,
 not noise in the test). The amendment and the motion fix are on by default; the speed scale stays
 45 in params.rs and every built-in preset, and branch `speed-scale-75-parked` keeps the 75 (PLT-181,
-PLT-022). The arm that decides the amendment is read at 45 on master's A and B below.
+PLT-022). The arm that decides the amendment is read at 45 on master's A and B below. (The test
+planet's binds were the edge term's, and 75 went on with PLT-684: "The ridge push by the floor's
+age (PLT-684, 2026-10-26)" below.)
 
 **The arm on master's A and B** (the coordinator's rule of 2026-10-26: the amendment and the motion
 fix at 45, on master's A and B). `fx582-m19`: this branch merged with master (f182f189 and the
@@ -10234,6 +10237,49 @@ slab's weight (PLT-185, FRC-016), 175 to 262 mm/yr at 75; Forsyth & Uyeda's is 7
 "independent of the surface geometry", and their balance (PLT-585) has no speed scale. These binds
 are the scale's own terminal velocity on a small plate with an old slab, not a missing or mis-scaled
 small-plate term, so the stage builds nothing for them.
+
+**The arm** sp75-fix: the law on, `--set tectonics.plate_speed_scale_mm_yr=75`, on master 7546a670
+(front-loaded island arcs on) at 640b5afe; key d986a3616d61, argkey d0cd1773; seeds 1 to 4, both
+starts, the crust-budget envs. Read against base21-s4 (base21's seeds 1 to 4, key 8e2115301833,
+argkey cd665cef) with `pool.sh table` (v1census; guard after `pool.sh measure --measures guard`;
+islab with `--registry tools/review/islfront/measures_islab.json`) and the lane's readers
+(speed3, diag3, speed5 and budget1 in build/front/cr/, outside the repo's tracked files). Medians of
+8 runs, Mann-Whitney p:
+
+| | base21-s4 (45) | sp75-fix (75, PLT-684) | p |
+|---|---|---|---|
+| PLT-022's guard, runs bound | 0 | 0 | |
+| relief guard's worst, m from the sea | 10,230 | 10,098 | 0.23 |
+| largest excess over Airy, m | 2,458 | 2,663 | 0.28 |
+| CHK-020's RMS speed, mm/yr (40 to 100) | 26.2 | 40.6 (37.8 to 42.9) | < 0.001 |
+| CHK-028's plate-steps over 150 mm/yr, % (≤ 0.5) | 0.000 | 0.456 (3 of 8 past 0.5) | < 0.001 |
+| floor's mean age, Myr (Earth 64) | 145.1 | 108.3 | 0.001 |
+| floor older than 180 Myr (Earth 0.006) | 0.311 | 0.187 | 0.001 |
+| slab plates / in a collision / free, mm/yr | 61.6 / 24.2 / 20.9 | 79.4 / 37.6 / 35.1 | |
+| slab-attached over the rest (Earth 3 to 4) | 2.24 | 2.11 | |
+| island / continental front, km a step | 48,657 / 32,935 | 40,468 / 33,465 | |
+| island incipient share of the front | 0.499 | 0.348 | |
+| land | 0.270 | 0.274 | 0.65 |
+| largest landmass | 0.100 | 0.161 | 0.19 |
+| continental crust under the sea | 0.364 | 0.275 | 0.083 |
+| coast with high ground (≤ 0.11) | 0.155 | 0.139 | 1.0 |
+| land under ice | 0.076 | 0.038 | 0.083 |
+| collisions per 100 Myr | 5.15 | 4.55 | 0.082 |
+| continental crust's net change | −0.045 | −0.097 | < 0.001 |
+| criteria met: median, mean | 6, 6.38 | 6, 6.12 | 0.29 |
+
+The guard is clean on the pool, so by Ben's standing order (75 goes on once the guard is clean,
+whatever it does to V1) the default and the 13 built-in presets go to 75 on this branch (PLT-181).
+The plates of every class speed up by 1.3 to 1.7 times (at 75 the slab plates' pull is 88.6 % of
+their drive, the free plates' suction 65 % and the edge term 17 %). The faster plates
+make young floor (mean age 145 to 108 Myr, still older than Earth's 64) and consume more crust: the
+crust budget's net loss goes from 1.05 to 2.27 km³ a year, island arcs 1.16 to 1.50 (Stern & Scholl
+1.5), continental arcs 0.44 to 0.62 (1.0), sediment subduction 0.82 to 1.25 (1.1), subduction
+erosion 0.32 to 0.50 (1.4), and the crust-suturing zones' loss 1.06 to 2.10 (Earth 0.7) as the crust
+crossing collision fronts goes from 5.8 to 10.3 km³ a year. Plate-check's `continental_min` (the
+smallest continental share over the run, 0.372 to 0.317) fails in all 8 runs against 4 on the base,
+and `plate_life_p50_myr` (80 to 62.5 Myr) in all 8 against 3. No V1 number leaves its target; coast
+with high ground was outside it on the base too.
 
 ## The overriding plate's share (PLT-652, 2026-10-25)
 
