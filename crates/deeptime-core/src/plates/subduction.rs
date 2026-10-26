@@ -1613,7 +1613,10 @@ pub fn fronts_finish(
                     src.normal / k.continental_arc_convergence_ref_mm_yr,
                 )
             } else {
-                (island_axis_m, src.normal / k.island_arc_convergence_ref_mm_yr)
+                (
+                    island_axis_m,
+                    src.normal / k.island_arc_convergence_ref_mm_yr,
+                )
             };
             // Past the slab's ends no arc (`arc_slab_ends`, PLT-561), and none over an incipient
             // slab (PLT-610).

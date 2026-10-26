@@ -130,6 +130,10 @@ pub fn due(state: &PlateState, env: &Env) -> bool {
 /// takes its categorical labels from it (`interpolate`): the material at `q` is the material of
 /// the old sample whose cell holds it, not of the corner with the largest barycentric weight,
 /// whose region in a triangle that is not equilateral is not the corner's cell (ledger: PLT-664).
+/// It keeps a class's area on average, so its edge walks; a vote of the corners' weight at one
+/// half smooths the edge but eats every body a fixed fraction of a cell per resampling, an island
+/// arc's band whole within a run, and was rejected (2026-10-25, plates.md "Which old sample a new
+/// one follows").
 fn nearest_corner(geo: &Geo, c: &Cover, rot: DQuat, q: DVec3) -> u32 {
     let local = rot.inverse() * q;
     let pts = geo.points();
@@ -144,47 +148,6 @@ fn nearest_corner(geo: &Geo, c: &Cover, rot: DQuat, q: DVec3) -> u32 {
         }
     }
     best
-}
-
-/// TEMPORARY experiment (the M5 lane): the class with the largest barycentric weight among the
-/// cover's corners, and of its corners the one nearest `q`.
-fn vote_corner(src: &[Sample], geo: &Geo, c: &Cover, rot: DQuat, q: DVec3) -> u32 {
-    let class = |v: u32| {
-        let x = &src[v as usize];
-        (x.kind, x.kind == CONTINENTAL && super::transition::hyper_extended(x))
-    };
-    let near = nearest_corner(geo, c, rot, q);
-    let weight = |cl: (u8, bool)| -> f64 {
-        (0..3)
-            .filter(|&k| c.w[k] > 0.0 && class(c.tri[k]) == cl)
-            .map(|k| c.w[k])
-            .sum()
-    };
-    let mut best = (class(near), weight(class(near)));
-    for k in 0..3 {
-        if c.w[k] > 0.0 {
-            let cl = class(c.tri[k]);
-            let w = weight(cl);
-            if w > best.1 {
-                best = (cl, w);
-            }
-        }
-    }
-    if best.0 == class(near) {
-        return near;
-    }
-    let local = rot.inverse() * q;
-    let pts = geo.points();
-    let mut out = (u32::MAX, f64::NEG_INFINITY);
-    for k in 0..3 {
-        if c.w[k] > 0.0 && class(c.tri[k]) == best.0 {
-            let d = pts[c.tri[k] as usize].dot(local);
-            if d > out.1 {
-                out = (c.tri[k], d);
-            }
-        }
-    }
-    out.0
 }
 
 /// Interpolates a sample from a cover of the old crust; vectors come out in the mantle frame,
@@ -425,6 +388,18 @@ pub const MAFIC_DROPPED_GLOBAL: &str = "plates/resample_mafic_dropped_km3";
 /// slab at resamplings instead of accreting (`sediment_subduction_share`, PLT-440), km³
 /// (Earth-normalized; the crust budget's sediment subduction against Stern & Scholl 2010).
 pub const SEDIMENT_SUBDUCTED_GLOBAL: &str = "plates/sediment_subducted_km3";
+/// World global (measurement only, for the sediment diagnosis, `tools/review/seddiag/`): the
+/// sediment and sedimentary rock of ocean floor that goes under at resamplings, before the share
+/// the slab takes (PLT-440, PLT-660) is applied, slab path included, km³ (Earth-normalized),
+/// whether or not sediment subduction is on. It separates what reaches the trenches from what
+/// they keep. Split by the crust type of the sample on top: continental …
+pub const SEDIMENT_REACHING_TRENCH_GLOBAL: &str = "plates/sediment_reaching_trench_km3";
+pub const SEDIMENT_REACHING_TRENCH_CONTINENTAL_GLOBAL: &str =
+    "plates/sediment_reaching_trench_continental_km3";
+/// … and oceanic; the rest of the total is the one-way slab's (`SLAB_GLOBAL`'s points, which have
+/// no sample on top).
+pub const SEDIMENT_REACHING_TRENCH_OCEANIC_GLOBAL: &str =
+    "plates/sediment_reaching_trench_oceanic_km3";
 /// World global (one-way subduction, `tectonics.one_way_subduction`, only while it is on): the
 /// conserved pools of crust that went down a trench and that only held crust covered at a
 /// resampling, gone down with the slab (the point became new sea floor), km³ (Earth-normalized).
@@ -785,7 +760,9 @@ pub fn resample(
     // belt or went down with the slab (`belts.rs`): it is consumed here, not accreted a second
     // time (ledger: PLT-276, PLT-292). Both are counted, m of rock per new sample.
     let mut plate_new: Vec<u32> = vec![u32::MAX; n];
-    let mut tally: Vec<[f64; 9]> = vec![[0.0; 9]; n];
+    // 9 to 11: the floor's sediment reaching a trench, under continental or oceanic crust, or the
+    // one-way slab's (measurement only).
+    let mut tally: Vec<[f64; 12]> = vec![[0.0; 12]; n];
     let sediment_share = k.sediment_subduction_share as f32; // ledger: PLT-440
     // By margin type instead of one share (ledger: PLT-660).
     let sourced = k.sediment_subduction_sourced;
@@ -797,15 +774,9 @@ pub fn resample(
     let mut limits: Vec<[f32; 3]> = vec![[f32::INFINITY, 0.0, f32::INFINITY]; n];
     // A cover of group `g` interpolated at the new point `q`, its labels from the old sample
     // nearest `q` (ledger: PLT-664).
-    let vote = std::env::var("DEEPTIME_EXP_VOTE").is_ok(); // TEMPORARY experiment
     let interp = |g: u32, c: &Cover, q: DVec3| {
         let rot = rots[g as usize];
-        let m = if vote {
-            vote_corner(src, old, c, rot, q)
-        } else {
-            nearest_corner(old, c, rot, q)
-        };
-        interpolate(src, c, rot, m)
+        interpolate(src, c, rot, nearest_corner(old, c, rot, q))
     };
     let mut samples: Vec<Sample> = found
         .par_iter()
@@ -814,19 +785,21 @@ pub fn resample(
         .zip(traces.par_iter_mut())
         .zip(limits.par_iter_mut())
         .zip(new_pts.par_iter())
-        .map(|((((((top, others), pl), tally), trace), lim), &q)| match top {
+        .map(|((((((top, rest), pl), tally), tr), lim), &q)| match top {
             None => {
                 // One-way subduction's gap (the covers are all held crust; none elsewhere): its
                 // conserved pools went down with the slab, its sediment counted as subducted
                 // sediment too (ledger: PLT-542, PLT-440).
-                for (g2, c2) in others {
+                for (g2, c2) in rest {
                     let u = interp(*g2, c2, q);
                     tally[8] += u.pools[..pool::CONSERVED]
                         .iter()
                         .map(|&x| f64::from(x))
                         .sum::<f64>();
-                    tally[7] += f64::from(u.pools[pool::SEDIMENT].max(0.0))
+                    let pile = f64::from(u.pools[pool::SEDIMENT].max(0.0))
                         + f64::from(u.pools[pool::SEDIMENTARY].max(0.0));
+                    tally[7] += pile;
+                    tally[11] += pile;
                 }
                 Sample::blank(0)
             }
@@ -842,7 +815,7 @@ pub fn resample(
                     *lim = [blend(&old.ceiling_m), s.elevation_m, blend(&old.top_m)];
                 }
                 if tracing {
-                    *trace = Some(gap_budget::Trace {
+                    *tr = Some(gap_budget::Trace {
                         tri: c.tri,
                         w: c.w,
                         pools: s.pools,
@@ -850,7 +823,7 @@ pub fn resample(
                     });
                 }
                 let blended = s.pools;
-                for (g2, c2) in others {
+                for (g2, c2) in rest {
                     let under = &src[c2.major() as usize];
                     let p2 = group_plate[*g2 as usize];
                     if under.is_hidden() || p2 == *pl || overrides(*pl, p2) {
@@ -875,10 +848,16 @@ pub fn resample(
                             // accretes. ledger: PLT-440; with `sediment_subduction_sourced`
                             // the share follows the margin's type (PLT-660).
                             let mut subducted = 0.0_f64;
-                            if (sourced || sediment_share > 0.0)
-                                && under.kind != CONTINENTAL
-                                && (under.is_hidden() || (p2 != *pl && overrides(*pl, p2)))
-                            {
+                            let going_under = under.kind != CONTINENTAL
+                                && (under.is_hidden() || (p2 != *pl && overrides(*pl, p2)));
+                            if going_under {
+                                // Measurement only: what reaches the trench, before the share.
+                                let pile = f64::from(u.pools[pool::SEDIMENT].max(0.0))
+                                    + f64::from(u.pools[pool::SEDIMENTARY].max(0.0));
+                                let slot = if s.kind == CONTINENTAL { 9 } else { 10 };
+                                tally[slot] += pile;
+                            }
+                            if (sourced || sediment_share > 0.0) && going_under {
                                 let share = if sourced {
                                     let pile = u.pools[pool::SEDIMENT].max(0.0)
                                         + u.pools[pool::SEDIMENTARY].max(0.0);
@@ -963,6 +942,13 @@ pub fn resample(
     }
     if k.one_way_subduction {
         *world.globals.entry(SLAB_GLOBAL.to_owned()).or_insert(0.0) += sum(8);
+    }
+    for (name, v) in [
+        (SEDIMENT_REACHING_TRENCH_GLOBAL, sum(9) + sum(10) + sum(11)),
+        (SEDIMENT_REACHING_TRENCH_CONTINENTAL_GLOBAL, sum(9)),
+        (SEDIMENT_REACHING_TRENCH_OCEANIC_GLOBAL, sum(10)),
+    ] {
+        *world.globals.entry(name.to_owned()).or_insert(0.0) += v;
     }
 
     // Gaps: fresh oceanic crust between diverging plates.
