@@ -134,7 +134,9 @@ host rock in the top 2 km) and three global clocks.
    within 30 km as gravel bars, or else laid on the finished ground as a bench, which slides along
    z by whole blocks to stay inside the world's z range at a pole (ORE-283). The grid's last rows run past the poles and a deposit
    is jittered within its cell, so a cluster's point outside the poles is drawn again (test `nothing_is_placed_past_the_poles`) and a
-   placer jittered past a pole is moved inside by the same ORE-283 slide. A site counts toward an essential only when the material is its
+   placer jittered past a pole is moved inside by the same ORE-283 slide. The guarantee puts its body at a cell's own centre, and the
+   straddling row's centre lies past the pole, so a cell whose centre is past a pole is no candidate (DEP-223); the land set aside is
+   counted in the census (`guarantee_past_pole`). A site counts toward an essential only when the material is its
    primary product (DEP-206): on the real planet of 2026-10-04 a 0.07 Mt impact deposit with copper
    as a co-product had satisfied the copper essential; lead, a co-product of every type that makes
    it, is the one essential that counts co-products (ORE-273). An essential whose material has no
