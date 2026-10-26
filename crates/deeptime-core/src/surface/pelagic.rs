@@ -27,7 +27,8 @@
 //!   the whole supply is laid. The rest (before the calcifiers, all of it) is laid as the cap
 //!   carbonate is, evenly on the floor 0 to [`super::CARBONATE_FLOOR_M`] deep (ERO-067).
 //!
-//! The rain is a plate step's supply, laid once per step (the first substep); cells count as
+//! The rain is a plate step's supply, laid once per step after its last substep, on the floor
+//! as the substeps leave it (so its arrays live only in the step's last phase); cells count as
 //! equal area, as everywhere in the surface's mass budget. A cell takes no more than the water
 //! above it: what a full cell cannot hold settles on the cells of its floor that can
 //! ([`Rain::fill`]), so the supply is laid whole while the sea has room; the dust taken off the
