@@ -12,6 +12,8 @@ rest), the belt's no room with room left (`noroom_sliver`), with none (`noroom_c
 ceilings' clip; then the loss as a product, front length x convergence x crust thickness x lost
 fraction, and between the first arm and each other the change's log shares of those factors.
 `--series` adds each 50-Myr interval's front, convergence and losses (mean over the runs).
+Also: what PLT-700 kept (`noroom_stays`), the founder's and the rate limit's sinks
+(`foundered`, `rate_lost`), and the dock tally's splits (PLT-515, PLT-701).
 """
 import json
 import math
@@ -78,6 +80,9 @@ def parts(g):
         "area": g.get("crossed_km2", 0.0),
         "front": g.get("front_km_myr", 0.0),
         "toe": g.get("taper_toe", 0.0),
+        "stays": g.get("noroom_stays", 0.0),
+        "foundered": g.get("foundered", 0.0),
+        "rate_lost": g.get("rate_lost", 0.0),
     }
 
 
@@ -108,7 +113,19 @@ def summarize(length, runs):
 
 
 COLS = ["crossed", "kept", "loss", "share", "sliver", "capped", "clipped", "upper", "wedge",
-        "front_km", "conv_mm_yr", "h_km", "lost_frac", "per_km"]
+        "front_km", "conv_mm_yr", "h_km", "lost_frac", "per_km", "stays", "foundered", "rate_lost"]
+
+
+def noroom(path):
+    """The no-room split by belt class (PLT-701; whole run, km^3): {class: [front_km_myr,
+    crossed, sliver, capped, stays]}, or None before the split was printed."""
+    out = {}
+    with open(f"{path}/summary.txt") as f:
+        for line in f:
+            m = re.match(r"dock_noroom_(empty|narrow|wide) (\S+)", line)
+            if m:
+                out[m.group(1)] = [float(x) for x in m.group(2).split(",")]
+    return out or None
 
 
 def main():
@@ -120,10 +137,11 @@ def main():
         del args[i:i + 2]
     series = "--series" in args
     args = [a for a in args if a != "--series"]
-    arms = {}
+    arms, arm_len = {}, {}
     for a in args:
         length, runs = arm_runs(pool, a)
         arms[a] = summarize(length, runs)
+        arm_len[a] = length
     print("# collision fronts, mean over each arm's runs (km3/yr; front km at any time; km3/km/Myr)")
     print(f"{'arm':14s} {'n':>3s} " + " ".join(f"{c:>9s}" for c in COLS))
     for a, rows in arms.items():
@@ -164,6 +182,24 @@ def main():
         tot = sum(bins)
         if tot > 0:
             print(f"{a:14s} " + " ".join(f"{b / tot:7.3f}" for b in bins) + f"   conv {mean(conv):6.2f}")
+    print("# the no-room split by belt class (PLT-701, whole run): share of front-time, and km3/yr "
+          "crossed, left over with room (sliver), at the strength height (capped), kept by PLT-700 (stays)")
+    for a, rows in arms.items():
+        tot = {c: [0.0] * 5 for c in ("empty", "narrow", "wide")}
+        n = 0
+        for r in rows:
+            d = noroom(r["path"])
+            if d is None:
+                continue
+            n += 1
+            for c, v in d.items():
+                tot[c] = [x + y for x, y in zip(tot[c], v)]
+        if n:
+            yrs = n * arm_len[a] * 1e6
+            ft = sum(v[0] for v in tot.values())
+            for c, v in tot.items():
+                print(f"{a:14s} {c:7s} front {v[0] / ft if ft > 0 else float('nan'):6.3f}  " + " ".join(
+                    f"{k} {x / yrs:7.3f}" for k, x in zip(("crossed", "sliver", "capped", "stays"), v[1:])))
     if series:
         for a, rows in arms.items():
             print(f"# {a}: each 50-Myr interval, mean over runs: front km, conv mm/yr, crossed, share, sliver, "

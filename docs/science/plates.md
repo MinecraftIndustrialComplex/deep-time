@@ -4426,6 +4426,110 @@ planets are changed anyway (the coordinator's call). Both switches are off on th
    guard"), so its medians are of 11. No run of the other arms stopped. It happens only with half
    of the crossing crust going down, a setting no preset uses, and was not followed further.
 
+## The collision fronts' loss at speed scale 75: crust with no room stays (PLT-700, PLT-701, 2026-10-26)
+
+The suture-loss lane (build log 2026-10-26 "Suture loss"). The question: at speed scale 75 the
+collision fronts destroy continental crust at about 3 times Earth's rate (2.1 km³ a year on base22
+against Stern & Scholl's 0.7), and the plate check fails continental crust's minimum and the
+plates' life. Which of four causes is it: a loss that scales with convergence where it should not,
+crust that should thicken, suture or extrude being booked as lost, the subducted share against its
+sources, or faster plates driving crust into fronts that should stall?
+
+### The decomposition (cached runs, no simulation)
+
+From the crust budget's cumulative globals (`tools/review/sutureloss/collseries.py`; mean of each
+arm's 8 runs, seeds 1 to 4 on both starts, km³ a year over 1000 Myr):
+
+| | base21-s4 (scale 45) | base22-s4 (scale 75) | base23-s4 (fix C) |
+|---|---|---|---|
+| crust crossing the fronts | 5.77 | 10.29 | 8.42 |
+| kept (belts, wedges, overriding interiors) | 4.71 | 8.19 | 6.40 |
+| lost at the fronts | 1.06 | 2.11 | 2.02 |
+| of it PLT-242's share (5 %) | 0.29 | 0.51 | 0.42 |
+| of it left over after the belt's passes with room in it (`noroom_sliver`) | 0.36 | 0.88 | 0.85 |
+| of it at the strength height or with no belt (`noroom_capped`) | 0.42 | 0.71 | 0.76 |
+| front in collision at any time | 9,044 km | 12,042 km | 8,573 km |
+| convergence across it | 20.8 mm/yr | 27.5 mm/yr | 30.7 mm/yr |
+| crust crossing, thickness | 30.6 km | 31.1 km | 32.0 km |
+| lost fraction of the crossing | 0.184 | 0.204 | 0.239 |
+| lost per km of front | 117 km³/km/Myr | 174 | 234 |
+
+The founder's sink (PLT-258) and the rate limit's (PLT-287) are idle at the fronts: 0 and 0.01 km³
+a year on base23-s4. Scale 45 to 75 doubled the loss (x1.99); of its logarithm the front's length
+took 0.41, the convergence 0.41, the crust's thickness 0.02 and the lost fraction 0.15. Fix C
+(PLT-690 to PLT-692) shortened the front (x0.71) but the convergence rose (x1.12) and so did the
+lost fraction (x1.17): the loss fell only to x0.96. Fix C's fewer collisions do not take the loss
+away.
+
+### The four causes
+
+1. *A loss that scales with convergence.* PLT-242's share is a fixed part of the crossing, so it
+   scales with the convergence: 0.42 km³ a year, 21 % of the 2.02. Stern & Scholl's 115 km³ per km
+   and Myr is not a share: Scholl & von Huene 2010 build it from each plate's edge retreating
+   "~1.5 km/Ma, or ~3 km/Ma combined" over a suture's 20 to 50 Myr, times the crust's thickness,
+   with no convergence in it. Wang et al. 2022 scale India's loss with the convergence ("Assuming
+   an average convergence of 5 cm/yr along a ~2500 km long suture zone ... 0.58-1.35 AU"). Both
+   forms are in the sources; at base23's crossing (982 km³ per km and Myr) the share's 49 is
+   Stern & Scholl's 50 of deep lower-plate loss. Not the cause.
+2. *Crust that should thicken being booked as lost.* The belt's no-room rule: 1.61 km³ a year,
+   79 % of the 2.02 (`noroom_sliver` 42 %, `noroom_capped` 38 %). PLT-243's floor holds a narrow
+   overriding plate to half a full belt's share per pass and PLT-253's fill stops after six passes,
+   so what a sliver keeps is set by the number of passes, not by any process; with no
+   continental crust behind the front (an arc in collision, PLT-290) all of it went down; and at
+   the strength height the rest went down where Molnar & Lyon-Caen 1988 say "convergence can
+   continue as the range builds outward, growing laterally into a high plateau". This is the
+   cause. With fix C it rose from 0.155 to 0.191 of the crossing (`noroom_sliver` 0.086 to 0.100,
+   `noroom_capped` 0.069 to 0.091) as the convergence at the fronts rose (26.4 to 30.0 mm/yr over
+   the dock tally's front-time); the front-time with a mostly oceanic overriding side did not grow
+   (over half oceanic 0.47 to 0.42 of it).
+3. *The share against its sources.* 5 % lost: Stern & Scholl's 50 of deep loss is 5.1 % of
+   base23's crossing, and 65 (with sediment) 6.6 %. The India-Asia mass balances lose far more:
+   about 50 % (Ingalls et al. 2016), 40 to 50 % (Replumaz et al. 2010, as the Ingalls addendum
+   quotes it), about 30 % at 41 km of crust and none at 23 to 29 km (Yakovlev & Clark 2014), 20 to
+   47 % of the felsic crust (Wang et al. 2022), at least 30 % (Zhu et al. 2024, the abstract). One
+   collision, the best measured; Stern & Scholl take 10 % for India "as a minimum estimate". The
+   share is left as it is: it is not the excess here, and the sources disagree by 4 to 10 times on
+   it (an open question for Ben, not a fix).
+4. *Fronts that should stall.* They do: the plate check's collision length is 48 Myr (target up
+   to 120) and the convergence 20 Myr after onset is 0.50 of the onset's (in target). The
+   convergence at the fronts is 1.64 times Bird's 18.7 mm/yr across the continental convergent
+   boundary, the speed scale's; the front's length, 8,573 km, is inside Earth's 6,000 (long-term)
+   to 12,000 km (today).
+
+Against Earth at the model's own front length: Stern & Scholl's 115 gives 0.99 km³ a year at
+8,573 km and 65 (no upper-plate erosion at the model's fronts) 0.56, so base23's 2.02 is 2 to 3.6
+times Earth's, and the 2.1 against 0.7 of the question compares 12,000 km of front with Stern &
+Scholl's long-term 6,000 (at today's 12,000 km their figure is about 1.4).
+
+### What was built (PLT-700, `tectonics.collision_noroom_stays`, on)
+
+Crust a belt has no room for stays in the crust. `fill_belt` runs its passes until the crust is
+placed or every sample stands at the strength height, with no floor on a narrow belt's weight;
+what is left is stacked on the belt by its profile, or, where no continental crust stands within
+the belt's reach, on the overriding plate's edge samples at the front (an arc in collision, which
+PLT-289 turns continental once it holds T_n of crystalline crust). The rules that already move
+thick crust then act on it, in the same step: the rate limit (PLT-287) and the founder's spreading
+to the nearest room on the plate (PLT-277), which sink only what finds no room (PLT-258's
+Rayleigh-Taylor foundering). Only PLT-242's share leaves at the front. Nothing new is tuned: the
+switch removes a sink, and every number it leans on is an existing row's.
+
+PLT-701 is measurement: the dock tally (PLT-515) splits the no-room crust over the whole run by the
+belt's class (no continental crust in reach, narrower than half a full belt, wider) with each
+class's front-time and crossing (`dock_noroom_*` in the summary), and the crust budget books what
+PLT-700 kept (`noroom_stays`).
+
+Unit tests (`plates/belts.rs`): `the_belts_passes_run_to_the_end_with_the_switch` (six passes of a
+tenth leave 0.9⁶ of the crust, the complete fill places it all by the profile and stops at the
+strength height); `crust_with_no_room_in_the_belt_stays_in_the_crust` (behind a narrow overriding
+continent, under either belt surface, the crust added is the share of what crossed, less the
+ceilings' clip; off, part of it goes down); `an_arc_in_collision_takes_the_crust_on_its_edge` (no
+continental crust behind the front: off, all of the belt's part is `noroom_capped`; on, the same
+amount rises on the overriding edge).
+
+### The arm (noroom against base23-s4)
+
+ARM_PENDING
+
 ## The transition's width and the drowned continents (2026-10-22)
 
 The full measurement of the cause is in sea-level.md, "The continents under the sea and the sea's
