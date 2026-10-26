@@ -28,7 +28,7 @@ use super::geometry::Tree;
 use super::geometry::{Geo, coast_split, connect_plates};
 use super::noise::fbm;
 use super::state::{
-    CONTINENTAL, Group, HIDDEN, Plate, PlateState, RiftLink, Sample, SlabTrack, TRENCH,
+    BackArc, CONTINENTAL, Group, HIDDEN, Plate, PlateState, RiftLink, Sample, SlabTrack, TRENCH,
 };
 use crate::error::CoreError;
 use crate::sphere::kdtree::angle_of_chord2;
@@ -966,6 +966,311 @@ fn membership(members: &[u32], n: usize) -> Vec<bool> {
     m
 }
 
+/// The plate_birth and rift_onset `origin` of a back-arc rift (ledger PLT-700).
+pub const BACKARC_ORIGIN: &str = "back_arc";
+
+/// The youngest floor coming in at a front where a back-arc rifts, Myr (Sdrolias & Müller
+/// 2006: "back-arc basins develop when the age of subducting normal oceanic lithosphere is
+/// greater than 55 million years"). ledger: PLT-702
+pub const BACKARC_SLAB_AGE_MYR: f64 = 55.0;
+
+/// The shortest slab under a back-arc rift, km (Karig 1971: "Active extension is restricted to
+/// arc systems with earthquakes deeper than about 350 km"). The slab's length stands for its
+/// depth, as the slab pull reads it against PLT-184's 700 km. ledger: PLT-703
+pub const BACKARC_SLAB_KM: f64 = 350.0;
+
+/// The fewest samples a back-arc rift leaves on each side: a subduction initiation's 32
+/// (`initiate`; the lattice's resolution, game-choice). ledger: PLT-704
+const BACKARC_MIN_SAMPLES: usize = 32;
+
+/// World globals of back-arc rifting and the trench's motion (measurement, written only with
+/// `tectonics.backarc_rifting` on; ledger PLT-706). Over the step's subducting fronts
+/// (`subduction::Pull::subducting_fronts`, one lattice spacing each, as PLT-692 counts them), km ×
+/// Myr …
+pub const TRENCH_FRONT_GLOBAL: &str = "plates/trench_front_km_myr";
+/// … that length × the trench's velocity normal to the front, seaward positive (retreat, Heuret
+/// & Lallemand 2005's sign; the trench moves with the plate that holds the front), mm/yr × km × Myr …
+pub const TRENCH_VT_GLOBAL: &str = "plates/trench_vt_mm_yr_km_myr";
+/// … that length × the convergence normal to the front (the subduction rate, Schellart et al.
+/// 2007's vS + vT) …
+pub const TRENCH_VC_GLOBAL: &str = "plates/trench_vc_mm_yr_km_myr";
+/// … the length whose trench retreats (Vt > 0) …
+pub const TRENCH_RETREAT_GLOBAL: &str = "plates/trench_retreat_km_myr";
+/// … the length whose |Vt| is 50 mm/yr or less …
+pub const TRENCH_WITHIN50_GLOBAL: &str = "plates/trench_within50_km_myr";
+/// … the length back-arc slivers hold …
+pub const BACKARC_FRONT_GLOBAL: &str = "plates/backarc_front_km_myr";
+/// … the length that qualifies for a back-arc rift and no sliver holds …
+pub const BACKARC_QUALIFYING_GLOBAL: &str = "plates/backarc_qualifying_km_myr";
+/// … the slivers' fronts whose parent lives …
+pub const BACKARC_VD_KM_GLOBAL: &str = "plates/backarc_vd_km_myr";
+/// … and that length × the back-arc's opening normal to the front (the sliver's velocity less
+/// its parent's, opening positive; Heuret & Lallemand's Vd with the sign turned).
+pub const BACKARC_VD_GLOBAL: &str = "plates/backarc_vd_mm_yr_km_myr";
+
+/// Back-arc rifting (`tectonics.backarc_rifting`, ledger PLT-700 to PLT-706): the moving
+/// trench. In a model of rigid plates whose fronts are fixed in the overriding plate, a trench
+/// moves only with that plate; Earth's trenches roll back where the overriding plate splits and a
+/// back-arc basin opens behind its forearc (Heuret & Lallemand 2005: Vt = Vup + Vd).
+///
+/// `fronts` and `detail` are the step's subducting fronts (`subduction::Pull`): the overriding
+/// side's samples past incipient, each with the subducting side's sample across it and the
+/// boundary normal towards it. A front qualifies where the floor coming in is older than 55 Myr
+/// (PLT-702), the plate holding the front moves away from it (its velocity along the normal
+/// below 0: Sdrolias & Müller 2006, "The initiation of back-arc extension is preceded by the
+/// landward migration of the overriding plate, in an absolute reference frame"; here the
+/// mantle's frame), the pair's slab is 350 km or longer (PLT-703), and no back-arc sliver holds
+/// it (once open, "back-arc formation will continue unabated even if the overriding plate begins
+/// to move toward the trench"). Each pair of plates with a qualifying front draws once a step
+/// with probability 1 − e^(−λ), λ = `backarc_rifting_per_myr` × dt (PLT-701); a draw splits off
+/// the overriding plate's samples within `arc_distance_km` of those fronts, its forearc and arc,
+/// the largest connected strip (PLT-704), as a new plate with the parent's motion. The sliver
+/// takes the front, the slab and their suction (PLT-534's inheritance); the force balance decides
+/// whether it opens (the rest of the plate no longer feels that suction), a rift link lets a
+/// back-arc that does not open heal (PLT-272), and the sliver is kept below PLT-091's size while
+/// it holds a subducting front (PLT-705). Emits a rift_onset and a plate_birth with `origin`
+/// "back_arc". Also measures the trench's motion over every subducting front (PLT-706).
+#[allow(clippy::too_many_arguments)]
+pub fn maybe_rift_backarc(
+    state: &mut PlateState,
+    world: &mut WorldState,
+    geo: &Geo,
+    pos: &[DVec3],
+    env: &Env,
+    fronts: &[u32],
+    detail: &[(u32, DVec3)],
+) -> Result<(), CoreError> {
+    let k = env.k;
+    if !k.backarc_rifting {
+        state.backarcs.clear();
+        return Ok(());
+    }
+    let t = env.t_myr;
+    let norm = env.norm;
+    // One lattice spacing per front sample × the step (PLT-692's count).
+    let km_myr = norm.km(norm.spacing_rad()) * env.dt_myr;
+    // A sliver keeps its exemption while it holds a subducting front (PLT-705).
+    let holders: std::collections::BTreeSet<u32> =
+        fronts.iter().map(|&v| state.plate_of(v as usize)).collect();
+    let plates = &state.plates;
+    state.backarcs.retain(|b| {
+        plates.get(b.plate as usize).is_some_and(|p| p.alive) && holders.contains(&b.plate)
+    });
+    let parent_of: BTreeMap<u32, u32> = state
+        .backarcs
+        .iter()
+        .map(|b| (b.plate, b.parent))
+        .collect();
+    let slab_km: BTreeMap<(u32, u32), f64> = state
+        .slabs
+        .iter()
+        .filter(|s| !s.latent)
+        .map(|s| ((s.under, s.over), s.km))
+        .collect();
+    let omega = |p: u32| DVec3::from_array(state.plates[p as usize].omega);
+    let alive = |p: u32| state.plates.get(p as usize).is_some_and(|q| q.alive);
+    let mut sums = [0.0_f64; 9];
+    let mut qualifying: BTreeMap<(u32, u32), Vec<u32>> = BTreeMap::new();
+    for (&v, &(u, n)) in fronts.iter().zip(detail) {
+        let x = pos[v as usize];
+        let o = state.plate_of(v as usize);
+        let up = state.plate_of(u as usize);
+        let v_o = norm.velocity_mm_yr(omega(o), x);
+        // The trench moves with the plate that holds the front: Vt is its velocity along the
+        // normal towards the subducting plate, seaward positive (Heuret & Lallemand 2005).
+        let vt = v_o.dot(n);
+        let vc = (v_o - norm.velocity_mm_yr(omega(up), x)).dot(n);
+        sums[0] += km_myr;
+        sums[1] += vt * km_myr;
+        sums[2] += vc * km_myr;
+        if vt > 0.0 {
+            sums[3] += km_myr;
+        }
+        if vt.abs() <= 50.0 {
+            sums[4] += km_myr;
+        }
+        if let Some(&parent) = parent_of.get(&o) {
+            sums[5] += km_myr;
+            if alive(parent) {
+                sums[7] += km_myr;
+                sums[8] += (v_o - norm.velocity_mm_yr(omega(parent), x)).dot(n) * km_myr;
+            }
+            continue;
+        }
+        // ledger: PLT-702, PLT-703
+        let old = state.samples[u as usize].age_myr(t) > BACKARC_SLAB_AGE_MYR;
+        let deep = slab_km.get(&(up, o)).is_some_and(|&km| km >= BACKARC_SLAB_KM);
+        if up != o && old && deep && vt < 0.0 {
+            sums[6] += km_myr;
+            qualifying.entry((up, o)).or_default().push(v);
+        }
+    }
+    for (key, x) in [
+        TRENCH_FRONT_GLOBAL,
+        TRENCH_VT_GLOBAL,
+        TRENCH_VC_GLOBAL,
+        TRENCH_RETREAT_GLOBAL,
+        TRENCH_WITHIN50_GLOBAL,
+        BACKARC_FRONT_GLOBAL,
+        BACKARC_QUALIFYING_GLOBAL,
+        BACKARC_VD_KM_GLOBAL,
+        BACKARC_VD_GLOBAL,
+    ]
+    .into_iter()
+    .zip(sums)
+    {
+        *world.globals.entry(key.to_owned()).or_insert(0.0) += x;
+    }
+    // ledger: PLT-701 (per Myr, so the step's hazard scales with its length)
+    let lambda = k.backarc_rifting_per_myr * env.dt_myr;
+    for ((_, o), at) in qualifying {
+        if state.alive().count() as u32 >= k.max_plates {
+            break;
+        }
+        if state.rng.next_f64() < 1.0 - (-lambda).exp() {
+            rift_backarc(state, world, geo, pos, env, o, &at)?;
+        }
+    }
+    Ok(())
+}
+
+/// Splits plate `id`'s samples within `arc_distance_km` of the fronts `at` off as a back-arc
+/// sliver (ledger PLT-700, PLT-704): the forearc and the arc, where Taylor & Karner 1983 find
+/// the arc rifting ("rifting of the volcanic arc may occur on either side of the line of active
+/// volcanoes (±50 km)") and Sdrolias & Müller 2006 the locus "commonly in between the remnant and
+/// active volcanic arc"; the arc stands `arc_distance_km` behind its trench (PLT-042). The
+/// largest connected strip is the sliver; under 32 samples on either side, the draw is refused.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn rift_backarc(
+    state: &mut PlateState,
+    world: &mut WorldState,
+    geo: &Geo,
+    pos: &[DVec3],
+    env: &Env,
+    id: u32,
+    at: &[u32],
+) -> Result<(), CoreError> {
+    let k = env.k;
+    let norm = env.norm;
+    let t = env.t_myr;
+    let n = state.samples.len();
+    // A split earlier this step may have taken some of these fronts.
+    let at: Vec<DVec3> = at
+        .iter()
+        .filter(|&&v| state.plate_of(v as usize) == id)
+        .map(|&v| pos[v as usize])
+        .collect();
+    if at.is_empty() {
+        return Ok(());
+    }
+    let members: Vec<u32> = (0..n as u32)
+        .filter(|&i| state.plate_of(i as usize) == id)
+        .collect();
+    let member = membership(&members, n);
+    let tree = Tree::over(&at, |_| true);
+    let reach = norm.rad(k.arc_distance_km); // ledger: PLT-042, PLT-704
+    let mut label = vec![u32::MAX; n];
+    for &i in &members {
+        let near = tree
+            .nearest(pos[i as usize])
+            .is_some_and(|(_, d2)| angle_of_chord2(d2) <= reach);
+        label[i as usize] = u32::from(near);
+    }
+    connect_plates(geo, &mut label, |i| member[i]);
+    let split: Vec<u32> = members
+        .iter()
+        .copied()
+        .filter(|&i| label[i as usize] == 1)
+        .collect();
+    if split.len() < BACKARC_MIN_SAMPLES || members.len() - split.len() < BACKARC_MIN_SAMPLES {
+        state.counters.backarc_refused += 1;
+        return Ok(());
+    }
+    let split_coast = coast_split(geo, state, &members, |i| member[i], |i| label[i]);
+    let new_id = state.plates.len() as u32;
+    let parent = state.plates[id as usize].clone();
+    let mut twin: BTreeMap<u32, u32> = BTreeMap::new();
+    let (mut c, mut cont) = (DVec3::ZERO, 0usize);
+    for &i in &split {
+        let g = state.samples[i as usize].group;
+        let new = *twin.entry(g).or_insert_with(|| {
+            let rot = state.groups[g as usize].rot;
+            state.groups.push(Group { plate: new_id, rot });
+            (state.groups.len() - 1) as u32
+        });
+        let s = &mut state.samples[i as usize];
+        s.group = new;
+        c += pos[i as usize];
+        cont += usize::from(s.kind == CONTINENTAL);
+    }
+    let line: DVec3 = at.iter().copied().sum();
+    let c = c.normalize_or(line.normalize_or(DVec3::Z));
+    let omega = DVec3::from_array(parent.omega);
+    let count = split.len();
+    state.plates.push(Plate {
+        id: new_id,
+        alive: true,
+        omega: omega.to_array(),
+        born_myr: t,
+        died_myr: None,
+        birth_event: None,
+        parent: Some(id),
+        lip_until_myr: f64::NEG_INFINITY,
+        lip_event: None,
+        samples: count as u32,
+        centroid: c.to_array(),
+        continental_frac: cont as f64 / count as f64,
+    });
+    state.plates[id as usize].samples = (members.len() - count) as u32;
+    let area_km2 = norm.planet_area_km2(count as f64 * norm.sample_area_km2());
+    let rift = events::event(world, t, RIFT_ONSET, c)
+        .magnitude((cont as f64 / count as f64) as f32)
+        .param("plate", i64::from(id))
+        .param("fragments", 2_i64)
+        .param("origin", BACKARC_ORIGIN)
+        .param("continental_frac", cont as f64 / count as f64)
+        .param("area_km2", area_km2)
+        .param(
+            "coast_split_km",
+            norm.planet_len_km(split_coast as f64 * norm.km(norm.spacing_rad())),
+        );
+    let rift_event = world.emit(rift)?;
+    let e = events::event(world, t, PLATE_BIRTH, c)
+        .magnitude((count as f64 * norm.sample_area_km2() / state.a0_km2) as f32)
+        .param("plate", i64::from(new_id))
+        .param("parent", i64::from(id))
+        .param("origin", BACKARC_ORIGIN)
+        .param("area_km2", area_km2)
+        .param("continental_frac", cont as f64 / count as f64)
+        .param("speed_mm_yr", norm.speed_mm_yr(omega, c))
+        .param(
+            "front_km",
+            norm.planet_len_km(at.len() as f64 * norm.km(norm.spacing_rad())),
+        )
+        .caused_by(rift_event);
+    let birth = world.emit(e)?;
+    state.plates[new_id as usize].birth_event = Some(birth);
+    state.counters.plate_births += 1;
+    state.counters.backarc_rifts += 1;
+    // A back-arc that does not open heals (PLT-272).
+    state.rift_links.push(RiftLink {
+        a: id.min(new_id),
+        b: id.max(new_id),
+        event: rift_event,
+        quiet_since_myr: None,
+    });
+    state.backarcs.push(BackArc {
+        plate: new_id,
+        parent: id,
+        born_myr: t,
+    });
+    // The sliver takes the front, the contact and the slab it borders (ledger: PLT-534).
+    if k.split_inheritance {
+        super::inherit::inherit(state, pos, env, &[(id, vec![new_id])]).book(world);
+    }
+    Ok(())
+}
+
 /// Heals the rifts that did not open (design `docs/design/plate-force-balance.md` §3.4: two plates
 /// that have stopped moving relative to each other are one plate). Two plates a rift separated
 /// (`PlateState::rift_links`) whose relative speed has stayed under `weld_speed_mm_yr` all along
@@ -1189,6 +1494,7 @@ pub(in crate::plates) mod tests {
             shown: None,
             one_way: None,
             propagations: Vec::new(),
+            backarcs: Vec::new(),
             level_set: None,
         };
         let pos = positions(&st, geo);
@@ -1726,5 +2032,202 @@ pub(in crate::plates) mod tests {
             let h = near_trench_hazard(r, 51_310.0, 105.0, floor);
             assert!((h * floor as f64 - 4.0).abs() < 1e-9, "{floor}: {h}");
         }
+    }
+
+    /// Back-arc rifting's test planet: plate 0 (U) south of the equator, plate 1 (O) north of it
+    /// on the hemisphere x > 0, plate 2 the rest, all of floor `age_myr` old. O turns about −Y
+    /// at `mm_yr` (its front moves north, away from the trench, by up to that; negative, towards
+    /// it), a slab `slab_km` long hangs from U under O with their contact. Returns the state, the
+    /// positions and the step's subducting fronts as `subduction::Pull` gives them: O's samples
+    /// with a lattice neighbour on U, each with that neighbour and the normal towards it (south).
+    pub(in crate::plates) fn backarc_planet(
+        geo: &Geo,
+        age_myr: f64,
+        mm_yr: f64,
+        slab_km: f64,
+    ) -> (PlateState, Vec<DVec3>, Vec<u32>, Vec<(u32, DVec3)>) {
+        use crate::plates::inherit::tests::{add_plate, contact};
+        let mut st = one_plate(geo, 7, |_| {
+            let mut s = old_floor();
+            s.formed_myr = (2.0 - age_myr) as f32;
+            s
+        });
+        add_plate(&mut st, geo, 1, |p| p.x > 0.0 && p.z > 0.0);
+        add_plate(&mut st, geo, 2, |p| p.x <= 0.0);
+        let norm = Norm::new(6370.0, 6371.0, N);
+        st.plates[1].omega = (-DVec3::Y * norm.omega_of_speed(mm_yr)).to_array();
+        st.contacts.push(contact(0, 1, DVec3::X));
+        st.slabs.push(SlabTrack {
+            under: 0,
+            over: 1,
+            km: slab_km,
+            ..SlabTrack::default()
+        });
+        let pos = positions(&st, geo);
+        let (mut fronts, mut detail) = (Vec::new(), Vec::new());
+        for (v, &x) in pos.iter().enumerate() {
+            if st.plate_of(v) != 1 {
+                continue;
+            }
+            if let Some((u, _)) = geo.edges(v as u32).find(|&(u, _)| st.plate_of(u as usize) == 0) {
+                fronts.push(v as u32);
+                detail.push((u, (-DVec3::Z - x * x.dot(-DVec3::Z)).normalize()));
+            }
+        }
+        (st, pos, fronts, detail)
+    }
+
+    fn backarc_on(rate: f64) -> TectonicParams {
+        TectonicParams {
+            backarc_rifting: true,
+            backarc_rifting_per_myr: rate,
+            ..TectonicParams::default()
+        }
+    }
+
+    /// Sdrolias & Müller 2006 (ledger PLT-700 to PLT-704): back-arc basins "develop when the age
+    /// of subducting normal oceanic lithosphere is greater than 55 million years", their
+    /// initiation "is preceded by the landward migration of the overriding plate", the locus is
+    /// "commonly in between the remnant and active volcanic arc"; Karig 1971: extension only where
+    /// the slab passes "about 350 km". A front with 80 Myr floor coming in, O moving away from it
+    /// at up to 30 mm/yr and a 400 km slab qualifies: a certain draw splits off O's samples
+    /// within `arc_distance_km` of its fronts (the forearc and the arc) as a plate with O's
+    /// motion, which takes the contact and the slab, is linked to O to heal and is on the
+    /// sliver list; one rift_onset and one plate_birth with `origin` "back_arc". A floor of 50
+    /// Myr, O moving towards the trench, a 300 km slab, or the switch off: nothing, and off, not
+    /// a draw of the generator nor a global.
+    #[test]
+    fn a_backarc_rifts_over_an_old_deep_slab_behind_a_retreating_upper_plate() {
+        let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let k = backarc_on(1.0e9);
+        let (mut st, pos, fronts, detail) = backarc_planet(&geo, 80.0, 30.0, 400.0);
+        let before: Vec<u32> = (0..pos.len()).map(|i| st.plate_of(i)).collect();
+        let mut world = WorldState::new(1, 16_384, 0.0);
+        maybe_rift_backarc(&mut st, &mut world, &geo, &pos, &env(&k), &fronts, &detail).unwrap();
+        assert_eq!(st.plates.len(), 4, "one sliver");
+        let s = 3u32;
+        assert_eq!(st.plates[3].parent, Some(1));
+        assert_eq!(st.counters.backarc_rifts, 1);
+        assert_eq!(
+            st.backarcs,
+            vec![BackArc {
+                plate: s,
+                parent: 1,
+                born_myr: 2.0
+            }]
+        );
+        assert!(st.rift_links.iter().any(|l| (l.a, l.b) == (1, s)));
+        // Every sample of the sliver was O's and lies within the arc's distance of a front; every
+        // front is on it.
+        let reach = env(&k).norm.rad(k.arc_distance_km);
+        let tree = Tree::over(&pos, |i| fronts.contains(&(i as u32)));
+        let sliver: Vec<usize> = (0..pos.len()).filter(|&i| st.plate_of(i) == s).collect();
+        assert!(sliver.len() >= BACKARC_MIN_SAMPLES, "{}", sliver.len());
+        for &i in &sliver {
+            assert_eq!(before[i], 1);
+            let (_, d2) = tree.nearest(pos[i]).unwrap();
+            assert!(angle_of_chord2(d2) <= reach + 1e-12, "sample {i} beyond the arc");
+        }
+        assert!(fronts.iter().all(|&v| st.plate_of(v as usize) == s));
+        assert_eq!(st.plates[3].omega, st.plates[1].omega);
+        assert!(
+            st.contacts.iter().any(|c| (c.under, c.over) == (0, s)),
+            "the sliver holds the contact"
+        );
+        assert!(
+            st.slabs
+                .iter()
+                .any(|sl| (sl.under, sl.over) == (0, s) && sl.km == 400.0),
+            "the sliver holds the slab: {:?}",
+            st.slabs
+        );
+        let origin = deeptime_format::ParamValue::Str(BACKARC_ORIGIN.into());
+        let kinds: Vec<&str> = world.events.iter().map(|e| e.kind.as_str()).collect();
+        assert_eq!(kinds, vec![RIFT_ONSET, PLATE_BIRTH], "{kinds:?}");
+        assert!(
+            world
+                .events
+                .iter()
+                .all(|e| e.params.get("origin") == Some(&origin))
+        );
+        // The measures: every front qualified and no sliver held one this step.
+        let g = |key: &str| world.globals.get(key).copied().unwrap_or(f64::NAN);
+        assert!((g(BACKARC_QUALIFYING_GLOBAL) - g(TRENCH_FRONT_GLOBAL)).abs() < 1e-9);
+        assert_eq!(g(BACKARC_FRONT_GLOBAL), 0.0);
+        assert!(g(TRENCH_VT_GLOBAL) < 0.0, "O moves away from its trench: Vt < 0");
+        // A step later the sliver holds the fronts and keeps its place on the list.
+        let fronts2: Vec<u32> = fronts.clone();
+        maybe_rift_backarc(&mut st, &mut world, &geo, &pos, &env(&k), &fronts2, &detail).unwrap();
+        assert_eq!(st.plates.len(), 4, "a held front draws no second sliver");
+        assert_eq!(st.backarcs.len(), 1);
+        assert!(g(BACKARC_FRONT_GLOBAL) > 0.0);
+        // Without a front it leaves the list.
+        maybe_rift_backarc(&mut st, &mut world, &geo, &pos, &env(&k), &[], &[]).unwrap();
+        assert!(st.backarcs.is_empty());
+
+        for (age, mm_yr, slab, why) in [
+            (50.0, 30.0, 400.0, "floor of 50 Myr"),
+            (80.0, -30.0, 400.0, "O moving towards the trench"),
+            (80.0, 30.0, 300.0, "a 300 km slab"),
+        ] {
+            let (mut st, pos, fronts, detail) = backarc_planet(&geo, age, mm_yr, slab);
+            let mut world = WorldState::new(1, 16_384, 0.0);
+            maybe_rift_backarc(&mut st, &mut world, &geo, &pos, &env(&k), &fronts, &detail)
+                .unwrap();
+            assert_eq!(st.plates.len(), 3, "{why}: no sliver");
+            assert_eq!(world.globals[BACKARC_QUALIFYING_GLOBAL], 0.0, "{why}");
+        }
+        let off = TectonicParams {
+            backarc_rifting: false,
+            ..backarc_on(1.0e9)
+        };
+        let (mut st, pos, fronts, detail) = backarc_planet(&geo, 80.0, 30.0, 400.0);
+        let rng = st.rng.clone();
+        let mut world = WorldState::new(1, 16_384, 0.0);
+        maybe_rift_backarc(&mut st, &mut world, &geo, &pos, &env(&off), &fronts, &detail).unwrap();
+        assert_eq!(st.plates.len(), 3);
+        assert!(world.globals.is_empty() && world.events.is_empty());
+        assert_eq!(st.rng, rng, "off draws nothing");
+    }
+
+    /// The hazard (ledger PLT-701): Heuret & Lallemand 2005's Table 1 has 16 of its 68 segments
+    /// with a slab of 55 Myr or older under a landward upper plate in class E3 (back-arc
+    /// spreading); Sdrolias & Müller 2006's four Cenozoic back-arc basins spread for 15.4 Myr on
+    /// average. A qualifying front that converts at the rate h and spreads for D holds a spreading
+    /// back-arc on the share h D / (1 + h D) of its length: Heuret & Lallemand's 16 / 68.
+    #[test]
+    fn the_backarc_hazard_gives_earth_s_spreading_share() {
+        let h = TectonicParams::default().backarc_rifting_per_myr;
+        let d = (8.0 + 15.0 + 15.0 + 23.5) / 4.0;
+        assert!((d - 15.375_f64).abs() < 1e-12);
+        let share = h * d / (1.0 + h * d);
+        assert!((share - 16.0 / 68.0).abs() < 1e-12, "{share}");
+        assert!((0.019..0.021).contains(&h), "{h}");
+    }
+
+    /// Bird 2003's back-arc microplates are 0.0002 to 0.016 sr (Table 1: Mariana 0.01037, Tonga
+    /// 0.00625, South Sandwich 0.00317, Futuna 0.00079), below PLT-091's 0.003 of the sphere
+    /// (0.0377 sr) but for the largest. A sliver on the list is kept below the size at a
+    /// resampling's burial; off the list it is absorbed as any small plate (ledger PLT-705).
+    #[test]
+    fn a_sliver_holding_its_front_outlives_the_plate_size_rule() {
+        let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let k = backarc_on(1.0e9);
+        let (mut st, pos, fronts, detail) = backarc_planet(&geo, 80.0, 30.0, 400.0);
+        let mut world = WorldState::new(1, 16_384, 0.0);
+        maybe_rift_backarc(&mut st, &mut world, &geo, &pos, &env(&k), &fronts, &detail).unwrap();
+        // Make the sliver small: the size rule a little above it.
+        let small = TectonicParams {
+            min_plate_area_frac: f64::from(st.plates[3].samples) / N as f64 * 1.5,
+            ..k.clone()
+        };
+        let causes = BTreeMap::new();
+        crate::plates::ridges::bury(&mut st, &mut world, Some(&geo), &pos, &env(&small), &causes)
+            .unwrap();
+        assert!(st.plates[3].alive, "on the list, the sliver stays");
+        st.backarcs.clear();
+        crate::plates::ridges::bury(&mut st, &mut world, Some(&geo), &pos, &env(&small), &causes)
+            .unwrap();
+        assert!(!st.plates[3].alive, "off the list, the size rule takes it");
     }
 }

@@ -6963,3 +6963,83 @@ fn a_resampling_keeps_thin_crust_on_average() {
         changes
     );
 }
+
+/// Back-arc rifting through the force balance (ledger PLT-700, PLT-706): FRC-016's reference
+/// plate ([`a_reference_plate`]: a 3,000 km trench of a full-length 80 Myr slab under plate 0)
+/// with plate 0's forearc and arc split off as a back-arc sliver (`rifting::rift_backarc`, the
+/// samples within `arc_distance_km` of the front). The sliver takes the slab's suction (PLT-186,
+/// PLT-540) and plate 0 loses it, so the balance moves the sliver seaward of plate 0: the back-arc
+/// opens, at a rate inside Heuret & Lallemand 2005's Table 1 E3 segments (back-arc spreading:
+/// 2.8 to 142.1 mm/yr, median 34.8), and the trench, which moved with plate 0 before, rolls back
+/// no faster than Schellart et al. 2007's fastest (16 cm/yr, "only observed close to slab edges").
+/// No anchoring or other new force is in it: the sliver moves by the model's own slab terms.
+#[test]
+fn a_backarc_sliver_opens_at_earth_s_rates() {
+    let p = preset(40_000, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let k = &p.tectonics;
+    let (mut st, geo, pos, _, _) = a_reference_plate(
+        &p,
+        &env,
+        forces::REF_TRENCH_KM,
+        0.02,
+        k.plate_speed_scale_mm_yr,
+    );
+    let n = st.samples.len();
+    let fronts: Vec<u32> = (0..n as u32)
+        .filter(|&v| {
+            st.plate_of(v as usize) == 0
+                && !st.samples[v as usize].is_hidden()
+                && geo.edges(v).any(|(u, _)| st.plate_of(u as usize) == 1)
+        })
+        .collect();
+    // The trench's motion before: it moves with plate 0.
+    let vel = |w: Option<DVec3>, x: DVec3| w.map_or(DVec3::ZERO, |w| env.norm.velocity_mm_yr(w, x));
+    let normals = |st: &PlateState| -> Vec<DVec3> {
+        let plate_of: Vec<u32> = (0..n).map(|i| st.plate_of(i)).collect();
+        let rots: Vec<glam::DQuat> = st.groups.iter().map(|g| kinematics::quat(g.rot)).collect();
+        fronts
+            .iter()
+            .map(|&v| {
+                shortening::boundary_normal(&geo, &pos, &rots, &st.samples, &plate_of, v as usize, 1)
+            })
+            .collect()
+    };
+    let mut base = st.clone();
+    let before = forces::step(&mut base, &geo, &pos, &env, DVec3::Z, 0.0);
+    assert!(before.solved);
+    let nb = normals(&base);
+    let vt_before = fronts
+        .iter()
+        .zip(&nb)
+        .map(|(&v, nr)| vel(before.omega[0], pos[v as usize]).dot(*nr))
+        .sum::<f64>()
+        / fronts.len() as f64;
+    let mut world = WorldState::new(1, 16_384, p.t_start_years());
+    rifting::rift_backarc(&mut st, &mut world, &geo, &pos, &env, 0, &fronts).unwrap();
+    let s = st.plates.len() - 1;
+    assert_eq!(st.plates[s].parent, Some(0), "a sliver split off plate 0");
+    assert!(fronts.iter().all(|&v| st.plate_of(v as usize) == s as u32));
+    let ans = forces::step(&mut st, &geo, &pos, &env, DVec3::Z, 0.0);
+    assert!(ans.solved);
+    let na = normals(&st);
+    let (mut vd, mut vt) = (0.0, 0.0);
+    for (&v, nr) in fronts.iter().zip(&na) {
+        let x = pos[v as usize];
+        vd += (vel(ans.omega[s], x) - vel(ans.omega[0], x)).dot(*nr);
+        vt += vel(ans.omega[s], x).dot(*nr);
+    }
+    vd /= fronts.len() as f64;
+    vt /= fronts.len() as f64;
+    eprintln!(
+        "back-arc sliver: {} samples, {} front samples; the back-arc opens at {vd:.1} mm/yr \
+         (Heuret & Lallemand's E3 2.8 to 142.1, median 34.8); the trench moves {vt:.1} mm/yr \
+         seaward, {vt_before:.1} before the split",
+        st.plates[s].samples,
+        fronts.len()
+    );
+    assert!((2.8..=142.1).contains(&vd), "the back-arc opens at {vd} mm/yr");
+    assert!(vt > vt_before, "the trench rolls back: {vt} against {vt_before}");
+    assert!(vt.abs() <= 160.0, "the trench moves {vt} mm/yr");
+}

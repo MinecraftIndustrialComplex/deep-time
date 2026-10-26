@@ -947,6 +947,10 @@ pub struct Pull {
     /// against Bird 2003 (`boundary_subduction_km`). Fix C's active trenches: where subduction
     /// initiation may start and how long the planet's trench is (ledger: PLT-691, PLT-692).
     pub subducting_fronts: Vec<u32>,
+    /// Each of `subducting_fronts` in order: the subducting side's sample across the front and the
+    /// front's boundary normal (a unit tangent from the overriding plate towards it, PLT-310), for
+    /// back-arc rifting and its trench-motion measures (ledger: PLT-700, PLT-706).
+    pub subducting_detail: Vec<(u32, DVec3)>,
     /// Arc crust this step added to continental crust, km³ (Earth-normalized; measurement, for
     /// the crust budget against Stern & Scholl 2010).
     pub arc_continental_km3: f64,
@@ -1497,6 +1501,7 @@ pub fn fronts_finish(
     let mut info: Vec<Source> = Vec::new();
     let mut front_len = vec![0.0; state.plates.len()];
     let mut subducting_fronts: Vec<u32> = Vec::new();
+    let mut subducting_detail: Vec<(u32, DVec3)> = Vec::new();
     let (mut front_continental, mut front_oceanic) = (0.0_f64, 0.0_f64);
     // The same two weighted by the convergence normal to the front (measurement: the mean v_n at
     // the arcs, PLT-665).
@@ -1606,6 +1611,7 @@ pub fn fronts_finish(
                 front_len[under] += front_km;
                 if !incipient_here {
                     subducting_fronts.push(v as u32);
+                    subducting_detail.push((u, normal));
                 }
                 // The arc begins at its contact's first oceanic front past incipient (a sample
                 // too slow for a slab is not, PLT-681), and is young until the early pulse ends
@@ -1983,6 +1989,7 @@ pub fn fronts_finish(
     Pull {
         front_km: front_len,
         subducting_fronts,
+        subducting_detail,
         arc_continental_km3: arc_continental_m * area / 1000.0,
         arc_oceanic_km3: arc_oceanic_m * area / 1000.0,
         front_continental_km_myr: front_continental,
