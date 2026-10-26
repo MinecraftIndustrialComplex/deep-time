@@ -4597,6 +4597,50 @@ fn hotspot_cones_are_counted_inside_the_hotspot_rate() {
     );
 }
 
+/// The arcs' rate counts the convergence once (PLT-665, PLT-666): an arc adds its type's rate per
+/// km (Stern & Scholl's 100 or 35 km³/km/Myr) times v_n over Earth's mean orthogonal convergence of
+/// that type's arcs (86.6 or 58.6 mm/yr), v_n the convergence normal to its front, with no cap. The
+/// same plates converging four times as fast (200 mm/yr, past both references and past the old
+/// cap's 100) add four times the magma, and the step's magma is the rate times the band's length
+/// at the fronts' mean v_n (the band's own mean, weighted by its samples, within 10 % of the
+/// fronts'). The fixture is [`converging_plates`]' (a continental arc) at two speeds.
+#[test]
+fn an_arcs_rate_is_its_types_rate_at_earths_convergence_scaled_by_its_own() {
+    let mut p = preset(20_000, 20.0, "supercontinent", 5);
+    // A fixture with no slab, so an arc only with incipient subduction off (PLT-610).
+    p.tectonics.incipient_subduction = false;
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let k = &p.tectonics;
+    let run = |mm_yr: f64| {
+        let (mut st, geo, pos) = two_plates(&p, &env, 0.1);
+        st.plates[1].omega = (DVec3::X * env.norm.omega_of_speed(mm_yr)).to_array();
+        let mut cones = vec![[0.0; 2]; st.samples.len()];
+        subduction::fronts_and_uplift(&mut st, &geo, &pos, &env, &mut cones, 0.0)
+    };
+    let (slow, fast) = (run(50.0), run(200.0));
+    let magma = |pull: &subduction::Pull| pull.arc_continental_km3 + pull.arc_oceanic_km3;
+    assert!(magma(&slow) > 0.0, "no arc");
+    let ratio = magma(&fast) / magma(&slow);
+    assert!((ratio - 4.0).abs() < 1e-6 * 4.0, "4× the convergence, {ratio}× the magma");
+    for pull in [&slow, &fast] {
+        let front = pull.front_continental_km_myr + pull.front_oceanic_km_myr;
+        // Each type's rate over its reference convergence, times the type's v_n-weighted front.
+        let per = [
+            k.continental_arc_km3_per_km_myr / k.continental_arc_convergence_ref_mm_yr,
+            k.island_arc_km3_per_km_myr / k.island_arc_convergence_ref_mm_yr,
+        ];
+        let rate_km2 = per[0] * pull.front_normal_km_myr[0] + per[1] * pull.front_normal_km_myr[1];
+        let want = rate_km2 / front * pull.arc_band_km_myr;
+        assert!(
+            (magma(pull) - want).abs() < 0.1 * want,
+            "{} km³ of arc magma against {want} km³ (front {front} km Myr, band {} km Myr)",
+            magma(pull),
+            pull.arc_band_km_myr
+        );
+    }
+}
+
 /// Plate task 8: the cordillera thickens by crust shortened from the continent behind it, which
 /// thins by as much (volume kept): the step's crust changes by its arc magma alone, and the range
 /// stands higher than without the shortening, the crust behind it no higher.
@@ -4990,30 +5034,38 @@ fn a_front_stamps_its_orthogonal_convergence() {
     }
 }
 
-/// The ratchet (the M5 lane, 2026-10-25; arm m5-margins, plates.md "The ratchet"): a resampling
-/// blended a continental sample's rock and basement over all its continental corners, so a column
-/// of a converted margin (PLT-661: hyper-extended, under 10 km of its own crystalline crust)
-/// beside its continent's core took a share of the core's crust, stopped being hyper-extended and
-/// became the taper's continental side, and at the next step the ring beyond it, which holds the
-/// continents' sediment, was in the zone and turned: the boundary moved out at every resampling.
-/// The blend keeps the two classes apart (PLT-663). One plate holds a continent (z > 0) and its own
-/// ocean floor out to z = −0.3 under 2,500 m of the continents' sediment. A first transition step
-/// turns the zone's ocean side continental and a second turns nothing (the side rule); then on six
-/// lattices a resampling must keep the hyper-extended columns' count within the lattice's noise
-/// and make no column that mixes the classes (a basement under 10 km or more of its own crust),
-/// and six resamplings in a row, each followed by a step, must leave the continent's core (its
-/// columns that are not hyper-extended) as it was. Measured (2026-10-25): on the old blend one
-/// resampling took the 271 hyper-extended columns to 213 to 224 and made 177 to 194 mixed ones,
-/// and six in a row grew the core from 9,998 columns to 10,117 (+1.2 %) and the mixed ones to
-/// 975; on the class blend the count stays 265 to 280, no column mixes, and the core ends at
-/// 10,002 (+0.04 %). The zone itself still grows, and the test prints it without asserting on
-/// it: the step after each of the six turns 14 to 40 columns, the hyper-extended count goes 271,
-/// 314, 343, 364, 393, 411, 441 and the zone's lowest z −0.031 to −0.074, about a ring further
-/// out than the rule reaches (a residual ratchet: a new sample takes its major corner's class, so
-/// the lattice's noise drops oceanic samples into the ring beside the core, which the next step
-/// turns, and carries hyper-extended ones past that ring, which nothing turns back).
-#[test]
-fn a_resampling_keeps_a_converted_margin_apart_from_its_core() {
+/// What the ratchet tests measure on their planet (the M5 lane, 2026-10-25; arm m5-margins,
+/// plates.md "The ratchet"): the zone of hyper-extended columns a converted margin leaves, and the
+/// continent's core beside it, over one resampling on six lattices and over six resamplings in a
+/// row, each followed by a transition step as a run has them.
+struct Ratchet {
+    /// The first step's turned columns, then the hyper-extended count, its lowest z and the core
+    /// after it.
+    first: u32,
+    before: usize,
+    reach0: f64,
+    core0: usize,
+    /// One resampling on each of six lattices: the hyper-extended count and its lowest z.
+    kept: Vec<f64>,
+    reaches: Vec<f64>,
+    /// Mixed columns (a basement under 10 km or more of its own crust) after every resampling.
+    mixes: Vec<usize>,
+    /// The chain: the core after each step, the columns each step turned, and the zone
+    /// (its count at the resampling, after the step, and its lowest z after the step).
+    cores: Vec<usize>,
+    turned: Vec<u32>,
+    zone: Vec<(usize, usize, f64)>,
+    /// The core after each of the chain's steps: its columns south of the start's edge (z < 0), and its
+    /// lowest z.
+    core_out: Vec<(usize, f64)>,
+}
+
+/// The ratchet tests' planet and chain: one plate holds a continent (z > 0) and its own ocean floor
+/// out to z = −0.3 under 2,500 m of the continents' sediment. A first transition step turns the
+/// zone's ocean side continental and a second turns nothing (the side rule, asserted here). Then
+/// one resampling on six lattices, and `chain` resamplings in a row, each followed by a step when
+/// `steps` holds.
+fn ratchet(chain: u64, steps: bool) -> Ratchet {
     let mut p = preset(20_000, 20.0, "supercontinent", 5);
     p.tectonics.margin_sediment_continental = true;
     p.tectonics.transition_ocean_crust = true;
@@ -5086,64 +5138,165 @@ fn a_resampling_keeps_a_converted_margin_apart_from_its_core() {
     };
     let (before, core0) = (hyper(&st), core(&st));
     assert!(before >= first.margins as usize && mixed(&st) == 0);
-    // One resampling on six lattices.
-    let (mut kept, mut mixes) = (Vec::new(), Vec::new());
-    for k in 0..6 {
-        let (s2, _, _) = resampled(&st, &geo, &pos, k);
-        kept.push(hyper(&s2) as f64);
-        mixes.push(mixed(&s2));
-    }
-    // Six resamplings in a row, each followed by a transition step, as a run has them: the old
-    // blend's ratchet grew the core at each; on the class blend the core stays, but the zone's
-    // outer edge creeps out (printed: the count and the lowest z at each, not asserted).
     // How far down the ocean the zone reaches: the hyper-extended columns' lowest z.
     let reach = |st: &PlateState, pos: &[DVec3]| {
-        let z = st
-            .samples
+        st.samples
             .iter()
             .zip(pos)
             .filter(|(s, _)| !s.is_hidden() && transition::hyper_extended(s))
             .map(|(_, q)| q.z)
-            .fold(f64::INFINITY, f64::min);
-        (z * 1000.0).round() / 1000.0
+            .fold(f64::INFINITY, f64::min)
     };
-    eprintln!(
-        "the zone reaches z {} before the resamplings",
-        reach(&st, &pos)
-    );
+    let reach0 = reach(&st, &pos);
+    let (mut kept, mut reaches, mut mixes) = (Vec::new(), Vec::new(), Vec::new());
+    for k in 0..6 {
+        let (s2, _, pos2) = resampled(&st, &geo, &pos, k);
+        kept.push(hyper(&s2) as f64);
+        reaches.push(reach(&s2, &pos2));
+        mixes.push(mixed(&s2));
+    }
+    // Where the core reaches: its columns south of the start's edge and its lowest z.
+    let core_reach = |st: &PlateState, pos: &[DVec3]| {
+        let zs: Vec<f64> = st
+            .samples
+            .iter()
+            .zip(pos)
+            .filter(|(s, _)| {
+                !s.is_hidden() && s.kind == CONTINENTAL && !transition::hyper_extended(s)
+            })
+            .map(|(_, q)| q.z)
+            .collect();
+        let out = zs.iter().filter(|&&z| z < 0.0).count();
+        (out, zs.iter().copied().fold(f64::INFINITY, f64::min))
+    };
     let (mut cores, mut turned, mut zone) = (Vec::new(), Vec::new(), Vec::new());
-    let mut chain = resampled(&st, &geo, &pos, 100);
-    for k in 1..=6 {
-        let (s2, geo2, pos2) = &mut chain;
+    let mut core_out = Vec::new();
+    let mut lattice = resampled(&st, &geo, &pos, 100);
+    for k in 1..=chain {
+        let (s2, geo2, pos2) = &mut lattice;
         mixes.push(mixed(s2));
         let at_resampling = hyper(s2);
-        turned.push(transition::step(s2, geo2, pos2, &env).margins);
+        turned.push(if steps {
+            transition::step(s2, geo2, pos2, &env).margins
+        } else {
+            0
+        });
         cores.push(core(s2));
         zone.push((at_resampling, hyper(s2), reach(s2, pos2)));
-        if k < 6 {
-            chain = resampled(&chain.0, &chain.1, &chain.2, 100 + k);
+        core_out.push(core_reach(s2, pos2));
+        if k < chain {
+            lattice = resampled(&lattice.0, &lattice.1, &lattice.2, 100 + k);
         }
     }
-    let mean = |v: &[f64]| v.iter().sum::<f64>() / v.len() as f64;
+    let r = Ratchet {
+        first: first.margins,
+        before,
+        reach0,
+        core0,
+        kept,
+        reaches,
+        mixes,
+        cores,
+        turned,
+        zone,
+        core_out,
+    };
     eprintln!(
-        "first step turned {}, hyper-extended {before}, core {core0}; after one resampling: \
-         hyper-extended {kept:?}; six in a row: core {cores:?}, turned {turned:?}, \
-         hyper-extended (at the resampling, after its step) {zone:?}; mixed {mixes:?}",
-        first.margins
+        "first step turned {}, hyper-extended {} reaching z {:.4}, core {}; after one \
+         resampling: hyper-extended {:?} reaching z {:.4?}; six in a row: core {:?}, turned \
+         {:?}, hyper-extended (at the resampling, after its step, its lowest z) {:.4?}; mixed \
+         {:?}; the core south of the start's edge (columns, lowest z) {:.4?}",
+        r.first,
+        r.before,
+        r.reach0,
+        r.core0,
+        r.kept,
+        r.reaches,
+        r.cores,
+        r.turned,
+        r.zone,
+        r.mixes,
+        r.core_out
     );
-    let change = mean(&kept) / before as f64 - 1.0;
+    r
+}
+
+/// The ratchet: a resampling blended a continental sample's rock and basement over all its
+/// continental corners, so a column of a converted margin (PLT-661: hyper-extended, under 10 km
+/// of its own crystalline crust) beside its continent's core took a share of the core's crust,
+/// stopped being hyper-extended and became the taper's continental side, and at the next step the
+/// ring beyond it, which holds the continents' sediment, was in the zone and turned: the boundary
+/// moved out at every resampling. The blend keeps the two classes apart (PLT-663). On the planet
+/// of [`ratchet`], one resampling must keep the hyper-extended columns' count within 5 % on the
+/// six lattices' mean and make no column that mixes the classes, and six resamplings in a row,
+/// each followed by a step, must leave the continent's core (its columns that are not
+/// hyper-extended) within 0.5 % of where it was. Measured (2026-10-25): on the old blend one
+/// resampling took the 271 hyper-extended columns to 213 to 224 and made 177 to 194 mixed ones,
+/// and six in a row grew the core from 9,998 columns to 10,117 (+1.2 %) and the mixed ones to
+/// 975; on the class blend with a new sample's labels from its nearest old sample (PLT-664) the
+/// count stays 266 to 277, no column mixes, and the core ends at 9,979 (−0.2 %).
+#[test]
+fn a_resampling_keeps_a_converted_margin_apart_from_its_core() {
+    let r = ratchet(6, true);
+    let mean = r.kept.iter().sum::<f64>() / r.kept.len() as f64;
+    let change = mean / r.before as f64 - 1.0;
     assert!(
         change.abs() < 0.05,
-        "the hyper-extended columns {before} → {kept:?} ({:+.1} %)",
+        "the hyper-extended columns {} → {:?} ({:+.1} %)",
+        r.before,
+        r.kept,
         change * 100.0
     );
-    assert!(mixes.iter().all(|&m| m == 0), "mixed columns {mixes:?}");
-    let grown = cores[5] as f64 / core0 as f64 - 1.0;
+    assert!(r.mixes.iter().all(|&m| m == 0), "mixed columns {:?}", r.mixes);
+    let grown = r.cores[r.cores.len() - 1] as f64 / r.core0 as f64 - 1.0;
     assert!(
         grown.abs() < 0.005,
-        "the core {core0} → {cores:?} ({:+.2} %) over six resamplings",
+        "the core {} → {:?} ({:+.2} %) over six resamplings",
+        r.core0,
+        r.cores,
         grown * 100.0
     );
+}
+
+/// The residual ratchet (the coordinator's call, 2026-10-25): over six resamplings, each followed
+/// by a step, the zone's count and its lowest z stay flat within the lattice's noise. The noise is
+/// the test's own spread: the band one resampling spreads each over on the six lattices of
+/// [`ratchet`], from the least to the largest of the seven values (the start's and the six
+/// lattices'), widened by that band's width on each side, so no value is tuned. It FAILS with
+/// the nearest-old-sample labels (PLT-664), as it did with the major corner's: the count goes
+/// 271, 316, 349, 372, 398, 421, 442 against the band [255, 288] and the lowest z −0.031 to −0.074
+/// against [−0.046, −0.026]; the major corner's labels gave 314, 343, 364, 393, 411, 441. Run to
+/// 24 resamplings the count kept growing (709) and the lowest z reached −0.154; with no step after
+/// each, the count stayed 257 to 302 while the lowest z still wandered out to −0.110. So a
+/// categorical label resampled from any one corner moves the class's edge without bias, a
+/// fraction of a spacing each time, and the one-way conversion keeps every move that puts an
+/// ocean-side column in the zone (plates.md "The residual ratchet"). Ignored until a fix that adds
+/// no knob is chosen.
+#[test]
+#[ignore = "fails: the zone grows at each resampling's step (PLT-664, plates.md \"The residual ratchet\")"]
+fn a_converted_margins_zone_stays_flat_over_six_resamplings() {
+    let r = ratchet(6, true);
+    let band = |v0: f64, v: &[f64]| {
+        let lo = v.iter().copied().fold(v0, f64::min);
+        let hi = v.iter().copied().fold(v0, f64::max);
+        (lo - (hi - lo), hi + (hi - lo))
+    };
+    let (count_lo, count_hi) = band(r.before as f64, &r.kept);
+    let (z_lo, z_hi) = band(r.reach0, &r.reaches);
+    for (k, &(_, after, z)) in r.zone.iter().enumerate() {
+        assert!(
+            (count_lo..=count_hi).contains(&(after as f64)),
+            "resampling {}: the zone's count {after} outside [{count_lo}, {count_hi}] ({:?})",
+            k + 1,
+            r.zone
+        );
+        assert!(
+            (z_lo..=z_hi).contains(&z),
+            "resampling {}: the zone's lowest z {z:.4} outside [{z_lo:.4}, {z_hi:.4}] ({:?})",
+            k + 1,
+            r.zone
+        );
+    }
 }
 
 /// Plate task 8 (the gap budget's recommendation 1): continental crust a resampling accretes
@@ -6007,4 +6160,13 @@ fn a_deferred_collision_leaves_both_plates_to_the_balance() {
         frozen.len(),
         &frozen[..frozen.len().min(20)]
     );
+}
+
+/// TEMPORARY (the M5 lane's diagnosis, removed before the merge): the ratchet's chain at 24
+/// resamplings, with and without the steps.
+#[test]
+#[ignore = "diagnosis"]
+fn ratchet_chain_24_diagnosis() {
+    ratchet(24, true);
+    ratchet(24, false);
 }

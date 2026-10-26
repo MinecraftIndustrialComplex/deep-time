@@ -591,6 +591,15 @@ impl PlatesStage {
                 subduction::ARC_FRONT_STRAIGHT_GLOBAL,
                 pull.front_straight_km_myr,
             ),
+            // ledger: PLT-665 (measurement only)
+            (
+                subduction::ARC_FRONT_NORMAL_CONTINENTAL_GLOBAL,
+                pull.front_normal_km_myr[0],
+            ),
+            (
+                subduction::ARC_FRONT_NORMAL_OCEANIC_GLOBAL,
+                pull.front_normal_km_myr[1],
+            ),
             // ledger: PLT-554 (measurement only)
             (subduction::ARC_BAND_GLOBAL, pull.arc_band_km_myr),
         ] {
