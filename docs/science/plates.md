@@ -2720,7 +2720,9 @@ that the budget books as moved.
 5. *Hotspots and rifts add 0.04, twelve times below Earth's 0.5*: flood basalts and volcanic rifted
    margins have no rule of their own.
 6. *Pelagic sediment counted felsic, 1.40*: the plate step's pelagic rain (`pelagic_m_per_myr`)
-   books as felsic rock on the ocean floor and reaches the continents at resamplings.
+   books as felsic rock on the ocean floor and reaches the continents at resamplings. (Since
+   2026-10-25 the plates lay no pelagic rain: PLT-103 is retired and the surface stage's sourced
+   rain, erosion-and-sediment.md "The pelagic rain", lays it in the surface's own budget.)
 
 Table 1's rows add about 12 km³ a year on the branch against Earth's 3.2 and take 5.7 against at
 least 3.2, but the continental volume moves far more by the budget's own parts: the surface stage

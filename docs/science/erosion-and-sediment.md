@@ -22,6 +22,7 @@ Through the whole history, rivers cut into rising land (the stream power law: er
 | [ERO](ledger/ERO.md) | surface numerics: the diffusion solve, the parallel flood | ERO-183 to ERO-184 (2) |
 | [ERO](ledger/ERO.md) | pelagic and periplatform carbonate, photic diagnostics, euxinic veto | ERO-191 to ERO-197 (7) |
 | [ERO](ledger/ERO.md) | chemical denudation: the dissolved load of the carbon cycle's silicate weathering | ERO-205 to ERO-207 (3) |
+| [ERO](ledger/ERO.md) | the pelagic rain: dust, the dissolved load back as opal and carbonate, its test, its facies | ERO-208 to ERO-216 (9) |
 
 Rows by status (2026-10-18, `tools/review/claims_counts.py`): `verified` 10, `cited-unverified` 82, `from-memory` 2, `abstract-only` 4, `calibrated` 8, `game-choice` 11, `uncited` 56.
 
@@ -734,7 +735,8 @@ al. 2015). Three causes, measured:
 
 **What changed.**
 
-- **Pelagic chalk** (ERO-191, ERO-192, ORE-270). Once the planktic calcifiers are in full, the
+- **Pelagic chalk** (ERO-191, ERO-192, ORE-270; replaced 2026-10-25 by the chalk of "The pelagic
+  rain" below, which keeps the calcifiers' clock and the CCD and drops the fixed rate). Once the planktic calcifiers are in full, the
   open sea floor gains calcareous ooze at 4.0 m/Myr of chalk (from Milliman and Droxler's deep-sea
   accumulation over the calcareous share of the floor, the arithmetic in the ledger row), times
   the share that survives dissolution, all of it down to 1,000 m above the CCD and none at the
@@ -971,7 +973,9 @@ the dissolved load in it.
 - The supply's x2 (CLM-156) was set when the grid carried 9.5 Gt/yr; on base13 it carries about
   23 Gt/yr. With it, a fully supply-limited cell can lose rock in solution at up to 0.66 of its
   erosion, above the largest depletion fraction Riebe, Kirchner & Finkel 2004 measured (0.61).
-- The dissolved load leaves the planet's mass budget. On Earth it returns to the sea floor as
+- (Closed 2026-10-25 by "The pelagic rain" below: the dissolved load comes back to the floor as
+  opal and carbonate, mol for mol. The text that follows is the limit as it stood.) The dissolved
+  load leaves the planet's mass budget. On Earth it returns to the sea floor as
   carbonate and silica; here the carbon cycle lays only its drawdown beyond the degassing as cap
   carbonate, and the surface stage's carbonate rules are not tied to the carbon budget (above).
   Checked for a sink to send it to (the coordinator's question, 2026-10-25): none carries it.
@@ -1020,3 +1024,135 @@ is bit-identical to base14 (a one-run arm, `m5-chemden-off`, supercontinent seed
 state hash). The sea's lower stand at the end (278 m against 409, untested) goes with the
 dissolved load leaving the mass budget (Limits) and the slightly larger loss of continental
 crust.
+
+## The pelagic rain (pelagic lane, 2026-10-25)
+
+**Why.** The sediment diagnosis (build log 2026-10-25, sed-excess-diag, merged 05db3452) found
+the sea's sediment 3.0 times GlobSed's solid volume, the whole excess on oceanic floor, and about
+a tenth of that excess (in log shares) in the plates' pelagic rain: an unsourced 5 m/Myr on every
+oceanic cell, also laid on the initial floor as 5 m/Myr times its age (PLT-103). The surface stage
+laid a fixed 4 m/Myr of chalk besides (ERO-191), and the dissolved load the land's weathering took
+away left the planet's mass budget ("Chemical denudation", Limits). The coordinator's call
+(decisions log 2026-10-26): remove PLT-103 and lay one sourced pelagic rain in its place, from
+aeolian dust, the dissolved load returned as opal and carbonate, and chalk where a sourced CCD lets
+it survive.
+
+**The rain** (`surface/pelagic.rs`). Three parts, each from a measured flux and none fitted to a
+sediment thickness, laid once per plate step (the first substep, after the neritic factory):
+
+- **Aeolian dust** (ERO-208 to ERO-210). Earth's arid land sends 450 Tg of mineral dust a year to
+  the oceans (Jickells et al. 2005, Fig. 2). A planet sends that flux per km2 of Earth's 25.5
+  million km2 of arid and hyper-arid land (aridity index below 0.2: Safriel et al. 2005, Table
+  22.1, after Middleton & Thomas 1997) times its own: the land cells whose climate aridity (P/PET,
+  BIO-038) is below 0.2. The grains are silt's 2,661 kg/m3 (Kominz et al. 2011). The dust is laid
+  evenly on the sea, and exactly the volume laid is taken evenly off the arid cells at the step's
+  end, so the move conserves material. Jickells gives no rate by latitude; the basins' shares he
+  gives (North Atlantic 43 %, Indian 25 %, ...) follow Earth's deserts and winds, no law a planet
+  can use, so the dust falls evenly. At Earth's arid area it is 0.17 km3/yr, 0.47 m/Myr over the
+  ocean.
+- **Biogenic opal** (ERO-211 to ERO-213). The dissolved load's silica, 0.70 of its mass (West et
+  al. 2005, Table 2: the Grenville craton, the one ERO-206 takes), comes back as opal (SiO2 with
+  10 % water, 2,000 kg/m3) the way the modern ocean buries silica, in steady state (Tréguer et al.
+  2021: inputs 14.8, outputs 15.6 Tmol Si/yr). The floor deeper than 1 km takes the open ocean's
+  5.5 of the 15.6 (Hayes et al. 2021's burial below 1 km); the shallower floor takes the rest (the
+  coastal and continental-margin zone's 3.7, reverse weathering 4.7 and sponges 1.7, laid as one
+  siliceous part).
+- **Carbonate** (ERO-214, ERO-191, ERO-192). Each mol of the dissolved Ca + Mg comes back as a mol
+  of calcite, less the share the climate's drawdown already laid as cap carbonate
+  (`climate/cap_carbonate_mol`). The planktic calcifiers' share (the deposit engine's clock,
+  ORE-270, at the step's middle: 0 before 0.20 Ga, 1 from 0.10 Ga) rains as chalk on the floor
+  above the carbonate compensation depth, each cell's share in proportion to what survives
+  dissolution at its depth: all of it down to the lysocline 1,000 m above the CCD, none at the CCD
+  (Ridgwell & Zeebe 2005, sec. 1.1). What dissolves below the lysocline goes back into the sea and
+  is laid where carbonate survives, so the whole supply is laid. The rest (before the calcifiers,
+  all of it) is laid as the cap carbonate is, evenly on the floor 0 to 4,000 m deep (ERO-067).
+
+A step's deposit that is mostly opal is chert, mostly dust is shale, and both are black shale in
+euxinic water (ERO-216, a game-choice by the facies scheme's majority rule).
+
+**The CCD** (RCK-015, ERO-192). 4,500 m, the column builder's value, now sourced: "At present,
+this depth is approximately 4,500 m" (Coxall et al. 2005, abstract); 4.6 km in the equatorial
+Pacific (Pälike et al. 2012); a median of 4,439 m over Sulpis et al. 2018's 17 basins (3,895 to
+5,926 m). It is fixed. Pälike et al. find it at 3.0 to 3.5 km about 55 Ma and more than 1 km
+shallower before the Eocene-Oligocene transition, "consistent with an overall Cenozoic increase in
+weathering". A CCD that moves with age or chemistry needs the ocean's alkalinity budget (the
+carbonate the ocean gains against what it buries), which the model does not keep, so it is not
+built.
+
+**The fill.** A cell takes no more than the water above it. Each part in turn (the chalk, the
+shelf carbonate, the margin opal, the deep opal, the dust) is laid as s times its weight on the
+cell (the surviving share for the chalk; 1 on the part's floor and 0 elsewhere for the rest),
+capped by the room the cell has left, with the s that lays the part whole. Newton's method finds s
+from below: the laid volume is concave in s, so each step stays at or under the root. What a
+part's floor cannot hold at all goes to the other floor of its kind (the chalk's to the shelf
+carbonate, the margin opal's to the deep opal), or is reported unlaid (`rain_unlaid_km3` in the
+surface's totals). The sums run in fixed chunks of 4,096 cells, so the thread count does not
+change them. The pile is solid (no pore water), as every pool and layer of the model.
+
+**At Earth's balance.** The land weathers 5.32 x 10^12 mol of Ca + Mg a year (the degassing less
+the sea floor's share, CLM-158), so the dissolved load is 1.38 Gt/yr (0.51 km3/yr of rock). It
+returns 16.1 Tmol Si/yr as 0.54 km3/yr of opal and 5.32 Tmol/yr as 0.20 km3/yr of calcite, and
+the dust adds 0.17 km3/yr. On the unit test's synthetic ocean (below), the deep floor gets 0.57 to
+0.65 m/Myr of opal, the margin floor 5 to 11 m/Myr, and the floor above the lysocline 1.7 to
+2.5 m/Myr of chalk at the calcifiers' full share (each a range by where the test puts the ocean
+floor the age grid leaves out). Two findings, noted in the ledger and not acted on:
+
+- The model's silica is about twice the rivers': Tréguer et al. give the rivers 8.1 Tmol Si/yr
+  (dissolved 6.2 plus amorphous 1.9) and all inputs to the ocean 14.8, against the model's 16.1.
+  ERO-206's mass per mol sets it, through the Grenville craton's SiO2 / SCDR of 2.3 (ERO-211).
+- The returned carbonate is under half of Hayes et al.'s 11.3 Tmol/yr of CaCO3 buried below 1 km.
+  The rest of Earth's deep-sea carbonate is carbonate rock's weathering recycled, which the model
+  does not track (ERO-214; "Chemical denudation", Limits).
+
+**Tests.**
+
+- *Against GlobSed* (ERO-215). The rain on young floor away from the margins against GlobSed's eq.
+  2a (Straume et al. 2019: Z = sqrt(tau) (52 - 2.46 |phi| + 0.045 phi^2) m in place, fitted on
+  floor younger than 82 Myr, below 72 deg and more than 200 km from the margins, average STD
+  140 m). A synthetic Earth at its weathering balance, with Jickells's dust and the calcifiers in
+  full; Earth's floor by age (Seton et al. 2020, in 10-Myr bins) at GDH1's depth (PLT-352); the
+  rest of the ocean (361.9 x 10^6 km2, Eakins & Sharman 2010) as margin floor, 32.8 x 10^6 km2 of
+  it shallower than 500 m (Diesing 2020) at 200 m and the ungridded floor deeper than 500 m at
+  either bound of its depth (500 or 5,000 m). The pile a floor gathers at the depths it passes
+  through is decompacted with Kominz et al. 2011's average ocean-floor sediment (phi0 0.66,
+  lambda 1,333 m) and set against eq. 2a's area-weighted mean over |phi| < 72 deg. No constant in
+  the rain was set from GlobSed.
+
+  | Floor age | The rain, in place (m) | Eq. 2a (m) |
+  |---|---|---|
+  | 10 Myr | 76 to 94 | 113 |
+  | 30 Myr | 158 to 182 | 196 |
+  | 80 Myr | 284 to 298 | 320 |
+
+  The rain lies 14 to 42 m under eq. 2a, inside its average STD of 140 m (the test's bound).
+- *Mass, unit.* On 5,000 cells of random depth, 500 of them 1 to 50 mm deep, the dust, the
+  silica and the calcite come back whole: each part's laid volume equals its supply to 1e-9, the
+  part arrays add up to the laid total to 1e-6, and no cell takes more than its water. Full cells
+  pass the rest to the cells with room; the chalk follows the surviving share (none below the
+  CCD) and goes to the shelf carbonate when no floor lets it survive.
+- *Mass, coupled* (the surface stage's chemical denudation test, the pipeline at 3,000 cells for
+  30 Myr). The dissolved silica comes back as opal to 1e-5, and the unlaid rain is under 1e-6 of
+  the supply: 129,744 km3 dissolved, 49,358 km3 of carbonate and 135,766 km3 of opal returned,
+  303 km3 of dust, -6.8e-10 km3 unlaid. With chemical denudation off, no opal and no returned
+  carbonate.
+
+**Limits.**
+
+- The dust falls evenly, not downwind of the deserts, and glacial dust (2 to 20 times today's,
+  Jickells) comes only through the arid land's area.
+- The model's aridity is Thornthwaite's P/PET; that the atlas behind Earth's arid area used the
+  same PET is from memory (ERO-209).
+- All the dissolved cations come back as calcite, also the Mg that Earth removes as dolomite and
+  by hydrothermal exchange (Shalev et al. 2019).
+- Carbonate rock's weathering is not tracked, so the returned carbonate is under half of Earth's
+  deep-sea burial (above).
+- The CCD is fixed at its present depth (above).
+- The margin opal stands for reverse weathering and sponges too, laid as opal.
+- The silica is about twice the rivers' (above).
+- The chalk and the opal come only from the dissolved load: with chemical denudation off
+  (`climate.chemical_denudation`, on by default since 2026-10-25), only the dust rains.
+- The initial floor, new floor at a spreading gap and resampled floor start bare and gather the
+  rain from then on. GlobSed's eq. 2a could give the initial floor a starting pile by its age; not
+  built.
+
+**Measured.** The 8-run arm against base16 (seeds 1 to 4) waits for the coordinator's slot.

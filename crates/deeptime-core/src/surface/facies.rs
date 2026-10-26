@@ -11,7 +11,7 @@
 //! (`pelagic::Rain`) is chalk. Periplatform carbonate (2026-10-20) votes with the factory's
 //! for the class but, laid mostly below the photic zone, is no platform (`Kind::Periplatform`);
 //! euxinic water makes black shale of carbonate ooze too.
-//! The pelagic rain's opal and dust (2026-10-26, `pelagic.rs`): a deposit that is mostly opal is
+//! The pelagic rain's opal and dust (2026-10-25, `pelagic.rs`): a deposit that is mostly opal is
 //! chert (siliceous ooze lithifies to chert), one that is mostly dust is shale (the deep sea's
 //! clay), black shale in euxinic water as the other muds and oozes.
 //!
@@ -153,8 +153,8 @@ pub fn classify(s: &Setting, c: &Classes) -> (u16, Kind) {
         6 if euxinic => (c.black_shale, Kind::Euxinic), // ledger: ERO-196
         6 => (c.chalk, Kind::Pelagic),                  // ledger: ERO-194
         7 | 8 if euxinic => (c.black_shale, Kind::Euxinic), // ledger: ERO-216
-        7 => (c.chert, Kind::Pelagic),                      // ledger: ERO-216
-        8 => (c.shale, Kind::Clastic),                      // ledger: ERO-216
+        7 => (c.chert, Kind::Pelagic),                  // ledger: ERO-216
+        8 => (c.shale, Kind::Clastic),                  // ledger: ERO-216
         1 => {
             if s.aridity < EVAPORITE_ARIDITY && s.depth_m < DOLOMITE_DEPTH_M {
                 (c.dolostone, Kind::Carbonate)

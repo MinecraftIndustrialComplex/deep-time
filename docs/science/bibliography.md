@@ -1482,7 +1482,7 @@ RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on);
 ### pyBacktrack_lithologies
 - Reference: EarthByte group, pyBacktrack (software), bundled lithology table `pybacktrack/bundle_data/lithologies/primary.txt`. https://github.com/EarthByte/pyBacktrack
 - Cited as: the secondary source of Sclater & Christie 1980's porosity-depth parameters, for the porous cover tried in the plate model's column on 2026-10-20 and reverted (isostasy-and-height-limit.md)
-- Ledger ids: none (the trial was reverted)
+- Ledger ids: none for the 2026-10-20 trial (reverted); ERO-210, ERO-215 (2026-10-25, Kominz et al. 2011's rows, read at second hand by the sediment diagnosis's sub-agent: "Average_ocean_floor_sediment 2647 0.66 1333", "Silt 2661 0.76 1091", "Clay 2735 0.76 1252", "Coccolith_ooze 2710 0.59 1660", "Diatomite 2457 0.84 436", all "# Kominz et al. [2011]")
 - Access: open (software, GitHub)
 - Library: no saved copy (read through raw.githubusercontent.com on 2026-10-20).
 - Read in the lakes task (2026-10-20): the header "# name density porosity decay / # kg/m3 (%/100) m" and the four rows "# Sclater and Christie [1980]": "Shaley_sand 2680 0.56 2564", "Shale 2700 0.63 1960", "Sand 2650 0.49 3704", "Chalk 2710 0.7 1408".
@@ -4616,7 +4616,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Seton, M., Müller, R. D., Zahirovic, S., Williams, S., Wright, N. M., Cannon, J., Whittaker, J. M., Matthews, K. J., McGirr, R. (2020). A global data set of present-day oceanic crustal age and seafloor spreading parameters. Geochemistry, Geophysics, Geosystems 21(10):e2020GC009214.
 - DOI or URL: 10.1029/2020GC009214 (open access).
 - Cited as: not cited by the project; the earth file's "mean 64 Myr" for sea-floor age needs a source.
-- Ledger ids: (supports 201 and the run review); notes: supports 201 and the run review
+- Ledger ids: (supports 201 and the run review); notes: supports 201 and the run review; ERO-215 (2026-10-25: the floor-age bins of the 6-arcmin grid, 10-Myr bins to 180 Myr, as the sediment diagnosis's sub-agent computed them, tools/review/seddiag/sedstock.py SETON_BINS)
 - Access: open access.
 - Library (the project's source library, not distributed): fetched in WP-13a as data: the GMT remote server's grid earth_age_06m_p.grd (6 arc-minute, "EarthByte Earth Seafloor Age [Seton et al., 2020]") with the server's listing earth_age_server.txt. From: https://oceania.generic-mapping-tools.org/server/earth/earth_age/. Folder: Seton2020_earth_age.
 - Read so far (by the project): not read.
@@ -7232,7 +7232,7 @@ The sources behind the ocean crust's own column (build log 2026-10-19 "Crust tem
 - Reference: Straume, E. O., Gaina, C. and others (2019). GlobSed: updated total sediment thickness in the world's oceans. Geochemistry, Geophysics, Geosystems 20(4):1756-1772.
 - DOI or URL: 10.1029/2018GC008115; author copy https://epic.awi.de/49326/
 - Cited as: "GlobSed (Straume et al. 2019)" (strata.md, the census of the ocean crust's sediment by age).
-- Ledger ids: HYP-044 (2026-10-22: the ocean's sediment against the model's conserved pools; strata.md's comparison rests on it too). PLT-440 (2026-10-22, the trench budget: the ocean's sediment the share acts on).
+- Ledger ids: HYP-044 (2026-10-22: the ocean's sediment against the model's conserved pools; strata.md's comparison rests on it too). PLT-440 (2026-10-22, the trench budget: the ocean's sediment the share acts on). ERO-215 (2026-10-25, the pelagic rain's unit test: eq. 2a, Z = sqrt(tau) (52 - 2.46 |phi| + 0.045 phi^2) m, fitted on floor younger than 82 Myr below 72 deg more than 200 km from the margins, "an average sediment thickness of 267 m with average STD of 140 m", sec. 3.3, read by the sediment diagnosis's sub-agent and re-read by the pelagic lane, 2026-10-25).
 - Access: open author copy.
 - Library: not kept (read 2026-10-19 from the author-accepted PDF, text-extracted; again 2026-10-22 by a research sub-agent, Table 3: "This study" about 3.37 x 10^8 km3 over about 3.63 x 10^8 km2, mean 927 m; margins 1.43 x 10^8 km3 over 4.69 x 10^7 km2; beyond 200 km of the continent-ocean boundary 1.13 x 10^8 km3 over 2.79 x 10^8 km2).
 - Read so far (by the project): 2026-10-19 (crust templates agent): abstract, "sediment thickness increases with age of the oceanic crust, towards high southern and northern latitudes, and towards the equator"; Table 3, the mean over the whole grid 927 m, continental margins 3044 m, the deep ocean more than 200 km from the continent-ocean boundary 404 m; section 3, the ocean younger than 82 Myr within 72 degS to 72 degN "is characterized by an average sediment thickness of 267 m".
@@ -7276,7 +7276,7 @@ The carbonate and ore-deposit task (build log 2026-10-19): pelagic chalk above t
 - Reference: Ridgwell, A. and Zeebe, R. E. (2005). The role of the global carbonate cycle in the regulation and evolution of the Earth system. Earth and Planetary Science Letters 234(3-4):299-315.
 - DOI or URL: 10.1016/j.epsl.2005.03.006; open copy https://sseh.uchicago.edu/doc/Ridgwell_and_Zeebe_2005.pdf
 - Cited as: "Ridgwell and Zeebe 2005, EPSL 234: 307" (deposits/clocks.rs; surface/carbonate.rs).
-- Ledger ids: ORE-270, ERO-194
+- Ledger ids: ORE-270, ERO-194, ERO-192 (2026-10-25: sec. 1.1, the saturation horizon at about 4,500 m in the Atlantic and about 3,000 m in the Pacific, "Within a further 1000 m sediments are often completely devoid of carbonate particles (the CCD)", read by a Sonnet sub-agent of the pelagic lane)
 - Access: open copy.
 - Library: not kept (fetched through the web fetch tool and the PDF's text layer extracted with pdftotext, 2026-10-19).
 - Read so far (by the project): full text, 2026-10-19. P. 307: "it is not until the Mesozoic that a marked proliferation in coccolithophore and planktic foraminiferal diversity and abundance is observed ... Only then would a substantive deep-sea sedimentary carbonate sink have been possible"; "the mean area of platform carbonates during the Mesozoic and Cenozoic is much reduced compared to the Paleozoic"; the abstract's "Mid-Mesozoic Revolution"; the "Neritan" and "Cretan" ocean modes.
@@ -7321,7 +7321,7 @@ The carbonate and ore-deposit task (build log 2026-10-19): pelagic chalk above t
 - Reference: Diesing, M. (2020). Deep-sea sediments of the global ocean. Earth System Science Data 12(4):3367-3381.
 - DOI or URL: 10.5194/essd-12-3367-2020; https://essd.copernicus.org/articles/12/3367/2020/
 - Cited as: "Diesing 2020: 37 %" (surface/carbonate.rs).
-- Ledger ids: ERO-191
+- Ledger ids: ERO-191, ERO-215 (2026-10-25: Table 4, the seabed deeper than 500 m is 329.062 x 10^6 km2, read by a Sonnet sub-agent of the pelagic lane)
 - Access: open access.
 - Library: not kept.
 - Read so far (by the project): the article, by the research sub-agent, 2026-10-19: of the seabed below 500 m, calcareous 36.8 %, clay 31.0 %, radiolarian ooze 14.2 %, lithogenous 9.5 %, diatom ooze 8.5 %. (Its preprint's 50.3 % is a share of samples, not of area.)
@@ -7604,7 +7604,7 @@ The sources of the planet's water, the floor's age-depth law and the check on th
 - Reference: Eakins, B. W. and Sharman, G. F. (2010). Volumes of the World's Oceans from ETOPO1. NOAA National Geophysical Data Center, Boulder, CO.
 - DOI or URL: a mirror at https://climatechange.usf.edu/documents/Thermal%20Expansion/ocean_volumes.pdf (the NOAA page itself not read).
 - Cited as: "Eakins & Sharman 2010" (the ocean volume beside Charette & Smith 2010).
-- Ledger ids: ISO-085
+- Ledger ids: ISO-085, ERO-215 (2026-10-25: the ocean's 361.9 x 10^6 km2, the pelagic rain's synthetic ocean)
 - Access: open.
 - Read so far (by the project): the mirror, 2026-10-21: "Total: 361,900,000 ... 1,335,000,000 ... 3688 ... 10,803" (km2, km3, mean and greatest depth m); 0.1 % on the area, 1 % on the volume.
 
@@ -9009,7 +9009,7 @@ The sources of the dissolved load the surface stage takes off the land (erosion-
 - Reference: West, A. J., Galy, A. and Bickle, M. (2005). Tectonic and climatic controls on silicate weathering. Earth and Planetary Science Letters 235:211-228.
 - DOI or URL: 10.1016/j.epsl.2005.03.020 (from memory, not looked up); read at https://sseh.uchicago.edu/doc/West_et_al_2005.pdf (a mirror).
 - Cited as: "West, Galy & Bickle 2005"; "West 2005" (the coordinator's task).
-- Ledger ids: ERO-205, ERO-206, ERO-207; CLM-153, CLM-155 (notes)
+- Ledger ids: ERO-205, ERO-206, ERO-207, ERO-211 (2026-10-25: Table 2, Grenville's SiO2 2.63 of SCDR 1.14 + SiO2, the dissolved load's silica); CLM-153, CLM-155 (notes)
 - Access: paywalled at the publisher; the mirror above is open.
 - Library: not kept.
 - Read so far (by the project): full text, 2026-10-25 (a Sonnet sub-agent): abstract, "At lower erosion rates mineral supply limits weathering. At higher erosion rates there is abundant material but kinetic and therefore climatic factors limit weathering" and "In the transport-limited case, the supply of silicate cations from weathering is directly proportional to the supply of material by erosion"; sec. 4.1, the cratons "define a linear array ... with a slope close to one (0.96 +- 0.09, 1 sigma) and a value of A = 0.08 +- 0.02, comparable to the weight fraction of Ca + Mg + Na + K (0.1) in average silicate upper crust"; SCDR is "the silicate-derived Ca + Mg + Na + K ... reported in elemental weight units"; Table 2, the cratons (SCDR, SiO2, total denudation TDR in t/km2/yr; runoff mm/yr; T degC): Slave 0.25, 0.18, 3.2, 100, 4.0; Siberia 0.77, 1.61, 15, 270, 2.0; Africa 0.80, 2.96, 10, 250, 24.1; Grenville 1.14, 2.63, 13, 580, 4.5; Guyana 2.40, 10.18, 35, 1680, 25.0. The kinetic fit: K = 2.28 +- 1.09 t/km2/yr, Ea = 74 +- 29 kJ/mol. The paper gives no rate in m/Myr.
@@ -9045,10 +9045,10 @@ The sources of the dissolved load the surface stage takes off the land (erosion-
 - Reference: Tréguer, P. J. et al. (2021). Reviews and syntheses: The biogeochemical cycle of silicon in the modern ocean. Biogeosciences 18:1269-1289 (title and pages from memory).
 - DOI or URL: https://bg.copernicus.org/articles/18/1269/2021/bg-18-1269-2021.pdf
 - Cited as: "Tréguer et al. 2021".
-- Ledger ids: none (erosion-and-sediment.md "Chemical denudation", Limits)
+- Ledger ids: ERO-211, ERO-212 (2026-10-25, the pelagic rain); erosion-and-sediment.md "Chemical denudation", Limits
 - Access: open.
 - Library: not kept.
-- Read so far (by the project): full text, 2026-10-25 (a Sonnet sub-agent): "The best estimate for the riverine input (FR) of dSi ... remains at FR dSi = 6.2(+-1.8) Tmol Si yr-1 (Tréguer and De La Rocha, 2013)" (a restatement; the 2013 paper not read).
+- Read so far (by the project): full text, 2026-10-25 (a Sonnet sub-agent): "The best estimate for the riverine input (FR) of dSi ... remains at FR dSi = 6.2(+-1.8) Tmol Si yr-1 (Tréguer and De La Rocha, 2013)" (a restatement; the 2013 paper not read). Again 2026-10-25 (a Sonnet sub-agent of the pelagic lane): the budget's inputs 14.8 = rivers 8.1 (dSi 6.2 + aSi 1.9) + 0.5 + 1.9 + 2.3 + 0.3 + 1.7 Tmol Si/yr; outputs 15.6 = burial 9.2 (Hayes et al.'s open ocean deeper than 1 km, 5.5, plus the coastal and continental-margin zone, 3.7) + reverse weathering 4.7 + sponges 1.7; "open-ocean locations > 1 km in depth"; the sponges' areas 108.02 (margins and seamounts) and 253.86 (basins) million km2.
 
 ## India's post-contact convergence (the M5 lane's collision-duration readout), added 2026-10-25
 
@@ -9071,3 +9071,106 @@ Earth's convergence after India touched Asia, the readout the collision-duration
 - Access: open (Caltech's repository).
 - Library: not kept.
 - Read so far (by the project): full text, 2026-10-25 (a Sonnet sub-agent): "India's convergence rate with Eurasia slowed by more than 40% between 20 and 10 Ma"; "India collided with southern Eurasia at 45-55 Ma"; "drops in convergence rates of 30-38% (118 to 83 mm a-1 in northeastern India and 109 to 59 mm a-1 in northwestern India) at 40-45 Ma and of 45% (59-34 and 83-44 mm a-1) between 10 and 20 Ma"; "the essentially constant rate since 11 Ma".
+
+## The pelagic rain (ERO-208 to ERO-216; ERO-191, ERO-192, RCK-015), added 2026-10-25
+
+The sources of the surface stage's pelagic rain (erosion-and-sediment.md "The pelagic rain (2026-10-25)"), which replaced the plates' unsourced 5 m/Myr (PLT-103, retired). Read by a Sonnet sub-agent of the pelagic lane on 2026-10-25 unless an entry says otherwise (downloads in its scratch, not in the library). Already above, with what was read this time: Straume2019 (GlobSed's eq. 2a), Treguer2021 (the silicon budget), West2005, RidgwellZeebe2005, Diesing2020, EakinsSharman2010, Seton2020, pyBacktrack_lithologies (Kominz et al. 2011's rows). Not read: Gaillardet et al. 1999 (the rivers' dissolved silica, every route blocked); Middleton & Thomas 1997 (the World Atlas of Desertification, through the Millennium Assessment's table only); Kominz et al. 2011 (through pyBacktrack's table only).
+
+### Jickells2005
+- Reference: Jickells, T. D., An, Z. S., Andersen, K. K., Baker, A. R., Bergametti, G., Brooks, N., Cao, J. J., Boyd, P. W., Duce, R. A., Hunter, K. A., Kawahata, H., Kubilay, N., laRoche, J., Liss, P. S., Mahowald, N., Prospero, J. M., Ridgwell, A. J., Tegen, I. and Torres, R. (2005). Global iron connections between desert dust, ocean biogeochemistry, and climate. Science 308(5718):67-71 (authors after the first from memory).
+- DOI or URL: 10.1126/science.1105959
+- Cited as: "Jickells et al. 2005" (surface/pelagic.rs).
+- Ledger ids: ERO-208
+- Access: paywalled at the publisher; an open copy was read.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-25: Fig. 2 caption, "Total atmospheric dust inputs to the oceans = 450 Tg year-1"; dust production about 1,700 Tg/yr, 26 % of it reaching the oceans; the ocean basins' shares (North Atlantic 43 %, Indian 25 %, ...); "Dust produced in arid areas"; the processes "linked to aridity and climate in a highly nonlinear way"; glacial fluxes 2 to 20 times today's. No table by latitude.
+
+### Hayes2021
+- Reference: Hayes, C. T., Costa, K. M., Anderson, R. F., Calvo, E., Chase, Z., Demina, L. L., Dutay, J.-C., German, C. R., Heimbürger-Boavida, L.-E., Jaccard, S. L., Jacobel, A., Kohfeld, K. E., Kravchishina, M. D., Lippold, J., Mekik, F., Missiaen, L., Pavia, F. J., Paytan, A., Pedrosa-Pamies, R., Petrova, M. V., Rahman, S., Robinson, L. F., Roy-Barman, M., Sanchez-Vidal, A., Shiller, A., Tagliabue, A., Tessin, A. C., van Hulten, M. and Zhang, J. (2021). Global ocean sediment composition and burial flux in the deep sea. Global Biogeochemical Cycles 35:e2020GB006769 (the journal and number from memory; Tréguer et al. 2021 cite the preprint).
+- DOI or URL: the preprint 10.1002/essoar.10506119.1 (as Tréguer et al. 2021 give it).
+- Cited as: "Hayes et al. 2021" (surface/pelagic.rs).
+- Ledger ids: ERO-212, ERO-214
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): 2026-10-25: cores deeper than 1,000 m; burial of CaCO3 136 +- 34 Tg C/yr (11.3 Tmol, the sub-agent's arithmetic) and of opal 153 +- 33 Tg Si/yr (5.45 Tmol), 75 of it in the Southern Ocean; the basins' shares.
+
+### Sulpis2018
+- Reference: Sulpis, O., Boudreau, B. P., Mucci, A., Jenkins, C., Trossman, D. S., Arbic, B. K. and Key, R. M. (2018). Current CaCO3 dissolution at the seafloor caused by anthropogenic CO2. Proceedings of the National Academy of Sciences 115(46):11700-11705 (authors after the first, title and pages from memory).
+- DOI or URL: not looked up (the PNAS article and its SI appendix).
+- Cited as: "Sulpis et al. 2018" (structure/columns.rs).
+- Ledger ids: RCK-015, ERO-192
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): the SI appendix, table S1, 2026-10-25: the CCD, defined as the depth below which sediments hold less than 10 % CaCO3, in 17 basins from 3,895 to 5,926 m (median 4,439 m, unweighted mean 4,655 m: the sub-agent's arithmetic); the calcite saturation depth 0.5 to 1.9 km above it.
+
+### Coxall2005
+- Reference: Coxall, H. K., Wilson, P. A., Pälike, H., Lear, C. H. and Backman, J. (2005). Rapid stepwise onset of Antarctic glaciation and deeper calcite compensation in the Pacific Ocean. Nature 433:53-57 (authors after the first, title and pages from memory).
+- DOI or URL: the abstract on Europe PMC (the URL not kept).
+- Cited as: "Coxall et al. 2005" (structure/columns.rs).
+- Ledger ids: RCK-015
+- Access: paywalled; the abstract is open.
+- Library: not kept.
+- Read so far (by the project): the abstract only, 2026-10-25: "At present, this depth is approximately 4,500 m".
+
+### Palike2012
+- Reference: Pälike, H. et al. (2012). A Cenozoic record of the equatorial Pacific carbonate compensation depth. Nature 488:609-614 (title and pages from memory).
+- DOI or URL: not looked up.
+- Cited as: "Pälike et al. 2012" (structure/columns.rs).
+- Ledger ids: RCK-015
+- Access: paywalled at the publisher; an open copy was read.
+- Library: not kept.
+- Read so far (by the project): 2026-10-25: the CCD 4.6 km at present, 3.0 to 3.5 km at about 55 Ma, about 3.5 km in the Eocene, more than 1 km of deepening at the Eocene-Oligocene transition, "consistent with an overall Cenozoic increase in weathering".
+
+### Sigman1998
+- Reference: Sigman, D. M., McCorkle, D. C. and Martin, W. R. (1998). The calcite lysocline as a constraint on glacial/interglacial low-latitude production changes. Global Biogeochemical Cycles 12(3):409-427 (from memory).
+- DOI or URL: not looked up.
+- Cited as: "Sigman et al. 1998" (the ledger, ERO-192).
+- Ledger ids: ERO-192 (a cross-check)
+- Access: not recorded.
+- Library: not kept.
+- Read so far (by the project): 2026-10-25: a lysocline about 800 m thick in a model driven by the rain (a model result).
+
+### Shalev2019
+- Reference: Shalev, N., Bontognali, T. R. R., Wheat, C. G. and Vance, D. (2019). New isotope constraints on the Mg oceanic budget point to cryptic modern dolomite formation. Nature Communications 10:5646 (authors after the first and title from memory).
+- DOI or URL: not looked up (open access).
+- Cited as: "Shalev et al. 2019" (the ledger, ERO-214).
+- Ledger ids: ERO-214
+- Access: open access.
+- Library: not kept.
+- Read so far (by the project): 2026-10-25: rivers bring 5.5 Tmol Mg/yr; removed by dolomite 1.5 to 2.9, high-temperature hydrothermal exchange 0.24 to 1.4 and low-temperature flank exchange 1.0 to 1.7 Tmol/yr. "Mainly ridge exchange" is not what the paper finds.
+
+### Safriel2005
+- Reference: Safriel, U., Adeel, Z. et al. (2005). Dryland Systems. Chapter 22 in Ecosystems and Human Well-being: Current State and Trends, Volume 1. Millennium Ecosystem Assessment, Island Press (co-authors from memory).
+- DOI or URL: the chapter's PDF on the Millennium Ecosystem Assessment's site (the URL not kept).
+- Cited as: "Millennium Ecosystem Assessment, Safriel et al. 2005, Table 22.1" (surface/pelagic.rs).
+- Ledger ids: ERO-209
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): Table 22.1, 2026-10-25 (after Middleton & Thomas 1997): hyper-arid (aridity index below 0.05) 9.8 million km2, arid (0.05 to 0.20) 15.7 million km2, of 147.57 million km2 of land. FAO's figures, 7.5 % and 12.1 % of the land, from another page.
+
+### Meng2022
+- Reference: Meng, J. et al. (2022). Geophysical Research Letters (the dust model paper; title not kept).
+- DOI or URL: not kept.
+- Cited as: "Meng et al. 2022" (the ledger, ERO-210).
+- Ledger ids: ERO-210 (a cross-check)
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): 2026-10-25: dust grains of "physical density of 2,500 kg m-3" (the model's assumed value, not a measurement).
+
+### FrontiersOpal2023
+- Reference: a review of biogenic silica's properties, Frontiers in Marine Science (2023) (authors and title not kept).
+- DOI or URL: 10.3389/fmars.2023.1150518
+- Cited as: "the review in Frontiers in Marine Science 2023" (surface/pelagic.rs).
+- Ledger ids: ERO-213
+- Access: open access.
+- Library: not kept.
+- Read so far (by the project): 2026-10-25: the density of sponge spicules 1.95 to 2.1, radiolarians 1.85 to 2.0, diatoms 1.7 to 1.95 g/cm3; amorphous hydrated silica about 2.2.
+
+### MortlockFroelich1989
+- Reference: Mortlock, R. A. and Froelich, P. N. (1989). A simple method for the rapid determination of biogenic opal in pelagic marine sediments. Deep Sea Research Part A 36(9):1415-1426 (as Tréguer et al. 2021's reference list gives it, the issue from memory).
+- DOI or URL: not looked up.
+- Cited as: "Mortlock and Froelich 1989" (surface/pelagic.rs).
+- Ledger ids: ERO-213
+- Access: paywalled.
+- Library: not kept.
+- Read so far (by the project): at second hand only, 2026-10-25 (a search snippet): opal holds about 10 % water (SiO2.0.4H2O), a factor of 2.4 from Si to opal.

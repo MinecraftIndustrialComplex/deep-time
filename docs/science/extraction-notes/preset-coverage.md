@@ -10,6 +10,8 @@ The four presets are the "pipeline" presets under their game names (`earthlike_q
 
 **Changed since (P1-19 #27, the coupled group's cadence, 2026-10-18):** the keys counted per plate step are now per Myr or a time, so a coarser `tectonics.time_step_myr` keeps the rates: `tectonics.rift_lambda0` (0.012 per step) is `rift_per_myr` (0.006), `subduction_initiation_rate` (0.3) is `subduction_initiation_per_myr` (0.15), `trench_relax` (0.5 per step) is `trench_half_life_myr` (2.0), `resample_min_steps` and `resample_max_steps` (10, 60) are `resample_min_myr` and `resample_max_myr` (20, 120), `contact_timeout_steps` (12) is `contact_timeout_myr` (24), and `surface.carbonate_clastic_m` (20 m per step) is `carbonate_clastic_m_myr` (10). `climate.snapshot_every_myr` is 20 (was 10; the plate step stays 2 Myr and `surface.substeps` 1). Ledger: PLT-053, PLT-059, PLT-063, PLT-082, PLT-098, ERO-065, SCL-038.
 
+**Changed since (the pelagic lane, 2026-10-25):** `tectonics.pelagic_m_per_myr` (5.0, PLT-103, retired) is gone; the surface stage's pelagic rain that replaced it (`surface/pelagic.rs`, ERO-208 to ERO-214) has no preset key.
+
 ## Top-level sections and leaf counts (earthlike_quick_16k)
 
 | section | leaves | subsystem | what it is |

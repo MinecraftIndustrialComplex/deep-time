@@ -13,7 +13,7 @@
 //! stops at sea level: a step adds at most the water depth (Landlab's explicit rate times Δt would
 //! overshoot at deep-time steps).
 //!
-//! **Pelagic carbonate** (2026-10-19; since 2026-10-26 in `surface::pelagic`). The chalk is the
+//! **Pelagic carbonate** (2026-10-19; since 2026-10-25 in `surface::pelagic`). The chalk is the
 //! calcifiers' share of the carbonate the dissolved load returns to the sea floor, not a rate of
 //! its own; the carbonate compensation depth decides where it survives.
 
