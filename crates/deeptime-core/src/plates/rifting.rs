@@ -27,7 +27,9 @@ use super::events::{self, PLATE_BIRTH, PLATE_DEATH, RIFT_ONSET};
 use super::geometry::Tree;
 use super::geometry::{Geo, coast_split, connect_plates};
 use super::noise::fbm;
-use super::state::{CONTINENTAL, Group, HIDDEN, Plate, PlateState, RiftLink, SlabTrack, TRENCH};
+use super::state::{
+    CONTINENTAL, Group, HIDDEN, Plate, PlateState, RiftLink, Sample, SlabTrack, TRENCH,
+};
 use crate::error::CoreError;
 use crate::sphere::kdtree::angle_of_chord2;
 use crate::world::WorldState;
@@ -387,6 +389,11 @@ pub fn rift(
     Ok(())
 }
 
+/// The world global summing fix C's trench length × step over the run, km × Myr: the realized
+/// initiations' expectation is `subduction_initiation_per_trench_km_myr` × this (measurement,
+/// ledger PLT-692).
+pub const INITIATION_TRENCH_GLOBAL: &str = "plates/initiation_trench_km_myr";
+
 /// Spontaneous subduction initiation at old oceanic lithosphere (design choice, beyond Cortial:
 /// without it, oceanic crust on a plate with no trench ages for ever, while Earth's ocean floor is
 /// recycled within about 200 Myr; Stern 2004, "Subduction initiation: spontaneous and induced").
@@ -403,6 +410,24 @@ pub fn rift(
 /// it towards the rest, and the convergence opens a subduction zone at the fracture on the
 /// following steps, where the older crust goes down (`subduction.rs`) and the slab grows. Emits a
 /// plate_birth with `origin` "subduction_initiation".
+///
+/// With `initiation_near_trenches` (fix C, ledger PLT-690 to PLT-692; Crameri et al. 2020) the
+/// active trenches are this step's subduction zones, `fronts` (`subduction::Pull::
+/// subducting_fronts`: the overriding side's samples of the oceanic fronts past incipient, the
+/// boundary the plate check measures against Bird 2003's subduction zones); the floor that
+/// qualifies is the visible ocean floor within `subduction_initiation_reach_km` of one (not a
+/// front or TRENCH sample itself), of any age, and the hazard is the planet's: λ summed over the
+/// plates is `subduction_initiation_per_trench_km_myr` × the fronts' length (one lattice spacing
+/// per front sample, as the plate check counts it) × the step, each plate's share its qualifying
+/// floor (times PLT-505's weight). No front, no initiation. The samples flagged TRENCH (the
+/// subducting plates' rims beside their hidden floor) are no measure of that length: they also
+/// mark collisions, incipient and slow fronts and the rims of floor held under after its contact
+/// ended, and on base20 summed to about twice the plate check's subducting boundary. The fracture
+/// is the bisector of the seed and its foot on the nearest trench
+/// (`trench_foot`): parallel to that trench at half the seed's distance (Crameri et al. 2020's
+/// Table 1: ten of thirteen new trenches at a normal offset parallel to the nearest older trench,
+/// three oblique, none along its strike). A draw whose fracture leaves fewer than 32 samples on a
+/// side is counted (`initiations_refused`) and dropped.
 pub fn maybe_initiate_subduction(
     state: &mut PlateState,
     world: &mut WorldState,
@@ -410,21 +435,51 @@ pub fn maybe_initiate_subduction(
     pos: &[DVec3],
     env: &Env,
     stress: &[Option<f64>],
+    fronts: &[u32],
 ) -> Result<(), CoreError> {
     let k = env.k;
-    if k.subduction_initiation_per_myr <= 0.0 {
+    let near_trenches = k.initiation_near_trenches;
+    let rate = if near_trenches {
+        k.subduction_initiation_per_trench_km_myr
+    } else {
+        k.subduction_initiation_per_myr
+    };
+    if rate <= 0.0 {
         return Ok(());
     }
     let t = env.t_myr;
     let area = env.norm.sample_area_km2();
-    let trenches: Vec<DVec3> = state
-        .samples
-        .iter()
-        .enumerate()
-        .filter(|(_, s)| s.flags & TRENCH != 0)
-        .map(|(i, _)| pos[i])
-        .collect();
+    // The trenches: with fix C this step's subduction zones (Crameri et al. 2020's "active
+    // subduction zones", ledger PLT-691); else the samples flagged TRENCH (PLT-064's clearance).
+    let trenches: Vec<DVec3> = if near_trenches {
+        fronts.iter().map(|&v| pos[v as usize]).collect()
+    } else {
+        state
+            .samples
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| s.flags & TRENCH != 0)
+            .map(|(i, _)| pos[i])
+            .collect()
+    };
+    let mut on_front = vec![false; state.samples.len()];
+    if near_trenches {
+        for &v in fronts {
+            on_front[v as usize] = true;
+        }
+    }
+    // Subduction breeds subduction (Crameri et al. 2020): with no trench, nothing starts.
+    if near_trenches && trenches.is_empty() {
+        return Ok(());
+    }
     let trench_tree = (!trenches.is_empty()).then(|| Tree::over(&trenches, |_| true));
+    // The angle to the nearest trench sample (infinite with none).
+    let to_trench = |i: usize| {
+        trench_tree
+            .as_ref()
+            .and_then(|tr| tr.nearest(pos[i]))
+            .map_or(f64::INFINITY, |(_, d2)| angle_of_chord2(d2))
+    };
     // No initiation within one lattice spacing of a front where along-strike propagation
     // carries subduction to the margins (Crameri et al. 2020 source both); else the old 1,000 km.
     // ledger: PLT-064, PLT-656
@@ -435,11 +490,19 @@ pub fn maybe_initiate_subduction(
         old_clearance
     };
     // An initiation the old clearance would have refused (counted, PLT-064).
-    let near_front = |i: usize| {
-        trench_tree.as_ref().is_some_and(|tr| {
-            tr.nearest(pos[i])
-                .is_some_and(|(_, d2)| angle_of_chord2(d2) <= old_clearance)
-        })
+    let near_front = |i: usize| to_trench(i) <= old_clearance;
+    // Within reach of an active trench (fix C). ledger: PLT-691
+    let reach = env.norm.rad(k.subduction_initiation_reach_km);
+    // The fracture's other centre with fix C: the seed's foot on the nearest trench, so the
+    // fracture runs parallel to that trench halfway to the seed (PLT-690); else the young floor's
+    // centroid. The trench's line is fitted over three lattice spacings (numerical: a few samples
+    // of trench, about 210 km on the quick presets' 100,000 samples, not a physical length).
+    let stencil = 3.0 * env.norm.spacing_rad();
+    let toward = |seed: u32| {
+        trench_tree
+            .as_ref()
+            .filter(|_| near_trenches)
+            .and_then(|tr| trench_foot(pos[seed as usize], &trenches, tr, stencil))
     };
     // Off the passive margin (V1 gap 2's stage C1): the reach of the arc the new trench builds
     // on the plate, and a lattice spacing for where the front falls. ledger: PLT-503
@@ -448,23 +511,50 @@ pub fn maybe_initiate_subduction(
     } else {
         0.0
     };
-    let clear = |i: usize| {
-        trench_tree.as_ref().is_none_or(|tr| {
-            tr.nearest(pos[i])
-                .is_none_or(|(_, d2)| angle_of_chord2(d2) > clearance)
-        })
+    // The floor that may go: old and clear of trenches (PLT-062, PLT-064), or with fix C any
+    // floor within reach of one (Crameri et al. 2020: the subducting plates' mean ages at
+    // initiation 31.7 to 117.4 Myr, and none spontaneous). ledger: PLT-690
+    // A front or trench sample itself is no new trench's place (and the split below needs the
+    // seed off the front).
+    let qualifies = |i: usize, s: &Sample| {
+        if near_trenches {
+            s.flags & TRENCH == 0 && !on_front[i] && to_trench(i) <= reach
+        } else {
+            s.age_myr(t) > k.subduction_initiation_age_myr && to_trench(i) > clearance
+        }
     };
     let mut old: Vec<Vec<u32>> = vec![Vec::new(); state.plates.len()];
     for (i, s) in state.samples.iter().enumerate() {
-        if !s.is_hidden()
-            && s.kind != CONTINENTAL
-            && s.age_myr(t) > k.subduction_initiation_age_myr
-            && clear(i)
-        {
+        if !s.is_hidden() && s.kind != CONTINENTAL && qualifies(i, s) {
             old[state.plate_of(i) as usize].push(i as u32);
         }
     }
     let ids: Vec<u32> = state.alive().map(|p| p.id).collect();
+    // The hazard per qualifying sample and step. Fix C: the planet's expected initiations, rate ×
+    // the subduction zones' length (one lattice spacing per front sample, Earth-normalized km, as
+    // the plate check's `boundary_subduction_km` counts it against Bird 2003's 51,310 km) × the
+    // step, over the qualifying floor of the plates that can be drawn (ledger: PLT-692); else
+    // PLT-063, per Myr and A_0 of old floor.
+    let per_sample = if near_trenches {
+        let trench_km = trenches.len() as f64 * env.norm.km(env.norm.spacing_rad());
+        let floor: usize = ids
+            .iter()
+            .map(|&id| old[id as usize].len())
+            .filter(|&n| n >= 16)
+            .sum();
+        if floor == 0 {
+            return Ok(());
+        }
+        // Measurement: the length the hazard read × the step, summed over the run, so the
+        // realized initiations read against the rate × this sum (PLT-692).
+        *world
+            .globals
+            .entry(INITIATION_TRENCH_GLOBAL.to_owned())
+            .or_insert(0.0) += trench_km * env.dt_myr;
+        Some(near_trench_hazard(rate, trench_km, env.dt_myr, floor))
+    } else {
+        None
+    };
     // Subduction starts under compression (V1 gap 2's stage C2): the same weight with −σ, over
     // the plates' old floor. ledger: PLT-505
     let weights = if k.initiation_stress_mpa > 0.0 {
@@ -485,23 +575,26 @@ pub fn maybe_initiate_subduction(
         if o.len() < 16 {
             continue;
         }
-        // ledger: PLT-063 (per Myr, so the step's rate scales with its length)
-        let rate = k.subduction_initiation_per_myr * env.dt_myr;
-        let mut lambda = rate * o.len() as f64 * area / state.a0_km2;
+        // ledger: PLT-063, PLT-692 (per Myr, so the step's rate scales with its length)
+        let mut lambda = match per_sample {
+            Some(h) => h * o.len() as f64,
+            None => rate * env.dt_myr * o.len() as f64 * area / state.a0_km2,
+        };
         if let Some(w) = weights.as_ref().and_then(|w| w.get(&id)) {
             lambda *= w;
         }
         if state.rng.next_f64() < 1.0 - (-lambda).exp() {
-            if margin > 0.0 {
+            let n = state.plates.len();
+            let seed = if margin > 0.0 {
                 // The old floor within the margin of the plate's continental crust stays on the
                 // plate, and the fracture's seed is old floor beyond it; none, no initiation.
                 let near = near_continent(state, pos, id, margin);
                 let far: Vec<u32> = o.iter().copied().filter(|&i| !near[i as usize]).collect();
                 if far.is_empty() {
+                    state.counters.initiations_refused += 1;
                     continue;
                 }
                 let seed = far[state.rng.below(far.len() as u64) as usize];
-                let n = state.plates.len();
                 initiate(
                     state,
                     world,
@@ -512,21 +605,109 @@ pub fn maybe_initiate_subduction(
                     seed,
                     o,
                     Some(near.as_slice()),
+                    toward(seed),
                 )?;
-                if state.plates.len() > n && near_front(seed as usize) {
-                    state.counters.initiations_near_fronts += 1;
-                }
+                seed
             } else {
                 let seed = o[state.rng.below(o.len() as u64) as usize];
-                let n = state.plates.len();
-                initiate(state, world, geo, pos, env, id, seed, o, None)?;
-                if state.plates.len() > n && near_front(seed as usize) {
+                initiate(state, world, geo, pos, env, id, seed, o, None, toward(seed))?;
+                seed
+            };
+            if state.plates.len() == n {
+                // Drawn, but the fracture left too little on a side (`initiate`). Counted, so the
+                // realized rate can be read against the hazard (PLT-692).
+                state.counters.initiations_refused += 1;
+            } else {
+                if near_front(seed as usize) {
                     state.counters.initiations_near_fronts += 1;
+                }
+                // Where the new trench falls from the old ones, in Crameri et al. 2020's
+                // distance classes (measurement, PLT-690).
+                let d = env
+                    .norm
+                    .km(fracture_reach(state, geo, n as u32, id, &to_trench));
+                let c = &mut state.counters;
+                for (within, count) in [
+                    (250.0, &mut c.initiations_reach_250),
+                    (500.0, &mut c.initiations_reach_500),
+                    (1000.0, &mut c.initiations_reach_1000),
+                    (1500.0, &mut c.initiations_reach_1500),
+                ] {
+                    if d <= within {
+                        *count += 1;
+                    }
                 }
             }
         }
     }
     Ok(())
+}
+
+/// The foot of `q` on the trench nearest it (fix C, ledger PLT-690): the trench samples within
+/// `stencil` radians of the trench sample nearest `q` (`tree` is over `trenches`), fitted by
+/// their principal axis in the gnomonic projection about that sample (where a great circle is a
+/// straight line), and `q` dropped onto that line. The nearest sample alone would tilt the
+/// fracture by the lattice's offset along the trench, up to about atan(spacing / 2d) for a seed d
+/// from it. With one trench sample in the stencil, that sample.
+fn trench_foot(q: DVec3, trenches: &[DVec3], tree: &Tree, stencil: f64) -> Option<DVec3> {
+    let (j, _) = tree.nearest(q)?;
+    let p0 = trenches[j as usize];
+    let near = tree.within(p0, stencil);
+    if near.len() < 2 || q.dot(p0) <= 0.0 {
+        return Some(p0);
+    }
+    let e1 = p0.any_orthogonal_vector().normalize();
+    let e2 = p0.cross(e1);
+    let plane = |p: DVec3| {
+        let g = p / p.dot(p0) - p0;
+        (g.dot(e1), g.dot(e2))
+    };
+    let pts: Vec<(f64, f64)> = near
+        .iter()
+        .map(|&(i, _)| plane(trenches[i as usize]))
+        .collect();
+    let n = pts.len() as f64;
+    let (mx, my) = pts
+        .iter()
+        .fold((0.0, 0.0), |(a, b), &(x, y)| (a + x / n, b + y / n));
+    let (sxx, sxy, syy) = pts.iter().fold((0.0, 0.0, 0.0), |(a, b, c), &(x, y)| {
+        let (dx, dy) = (x - mx, y - my);
+        (a + dx * dx, b + dx * dy, c + dy * dy)
+    });
+    let theta = 0.5 * (2.0 * sxy).atan2(sxx - syy);
+    let (tx, ty) = (theta.cos(), theta.sin());
+    let (sx, sy) = plane(q);
+    let along = (sx - mx) * tx + (sy - my) * ty;
+    Some((p0 + (mx + along * tx) * e1 + (my + along * ty) * e2).normalize())
+}
+
+/// The planet's subduction-initiation hazard per qualifying sample and step with fix C (ledger
+/// PLT-692): `per_km_myr` × the active trench length (km) × the step (Myr) expected initiations,
+/// spread evenly over the `floor` qualifying samples of the plates that can be drawn.
+fn near_trench_hazard(per_km_myr: f64, trench_km: f64, dt_myr: f64, floor: usize) -> f64 {
+    per_km_myr * trench_km * dt_myr / floor as f64
+}
+
+/// The angle from a new plate's fracture to the nearest trench that was there before it
+/// (`to_trench`): the least over the new plate's visible samples with a visible lattice neighbour
+/// on its parent. Infinite with no fracture or no trench.
+fn fracture_reach(
+    state: &PlateState,
+    geo: &Geo,
+    new_id: u32,
+    parent: u32,
+    to_trench: &impl Fn(usize) -> f64,
+) -> f64 {
+    (0..state.samples.len())
+        .filter(|&i| {
+            state.plate_of(i) == new_id
+                && !state.samples[i].is_hidden()
+                && geo.edges(i as u32).any(|(u, _)| {
+                    state.plate_of(u as usize) == parent && !state.samples[u as usize].is_hidden()
+                })
+        })
+        .map(to_trench)
+        .fold(f64::INFINITY, f64::min)
 }
 
 /// The plate's visible oceanic samples within `margin` (radians, great circle) of its visible
@@ -562,6 +743,7 @@ fn initiate(
     seed: u32,
     old: &[u32],
     keep: Option<&[bool]>,
+    toward: Option<DVec3>,
 ) -> Result<(), CoreError> {
     let k = env.k;
     let norm = env.norm;
@@ -571,25 +753,32 @@ fn initiate(
         .filter(|&i| state.plate_of(i as usize) == id)
         .collect();
     let member = membership(&members, n);
-    let mut is_old = vec![false; n];
-    for &i in old {
-        is_old[i as usize] = true;
-    }
-    let young: DVec3 = members
-        .iter()
-        .filter(|&&i| !is_old[i as usize] && !state.samples[i as usize].is_hidden())
-        .map(|&i| pos[i as usize])
-        .sum();
     let c_old = pos[seed as usize];
-    let c_young = if young.length_squared() > 1e-12 {
-        young.normalize()
+    // Fix C (ledger PLT-690): the fracture is the bisector of the seed and its nearest trench,
+    // parallel to that trench halfway to the seed (Crameri et al. 2020's Table 1: ten of
+    // thirteen new trenches parallel to the old one at a normal offset, none along its strike).
+    let c_young = if let Some(p) = toward {
+        p
     } else {
-        // All old: split off the half around the seed, away from the farthest point.
-        members
+        let mut is_old = vec![false; n];
+        for &i in old {
+            is_old[i as usize] = true;
+        }
+        let young: DVec3 = members
             .iter()
+            .filter(|&&i| !is_old[i as usize] && !state.samples[i as usize].is_hidden())
             .map(|&i| pos[i as usize])
-            .max_by(|a, b| c_old.angle_between(*a).total_cmp(&c_old.angle_between(*b)))
-            .unwrap_or(-c_old)
+            .sum();
+        if young.length_squared() > 1e-12 {
+            young.normalize()
+        } else {
+            // All old: split off the half around the seed, away from the farthest point.
+            members
+                .iter()
+                .map(|&i| pos[i as usize])
+                .max_by(|a, b| c_old.angle_between(*a).total_cmp(&c_old.angle_between(*b)))
+                .unwrap_or(-c_old)
+        }
     };
     let noise_seed = state.rng.next_u64();
     let warp = k.rift_warp_rad;
@@ -1034,13 +1223,15 @@ pub(in crate::plates) mod tests {
     /// (the passive margin turned active, which PLT-067 meant to stop); on, no sample of the
     /// sinking plate lies within the arc's reach and a spacing of the continent, so the arc the
     /// new trench builds stands on ocean floor; with an arc reaching across the ocean there is no
-    /// initiation. ledger: PLT-503, PLT-067
+    /// initiation. The planet has no trench, so this is PLT-062's siting (fix C off; with it on,
+    /// nothing starts without a trench). ledger: PLT-503, PLT-067
     #[test]
     fn subduction_starts_off_the_passive_margin() {
         let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
         let cap = |p: DVec3| p.z > 0.5;
         let initiate_with = |offshore: bool, arc_km: f64, seed: u64| -> (PlateState, Vec<DVec3>) {
             let k = TectonicParams {
+                initiation_near_trenches: false,
                 subduction_initiation_per_myr: 100.0,
                 subduction_initiation_offshore: offshore,
                 arc_distance_km: arc_km,
@@ -1053,7 +1244,8 @@ pub(in crate::plates) mod tests {
             );
             let pos = positions(&state, &geo);
             let mut world = WorldState::new(1, 16_384, 0.0);
-            maybe_initiate_subduction(&mut state, &mut world, &geo, &pos, &env(&k), &[]).unwrap();
+            maybe_initiate_subduction(&mut state, &mut world, &geo, &pos, &env(&k), &[], &[])
+                .unwrap();
             (state, pos)
         };
         let points = geo.points();
@@ -1248,6 +1440,7 @@ pub(in crate::plates) mod tests {
                 seed,
                 &old,
                 None,
+                None,
             )
             .unwrap();
             assert_eq!(st.plates.len(), 2, "an initiation");
@@ -1309,6 +1502,7 @@ pub(in crate::plates) mod tests {
             seed,
             &old,
             None,
+            None,
         )
         .unwrap();
         assert_eq!(st.plates.len(), 3, "an initiation");
@@ -1324,5 +1518,213 @@ pub(in crate::plates) mod tests {
             crate::plates::inherit::tests::slab_of(&st, 2, 0).map(|s| s.km),
             Some(k.initiation_slab_km)
         );
+    }
+
+    /// The visible samples with a lattice neighbour on another plate.
+    fn fracture(st: &PlateState, geo: &Geo) -> Vec<usize> {
+        (0..N)
+            .filter(|&i| {
+                !st.samples[i].is_hidden()
+                    && geo
+                        .edges(i as u32)
+                        .any(|(u, _)| st.plate_of(u as usize) != st.plate_of(i))
+            })
+            .collect()
+    }
+
+    /// Crameri et al. 2020: "All SZI events start less than 1500 km away from other active
+    /// subduction zones and, in most cases, less than 500 km", and the subducting plates' mean
+    /// ages at initiation run from 31.7 to 117.4 Myr. A plate of floor 10 Myr old with a
+    /// subduction zone 2,200 km long on the equator: with fix C an initiation starts, its fracture
+    /// within half the reach of the trench (the bisector of a seed within reach and its foot on
+    /// the trench); off, floor that young never goes (PLT-062); with no subduction zone nothing
+    /// starts on, and samples flagged TRENCH with no front this step (a collision, an incipient
+    /// front, floor held under after its contact ended) are none. ledger: PLT-690, PLT-691,
+    /// PLT-692
+    #[test]
+    fn subduction_starts_near_trenches_at_any_age() {
+        let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let norm = Norm::new(6370.0, 6371.0, N);
+        let spacing = norm.spacing_rad();
+        let on_trench = |p: DVec3| p.z.asin().abs() < spacing && p.y.atan2(p.x).abs() < 0.17;
+        let run = |near: bool, flagged: bool, front: bool, seed: u64| {
+            let k = TectonicParams {
+                initiation_near_trenches: near,
+                subduction_initiation_per_trench_km_myr: 1.0,
+                subduction_initiation_per_myr: 100.0,
+                rift_warp_rad: 0.0,
+                ..Default::default()
+            };
+            let mut st = one_plate(&geo, seed, |p| {
+                let mut s = old_floor();
+                s.formed_myr = -10.0;
+                if flagged && on_trench(p) {
+                    s.flags |= TRENCH;
+                }
+                s
+            });
+            let pos = positions(&st, &geo);
+            let fronts: Vec<u32> = (0..N as u32)
+                .filter(|&i| front && on_trench(pos[i as usize]))
+                .collect();
+            let mut world = WorldState::new(1, 16_384, 0.0);
+            maybe_initiate_subduction(&mut st, &mut world, &geo, &pos, &env(&k), &[], &fronts)
+                .unwrap();
+            // The hazard's length, measured: one spacing per front sample × the step.
+            let read = world.globals.get(INITIATION_TRENCH_GLOBAL).copied();
+            let want = fronts.len() as f64 * norm.km(spacing) * env(&k).dt_myr;
+            if near && front {
+                let got = read.unwrap_or(0.0);
+                assert!((got - want).abs() < 1e-6 * want, "{got} km Myr, not {want}");
+            } else {
+                assert_eq!(read, None, "no fix C hazard read");
+            }
+            (st, pos)
+        };
+        let reach = norm.rad(TectonicParams::default().subduction_initiation_reach_km);
+        let points = geo.points();
+        let line = Tree::over(points, |i| on_trench(points[i]));
+        let to_trench = |p: DVec3| {
+            line.nearest(p)
+                .map_or(f64::INFINITY, |(_, d2)| angle_of_chord2(d2))
+        };
+        for seed in 1..=4 {
+            let (st, pos) = run(true, true, true, seed);
+            assert_eq!(st.plates.len(), 2, "seed {seed}: an initiation");
+            assert_eq!(st.counters.initiations, 1);
+            let closest = fracture(&st, &geo)
+                .into_iter()
+                .map(|i| to_trench(pos[i]))
+                .fold(f64::INFINITY, f64::min);
+            assert!(
+                closest <= reach / 2.0 + spacing,
+                "seed {seed}: the fracture {} km from the trench",
+                norm.km(closest)
+            );
+            assert_eq!(st.counters.initiations_reach_1000, 1);
+            assert_eq!(st.counters.initiations_refused, 0);
+            let (off, _) = run(false, true, true, seed);
+            assert_eq!(off.plates.len(), 1, "seed {seed}: off, young floor stays");
+            let (none, _) = run(true, false, false, seed);
+            assert_eq!(
+                none.plates.len(),
+                1,
+                "seed {seed}: no trench, no initiation"
+            );
+            let (rim, _) = run(true, true, false, seed);
+            assert_eq!(
+                rim.plates.len(),
+                1,
+                "seed {seed}: a TRENCH rim with no front this step, no initiation"
+            );
+        }
+    }
+
+    /// Crameri et al. 2020, Table 1: ten of the thirteen initiations since about 105 Ma lie at "a
+    /// normal offset, but otherwise parallel to the closest, pre-existing subduction trench", three
+    /// at an oblique one, none along its strike. With fix C the fracture is the bisector of the
+    /// seed and its foot on the nearest trench: a seed 6° north of a trench along the equator
+    /// splits the plate along 3° N, level with the trench (the young floor's centroid, the south
+    /// pole, would put it at 42° S). The trench sample nearest the seed alone tilts it by the
+    /// lattice's offset along the trench (7.7° here, the first version). ledger: PLT-690
+    #[test]
+    fn the_fracture_runs_parallel_to_the_nearest_trench() {
+        let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let spacing = Norm::new(6370.0, 6371.0, N).spacing_rad();
+        let k = TectonicParams {
+            rift_warp_rad: 0.0,
+            ..Default::default()
+        };
+        let mut st = one_plate(&geo, 3, |_| old_floor());
+        let pos = positions(&st, &geo);
+        let lat = |p: DVec3| p.z.asin();
+        let lon = |p: DVec3| p.y.atan2(p.x);
+        let closest = |q: DVec3| {
+            (0..N as u32)
+                .min_by(|&a, &b| {
+                    q.angle_between(pos[a as usize])
+                        .total_cmp(&q.angle_between(pos[b as usize]))
+                })
+                .unwrap()
+        };
+        let at = |lat: f64| DVec3::new(lat.to_radians().cos(), 0.0, lat.to_radians().sin());
+        let seed = closest(at(6.0));
+        // A trench along the equator: the samples within half a spacing of it, over 60° of
+        // longitude.
+        let trenches: Vec<DVec3> = pos
+            .iter()
+            .copied()
+            .filter(|&p| lat(p).abs() < 0.5 * spacing && p.x > 0.0 && lon(p).abs() < 0.52)
+            .collect();
+        let tree = Tree::over(&trenches, |_| true);
+        let foot = trench_foot(pos[seed as usize], &trenches, &tree, 3.0 * spacing).unwrap();
+        assert!(
+            lat(foot).abs() < 0.25 * spacing
+                && (lon(foot) - lon(pos[seed as usize])).abs() < 0.25 * spacing,
+            "the foot ({:.2}, {:.2}) of the seed ({:.2}, {:.2})",
+            lat(foot).to_degrees(),
+            lon(foot).to_degrees(),
+            lat(pos[seed as usize]).to_degrees(),
+            lon(pos[seed as usize]).to_degrees()
+        );
+        let old: Vec<u32> = (0..N as u32).filter(|&i| pos[i as usize].z > 0.0).collect();
+        let mut world = WorldState::new(1, 16_384, 0.0);
+        initiate(
+            &mut st,
+            &mut world,
+            &geo,
+            &pos,
+            &env(&k),
+            0,
+            seed,
+            &old,
+            None,
+            Some(foot),
+        )
+        .unwrap();
+        assert_eq!(st.plates.len(), 2, "an initiation");
+        let mid = (lat(pos[seed as usize]) + lat(foot)) / 2.0;
+        // The fracture's samples near the meridian (both sides of the split, each within an edge
+        // or two of it, so the line through them is the bisector): a least-squares line in
+        // latitude against longitude, level with the trench and halfway to the seed.
+        let near_meridian: Vec<(f64, f64)> = fracture(&st, &geo)
+            .into_iter()
+            .filter(|&i| pos[i].x > 0.0 && lon(pos[i]).abs() < 10f64.to_radians())
+            .map(|i| (lon(pos[i]), lat(pos[i])))
+            .collect();
+        assert!(near_meridian.len() >= 8, "{}", near_meridian.len());
+        let n = near_meridian.len() as f64;
+        let (mx, my) = near_meridian
+            .iter()
+            .fold((0.0, 0.0), |(a, b), &(x, y)| (a + x / n, b + y / n));
+        let (sxx, sxy) = near_meridian.iter().fold((0.0, 0.0), |(a, b), &(x, y)| {
+            (a + (x - mx) * (x - mx), b + (x - mx) * (y - my))
+        });
+        let slope = sxy / sxx;
+        let at_meridian = my - slope * mx;
+        assert!(
+            slope.atan().abs() < 3f64.to_radians() && (at_meridian - mid).abs() < 0.5 * spacing,
+            "the fracture at {:.2}° N on the meridian, tilted {:.2}°, against {:.2}° N: {:?}",
+            at_meridian.to_degrees(),
+            slope.atan().to_degrees(),
+            mid.to_degrees(),
+            near_meridian
+                .iter()
+                .map(|&(x, y)| format!("({:.2}, {:.2})", y.to_degrees(), x.to_degrees()))
+                .collect::<Vec<_>>()
+        );
+    }
+
+    /// Fix C's rate (ledger PLT-692): Crameri et al. 2020 count four newly destructive
+    /// initiations since about 105 Ma, against Bird 2003's 51,310 km of subduction zones; with
+    /// Earth's trench length a planet expects four in 105 Myr, however its qualifying floor is
+    /// shared out.
+    #[test]
+    fn the_initiation_hazard_is_the_trench_length_rate() {
+        let r = TectonicParams::default().subduction_initiation_per_trench_km_myr;
+        for floor in [16, 1_000, 9_999] {
+            let h = near_trench_hazard(r, 51_310.0, 105.0, floor);
+            assert!((h * floor as f64 - 4.0).abs() < 1e-9, "{floor}: {h}");
+        }
     }
 }

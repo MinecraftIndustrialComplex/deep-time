@@ -942,6 +942,11 @@ pub const CORDILLERA_GLOBAL: &str = "plates/cordillera_shortened_km3";
 pub struct Pull {
     /// Each plate's oceanic subduction front length, km (Earth-normalized; the dynamics record's).
     pub front_km: Vec<f64>,
+    /// This step's subduction zones: the overriding side's samples of the oceanic fronts past
+    /// incipient (PLT-610, PLT-681), the fronts the plate check counts as subducting boundary
+    /// against Bird 2003 (`boundary_subduction_km`). Fix C's active trenches: where subduction
+    /// initiation may start and how long the planet's trench is (ledger: PLT-691, PLT-692).
+    pub subducting_fronts: Vec<u32>,
     /// Arc crust this step added to continental crust, km³ (Earth-normalized; measurement, for
     /// the crust budget against Stern & Scholl 2010).
     pub arc_continental_km3: f64,
@@ -1491,6 +1496,7 @@ pub fn fronts_finish(
     };
     let mut info: Vec<Source> = Vec::new();
     let mut front_len = vec![0.0; state.plates.len()];
+    let mut subducting_fronts: Vec<u32> = Vec::new();
     let (mut front_continental, mut front_oceanic) = (0.0_f64, 0.0_f64);
     // The same two weighted by the convergence normal to the front (measurement: the mean v_n at
     // the arcs, PLT-665).
@@ -1598,6 +1604,9 @@ pub fn fronts_finish(
             if su.kind != CONTINENTAL {
                 let under = state.contacts[c].under as usize;
                 front_len[under] += front_km;
+                if !incipient_here {
+                    subducting_fronts.push(v as u32);
+                }
                 // The arc begins at its contact's first oceanic front past incipient (a sample
                 // too slow for a slab is not, PLT-681), and is young until the early pulse ends
                 // (ledger: PLT-669, PLT-670).
@@ -1973,6 +1982,7 @@ pub fn fronts_finish(
     let area = norm.sample_area_km2();
     Pull {
         front_km: front_len,
+        subducting_fronts,
         arc_continental_km3: arc_continental_m * area / 1000.0,
         arc_oceanic_km3: arc_oceanic_m * area / 1000.0,
         front_continental_km_myr: front_continental,
