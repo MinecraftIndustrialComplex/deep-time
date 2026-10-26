@@ -494,6 +494,7 @@ pub fn resolve(
                     cont_in: 0,
                     reversed: false,
                     carried: false,
+                    arc_onset_myr: None,
                 });
                 let k = state.contacts.len() - 1;
                 index.insert((lo, hi), k);
@@ -772,6 +773,8 @@ fn reverse(
     c.cont_in = 0;
     c.max_uplift_mm_yr = 0.0;
     c.andean = false;
+    // The new polarity's slab is new: its arc begins when it passes incipient (PLT-669).
+    c.arc_onset_myr = None;
     // A reversal a geologist could map is one of a subduction zone that was confirmed, counted
     // when the new polarity is confirmed in turn (`confirm`; measurement, ledger PLT-514).
     c.reversed = old.onset_event.is_some();
@@ -878,6 +881,51 @@ pub const FRONT_G_CONTINENTAL_NORMAL_GLOBAL: &str = "plates/arc_front_g_normal_c
 /// (measurement; ledger: PLT-665).
 pub const ARC_FRONT_NORMAL_CONTINENTAL_GLOBAL: &str = "plates/arc_front_normal_continental";
 pub const ARC_FRONT_NORMAL_OCEANIC_GLOBAL: &str = "plates/arc_front_normal_oceanic";
+/// World globals: the continental and the island arcs' fronts over the run (as
+/// [`ARC_FRONT_CONTINENTAL_GLOBAL`] and [`ARC_FRONT_OCEANIC_GLOBAL`]) whose arc is younger than
+/// [`ISLAND_ARC_BURST_MYR`] (its age from its contact's `arc_onset_myr`), km × Myr; whatever
+/// `arc_front_loaded` (measurement: the length the early pulse acts on, against S&S's arcs).
+/// ledger: PLT-670
+pub const ARC_FRONT_YOUNG_CONTINENTAL_GLOBAL: &str = "plates/arc_front_young_continental_km_myr";
+pub const ARC_FRONT_YOUNG_OCEANIC_GLOBAL: &str = "plates/arc_front_young_oceanic_km_myr";
+
+/// Front-loaded island arcs (`tectonics.arc_front_loaded`): the early pulse, km³ of new crust per
+/// km of arc per Myr, at any convergence … Stern & Scholl 2010, p. 11: intra-oceanic arc growth
+/// is "approximately 100 km3/km-million years (500 km3/million years for first 10 million years
+/// plus 30 km3/million years for 60 million years thereafter)"; the pulse is the arc's first
+/// years of slab sinking and forearc spreading, not its convergence. ledger: PLT-668
+pub const ISLAND_ARC_BURST_KM3_PER_KM_MYR: f64 = 500.0;
+/// … for the arc's first this many Myr from its onset (Stern & Scholl's "first 10 million
+/// years") …
+pub const ISLAND_ARC_BURST_MYR: f64 = 10.0;
+/// … and the mature arc's rate at Earth's mean orthogonal convergence of intra-oceanic arcs
+/// (`island_arc_convergence_ref_mm_yr`, PLT-666), scaled by its own (S&S's "30 km3/million
+/// years").
+pub const ISLAND_ARC_MATURE_KM3_PER_KM_MYR: f64 = 30.0;
+
+/// An island arc's crust per km of arc per Myr at its reference, and the factor on it, at arc age
+/// `age_myr` (from its contact's `arc_onset_myr`; `None` before the onset) and orthogonal
+/// convergence `v_n_mm_yr`: the rate is their product. Off (`arc_front_loaded`), the one rate
+/// `island_arc_km3_per_km_myr` × v_n / `island_arc_convergence_ref_mm_yr` (PLT-045, PLT-665,
+/// PLT-666) at every age; on, [`ISLAND_ARC_BURST_KM3_PER_KM_MYR`] with no factor while the arc
+/// is younger than [`ISLAND_ARC_BURST_MYR`], then [`ISLAND_ARC_MATURE_KM3_PER_KM_MYR`] ×
+/// v_n / the reference. The continental arcs keep their one rate either way: Stern & Scholl
+/// measured the pulse on intra-oceanic arcs. ledger: PLT-668
+pub fn island_arc_law(
+    k: &crate::params::TectonicParams,
+    age_myr: Option<f64>,
+    v_n_mm_yr: f64,
+) -> (f64, f64) {
+    let g = v_n_mm_yr / k.island_arc_convergence_ref_mm_yr;
+    if !k.arc_front_loaded {
+        return (k.island_arc_km3_per_km_myr, g);
+    }
+    match age_myr {
+        Some(a) if a < ISLAND_ARC_BURST_MYR => (ISLAND_ARC_BURST_KM3_PER_KM_MYR, 1.0),
+        _ => (ISLAND_ARC_MATURE_KM3_PER_KM_MYR, g),
+    }
+}
+
 /// World global: the oceanic fronts over the run by each front sample's share of the straight
 /// front, km × Myr, whatever `front_share` (measurement: the `arc_front_*` globals over this are
 /// the lattice's count of a front against its straight length while it is off). ledger: PLT-530
@@ -919,6 +967,9 @@ pub struct Pull {
     /// to the front, km × Myr × mm/yr: over them, the mean v_n of the continental and the island
     /// arcs' fronts (measurement; PLT-665).
     pub front_normal_km_myr: [f64; 2],
+    /// `front_continental_km_myr` and `front_oceanic_km_myr` whose arc is younger than
+    /// [`ISLAND_ARC_BURST_MYR`], km × Myr (measurement; PLT-670).
+    pub front_young_km_myr: [f64; 2],
     /// The oceanic slabs' arc bands this step by their length, km × Myr: the band's weight summed
     /// over the samples its fronts reach, times a sample's area, over the band's integral across
     /// the arc (√π · `arc_width_km`); a straight front's band gives its length (measurement;
@@ -1443,6 +1494,8 @@ pub fn fronts_finish(
     // The same two weighted by the convergence normal to the front (measurement: the mean v_n at
     // the arcs, PLT-665).
     let mut front_normal = [0.0_f64; 2];
+    // The same two whose arc is younger than the early pulse (measurement; PLT-670).
+    let mut front_young = [0.0_f64; 2];
     let front_km = norm.km(norm.spacing_rad());
     let arc_steps = (k.arc_distance_km / front_km).floor() as u32;
     // A front sample's length of front, km: its share of the straight front with `front_share`
@@ -1540,6 +1593,13 @@ pub fn fronts_finish(
             if su.kind != CONTINENTAL {
                 let under = state.contacts[c].under as usize;
                 front_len[under] += front_km;
+                // The arc begins at its contact's first oceanic front past incipient, and is
+                // young until the early pulse ends (ledger: PLT-669, PLT-670).
+                let arc_young = !young[c] && {
+                    let onset = *state.contacts[c].arc_onset_myr.get_or_insert(t_myr);
+                    t_myr - onset < ISLAND_ARC_BURST_MYR
+                };
+                let young_km_myr = if arc_young { len_km * env.dt_myr } else { 0.0 };
                 // Measurement only: by the crust the arc stands on, as the boundary mix counts it
                 // (ledger: PLT-370).
                 if continent_within(state, geo, v as u32, arc_steps, |u| {
@@ -1547,9 +1607,11 @@ pub fn fronts_finish(
                 }) {
                     front_continental += len_km * env.dt_myr;
                     front_normal[0] += len_km * env.dt_myr * across;
+                    front_young[0] += young_km_myr;
                 } else {
                     front_oceanic += len_km * env.dt_myr;
                     front_normal[1] += len_km * env.dt_myr * across;
+                    front_young[1] += young_km_myr;
                 }
             }
         }
@@ -1612,6 +1674,11 @@ pub fn fronts_finish(
                     continental_axis_m,
                     src.normal / k.continental_arc_convergence_ref_mm_yr,
                 )
+            } else if k.arc_front_loaded {
+                // The island arc's early pulse, then its mature rate, by the arc's age (PLT-668).
+                let age = contacts[src.contact].arc_onset_myr.map(|t0| t_myr - t0);
+                let (rate, g) = island_arc_law(k, age, src.normal);
+                (rate / band_km * 1000.0 * env.dt_myr, g)
             } else {
                 (
                     island_axis_m,
@@ -1910,6 +1977,7 @@ pub fn fronts_finish(
         front_g_continental_km_myr: g_continental_km_myr,
         front_straight_km_myr: straight_km_myr,
         front_normal_km_myr: front_normal,
+        front_young_km_myr: front_young,
         arc_band_km_myr: band_weight * area / band_km * env.dt_myr,
         forearcs: (erosion_rate > 0.0).then_some(Forearcs {
             loss_km3,
