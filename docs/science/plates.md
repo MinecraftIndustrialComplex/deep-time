@@ -9806,10 +9806,13 @@ initiations):
   FRC-004's weight at the trench floor's age × min(L, 700 km) / 700 km × max(cos θ, 0), where θ is
   the angle between the pull (towards O) and the margin's inward normal at the end of the stretch to
   break (towards U's continent), against the margin's strength there (PLT-658, below). A pull along
-  the coast does not break it.
+  the coast does not break it. The normal is taken across the margin's strike, the principal
+  direction of the coast floor within 2 spacings, where that floor reads as a line (PLT-659); a
+  point of the margin sees only one or two samples of its continent within 1.5 spacings, and the
+  direction to them alone tilted the test's tear 22° off the normal.
 - **The start (geometry A, the coordinator's choice).** The stretch's end P is U's coast floor within
   1.6 spacings of the trench sample, the farthest from U's trench. A tear runs from P along the
-  great circle away from the continent to the first sample of another plate. The continent C and the
+  great circle of the normal, away from the continent, to the first sample of another plate. The continent C and the
   floor beyond the tear become a new plate K' with U's motion (plate_birth, `origin`
   `margin_propagation`); U keeps the trench, the slab that pulls and the floor between the trench and
   the tear. The cut must leave K' in one piece, U with at most one piece more, at least

@@ -67,6 +67,14 @@ const TIP_SEARCH_SPACINGS: f64 = 2.0;
 /// The tear's step and its overhang at both ends, in lattice spacings. ledger: PLT-659
 /// (game-choice: the lattice's resolution)
 const TEAR_STEP_SPACINGS: f64 = 0.5;
+/// How far the margin's strike is read along its coast floor, in lattice spacings: within the
+/// border's 1.5 spacings a point of the margin sees one or two samples of its continent, too few
+/// for a direction. ledger: PLT-659 (game-choice: the lattice's resolution)
+const STRIKE_SPACINGS: f64 = 2.0;
+/// The coast floor reads as a line (a strike) when its variance along its principal direction is
+/// at least this many times its variance across it; a corner or a cape does not. ledger: PLT-659
+/// (game-choice: the lattice's resolution)
+const STRIKE_ANISOTROPY: f64 = 2.0;
 
 /// What a planned cut or advance found.
 enum Plan<T> {
@@ -166,6 +174,52 @@ impl<'a> View<'a> {
             }
         }
         (sum.length_squared() > 1e-24).then(|| sum.normalize())
+    }
+
+    /// The margin's inward normal at `x`, a unit tangent towards plate `pl`'s continent: across
+    /// the principal direction (the strike) of `pl`'s coast floor within [`STRIKE_SPACINGS`],
+    /// signed towards the continent within reach; where that floor is no line (fewer than three
+    /// samples, or a variance along under [`STRIKE_ANISOTROPY`] times the variance across), the
+    /// direction to the continent itself ([`View::toward`]). ledger: PLT-659
+    fn normal(&self, x: DVec3, pl: u32) -> Option<DVec3> {
+        let toward = self.toward(x, |j| self.land(j, pl))?;
+        let near: Vec<DVec3> = self
+            .vis
+            .within(x, STRIKE_SPACINGS * self.sp)
+            .into_iter()
+            .map(|(j, _)| j as usize)
+            .filter(|&j| self.coast[j] && self.plate[j] == pl)
+            .map(|j| tangent(x, self.pos[j] - x))
+            .collect();
+        if near.len() < 3 {
+            return Some(toward);
+        }
+        let e1 = tangent(x, if x.x.abs() < 0.9 { DVec3::X } else { DVec3::Y }).normalize();
+        let e2 = x.cross(e1);
+        let n = near.len() as f64;
+        let (mx, my) = near.iter().fold((0.0, 0.0), |a, t| {
+            (a.0 + t.dot(e1) / n, a.1 + t.dot(e2) / n)
+        });
+        let (mut sxx, mut syy, mut sxy) = (0.0, 0.0, 0.0);
+        for t in &near {
+            let (a, b) = (t.dot(e1) - mx, t.dot(e2) - my);
+            sxx += a * a;
+            syy += b * b;
+            sxy += a * b;
+        }
+        let half = 0.5 * (sxx + syy);
+        let dev = (0.25 * (sxx - syy) * (sxx - syy) + sxy * sxy).sqrt();
+        if half + dev < STRIKE_ANISOTROPY * (half - dev) {
+            return Some(toward);
+        }
+        let th = 0.5 * (2.0 * sxy).atan2(sxx - syy);
+        let strike = e1 * th.cos() + e2 * th.sin();
+        let across = x.cross(strike).normalize_or_zero();
+        let side = across.dot(toward);
+        if across == DVec3::ZERO || side.abs() < 1e-9 {
+            return Some(toward);
+        }
+        Some(if side > 0.0 { across } else { -across })
     }
 
     /// The nearest visible sample within `angle` of `x` that `of` selects (ties: the lower
@@ -478,7 +532,7 @@ fn plan_start(v: &View, env: &Env, u: u32) -> Plan<Cut> {
     let Some(p) = tip else {
         return Plan::None;
     };
-    let Some(inward) = v.toward(pos[p], |j| v.land(j, u)) else {
+    let Some(inward) = v.normal(pos[p], u) else {
         return Plan::None;
     };
     let drive = v
@@ -582,7 +636,7 @@ fn carry_on(v: &View, env: &Env, pr: &mut Propagation) -> Option<(Plan<Advance>,
         .min_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)))
         .map(|(i, _)| i as usize)?;
     let x = pos[tip];
-    let inward = v.toward(x, |j| v.land(j, kp))?;
+    let inward = v.normal(x, kp)?;
     let omega = |p: u32| DVec3::from_array(st.plates[p as usize].omega);
     let conv = env.norm.velocity_mm_yr(omega(u) - omega(kp), x).dot(inward);
     pr.converged_km += conv.max(0.0) * env.dt_myr;
@@ -629,7 +683,7 @@ fn plan_advance(v: &View, env: &Env, kp: u32, u: u32, tip: usize, u_near: usize)
     let Some(p) = end else {
         return Plan::Stall;
     };
-    let Some(inward) = v.toward(pos[p], |j| v.land(j, kp)) else {
+    let Some(inward) = v.normal(pos[p], kp) else {
         return Plan::Stall;
     };
     let cont = v.continent(p, kp);
@@ -910,9 +964,9 @@ mod tests {
         }
         for (i, c) in cells.iter().enumerate() {
             if *c == Cell::Floor
-                && geo.edges(i as u32).any(|(j, _)| {
-                    matches!(cells[j as usize], Cell::Slab | Cell::Over)
-                })
+                && geo
+                    .edges(i as u32)
+                    .any(|(j, _)| matches!(cells[j as usize], Cell::Slab | Cell::Over))
             {
                 st.samples[i].flags |= TRENCH;
             }
@@ -979,38 +1033,6 @@ mod tests {
         st
     }
 
-    /// Prints the plates around the junction (debugging).
-    fn map(st: &PlateState, pos: &[DVec3]) {
-        let mut la = 6.0;
-        while la > -44.0 {
-            let mut row = String::new();
-            let mut lo = -24.0;
-            while lo < 44.0 {
-                let (a, b) = (f64::to_radians(la), f64::to_radians(lo));
-                let x = DVec3::new(a.cos() * b.cos(), a.cos() * b.sin(), a.sin());
-                let i = (0..pos.len())
-                    .min_by(|&i, &j| x.distance(pos[i]).total_cmp(&x.distance(pos[j])))
-                    .unwrap();
-                let s = &st.samples[i];
-                let c = match (st.plate_of(i), s.kind == CONTINENTAL, s.is_hidden()) {
-                    (U, _, true) => 'h',
-                    (U, true, _) => 'L',
-                    (U, _, _) if s.flags & TRENCH != 0 => 't',
-                    (U, _, _) => '.',
-                    (KP, true, _) => 'C',
-                    (KP, _, true) => 'k',
-                    (KP, _, _) => 'K',
-                    (O, _, _) => 'o',
-                    _ => 'x',
-                };
-                row.push(c);
-                lo += 1.6;
-            }
-            eprintln!("{la:6.1} {row}");
-            la -= 1.6;
-        }
-    }
-
     /// Each plate is one lattice piece and every sample's plate is alive.
     fn clean(st: &PlateState, geo: &Geo) {
         let plate: Vec<u32> = (0..N).map(|i| st.plate_of(i)).collect();
@@ -1038,12 +1060,8 @@ mod tests {
         assert_eq!(st.counters.plate_births, 1);
         assert_eq!(st.counters.propagation_stalls, 0);
         assert_eq!(st.propagations.len(), 1);
-        assert_eq!(
-            (st.propagations[0].under, st.propagations[0].over),
-            (U, KP)
-        );
+        assert_eq!((st.propagations[0].under, st.propagations[0].over), (U, KP));
         let sp = Norm::new(6370.0, 6371.0, N).spacing_rad().to_degrees();
-        map(&st, &pos);
         let mut tear_lon: Vec<f64> = Vec::new();
         for (i, &x) in pos.iter().enumerate() {
             let (la, lo) = lat_lon(x);
@@ -1158,10 +1176,12 @@ mod tests {
         let k_before = st.plates[KP as usize].samples;
         step(&mut st, &mut world, &geo, &pos, &e).unwrap();
         let pr = &st.propagations[0];
-        assert_eq!(pr.advances, 0, "one step is short of the critical convergence");
+        assert_eq!(
+            pr.advances, 0,
+            "one step is short of the critical convergence"
+        );
         assert!((pr.converged_km - 76.0).abs() < 8.0, "{}", pr.converged_km);
         step(&mut st, &mut world, &geo, &pos, &e).unwrap();
-        map(&st, &pos);
         assert_eq!(st.propagations.len(), 1, "the propagation goes on");
         let pr = &st.propagations[0];
         assert_eq!(pr.advances, 1, "advanced once");
@@ -1170,12 +1190,20 @@ mod tests {
         assert_eq!(st.counters.propagation_stalls, 0);
         assert_eq!(st.plates.len(), 4, "no new plate");
         let k_after = st.plates[KP as usize].samples;
-        assert!(k_after < k_before, "K' gave U floor: {k_before} → {k_after}");
+        // A strip about a spacing wide from the margin to U's southern boundary, 40° away.
+        assert!(
+            k_before - k_after >= 15,
+            "K' gave U a strip of floor: {k_before} → {k_after}"
+        );
         let tip1 = DVec3::from_array(pr.tip);
         let (_, lo0) = lat_lon(tip0);
         let (_, lo1) = lat_lon(tip1);
         eprintln!("tip from {lo0:.2}° to {lo1:.2}° E; K' {k_before} → {k_after} samples");
-        assert!(lo1 > lo0, "the tip moved east along the margin");
+        let sp = e.norm.spacing_rad().to_degrees();
+        assert!(
+            lo1 - lo0 > 0.5 * sp && lo1 - lo0 < 2.5 * sp,
+            "the tip moved about a spacing east along the margin"
+        );
         for (i, s) in st.samples.iter().enumerate() {
             if s.kind == CONTINENTAL {
                 assert_eq!(st.plate_of(i), KP);
