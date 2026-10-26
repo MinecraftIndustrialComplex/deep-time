@@ -1143,7 +1143,9 @@ pub struct TectonicParams {
     /// `forsyth_uyeda_balance`, and the starting plates' speeds (PLT-273). 75 since 2026-10-26,
     /// calibrated against CHK-020: at 45 the area-weighted RMS speed was 28.2 mm/yr (base16); on
     /// a linear scaling 45 × 47 / 28.2 = 75 aims at Forsyth & Uyeda's 47 for Earth today. On the
-    /// pool (arm sp-v75) it gave 42.3, inside CHK-020's 40 to 100. Ledger PLT-181.
+    /// pool, alone (arm sp-v75), it gave 42.3 but PLT-022 bound in 3 of 8 runs on stale fronts in
+    /// the force balance; with PLT-582 reaching the balance (arm fx582-v75) it gives 44.4, inside
+    /// CHK-020's 40 to 100, and PLT-022 binds in none. Ledger PLT-181.
     pub plate_speed_scale_mm_yr: f64,
     /// Slab pull, relative strength (1 = the reference pull, `forces::SLAB_PULL_N_M`). PLT-182.
     pub slab_pull: f64,
