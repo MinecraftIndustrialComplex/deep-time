@@ -755,7 +755,10 @@ mod tests {
     #[test]
     fn the_open_floor_line_is_globsed_less_its_pore_water() {
         let thin = solid_of_in_place_m(1.0e-3);
-        assert!((thin / 1.0e-3 - (1.0 - OCEAN_SEDIMENT_POROSITY)).abs() < 1e-6, "{thin}");
+        assert!(
+            (thin / 1.0e-3 - (1.0 - OCEAN_SEDIMENT_POROSITY)).abs() < 1e-6,
+            "{thin}"
+        );
         let thick = 50_000.0 - solid_of_in_place_m(50_000.0);
         let most = OCEAN_SEDIMENT_POROSITY * OCEAN_SEDIMENT_DECAY_M;
         assert!((thick - most).abs() < 1e-6 * most, "{thick} {most}");
