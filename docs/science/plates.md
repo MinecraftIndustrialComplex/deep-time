@@ -10042,6 +10042,69 @@ not noise in the test). The amendment and the motion fix are on by default; the 
 45 in params.rs and every built-in preset, and branch `speed-scale-75-parked` keeps the 75 (PLT-181,
 PLT-022). The arm that decides the amendment is read at 45 on master's A and B below.
 
+**The arm on master's A and B** (the coordinator's rule of 2026-10-26: the amendment and the motion
+fix at 45, on master's A and B). `fx582-m19`: this branch merged with master (f182f189 and the
+decisions commit 9d7b190b; key b28aff01c5a7, argkey cd665cef, no `--set`), `earthlike_quick_16k`,
+both starts, seeds 1 to 4, 1,000 Myr, 2 threads, `+DEEPTIME_CRUST_BUDGET=1
++DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`. It was read against base19-s4, which is the M5 lane's arm
+`isl-ab` (the same key 155590e13591, argkey and runs), with `pool.sh table --base isl-ab --arm
+fx582-m19` (`v1census`, `guard` after `pool.sh measure --measures guard`, and the M5 lane's `islab`
+with `--registry tools/review/islfront/measures_islab.json`) and the lane's readers. Medians and
+exact Mann-Whitney p:
+
+| Measure | base19-s4 (8) | fx582-m19 (8) | p |
+|---|---|---|---|
+| CHK-020 RMS plate speed, mm/yr (40 to 100) | 26.4 | 26.6 (25.5 to 27.5) | 1.0 |
+| CHK-028 plate-steps over 150 mm/yr, % | 0.000 | 0.000 | |
+| PLT-022's guard, steps that bind | 0 in all 8 | 0 in all 8 | |
+| ocean floor's mean age, Myr (Earth 64) | 132.4 | 143.0 | 0.083 |
+| floor older than 180 Myr (Earth 0.006) | 0.263 | 0.295 | 0.105 |
+| floor older than 250 Myr | 0.171 | 0.199 | 0.130 |
+| A/C0, Myr | 144.8 | 150.5 | 0.130 |
+| the fastest plate centroid, mm/yr | 133.2 | 125.9 | 0.130 |
+| slab plates' speed over free plates' | 3.129 | 3.306 | 0.065 |
+| plates at the end | 23.5 | 24.0 | 0.64 |
+| collisions per 100 Myr | 4.90 | 4.85 | 0.87 |
+
+The guard is clean: PLT-022 bound in no run, the relief guard's worst 10,067 against 10,010 m (p
+0.88), no step beyond 2 Earth reliefs, the largest excess over Airy 2,301 against 2,616 m (p 0.083).
+Nothing moved at p < 0.05. At 45 the amendment leaves the speed where it was and the floor about 10
+Myr older (p 0.083), with the island subducting front 4 % shorter (below).
+
+The stale pull: the pull beyond the law's most on the current front (4.5 × 10¹³ N/m) fell from 2.5 %
+of all pull on base19-s4 to 0.2 %, the plate-steps past that most from 5.7 % to 0.9 %, and the pull
+on plate-steps with no current front from 1.9 % to 1.0 %.
+
+The census, medians with p: land 0.248 to 0.244 (0.88), the largest landmass 0.093 to 0.105 (0.44),
+continental crust under the sea 0.395 to 0.406 (0.80), land above 2 km 0.027 to 0.031 (0.80), coast
+with high ground 0.139 to 0.106 (0.65; its target at most 0.11), land under ice 0.066 to 0.050
+(0.57), the crust's net change −0.059 to −0.056 (1.0), criteria met (median, mean) 6 and 6.12 to 6
+and 6.38 (0.46).
+
+Speeds by class (area-weighted RMS, mm/yr): slab plates 58.5 to 61.5 (area 0.05), plates in a
+collision 24.2 to 24.1 (0.92), free plates 23.2 to 20.7 (0.03); big plates 21.6 to 21.6, mid 34.8 to
+35.2, small 43.2 to 42.9; oceanic 37.6 to 37.6, at least 30 % continental 20.6 to 20.8. A and B
+already moved most plates out of the slab class (its area 0.13 on base18-s4, 0.05 on base19-s4).
+
+The fast fronts: the ocean-continent front converging faster than 80 mm/yr 20.3 % to 20.7 %, the
+ocean-ocean front 6.9 % to 7.2 %, the front of plates whose centroid moves faster than 80 mm/yr
+6.0 % to 7.0 %. Earth's side by `earthvel.py` at the arm's level (×0.565, 26.6 / 47.1): 0.0 % of
+Earth's subduction front that is not an island arc converges faster than 80 mm/yr, and 6.2 % of its
+island arcs. The planet's fast ocean-continent front stays far above Earth's at a matched level; its
+fast ocean-ocean front is about Earth's island arcs'.
+
+The island fronts (`islab`): island and continental subducting front 30,363 and 24,249 km per step
+to 29,192 and 23,704; the incipient share of the island front 0.405 to 0.437 (by the thermal floor
+alone 0.312 to 0.350); contacts maturing per 100 Myr 55.4 to 54.0 (p 0.44), at a front v_n of 21.7 to
+20.2 mm/yr. A, B and `matured` now stand on current-geometry fronts, and they count about as before:
+the stale fronts were a few per cent of them.
+
+The crust budget, means over the 8 runs, km³/yr: island arcs 1.06 to 1.04 and continental arcs 0.48
+to 0.46, sediment subduction 0.81 to 0.80, subduction erosion 0.37 to 0.37, the suturing zones 1.30
+to 1.22 (Earth 0.7), the net change of the continental volume −1.26 to −1.31, the continental crust
+at the end 0.366 to 0.367; the island-arc front 46.4k to 48.1k km, the continental-arc front 22.8k to
+22.6k, the collision front 8,275 to 8,268 km.
+
 ## The overriding plate's share (PLT-652, 2026-10-25)
 
 The collision-front diagnosis (build log 2026-10-25, "Front lane: what sets the crust added per km of
