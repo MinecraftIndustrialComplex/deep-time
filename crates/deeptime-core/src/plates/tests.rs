@@ -5376,7 +5376,10 @@ fn cumulative_convergence_ends_the_incipient_stage() {
 #[test]
 fn a_ridge_under_compression_resists_less() {
     let g = forces::G_EARTH;
-    let on = crate::params::TectonicParams::default();
+    let on = crate::params::TectonicParams {
+        incipient_resistance_by_thickness: true,
+        ..crate::params::TectonicParams::default()
+    };
     let off = crate::params::TectonicParams {
         incipient_resistance_by_thickness: false,
         ..on.clone()
@@ -5401,7 +5404,11 @@ fn a_ridge_under_compression_resists_less() {
     eprintln!("the incipient resistance: floor 5 Myr old {ridge:.4e} N, 80 Myr {old:.4e} N");
     assert!(old > 0.0);
     let want = forces::INCIPIENT_RIDGE_N_M
-        / forces::incipient_resistance_n_m(&on, forces::SLAB_AGE_REF_MYR, g);
+        / forces::incipient_resistance_n_m(
+            &crate::params::TectonicParams::default(),
+            forces::SLAB_AGE_REF_MYR,
+            g,
+        );
     assert!(
         (ridge / old - want).abs() < 1e-9,
         "{} of the old floor's",
@@ -5762,4 +5769,33 @@ fn a_deferred_collision_leaves_both_plates_to_the_balance() {
         frozen.len(),
         &frozen[..frozen.len().min(20)]
     );
+}
+
+/// Why law 2's propagations end (PLT-656; the floor-age lane, 2026-10-26): arm fl-law2 had as
+/// many propagation events as starts in all 8 runs (no advance) and about nine stalls per start.
+/// One planet of the pool's preset (`LAW2_DIAG_START`, default the scattered continents;
+/// `LAW2_DIAG_SEED`, default 1; `LAW2_DIAG_MYR`, default 200), the plate stage alone; prints the
+/// counters and `propagation::TALLY` (why starts stall, why live propagations wait or end), and
+/// with `LAW2_DIAG_TRACE` set each start and visit with a sketch of the lattice around the tip.
+/// What it showed: U keeps a wedge of floor one or two spacings wide at the tip, its slab takes
+/// it down within a step or two, and U's crust leaves the tip long before 100 km of convergence.
+#[test]
+#[ignore = "diagnosis: 200 Myr at 100k samples; run with --release -- --ignored --nocapture"]
+fn why_law_2_propagations_end() {
+    let var = |k: &str| std::env::var(k).ok();
+    let start = var("LAW2_DIAG_START").unwrap_or_else(|| "scattered_continents".to_owned());
+    let seed: u64 = var("LAW2_DIAG_SEED").map_or(1, |x| x.parse().unwrap());
+    let myr: f64 = var("LAW2_DIAG_MYR").map_or(200.0, |x| x.parse().unwrap());
+    let mut p = builtin_preset("earthlike_quick_16k", 100_000, myr, &start, seed);
+    p.tectonics.margin_propagation = true;
+    p.tectonics.incipient_resistance_by_thickness = true;
+    let world = run_stage(&p, |_, _, _| {});
+    let c = &world.plates.as_ref().unwrap().counters;
+    eprintln!(
+        "{start} seed {seed}, {myr} Myr: starts {}, events {}, stalls {}, initiations near fronts {}",
+        c.propagation_starts, c.propagations, c.propagation_stalls, c.initiations_near_fronts
+    );
+    for (name, n) in propagation::TALLY_NAMES.iter().zip(&propagation::TALLY) {
+        eprintln!("  {name}: {}", n.load(std::sync::atomic::Ordering::Relaxed));
+    }
 }

@@ -1035,7 +1035,10 @@ pub struct TectonicParams {
     /// cut, under the same force test, moves the next stretch of the margin's floor from K' to U.
     /// The rule replaces PLT-064's clearance: with it on, a new subduction initiation keeps one
     /// lattice spacing from a front, not `subduction_initiation_clearance_km` (Crameri et al.
-    /// 2020: most initiations start within 500 km of another subduction zone). ledger: PLT-656
+    /// 2020: most initiations start within 500 km of another subduction zone). Off by default
+    /// (parked 2026-10-26, the coordinator's call): under these starts and the 100 km gate it
+    /// never advances in the sim, so it does not do the sourced process; off, PLT-064's 1,000 km
+    /// holds. ledger: PLT-656
     pub margin_propagation: bool,
     /// Law 3: the resistance an incipient subduction zone pushes against scales with the elastic
     /// thickness of the floor going under (Gurnis, Hall & Lavier 2004 [46]: the force to start
@@ -1043,7 +1046,8 @@ pub struct TectonicParams {
     /// 8.5 km to 15 km, anchored on their Case 1 peak of 3 × 10¹² N/m for 30 Myr floor, [59]),
     /// with the model's elastic thickness law (ISO-048, ISO-049). It replaces PLT-612's single
     /// 2.5 × 10¹² N/m above the ridge floor (PLT-613, kept) and scales law 2's margin strength.
-    /// Off, PLT-612 as before. ledger: PLT-657
+    /// Off, PLT-612 as before. Off by default: built inside law 2's stage and parked with it
+    /// (2026-10-26). ledger: PLT-657
     pub incipient_resistance_by_thickness: bool,
     /// Subduction initiation off the passive margin (V1 gap 2's stage C1): the old floor within
     /// the reach of the arc the new trench builds (`arc_distance_km` + `arc_width_km`, and one
@@ -1273,15 +1277,15 @@ impl Default for TectonicParams {
             subduction_initiation_age_myr: 150.0,
             subduction_initiation_per_myr: 0.15, // ledger: PLT-063
             subduction_initiation_clearance_km: 1000.0,
-            initiation_slab_km: 150.0,               // ledger: PLT-270
-            incipient_subduction: true,              // ledger: PLT-610 (on since 2026-10-25)
-            initiation_polarity_by_age: true,        // ledger: PLT-655
-            margin_propagation: true,                // ledger: PLT-656
-            incipient_resistance_by_thickness: true, // ledger: PLT-657
-            subduction_initiation_offshore: true,    // ledger: PLT-503 (on since 2026-10-23)
+            initiation_slab_km: 150.0,                // ledger: PLT-270
+            incipient_subduction: true,               // ledger: PLT-610 (on since 2026-10-25)
+            initiation_polarity_by_age: true,         // ledger: PLT-655
+            margin_propagation: false, // ledger: PLT-656 (parked 2026-10-26: no advance)
+            incipient_resistance_by_thickness: false, // ledger: PLT-657 (parked with law 2)
+            subduction_initiation_offshore: true, // ledger: PLT-503 (on since 2026-10-23)
             initiation_stress_mpa: 20.0, // ledger: PLT-505 (game-choice; on since 2026-10-23)
-            transference: false,         // ledger: PLT-516
-            contact_timeout_myr: 24.0,   // ledger: PLT-059
+            transference: false,       // ledger: PLT-516
+            contact_timeout_myr: 24.0, // ledger: PLT-059
             collision_orogeny_myr: 30.0,
             l1_every_steps: 0,
             forsyth_uyeda_balance: false, // ledger: PLT-585 (built 2026-10-25, off)

@@ -10,14 +10,15 @@
 //! margin's strength, the margin breaks: the continent C and the floor beyond a tear from the end
 //! of the broken stretch to U's next boundary become a new plate K', and U, which keeps the slab
 //! that pulls, converges on K' along the broken stretch. Each further critical convergence there
-//! (`forces::INCIPIENT_SLAB_KM`, 100 km), under the same force test with the new margin's own
-//! slab, breaks the next stretch of K''s margin floor and moves it to U.
+//! (`forces::INCIPIENT_SLAB_KM`, 100 km), under the same force test with U's slab beside the tip
+//! (the new margin's own, or U's slab under the plate that took U's floor at the tip down),
+//! breaks the next stretch of K''s margin floor and moves it to U.
 //!
 //! # The force test
 //! The pull across the margin ([`forces::margin_pull_n_m`]) is the slab pull per metre of the
 //! slab that hangs beside the stretch (FRC-002, FRC-004: its length, its floor's age) times the
-//! cosine between the direction it pulls (towards the overriding plate at the start, across the
-//! broken stretch later) and the inward normal of the stretch to break. The strength
+//! cosine between the direction it pulls (across U's trench, towards the plate over the slab)
+//! and the inward normal of the stretch to break. The strength
 //! ([`forces::margin_strength_n_m`]) is the fallback of PLT-658: PLT-517's 3 × 10¹² N/m scaled
 //! with the floor's elastic thickness by law 3 (PLT-657). No source read gives a verified
 //! integrated strength of a passive margin, and under this one the propagation does not depend
@@ -57,6 +58,132 @@ pub const KM_GLOBAL: &str = "plates/propagation_km";
 /// ratio).
 pub const MYR_GLOBAL: &str = "plates/propagation_myr";
 
+/// Diagnosis (tests only, `plates::tests::why_law_2_propagations_end`): why starts stall, why
+/// live propagations wait or end, why advances stall. Indices into [`TALLY_NAMES`].
+const T_START_STALL: usize = 0;
+const T_START_TEAR: usize = 8;
+const T_START_NO_FLOOR: usize = 9;
+const T_END_DEAD: usize = 10;
+#[cfg(test)]
+const T_END_NO_KP: usize = 11;
+#[cfg(test)]
+const T_END_NO_COAST: usize = 12;
+#[cfg(test)]
+const T_END_NO_U: usize = 13;
+const T_END_NORMAL: usize = 14;
+const T_END_U_NEAR: usize = 15;
+const T_WAIT_CONV: usize = 16;
+const T_WAIT_PULL: usize = 17;
+const T_ADV_NO_END: usize = 18;
+const T_ADV_NORMAL: usize = 19;
+const T_ADV_TEAR: usize = 20;
+const T_ADV_STALL: usize = 21;
+const T_ADV_GO: usize = 27;
+const T_VISIT: usize = 28;
+#[cfg(test)]
+pub(super) const TALLY_NAMES: [&str; 29] = [
+    "start stall: e or P not on U",
+    "start stall: a continent sample not on K'",
+    "start stall: K' in more than one piece",
+    "start stall: more pieces than before plus one",
+    "start stall: K' below the minimum",
+    "start stall: U below the minimum",
+    "start stall: no stretch",
+    "start stall: the stretch reaches past P",
+    "start stall: no tear",
+    "start made a K' with no visible floor",
+    "end: U or K' died",
+    "end: no K' sample within 2 spacings of the carried tip",
+    "end: K' there, but no K' coast floor",
+    "end: K' coast floor there, but none with U's crust within reach",
+    "end: no normal at the tip",
+    "end: no U crust within reach at the force test",
+    "wait: convergence under 100 km",
+    "wait: pull under the strength",
+    "advance stall: no stretch end",
+    "advance stall: no normal at the end",
+    "advance stall: no tear",
+    "advance stall: the tip not moved",
+    "advance stall: K' below the minimum",
+    "advance stall: K' in more pieces",
+    "advance stall: U in more pieces",
+    "advance stall: no stretch",
+    "advance stall: the stretch reaches past P'",
+    "advances",
+    "visits (tip found)",
+];
+#[cfg(test)]
+pub(super) static TALLY: [std::sync::atomic::AtomicU32; 29] =
+    [const { std::sync::atomic::AtomicU32::new(0) }; 29];
+
+fn tally(_i: usize) {
+    #[cfg(test)]
+    TALLY[_i].fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Diagnosis (tests only): the samples within about 7 spacings of `c`, visible ones left and
+/// hidden ones right, in a tangent frame (east right, north up). U: floor `u` (a trench `T`),
+/// land `U`, hidden `h`; K': floor `k`, land `C`, hidden `x`; others: floor `o`, land `O`,
+/// hidden `.`; the centre `@`.
+#[cfg(test)]
+fn sketch(st: &PlateState, pos: &[DVec3], c: DVec3, sp: f64, u: u32, kp: u32) -> String {
+    const R: i32 = 9;
+    const CELL: f64 = 0.8;
+    let east = DVec3::Z.cross(c).normalize_or(DVec3::X);
+    let north = c.cross(east);
+    let w = (2 * R + 1) as usize;
+    let mut grid = vec![vec![(f64::INFINITY, ' '); 2 * w]; w];
+    for (i, &p) in pos.iter().enumerate() {
+        if p.angle_between(c) > (R as f64 + 1.0) * CELL * sp {
+            continue;
+        }
+        let (x, y) = (
+            (p - c).dot(east) / sp / CELL,
+            (p - c).dot(north) / sp / CELL,
+        );
+        let (cx, cy) = (x.round() as i32, y.round() as i32);
+        if cx.abs() > R || cy.abs() > R {
+            continue;
+        }
+        let s = &st.samples[i];
+        let pl = st.plate_of(i);
+        let land = s.kind == CONTINENTAL;
+        let ch = match (pl == u, pl == kp, s.is_hidden(), land) {
+            (true, _, true, _) => 'h',
+            (true, _, false, true) => 'U',
+            (true, _, false, false) if s.flags & TRENCH != 0 => 'T',
+            (true, _, false, false) => 'u',
+            (_, true, true, _) => 'x',
+            (_, true, false, true) => 'C',
+            (_, true, false, false) => 'k',
+            (_, _, true, _) => '.',
+            (_, _, false, true) => 'O',
+            _ => 'o',
+        };
+        let d = (x - cx as f64).hypot(y - cy as f64);
+        let col = (cx + R) as usize + if s.is_hidden() { w } else { 0 };
+        let cell = &mut grid[(R - cy) as usize][col];
+        if d < cell.0 {
+            *cell = (d, ch);
+        }
+    }
+    grid[R as usize][R as usize].1 = '@';
+    grid.iter()
+        .map(|row| {
+            let (a, b) = row.split_at(w);
+            format!(
+                "    {} | {}\n",
+                a.iter().map(|c| c.1).collect::<String>(),
+                b.iter().map(|c| c.1).collect::<String>()
+            )
+        })
+        .collect()
+}
+
+/// Diagnosis (tests only): how many propagations have been sketched.
+#[cfg(test)]
+static SKETCHED: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
 /// How far beyond "near" the start's stretch may reach from the trench, in lattice spacings:
 /// the broken stretch at a start is the coast floor within this of the trench sample, one
 /// lattice step along the margin. ledger: PLT-659 (game-choice: the lattice's resolution)
@@ -71,6 +198,11 @@ const TEAR_STEP_SPACINGS: f64 = 0.5;
 /// border's 1.5 spacings a point of the margin sees one or two samples of its continent, too few
 /// for a direction. ledger: PLT-659 (game-choice: the lattice's resolution)
 const STRIKE_SPACINGS: f64 = 2.0;
+/// How far a trench's strike is read along its trench samples from the trench sample nearest the
+/// margin, in lattice spacings: twice the margin's [`STRIKE_SPACINGS`], since that sample is at
+/// the trench's end and sees its trench on one side only. ledger: PLT-659 (game-choice: the
+/// lattice's resolution)
+const TRENCH_STRIKE_SPACINGS: f64 = 2.0 * STRIKE_SPACINGS;
 /// The coast floor reads as a line (a strike) when its variance along its principal direction is
 /// at least this many times its variance across it; a corner or a cape does not. ledger: PLT-659
 /// (game-choice: the lattice's resolution)
@@ -177,22 +309,33 @@ impl<'a> View<'a> {
     }
 
     /// The margin's inward normal at `x`, a unit tangent towards plate `pl`'s continent: across
-    /// the principal direction (the strike) of `pl`'s coast floor within [`STRIKE_SPACINGS`],
-    /// signed towards the continent within reach; where that floor is no line (fewer than three
-    /// samples, or a variance along under [`STRIKE_ANISOTROPY`] times the variance across), the
-    /// direction to the continent itself ([`View::toward`]). ledger: PLT-659
+    /// the strike of `pl`'s coast floor ([`View::across`]), signed towards the continent within
+    /// reach ([`View::toward`]). ledger: PLT-659
     fn normal(&self, x: DVec3, pl: u32) -> Option<DVec3> {
         let toward = self.toward(x, |j| self.land(j, pl))?;
+        Some(self.across(
+            x,
+            STRIKE_SPACINGS,
+            |j| self.coast[j] && self.plate[j] == pl,
+            toward,
+        ))
+    }
+
+    /// The unit tangent at `x` across the principal direction (the strike) of the visible
+    /// samples `line` selects within `window` lattice spacings, signed towards `toward` (a unit
+    /// tangent); `toward` itself where they are no line (fewer than three samples, or a variance
+    /// along under [`STRIKE_ANISOTROPY`] times the variance across). ledger: PLT-659
+    fn across(&self, x: DVec3, window: f64, line: impl Fn(usize) -> bool, toward: DVec3) -> DVec3 {
         let near: Vec<DVec3> = self
             .vis
-            .within(x, STRIKE_SPACINGS * self.sp)
+            .within(x, window * self.sp)
             .into_iter()
             .map(|(j, _)| j as usize)
-            .filter(|&j| self.coast[j] && self.plate[j] == pl)
+            .filter(|&j| line(j))
             .map(|j| tangent(x, self.pos[j] - x))
             .collect();
         if near.len() < 3 {
-            return Some(toward);
+            return toward;
         }
         let e1 = tangent(x, if x.x.abs() < 0.9 { DVec3::X } else { DVec3::Y }).normalize();
         let e2 = x.cross(e1);
@@ -210,16 +353,16 @@ impl<'a> View<'a> {
         let half = 0.5 * (sxx + syy);
         let dev = (0.25 * (sxx - syy) * (sxx - syy) + sxy * sxy).sqrt();
         if half + dev < STRIKE_ANISOTROPY * (half - dev) {
-            return Some(toward);
+            return toward;
         }
         let th = 0.5 * (2.0 * sxy).atan2(sxx - syy);
         let strike = e1 * th.cos() + e2 * th.sin();
         let across = x.cross(strike).normalize_or_zero();
         let side = across.dot(toward);
         if across == DVec3::ZERO || side.abs() < 1e-9 {
-            return Some(toward);
+            return toward;
         }
-        Some(if side > 0.0 { across } else { -across })
+        if side > 0.0 { across } else { -across }
     }
 
     /// The nearest visible sample within `angle` of `x` that `of` selects (ties: the lower
@@ -403,6 +546,7 @@ pub fn step(
     for mut pr in live {
         let alive = |p: u32| state.plates.get(p as usize).is_some_and(|x| x.alive);
         if !alive(pr.under) || !alive(pr.over) {
+            tally(T_END_DEAD);
             continue;
         }
         let (plan, tip) = {
@@ -416,6 +560,7 @@ pub fn step(
             continue;
         };
         *world.globals.entry(MYR_GLOBAL.to_owned()).or_insert(0.0) += env.dt_myr;
+        tally(T_VISIT);
         pr.tip = tip.to_array();
         match plan {
             Plan::None => {}
@@ -424,6 +569,7 @@ pub fn step(
                 continue;
             }
             Plan::Go(adv) => {
+                tally(T_ADV_GO);
                 // The tip moves to the broken stretch's end.
                 apply_advance(state, world, pos, env, &mut pr, &adv);
                 changed = true;
@@ -490,9 +636,8 @@ fn plan_start(v: &View, env: &Env, u: u32) -> Plan<Cut> {
         return Plan::None;
     }
     let coast_tree = Tree::over(pos, |i| v.coast[i] && v.plate[i] == u);
-    let trench_tree = Tree::over(pos, |i| {
-        v.plate[i] == u && st.samples[i].flags & TRENCH != 0 && v.floor(i, u)
-    });
+    let is_trench = |i: usize| st.samples[i].flags & TRENCH != 0 && v.floor(i, u);
+    let trench_tree = Tree::over(pos, is_trench);
     let mut cands: Vec<(f64, usize)> = trench
         .iter()
         .filter_map(|&e| {
@@ -535,9 +680,13 @@ fn plan_start(v: &View, env: &Env, u: u32) -> Plan<Cut> {
     let Some(inward) = v.normal(pos[p], u) else {
         return Plan::None;
     };
-    let drive = v
+    // The slab pulls U's floor across U's trench towards O: across the trench's strike at e,
+    // signed towards O's visible samples there (alone, those lean towards the side past the
+    // trench's end, where no hidden slab lies over O's edge). ledger: PLT-659
+    let to_o = v
         .toward(pos[e], |j| v.visible(j, o))
         .unwrap_or_else(|| tangent(pos[e], pos[o_at] - pos[e]).normalize_or_zero());
+    let drive = v.across(pos[e], TRENCH_STRIKE_SPACINGS, is_trench, to_o);
     let cos = drive.dot(inward);
     let age_e = st.samples[e].age_myr(t);
     let age_p = st.samples[p].age_myr(t);
@@ -549,6 +698,7 @@ fn plan_start(v: &View, env: &Env, u: u32) -> Plan<Cut> {
     // The cut: the continent and the floor beyond the tear go to K'.
     let cont = v.continent(p, u);
     let Some(tear) = v.tear(p, -inward, u, e) else {
+        tally(T_START_TEAR);
         return Plan::Stall;
     };
     let mut on_u = vec![false; n];
@@ -587,18 +737,20 @@ fn plan_start(v: &View, env: &Env, u: u32) -> Plan<Cut> {
                 })
         })
         .collect();
-    let clean = lab[e] == 1
-        && lab[p] == 1
-        && (0..n).all(|i| !cont[i] || lab[i] == 0)
-        && n0 == 1
-        && n0 + n1 <= before + 1
-        && split.len() >= min
-        && stays >= min
-        && !stretch.is_empty()
-        && stretch
+    let fails = [
+        lab[e] != 1 || lab[p] != 1,
+        (0..n).any(|i| cont[i] && lab[i] != 0),
+        n0 != 1,
+        n0 + n1 > before + 1,
+        split.len() < min,
+        stays < min,
+        stretch.is_empty(),
+        stretch
             .iter()
-            .all(|&i| pos[i].angle_between(pos[e]) <= reach_stretch);
-    if !clean {
+            .any(|&i| pos[i].angle_between(pos[e]) > reach_stretch),
+    ];
+    if let Some(f) = fails.iter().position(|&x| x) {
+        tally(T_START_STALL + f);
         return Plan::Stall;
     }
     Plan::Go(Cut {
@@ -613,63 +765,156 @@ fn plan_start(v: &View, env: &Env, u: u32) -> Plan<Cut> {
     })
 }
 
-/// Carries on propagation `pr` (PLT-656): finds its tip (K''s coast floor beside U nearest the
-/// tip it carried), adds the step's convergence of U on K' across the margin there, and plans
-/// an advance once that reaches the critical convergence and the new margin's slab pulls across
-/// the next stretch harder than its strength. None: the propagation has ended (no tip).
+/// Carries on propagation `pr` (PLT-656): finds its tip (K''s coast floor beside U's crust,
+/// visible or hidden, nearest the tip it carried), adds the step's convergence of U on K' across
+/// the margin there, and plans an advance once that reaches the critical convergence and U's slab
+/// beside the tip pulls across the next stretch harder than its strength. None: the propagation
+/// has ended (no tip).
+///
+/// U's crust beside the tip counts hidden too: where the trench meets the margin at an angle,
+/// U keeps a wedge of floor between the trench and the tear that is narrow at the tip, and its
+/// slab takes that floor down within a step or two; the slab still hangs from U there. The slab
+/// that pulls is U's under the plate that covers U's crust nearest the tip: K' (the new margin's
+/// own slab) where that crust is visible, the plate over it where it is hidden. ledger: PLT-656
 fn carry_on(v: &View, env: &Env, pr: &mut Propagation) -> Option<(Plan<Advance>, DVec3)> {
     let k = env.k;
     let t = env.t_myr;
     let (st, pos) = (v.st, v.pos);
     let (u, kp) = (pr.under, pr.over);
     let carried = DVec3::from_array(pr.tip);
+    let u_crust = Tree::over(pos, |i| v.plate[i] == u);
+    let u_beside = |x: DVec3| {
+        u_crust
+            .nearest(x)
+            .filter(|&(_, d2)| angle_of_chord2(d2) <= v.reach)
+            .map(|(j, _)| j as usize)
+    };
     let tip = v
         .vis
         .within(carried, TIP_SEARCH_SPACINGS * v.sp)
         .into_iter()
         .filter(|&(i, _)| {
             let i = i as usize;
-            v.coast[i]
-                && v.plate[i] == kp
-                && v.nearest(pos[i], v.reach, |j| v.visible(j, u)).is_some()
+            v.coast[i] && v.plate[i] == kp && u_beside(pos[i]).is_some()
         })
         .min_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)))
-        .map(|(i, _)| i as usize)?;
+        .map(|(i, _)| i as usize);
+    #[cfg(test)]
+    if std::env::var_os("LAW2_DIAG_TRACE").is_some() {
+        // In spacings from the carried tip: the nearest sample of each kind (all samples).
+        let d = |of: &dyn Fn(usize) -> bool| {
+            (0..pos.len())
+                .filter(|&j| of(j))
+                .map(|j| pos[j].angle_between(carried) / v.sp)
+                .fold(f64::INFINITY, f64::min)
+        };
+        let hid = |j: usize| st.samples[j].is_hidden();
+        eprintln!(
+            "law2 t {t:.0} U {u} K' {kp} age {:.0} conv {:.0} km, step {} resampled {}: tip {} | U vis {:.2} hid {:.2}, K' coast {:.2} floor {:.2} land {:.2} hid {:.2}, other {:.2}",
+            t - pr.born_myr,
+            pr.converged_km,
+            st.step,
+            st.resample_step,
+            tip.is_some(),
+            d(&|j| v.plate[j] == u && !hid(j)),
+            d(&|j| v.plate[j] == u && hid(j)),
+            d(&|j| v.plate[j] == kp && v.coast[j]),
+            d(&|j| v.floor(j, kp)),
+            d(&|j| v.land(j, kp)),
+            d(&|j| v.plate[j] == kp && hid(j)),
+            d(&|j| v.plate[j] != kp && v.plate[j] != u && !hid(j)),
+        );
+        if SKETCHED.fetch_add(1, std::sync::atomic::Ordering::Relaxed) < 24 {
+            eprint!("{}", sketch(st, pos, carried, v.sp, u, kp));
+        }
+    }
+    let Some(tip) = tip else {
+        #[cfg(test)]
+        {
+            let near = v.vis.within(carried, TIP_SEARCH_SPACINGS * v.sp);
+            let of_kp = |i: u32| v.plate[i as usize] == kp;
+            tally(if !near.iter().any(|&(i, _)| of_kp(i)) {
+                T_END_NO_KP
+            } else if !near.iter().any(|&(i, _)| of_kp(i) && v.coast[i as usize]) {
+                T_END_NO_COAST
+            } else {
+                T_END_NO_U
+            });
+        }
+        return None;
+    };
     let x = pos[tip];
-    let inward = v.normal(x, kp)?;
+    let Some(inward) = v.normal(x, kp) else {
+        tally(T_END_NORMAL);
+        return None;
+    };
     let omega = |p: u32| DVec3::from_array(st.plates[p as usize].omega);
     let conv = env.norm.velocity_mm_yr(omega(u) - omega(kp), x).dot(inward);
     pr.converged_km += conv.max(0.0) * env.dt_myr;
     if pr.converged_km < INCIPIENT_SLAB_KM {
+        tally(T_WAIT_CONV);
         return Some((Plan::None, x));
     }
-    let u_near = v.nearest(x, v.reach, |j| v.visible(j, u))?;
+    let Some(u_near) = u_beside(x) else {
+        tally(T_END_U_NEAR);
+        return None;
+    };
+    let over = if st.samples[u_near].is_hidden() {
+        v.nearest(pos[u_near], PI, |j| v.plate[j] != u)
+            .map_or(kp, |j| v.plate[j])
+    } else {
+        kp
+    };
     let slab_km = st
         .slabs
         .iter()
-        .find(|s| s.under == u && s.over == kp && !s.latent)
+        .find(|s| s.under == u && s.over == over && !s.latent)
         .map_or(0.0, |s| s.km);
-    let cos = v
-        .toward(pos[u_near], |j| v.land(j, kp))
-        .map_or(0.0, |w| w.dot(inward));
+    // Under K' it pulls across the broken stretch, towards K''s continent; under another plate,
+    // across U's trench there towards that plate, as at the start.
+    let drive = if over == kp {
+        v.toward(pos[u_near], |j| v.land(j, kp))
+    } else {
+        v.toward(pos[u_near], |j| v.visible(j, over)).map(|w| {
+            let is_trench = |j: usize| st.samples[j].flags & TRENCH != 0 && v.floor(j, u);
+            v.across(pos[u_near], TRENCH_STRIKE_SPACINGS, is_trench, w)
+        })
+    };
+    let cos = drive.map_or(0.0, |w| w.dot(inward));
     let pull = forces::margin_pull_n_m(k, slab_km, st.samples[u_near].age_myr(t), cos, env.gravity);
     let strength = forces::margin_strength_n_m(k, st.samples[tip].age_myr(t), env.gravity);
+    #[cfg(test)]
+    if std::env::var_os("LAW2_DIAG_TRACE").is_some() {
+        eprintln!(
+            "law2 FORCE U {u} K' {kp}: U crust at {:.2} sp (hidden {}), over {over}, slab {slab_km:.0} km, cos {cos:.2}, pull {pull:.2e}, strength {strength:.2e}",
+            pos[u_near].angle_between(x) / v.sp,
+            st.samples[u_near].is_hidden()
+        );
+    }
     if pull < strength {
+        tally(T_WAIT_PULL);
         return Some((Plan::None, x));
     }
-    Some((plan_advance(v, env, kp, u, tip, u_near), x))
+    Some((plan_advance(v, env, kp, u, tip, u_near, &u_crust), x))
 }
 
 /// Plans an advance: the stretch's end P' is K''s coast floor within [`START_REACH_SPACINGS`]
-/// of the tip, the farthest from U (one lattice step along the margin, as at the start); K''s
-/// floor from the tip to a tear from P' away from the continent goes to U, P' with it
-/// (PLT-656).
-fn plan_advance(v: &View, env: &Env, kp: u32, u: u32, tip: usize, u_near: usize) -> Plan<Advance> {
+/// of the tip, the farthest from U's crust, visible or hidden (`u_crust`; one lattice step along
+/// the margin, as at the start); K''s floor from the tip to a tear from P' away from the
+/// continent goes to U, P' with it (PLT-656).
+fn plan_advance(
+    v: &View,
+    env: &Env,
+    kp: u32,
+    u: u32,
+    tip: usize,
+    u_near: usize,
+    u_crust: &Tree,
+) -> Plan<Advance> {
     let (st, pos) = (v.st, v.pos);
     let n = st.samples.len();
-    let u_tree = Tree::over(pos, |i| v.visible(i, u));
     let to_u = |i: usize| {
-        u_tree
+        u_crust
             .nearest(pos[i])
             .map_or(f64::INFINITY, |(_, d2)| angle_of_chord2(d2))
     };
@@ -681,13 +926,16 @@ fn plan_advance(v: &View, env: &Env, kp: u32, u: u32, tip: usize, u_near: usize)
         .filter(|&i| v.coast[i] && v.plate[i] == kp)
         .max_by(|&a, &b| to_u(a).total_cmp(&to_u(b)).then(b.cmp(&a)));
     let Some(p) = end else {
+        tally(T_ADV_NO_END);
         return Plan::Stall;
     };
     let Some(inward) = v.normal(pos[p], kp) else {
+        tally(T_ADV_NORMAL);
         return Plan::Stall;
     };
     let cont = v.continent(p, kp);
     let Some(tear) = v.tear(p, -inward, kp, u_near) else {
+        tally(T_ADV_TEAR);
         return Plan::Stall;
     };
     let mut moved = vec![false; n];
@@ -722,15 +970,18 @@ fn plan_advance(v: &View, env: &Env, kp: u32, u: u32, tip: usize, u_near: usize)
     let k_after = count_pieces(v.geo, &lab, kp, |i| lab[i] == kp);
     let u_after = count_pieces(v.geo, &lab, u, |i| lab[i] == u);
     let reach_stretch = pos[p].angle_between(pos[tip]) + 0.75 * v.sp;
-    let clean = moved[tip]
-        && left >= min_samples(env, n)
-        && k_after <= k_before
-        && u_after <= u_before
-        && !stretch.is_empty()
-        && stretch
+    let fails = [
+        !moved[tip],
+        left < min_samples(env, n),
+        k_after > k_before,
+        u_after > u_before,
+        stretch.is_empty(),
+        stretch
             .iter()
-            .all(|&i| pos[i].angle_between(pos[tip]) <= reach_stretch);
-    if !clean {
+            .any(|&i| pos[i].angle_between(pos[tip]) > reach_stretch),
+    ];
+    if let Some(f) = fails.iter().position(|&x| x) {
+        tally(T_ADV_STALL + f);
         return Plan::Stall;
     }
     Plan::Go(Advance {
@@ -787,6 +1038,25 @@ fn apply_start(
         } else {
             ages += s.age_myr(t);
             oceanic += 1;
+        }
+    }
+    if oceanic == 0 {
+        tally(T_START_NO_FLOOR);
+    }
+    #[cfg(test)]
+    if std::env::var_os("LAW2_DIAG_TRACE").is_some() {
+        eprintln!(
+            "law2 START t {t:.0} U {u} K' {new_id}: split {} (visible {vis}, land {cont}, floor {oceanic}), U had {}, stretch {}, tear {:.2} sp",
+            cut.split.len(),
+            parent.samples,
+            cut.stretch,
+            cut.tear_rad / norm.spacing_rad()
+        );
+        if SKETCHED.load(std::sync::atomic::Ordering::Relaxed) < 24 {
+            eprint!(
+                "{}",
+                sketch(state, pos, pos[cut.tip], norm.spacing_rad(), u, new_id)
+            );
         }
     }
     let c = c.normalize_or(pos[cut.tip]);
@@ -905,6 +1175,15 @@ mod tests {
     /// The age of the test floor, Myr.
     const AGE: f64 = 80.0;
     const T: f64 = 2.0;
+
+    /// Law 2 on, with law 3 inside it (both off by default since 2026-10-26, PLT-656).
+    fn law2() -> TectonicParams {
+        TectonicParams {
+            margin_propagation: true,
+            incipient_resistance_by_thickness: true,
+            ..TectonicParams::default()
+        }
+    }
 
     fn env(k: &TectonicParams) -> Env<'_> {
         Env {
@@ -1025,6 +1304,16 @@ mod tests {
         }
     }
 
+    /// As [`across`], with U's slab hidden under O's edge along the trench (to 3° N) and none
+    /// past the trench's end: O's visible samples near the end lie past it, to the north-east,
+    /// but the slab pulls U's floor north, across its trench, along the coast.
+    fn across_slab(la: f64, lo: f64) -> Cell {
+        match across(la, lo) {
+            Cell::Over if lo < 2.0 && la < 3.0 => Cell::Slab,
+            c => c,
+        }
+    }
+
     fn start(geo: &Geo, layout: fn(f64, f64) -> Cell, k: &TectonicParams, slab: f64) -> PlateState {
         let mut st = build(geo, layout, slab);
         let pos = positions(&st, geo);
@@ -1049,7 +1338,7 @@ mod tests {
     #[test]
     fn a_trench_that_reaches_its_margin_cuts_it_off() {
         let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
-        let k = TectonicParams::default();
+        let k = law2();
         let mut st = build(&geo, in_line, 300.0);
         let pos = positions(&st, &geo);
         let mut world = WorldState::new(1, 16_384, 0.0);
@@ -1122,22 +1411,25 @@ mod tests {
     }
 
     /// The pull acts across the margin only (cos θ, PLT-656): where the trench meets the margin
-    /// at a right angle and the slab pulls U's floor along the coast, nothing starts. The switch
-    /// off, nothing starts; a slab short of the critical convergence (PLT-611) starts nothing;
+    /// at a right angle and the slab pulls U's floor along the coast, nothing starts, also where
+    /// the slab hides O's edge along the trench, so O's visible samples near its end lie past it
+    /// (the slab pulls across its trench's strike, PLT-659). The switch off, nothing starts; a slab short of the critical convergence (PLT-611) starts nothing;
     /// and a slab past it starts only once its pull beats the margin (PLT-658 with law 3 at 80
     /// Myr: 5.9e12 N/m, which a full 3e13 × L / 700 km pull reaches at L = 138 km).
     #[test]
     fn a_pull_along_the_margin_or_a_short_slab_starts_nothing() {
         let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
-        let k = TectonicParams::default();
-        let side = start(&geo, across, &k, 600.0);
-        assert!(
-            side.plates.len() == 3 && side.counters.propagation_starts == 0,
-            "a pull along the margin started a propagation"
-        );
+        let k = law2();
+        for layout in [across, across_slab] {
+            let side = start(&geo, layout, &k, 600.0);
+            assert!(
+                side.plates.len() == 3 && side.counters.propagation_starts == 0,
+                "a pull along the margin started a propagation"
+            );
+        }
         let off = TectonicParams {
             margin_propagation: false,
-            ..TectonicParams::default()
+            ..law2()
         };
         assert_eq!(start(&geo, in_line, &off, 300.0).plates.len(), 3);
         assert_eq!(start(&geo, in_line, &k, 60.0).plates.len(), 3);
@@ -1153,7 +1445,7 @@ mod tests {
     #[test]
     fn the_convergence_moves_the_tip_along_the_margin() {
         let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
-        let k = TectonicParams::default();
+        let k = law2();
         let e = env(&k);
         let mut st = build(&geo, in_line, 300.0);
         let pos = positions(&st, &geo);
@@ -1220,12 +1512,79 @@ mod tests {
         assert_eq!(away.propagations.len(), 1);
     }
 
+    /// U's floor beside the tip gone down (hidden, as where the trench meets the margin at an
+    /// angle and U's slab takes the narrow wedge of floor at the tip down within a step): the tip
+    /// still finds U's crust beside it, and the propagation carries on and advances under U's
+    /// slab there as it does with that floor visible (PLT-656).
+    #[test]
+    fn a_tip_beside_u_s_slab_carries_on() {
+        let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let k = law2();
+        let e = env(&k);
+        let mut st = build(&geo, in_line, 300.0);
+        let pos = positions(&st, &geo);
+        let mut world = WorldState::new(1, 16_384, 0.0);
+        step(&mut st, &mut world, &geo, &pos, &e).unwrap();
+        assert_eq!(st.plates.len(), 4);
+        let speed = e.norm.omega_of_speed(40.0);
+        let l0 = 20f64.to_radians();
+        st.plates[U as usize].omega = [speed * l0.sin(), -speed * l0.cos(), 0.0];
+        for p in [O, X, KP] {
+            st.plates[p as usize].omega = [0.0; 3];
+        }
+        st.slabs.push(SlabTrack {
+            under: U,
+            over: KP,
+            km: 300.0,
+            ..SlabTrack::default()
+        });
+        let tip0 = DVec3::from_array(st.propagations[0].tip);
+        let sp = e.norm.spacing_rad();
+        let plate: Vec<u32> = (0..N).map(|i| st.plate_of(i)).collect();
+        let mut hidden = 0;
+        for (i, s) in st.samples.iter_mut().enumerate() {
+            if plate[i] == U && !s.is_hidden() && pos[i].angle_between(tip0) < 2.5 * sp {
+                s.flags |= HIDDEN;
+                hidden += 1;
+            }
+        }
+        assert!(hidden >= 5, "{hidden} samples of U's floor hidden");
+        let nearest_visible_u = (0..N)
+            .filter(|&i| plate[i] == U && !st.samples[i].is_hidden())
+            .map(|i| pos[i].angle_between(tip0) / sp)
+            .fold(f64::INFINITY, f64::min);
+        assert!(nearest_visible_u > 2.4, "{nearest_visible_u}");
+        let k_before = st.plates[KP as usize].samples;
+        step(&mut st, &mut world, &geo, &pos, &e).unwrap();
+        assert_eq!(st.propagations.len(), 1, "the propagation carries on");
+        assert_eq!(st.propagations[0].advances, 0);
+        step(&mut st, &mut world, &geo, &pos, &e).unwrap();
+        assert_eq!(st.propagations.len(), 1, "the propagation goes on");
+        let pr = &st.propagations[0];
+        assert_eq!(pr.advances, 1, "advanced once");
+        assert_eq!(st.counters.propagation_stalls, 0);
+        let k_after = st.plates[KP as usize].samples;
+        assert!(
+            k_before - k_after >= 15,
+            "K' gave U a strip of floor: {k_before} → {k_after}"
+        );
+        let (_, lo0) = lat_lon(tip0);
+        let (_, lo1) = lat_lon(DVec3::from_array(pr.tip));
+        let sp_deg = sp.to_degrees();
+        eprintln!("tip from {lo0:.2}° to {lo1:.2}° E; K' {k_before} → {k_after} samples");
+        assert!(
+            lo1 - lo0 > 0.5 * sp_deg && lo1 - lo0 < 3.5 * sp_deg,
+            "the tip moved east along the margin"
+        );
+        clean(&st, &geo);
+    }
+
     /// K' absorbed (the burial at a resampling, `ridges::bury`, below the minimum plate area):
     /// the propagation ends with it, and no sample is left on a dead plate or cut off its plate.
     #[test]
     fn an_absorbed_sliver_ends_its_propagation_cleanly() {
         let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
-        let k = TectonicParams::default();
+        let k = law2();
         let mut st = build(&geo, in_line_small, 300.0);
         let pos = positions(&st, &geo);
         let mut world = WorldState::new(1, 16_384, 0.0);
@@ -1240,7 +1599,7 @@ mod tests {
         let big = TectonicParams {
             min_plate_area_frac: f64::from(sizes[KP as usize]) / N as f64 * 1.01,
             plate_fission: false,
-            ..TectonicParams::default()
+            ..law2()
         };
         crate::plates::ridges::bury(
             &mut st,

@@ -2259,7 +2259,10 @@ mod tests {
         // The model's Te at 10 Myr is √(10/30) of 30 Myr's.
         assert!((thickness_scale(10.0) - (10.0f64 / 30.0).sqrt().powf(n)).abs() < 1e-12);
         assert!((thickness_scale(400.0) - thickness_scale(250.0)).abs() < 1e-12);
-        let on = TectonicParams::default();
+        let on = TectonicParams {
+            incipient_resistance_by_thickness: true,
+            ..TectonicParams::default()
+        };
         let off = TectonicParams {
             incipient_resistance_by_thickness: false,
             ..on.clone()
