@@ -124,10 +124,33 @@ pub fn due(state: &PlateState, env: &Env) -> bool {
     drift_km >= k.resample_drift_km
 }
 
+/// The old sample of cover `c` (a footprint of the group with rotation `rot` in the old lattice
+/// `geo`) nearest the mantle-frame direction `q`: of the cover's corners with a weight (the
+/// group's own), the one at the least angle from `q` in the group's frame. A resampled sample
+/// takes its categorical labels from it (`interpolate`): the material at `q` is the material of
+/// the old sample whose cell holds it, not of the corner with the largest barycentric weight,
+/// whose region in a triangle that is not equilateral is not the corner's cell (ledger: PLT-664).
+fn nearest_corner(geo: &Geo, c: &Cover, rot: DQuat, q: DVec3) -> u32 {
+    let local = rot.inverse() * q;
+    let pts = geo.points();
+    let mut best = c.major();
+    let mut best_dot = pts[best as usize].dot(local);
+    for k in 0..3 {
+        if c.w[k] > 0.0 {
+            let d = pts[c.tri[k] as usize].dot(local);
+            if d > best_dot {
+                (best, best_dot) = (c.tri[k], d);
+            }
+        }
+    }
+    best
+}
+
 /// Interpolates a sample from a cover of the old crust; vectors come out in the mantle frame,
-/// which is the new lattice's frame (every group starts unrotated).
-fn interpolate(src: &[Sample], c: &Cover, rot: DQuat) -> Sample {
-    let m = c.major();
+/// which is the new lattice's frame (every group starts unrotated). `m` is the old sample nearest
+/// the new point (`nearest_corner`): the sample's kind, its class and every other categorical
+/// label are `m`'s, and the blends below run over the corners of `m`'s class (ledger: PLT-664).
+fn interpolate(src: &[Sample], c: &Cover, rot: DQuat, m: u32) -> Sample {
     let mut s = src[m as usize];
     let corners = c.tri.map(|v| &src[v as usize]);
     let w = c.w;
@@ -135,14 +158,14 @@ fn interpolate(src: &[Sample], c: &Cover, rot: DQuat) -> Sample {
         (0..3).map(|k| w[k] * f64::from(f(corners[k]))).sum::<f64>() as f32
     };
     s.elevation_m = lerp(&|x| x.elevation_m);
-    // The corners of the sample's own kind and their weight (the major corner is one of them).
+    // The corners of the sample's own kind and their weight (the nearest corner is one of them).
     let same_kind: f64 = (0..3)
         .filter(|&k| corners[k].kind == s.kind)
         .map(|k| w[k])
         .sum();
     // The corners of the sample's own class, the kind and, on continental crust, whether it is
     // hyper-extended (under 10 km of its own crystalline crust, Brune et al. 2014), and their
-    // weight; the major corner is one of them, so the weight is never 0. A blend over a class is
+    // weight; the nearest corner is one of them, so the weight is never 0. A blend over a class is
     // a convex mean of columns on one side of the 10 km line, and stays on that side. Blending a
     // converted margin's columns (PLT-661: an ocean basement under a thin continental crust) with
     // the core's put 10 km or more of the core's crust into them at a resampling: they stopped
@@ -731,19 +754,26 @@ pub fn resample(
     // its corners' blended with its own weights, its floor the blended surface before the
     // accretion (new sea floor's are set with the gaps below).
     let mut limits: Vec<[f32; 3]> = vec![[f32::INFINITY, 0.0, f32::INFINITY]; n];
+    // A cover of group `g` interpolated at the new point `q`, its labels from the old sample
+    // nearest `q` (ledger: PLT-664).
+    let interp = |g: u32, c: &Cover, q: DVec3| {
+        let rot = rots[g as usize];
+        interpolate(src, c, rot, nearest_corner(old, c, rot, q))
+    };
     let mut samples: Vec<Sample> = found
         .par_iter()
         .zip(plate_new.par_iter_mut())
         .zip(tally.par_iter_mut())
         .zip(traces.par_iter_mut())
         .zip(limits.par_iter_mut())
-        .map(|(((((top, others), pl), tally), trace), lim)| match top {
+        .zip(new_pts.par_iter())
+        .map(|((((((top, others), pl), tally), trace), lim), &q)| match top {
             None => {
                 // One-way subduction's gap (the covers are all held crust; none elsewhere): its
                 // conserved pools went down with the slab, its sediment counted as subducted
                 // sediment too (ledger: PLT-542, PLT-440).
                 for (g2, c2) in others {
-                    let u = interpolate(src, c2, rots[*g2 as usize]);
+                    let u = interp(*g2, c2, q);
                     tally[8] += u.pools[..pool::CONSERVED]
                         .iter()
                         .map(|&x| f64::from(x))
@@ -754,7 +784,7 @@ pub fn resample(
                 Sample::blank(0)
             }
             Some((g, c)) => {
-                let mut s = interpolate(src, c, rots[*g as usize]);
+                let mut s = interp(*g, c, q);
                 *pl = group_plate[*g as usize];
                 if let Some(old) = old_limits {
                     let blend = |v: &[f32]| -> f32 {
@@ -777,7 +807,7 @@ pub fn resample(
                     let under = &src[c2.major() as usize];
                     let p2 = group_plate[*g2 as usize];
                     if under.is_hidden() || p2 == *pl || overrides(*pl, p2) {
-                        let mut u = interpolate(src, c2, rots[*g2 as usize]);
+                        let mut u = interp(*g2, c2, q);
                         let conserved: f64 = u.pools[..pool::CONSERVED]
                             .iter()
                             .map(|&x| f64::from(x))
@@ -837,7 +867,7 @@ pub fn resample(
                             accrete(&mut s.pools, &u.pools);
                         }
                     } else if under.kind == CONTINENTAL {
-                        let u = interpolate(src, c2, rots[*g2 as usize]);
+                        let u = interp(*g2, c2, q);
                         tally[5] += f64::from(u.thickness_m);
                     }
                 }

@@ -834,7 +834,12 @@ struct Source {
     contact: usize,
     /// Relative velocity of the subducting plate at the front, mm/yr (mantle frame).
     rel: DVec3,
+    /// The convergence the subduction uplift reads and the front stamps, mm/yr: the whole
+    /// relative speed, or `normal` with `DEEPTIME_ARC_NORMAL=1` (PLT-312).
     conv: f64,
+    /// The convergence normal to the front, mm/yr (PLT-312's component; 0 where the plates part
+    /// along the normal): the arcs' rate reads it (PLT-665).
+    normal: f64,
     obliquity_deg: f64,
     z_sub: f64,
     slab_age: f64,
@@ -867,6 +872,12 @@ pub const FRONT_G_NORMAL_GLOBAL: &str = "plates/arc_front_g_normal_km_myr";
 /// The same two over the fronts under continental overriding crust, km × Myr.
 pub const FRONT_G_CONTINENTAL_FULL_GLOBAL: &str = "plates/arc_front_g_full_continental_km_myr";
 pub const FRONT_G_CONTINENTAL_NORMAL_GLOBAL: &str = "plates/arc_front_g_normal_continental_km_myr";
+/// World globals: the continental and the island arcs' fronts over the run (as
+/// [`ARC_FRONT_CONTINENTAL_GLOBAL`] and [`ARC_FRONT_OCEANIC_GLOBAL`]) weighted by the convergence
+/// normal to the front, km × Myr × mm/yr; over those globals, the mean v_n the arcs read
+/// (measurement; ledger: PLT-665).
+pub const ARC_FRONT_NORMAL_CONTINENTAL_GLOBAL: &str = "plates/arc_front_normal_continental";
+pub const ARC_FRONT_NORMAL_OCEANIC_GLOBAL: &str = "plates/arc_front_normal_oceanic";
 /// World global: the oceanic fronts over the run by each front sample's share of the straight
 /// front, km × Myr, whatever `front_share` (measurement: the `arc_front_*` globals over this are
 /// the lattice's count of a front against its straight length while it is off). ledger: PLT-530
@@ -904,6 +915,10 @@ pub struct Pull {
     /// Oceanic fronts this step by their share of the straight front, km × Myr, whatever
     /// `front_share` (measurement; PLT-530).
     pub front_straight_km_myr: f64,
+    /// `front_continental_km_myr` and `front_oceanic_km_myr` weighted by the convergence normal
+    /// to the front, km × Myr × mm/yr: over them, the mean v_n of the continental and the island
+    /// arcs' fronts (measurement; PLT-665).
+    pub front_normal_km_myr: [f64; 2],
     /// The oceanic slabs' arc bands this step by their length, km × Myr: the band's weight summed
     /// over the samples its fronts reach, times a sample's area, over the band's integral across
     /// the arc (√π · `arc_width_km`); a straight front's band gives its length (measurement;
@@ -1054,14 +1069,15 @@ struct Boundary {
     front: Option<(u32, usize, DVec3, DVec3)>,
 }
 
-/// Set to 1 to scale the arcs and the subduction uplift by the convergence normal to the front
-/// (the boundary's normal, [`boundary_normal`]) instead of the full relative speed (the cordillera
-/// takes no convergence since PLT-320). Off by default: an experiment of the land-shape task
-/// (2026-10-20), which measured it to bring the arcs' yearly crust near Earth's and to take a fifth
-/// of the land away, so it waits for the continental crust's losses to be brought to Earth's
+/// Set to 1 to scale the subduction uplift by the convergence normal to the front (the boundary's
+/// normal, [`boundary_normal`]) instead of the full relative speed, and to stamp that component
+/// as the samples' convergence (the cordillera takes no convergence since PLT-320). Off by
+/// default: an experiment of the land-shape task (2026-10-20), which measured it, on the arcs as
+/// well then, to bring the arcs' yearly crust near Earth's and to take a fifth of the land away
 /// (`docs/science/plates.md`, "Land shape and the high ground"); the crust-budget task measured it
 /// again with the cordillera at Earth's typical arc and the collisions still losing four times
-/// Earth's ("The crust budget against Stern & Scholl"). ledger: PLT-312
+/// Earth's ("The crust budget against Stern & Scholl"). Since 2026-10-25 the arcs read the normal
+/// component whatever it says (PLT-665). ledger: PLT-312
 pub const NORMAL_CONVERGENCE_ENV: &str = "DEEPTIME_ARC_NORMAL";
 
 fn normal_convergence() -> bool {
@@ -1424,6 +1440,9 @@ pub fn fronts_finish(
     let mut info: Vec<Source> = Vec::new();
     let mut front_len = vec![0.0; state.plates.len()];
     let (mut front_continental, mut front_oceanic) = (0.0_f64, 0.0_f64);
+    // The same two weighted by the convergence normal to the front (measurement: the mean v_n at
+    // the arcs, PLT-665).
+    let mut front_normal = [0.0_f64; 2];
     let front_km = norm.km(norm.spacing_rad());
     let arc_steps = (k.arc_distance_km / front_km).floor() as u32;
     // A front sample's length of front, km: its share of the straight front with `front_share`
@@ -1491,7 +1510,7 @@ pub fn fronts_finish(
             }
             let conv = if by_normal { across } else { speed };
             // The obliquity is the angle between the convergence and the boundary's normal
-            // (PLT-312), whichever rate the arcs read, so the orthogonal rate is the stamped speed
+            // (PLT-312), whichever rate the uplift reads, so the orthogonal rate is the stamped speed
             // times its cosine ([`orthogonal_convergence_mm_yr`], PLT-660). Until 2026-10-25 it
             // was measured from the lattice edge to the converging neighbour unless
             // `DEEPTIME_ARC_NORMAL=1`, an edge that zigzags about the normal.
@@ -1507,6 +1526,7 @@ pub fn fronts_finish(
                 contact: c,
                 rel,
                 conv,
+                normal: across,
                 obliquity_deg: obliquity,
                 z_sub: f64::from(su.elevation_m),
                 slab_age: su.age_myr(t_myr),
@@ -1526,8 +1546,10 @@ pub fn fronts_finish(
                     state.samples[u].is_hidden()
                 }) {
                     front_continental += len_km * env.dt_myr;
+                    front_normal[0] += len_km * env.dt_myr * across;
                 } else {
                     front_oceanic += len_km * env.dt_myr;
+                    front_normal[1] += len_km * env.dt_myr * across;
                 }
             }
         }
@@ -1546,7 +1568,8 @@ pub fn fronts_finish(
     let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
     let (z_f, per_m) = (k.oceanic_floor_elevation_m, crust_per_metre(env));
     // The arcs' rates per km of arc, spread over the arc band (whose integral across the arc is
-    // √π · `arc_width_km`): crust per step at the axis at v_0, m.
+    // √π · `arc_width_km`): crust per step at the axis at the type's reference convergence
+    // (PLT-666), m.
     let band_km = std::f64::consts::PI.sqrt() * k.arc_width_km;
     let island_axis_m = k.island_arc_km3_per_km_myr / band_km * 1000.0 * env.dt_myr; // ledger: PLT-045
     let continental_axis_m = k.continental_arc_km3_per_km_myr / band_km * 1000.0 * env.dt_myr; // ledger: PLT-285
@@ -1579,12 +1602,18 @@ pub fn fronts_finish(
                 return Plan::default();
             }
             let d_km = norm.km(d);
-            let g = (src.conv / v0).min(1.0);
             let continental = s.kind == CONTINENTAL;
-            let axis = if continental {
-                continental_axis_m
+            // The arc's rate per km is its type's rate at Earth's mean orthogonal convergence of
+            // that type's arcs, times v_n over that mean, with no cap: Stern & Scholl's rates are
+            // averages over Earth's arcs at Earth's convergences, so scaling them by
+            // min(v / 100 mm/yr, 1) counted the convergence twice. ledger: PLT-665, PLT-666
+            let (axis, g) = if continental {
+                (
+                    continental_axis_m,
+                    src.normal / k.continental_arc_convergence_ref_mm_yr,
+                )
             } else {
-                island_axis_m
+                (island_axis_m, src.normal / k.island_arc_convergence_ref_mm_yr)
             };
             // Past the slab's ends no arc (`arc_slab_ends`, PLT-561), and none over an incipient
             // slab (PLT-610).
@@ -1731,6 +1760,8 @@ pub fn fronts_finish(
             } else {
                 1.0 - smooth((x - x0) / (1.0 - x0))
             };
+            // Cortial's speed transfer, the uplift's alone since the arcs read PLT-665's.
+            // ledger: PLT-037
             let g = (src.conv / v0).min(1.0);
             let zn = ((src.z_sub - zt) / (zc - zt)).clamp(0.0, 1.0);
             let h = zn * zn;
@@ -1875,6 +1906,7 @@ pub fn fronts_finish(
         front_g_normal_km_myr: g_normal_km_myr,
         front_g_continental_km_myr: g_continental_km_myr,
         front_straight_km_myr: straight_km_myr,
+        front_normal_km_myr: front_normal,
         arc_band_km_myr: band_weight * area / band_km * env.dt_myr,
         forearcs: (erosion_rate > 0.0).then_some(Forearcs {
             loss_km3,
