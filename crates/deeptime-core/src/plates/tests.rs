@@ -4644,6 +4644,227 @@ fn an_arcs_rate_is_its_types_rate_at_earths_convergence_scaled_by_its_own() {
     }
 }
 
+/// Front-loaded island arcs (PLT-668), the law against Stern & Scholl 2010, p. 11: "500
+/// km3/million years for first 10 million years plus 30 km3/million years for 60 million years
+/// thereafter". On, an island arc adds 500 km³/km/Myr at any convergence while it is younger than
+/// 10 Myr, then 30 × v_n / 86.6; over 70 Myr at the 2-Myr step and Earth's mean convergence that
+/// averages (500 × 10 + 30 × 60) / 70 = 97.1, S&S's "approximately 100". Off, the one rate 100 ×
+/// v_n / 86.6 (PLT-045, PLT-666) at every age, with or without an onset.
+#[test]
+fn front_loaded_island_arcs_follow_stern_and_scholl() {
+    let mut k = crate::params::TectonicParams::default();
+    let v_ref = k.island_arc_convergence_ref_mm_yr;
+    let rate = |k: &crate::params::TectonicParams, age: Option<f64>, v: f64| {
+        let (r, g) = subduction::island_arc_law(k, age, v);
+        r * g
+    };
+    k.arc_front_loaded = true;
+    for v in [5.0, 32.0, v_ref, 200.0] {
+        for age in [0.0, 4.0, 9.9] {
+            assert_eq!(rate(&k, Some(age), v), 500.0, "age {age} Myr at {v} mm/yr");
+        }
+        for age in [10.0, 40.0, 70.0] {
+            let mature = rate(&k, Some(age), v);
+            let want = 30.0 * v / v_ref;
+            assert!(
+                (mature - want).abs() < 1e-12 * want,
+                "{mature} at {v} mm/yr"
+            );
+        }
+    }
+    let dt = 2.0;
+    let mean = (0..35)
+        .map(|n| rate(&k, Some(f64::from(n) * dt), v_ref) * dt)
+        .sum::<f64>()
+        / 70.0;
+    assert!((mean - 6800.0 / 70.0).abs() < 1e-9, "{mean}");
+    assert!(
+        (mean - 100.0).abs() < 3.0,
+        "70 Myr average {mean} km³/km/Myr"
+    );
+    k.arc_front_loaded = false;
+    for age in [Some(0.0), Some(50.0), None] {
+        assert_eq!(
+            subduction::island_arc_law(&k, age, 43.3),
+            (k.island_arc_km3_per_km_myr, 43.3 / v_ref)
+        );
+    }
+}
+
+/// The straight front of [`a_front_of_known_length`] (40 degrees of the equator) with plate 1 at
+/// `mm_yr`, its contacts' slabs `slab_km` long and their arcs begun `age_myr` ago (`None`: not
+/// yet), `arc_front_loaded` `on`; with `ocean`, plate 0 turned to 30-Myr-old ocean floor, so the
+/// arc stands on oceanic crust (an island arc), else on the continent.
+fn arc_fixture(
+    on: bool,
+    ocean: bool,
+    slab_km: f64,
+    age_myr: Option<f64>,
+    mm_yr: f64,
+) -> (PlanetPreset, PlateState, Geo, Vec<DVec3>) {
+    let mut p = preset(20_000, 20.0, "supercontinent", 5);
+    p.tectonics.arc_front_loaded = on;
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (mut st, geo, pos) =
+        a_front_of_known_length(&p, &env, glam::DQuat::IDENTITY, 40.0, 15.0, 0.02, mm_yr);
+    if ocean {
+        for s in st.samples.iter_mut().filter(|s| s.group == 0) {
+            s.kind = OCEANIC;
+            s.pools = pools::oceanic_column();
+            s.elevation_m = -3000.0;
+            s.formed_myr = (env.t_myr - 30.0) as f32;
+            s.thickness_m = pools::thickness(&s.pools);
+        }
+    }
+    st.slabs = st
+        .contacts
+        .iter()
+        .map(|c| state::SlabTrack {
+            under: c.under,
+            over: c.over,
+            km: slab_km,
+            ..state::SlabTrack::default()
+        })
+        .collect();
+    for c in &mut st.contacts {
+        c.arc_onset_myr = age_myr.map(|a| env.t_myr - a);
+    }
+    (p, st, geo, pos)
+}
+
+/// One step's fronts on [`arc_fixture`]'s state at step `step`: what they measured and the step's
+/// time, Myr.
+fn arc_step(
+    p: &PlanetPreset,
+    st: &mut PlateState,
+    geo: &Geo,
+    pos: &[DVec3],
+    step: u64,
+) -> (subduction::Pull, f64) {
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, step);
+    let mut cones = vec![[0.0; 2]; st.samples.len()];
+    let pull = subduction::fronts_and_uplift(st, geo, pos, &env, &mut cones, 0.0);
+    (pull, env.t_myr)
+}
+
+/// Front-loaded island arcs on a front (PLT-668, PLT-670): on, a young island arc adds 500
+/// km³/km/Myr over its band at any convergence (the same at 50 and 200 mm/yr), a 20-Myr-old one
+/// 30 / 100 of the one rate at the same convergence and four times that at four times the
+/// convergence; off, the arc's age changes nothing. The continental arcs keep their one rate,
+/// on or off. The young fronts are measured either way: all of a just-begun arc's front, none of
+/// a 20-Myr-old one's.
+#[test]
+fn island_arcs_front_loaded_pulse_then_mature_rate() {
+    let run = |on: bool, ocean: bool, age: Option<f64>, mm_yr: f64| {
+        let (p, mut st, geo, pos) = arc_fixture(on, ocean, 150.0, age, mm_yr);
+        arc_step(&p, &mut st, &geo, &pos, 1).0
+    };
+    let off_new = run(false, true, None, 50.0);
+    let off_old = run(false, true, Some(20.0), 50.0);
+    assert!(off_new.arc_oceanic_km3 > 0.0, "no island arc");
+    assert_eq!(off_new.arc_continental_km3, 0.0);
+    assert!(off_new.front_oceanic_km_myr > 0.0);
+    assert_eq!(off_new.front_young_km_myr[1], off_new.front_oceanic_km_myr);
+    assert_eq!(off_old.front_young_km_myr, [0.0; 2]);
+    assert_eq!(off_old.arc_oceanic_km3, off_new.arc_oceanic_km3);
+
+    let young_slow = run(true, true, None, 50.0);
+    let young_fast = run(true, true, Some(4.0), 200.0);
+    let burst = subduction::ISLAND_ARC_BURST_KM3_PER_KM_MYR * young_slow.arc_band_km_myr;
+    eprintln!(
+        "island arc, one step: off {:.4e} km³; on, young {:.4e} km³ at 50 mm/yr and {:.4e} at \
+         200 (500 × the band {:.4e}); front {:.1} km Myr, band {:.1} km Myr",
+        off_new.arc_oceanic_km3,
+        young_slow.arc_oceanic_km3,
+        young_fast.arc_oceanic_km3,
+        burst,
+        young_slow.front_oceanic_km_myr,
+        young_slow.arc_band_km_myr
+    );
+    assert!(
+        (young_slow.arc_oceanic_km3 - burst).abs() < 1e-6 * burst,
+        "{} km³ against 500 × the band's {} km Myr",
+        young_slow.arc_oceanic_km3,
+        young_slow.arc_band_km_myr
+    );
+    let fast = young_fast.arc_oceanic_km3 / young_slow.arc_oceanic_km3;
+    assert!(
+        (fast - 1.0).abs() < 1e-9,
+        "4× the convergence, {fast}× the pulse"
+    );
+
+    let mature_slow = run(true, true, Some(20.0), 50.0);
+    let mature_fast = run(true, true, Some(20.0), 200.0);
+    let share = mature_slow.arc_oceanic_km3 / off_old.arc_oceanic_km3;
+    assert!((share - 0.3).abs() < 1e-9, "mature {share} of the one rate");
+    let fast = mature_fast.arc_oceanic_km3 / mature_slow.arc_oceanic_km3;
+    assert!(
+        (fast - 4.0).abs() < 4e-6,
+        "4× the convergence, {fast}× the mature arc"
+    );
+
+    let cont_on = run(true, false, None, 50.0);
+    let cont_off = run(false, false, None, 50.0);
+    assert!(cont_on.arc_continental_km3 > 0.0, "no continental arc");
+    assert_eq!(cont_on.arc_continental_km3, cont_off.arc_continental_km3);
+    assert_eq!(cont_on.arc_oceanic_km3, cont_off.arc_oceanic_km3);
+    assert!(cont_on.front_continental_km_myr > 0.0);
+    assert_eq!(
+        cont_on.front_young_km_myr[0],
+        cont_on.front_continental_km_myr
+    );
+}
+
+/// An arc begins at the first step its contact's slab is past PLT-611's 100 km (PLT-669; the
+/// slab under the arcs' volcanoes lies about 105 km deep on Earth's average, Syracuse & Abers
+/// 2006): over a 90-km slab (incipient) the contact has no onset and no young front; over a
+/// 110-km slab its onset is the step's time, and a later step keeps it, its front still young
+/// 2 Myr on and no longer young 10 Myr on. Each later step runs on a fresh fixture with the
+/// onsets carried over: a second step on the first step's state, with the plates not moved,
+/// finds no oceanic front.
+#[test]
+fn an_arcs_onset_is_its_slabs_first_step_past_incipient() {
+    let (p, mut st, geo, pos) = arc_fixture(false, true, 90.0, None, 50.0);
+    assert!(p.tectonics.incipient_subduction);
+    let (short, _) = arc_step(&p, &mut st, &geo, &pos, 1);
+    assert!(st.contacts.iter().all(|c| c.arc_onset_myr.is_none()));
+    assert_eq!(short.front_young_km_myr, [0.0; 2]);
+    assert!(short.front_oceanic_km_myr > 0.0);
+
+    let (p, mut st, geo, pos) = arc_fixture(false, true, 110.0, None, 50.0);
+    let (long, t1) = arc_step(&p, &mut st, &geo, &pos, 1);
+    let begun: Vec<f64> = st.contacts.iter().filter_map(|c| c.arc_onset_myr).collect();
+    assert!(!begun.is_empty());
+    assert!(begun.iter().all(|&t| t == t1), "{begun:?} against {t1}");
+    assert_eq!(long.front_young_km_myr[1], long.front_oceanic_km_myr);
+    let dt = p.dt_myr();
+    let later = |steps: u64| {
+        let (_, mut after, _, _) = arc_fixture(false, true, 110.0, None, 50.0);
+        assert_eq!(after.contacts.len(), st.contacts.len());
+        for (a, b) in after.contacts.iter_mut().zip(&st.contacts) {
+            assert_eq!((a.under, a.over), (b.under, b.over));
+            a.arc_onset_myr = b.arc_onset_myr;
+        }
+        let (pull, t) = arc_step(&p, &mut after, &geo, &pos, 1 + steps);
+        assert!((t - t1 - steps as f64 * dt).abs() < 1e-9);
+        let kept: Vec<f64> = after
+            .contacts
+            .iter()
+            .filter_map(|c| c.arc_onset_myr)
+            .collect();
+        assert_eq!(kept, begun);
+        pull
+    };
+    let soon = later(1);
+    assert!(soon.front_oceanic_km_myr > 0.0);
+    assert_eq!(soon.front_young_km_myr[1], soon.front_oceanic_km_myr);
+    let past = later((subduction::ISLAND_ARC_BURST_MYR / dt).ceil() as u64);
+    assert!(past.front_oceanic_km_myr > 0.0);
+    assert_eq!(past.front_young_km_myr, [0.0; 2]);
+}
+
 /// Plate task 8: the cordillera thickens by crust shortened from the continent behind it, which
 /// thins by as much (volume kept): the step's crust changes by its arc magma alone, and the range
 /// stands higher than without the shortening, the crust behind it no higher.
