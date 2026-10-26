@@ -4242,7 +4242,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Copley, A., Avouac, J.-P., Royer, J.-Y. (2010). India-Asia collision and the Cenozoic slowdown of the Indian plate: implications for the forces driving plate motions. Journal of Geophysical Research 115(B3):B03410.
 - DOI or URL: 10.1029/2009JB006634.
 - Cited as: "Copley, Avouac & Royer 2010, JGR 115:B03410".
-- Ledger ids: PLT-154, PLT-177, PLT-200, PLT-245 (plate tasks 3 and 4: India-Asia convergence from about 15 to about 4 cm/yr, thickening of Tibet the dominant cause; abstract)
+- Ledger ids: PLT-154, PLT-177, PLT-200, PLT-245 (plate tasks 3 and 4: India-Asia convergence from about 15 to about 4 cm/yr, thickening of Tibet the dominant cause; abstract); FRC-012, FRC-036, PLT-684 (the ridge push from the floor's age, full text, 2026-10-26)
 - Access: paywalled (abstract only; Wiley).
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
 - Substitute: none found.
@@ -4250,6 +4250,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read in this pass: abstract fetched (OpenAlex).
 - Reference check: correct, and the abstract also contains the force magnitudes used elsewhere in the designs (Part 2).
 - Read in WP-13a (2026-10-02): abstract again: convergence "dropping from ~15 to ~4 cm/yr" between 50 and 35 Ma; Himalaya-Tibet resistance ~5-6 x 10^12 N/m; ridge push ~2.5 x 10^12 N/m; crustal thickening "the dominant cause". The Cambridge and HAL copies were not reachable or hold no file. PLT-154, PLT-177, PLT-187, PLT-200, CHK-037.
+- Read 2026-10-26 (the front lane's speed-scale stage, a Sonnet sub-agent): full text, the HAL copy https://insu.hal.science/insu-00563237/document (not kept in the library). The ridge push "can be estimated using a plate cooling model [e.g., Parsons and Richter, 1980]", "calculated by integrating over the area of the plate the potential energy differences due to cooling (using the seafloor age distribution [Müller et al., 2008a])"; "the line force is taken to be 3 x 10^12 N per unit length parallel to the ridge"; "the force exerted upon regions of old seafloor by mid-ocean ridges (2.5 - 3 x 10^12 N/m)" (the extraction garbles the exponents; normalised). No statement on depth anomalies that are not thermal. FRC-012, FRC-036, PLT-684.
 
 ### DaviesvonBlanckenburg1995
 - Reference: Davies, J. H., von Blanckenburg, F. (1995). Slab breakoff: a model of lithosphere detachment and its test in the magmatism and deformation of collisional orogens. Earth and Planetary Science Letters 129(1-4):85-102.
@@ -9304,3 +9305,122 @@ Toth & Gurnis was read in full, McKenzie 1977 could not be reached.
 - Access: not found open (an AGU book chapter).
 - Library: not fetched.
 - Read so far (by the project): not read. Its 13 mm/yr (1.3 cm/yr) is known only through Toth & Gurnis 1998, p. 18,064 ("required a convergence rate of 13 mm/yr for subduction to be initiated") and Gurnis, Hall & Lavier 2004 ("the convergence velocity must be at least 1.3 cm/yr for the thermal anomaly of the slab to persist without diffusing away").
+
+## The ridge push by the floor's age (FRC-036, PLT-684), added 2026-10-26
+
+The sources of the front lane's speed-scale stage (plates.md "The ridge push by the floor's age (PLT-684, 2026-10-26)";
+build log 2026-10-26): what the ridge push is a function of (Copley et al. 2010, above, read in full this time; the five
+entries below), and what holds a small plate back (abstracts). Read by a Sonnet sub-agent on 2026-10-26; nothing was kept
+in the library. Not reachable: Parsons & Richter 1980, Lister 1975, Turcotte & Schubert, Mahatsente 2017; the full texts
+of Schouten et al. 1993, Conrad & Lithgow-Bertelloni 2002 and 2004 and Becker & O'Connell 2001 were behind publishers'
+walls, not worked around.
+
+### Clennett2023
+- Reference: Clennett, E. J. et al. (2023). Scientific Reports 13:10191 (the title not recorded by the lookup).
+- DOI or URL: 10.1038/s41598-023-37117-w.
+- Cited as: "Clennett et al. 2023, Sci. Rep. 13:10191".
+- Ledger ids: FRC-036, PLT-684 (2026-10-26)
+- Access: open access.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-26. "For a 1D half-space cooling model, this yields a force per unit length ... which depends on ... the age of the seafloor" (their Eq. 3, the Turcotte & Schubert form, linear in age); "the modified plate model deviates from half-space cooling for oceanic lithosphere older than 81 Ma"; ΔU = g∫z Δρ(z) dz from an age-depth law and isostasy, not from measured bathymetry.
+- Reference check: journal, volume, article number and DOI as fetched; authors after the first and the title not recorded.
+
+### DoinFleitout1996
+- Reference: Doin, M.-P. and Fleitout, L. (1996). Earth and Planetary Science Letters 142:121 (the title not recorded by the lookup).
+- DOI or URL: https://topex.ucsd.edu/geodynamics/Doin_Fleitout.pdf (a course copy).
+- Cited as: "Doin & Fleitout 1996, EPSL 142:121".
+- Ledger ids: FRC-036 (2026-10-26)
+- Access: open copy (the course page above).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-26. "the geoid anomaly decreases proportionally to the age of the lithosphere" (the half-space result); "In the plate model the subsidence is stopped at an age of about 80 Ma".
+- Reference check: authors, journal, volume and first page as fetched; title not recorded.
+
+### SandifordTrenchPull
+- Reference: Sandiford, M. The "trench pull" force. EarthArXiv preprint, revised after peer review (year not recorded by the lookup).
+- DOI or URL: https://eartharxiv.org/repository/object/7990/download/16688/.
+- Cited as: "Sandiford, 'trench pull' (EarthArXiv)".
+- Ledger ids: FRC-036 (2026-10-26)
+- Access: open (preprint).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-26. "the ridge push force is usually quoted in the range of 2-4 TN m^-1, which is an estimate applicable to the subsidence of old lithosphere (Lister, 1975; Turcotte & Schubert, 2002; Coblentz et al., 2015)"; the trench's flexure is a force of its own, measured against "an isostatic reference column of the same age" (implicit, not an explicit exclusion from the ridge push).
+- Reference check: title and author as fetched; co-authors, year and any journal version not checked.
+
+### ETHDymali2022
+- Reference: ETH Zürich, Geophysical Fluid Dynamics group (2022). Dynamics of the Mantle and Lithosphere, lecture notes, chapter 6.2 (plate tectonics).
+- DOI or URL: http://jupiter.ethz.ch/~gfdteaching/dymali/2022/downloads/PlateTectonics-Notes.pdf (the site's certificate had expired; fetched without the check).
+- Cited as: "ETH lecture notes, ch. 6.2".
+- Ledger ids: FRC-012, FRC-036 (2026-10-26)
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): full text of the chapter, 2026-10-26. Half-space model after Turcotte & Schubert (2002): "So the ridge push force is linearly proportional to the age t of the lithosphere. For the 80 Ma example lithosphere used above, this gives a ridge push force FRP = 3.1 x 10^12 N/m."
+- Reference check: course notes, no authors on the record.
+
+### SandwellTransferNotes
+- Reference: Sandwell, D. T. Gravity/Topography Transfer Function and Isostatic Geoid Anomalies, lecture notes, UC San Diego (year not recorded).
+- DOI or URL: https://topex.ucsd.edu/geodynamics/16_Transfer.pdf.
+- Cited as: "Sandwell's lecture notes".
+- Ledger ids: FRC-036 (2026-10-26; context)
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-26. "Ridge-push force is the outward force due to isostatically-compensated topography"; "one can use geoid height to measure ridge-push force [Parsons and Richter, 1980; Dahlen, 1981; Fleitout and Froidevaux, 1982; 1983]", F = g ∫ Δρ(z) z dz. His Advanced Geodynamics preview: "the ridge-push force is proportional to the age of the cooling ocean lithosphere".
+- Reference check: course notes.
+
+### ZobackZobackTreatise
+- Reference: Zoback, M. L. and Zoback, M. D. Lithosphere Stress and Deformation. Treatise on Geophysics, chapter 6.06 (edition and year not recorded).
+- DOI or URL: a university course copy (not the publisher's).
+- Cited as: "Zoback & Zoback, Treatise on Geophysics 6.06".
+- Ledger ids: FRC-036 (2026-10-26; the form against)
+- Access: publisher's book; read in a course copy.
+- Library: not kept.
+- Read so far (by the project): the chapter's passages on ridge push, 2026-10-26. "ridge push is the best quantified of the driving forces since it can be calculated directly from bathymetry and the crust/lithosphere structure in the oceans"; "fairly well constrained between 1-5 x 10^12 N m^-1"; "a buoyancy force acting over the entire profile of cooling oceanic lithosphere".
+- Reference check: chapter number and title as fetched.
+
+### MahatsenteCoblentz2015
+- Reference: Mahatsente, R. and Coblentz, D. (2015). Lithosphere 7:503.
+- DOI or URL: 10.1130/L441.1.
+- Cited as: "Mahatsente & Coblentz 2015".
+- Ledger ids: FRC-036 (2026-10-26; context)
+- Access: paywalled (the page returned a bot wall).
+- Library: not fetched.
+- Read so far (by the project): the abstract (OpenAlex), 2026-10-26: "The ridgepush forces were derived from the thermal state of the oceanic lithosphere, seafloor depth, and crustal age data."
+- Reference check: DOI, journal, volume and first page as fetched.
+
+### ConradHager1999
+- Reference: Conrad, C. P. and Hager, B. H. (1999). Journal of Geophysical Research 104(B8):17551-17571.
+- DOI or URL: 10.1029/1999JB900149.
+- Cited as: "Conrad & Hager 1999".
+- Ledger ids: none (plates.md "The ridge push by the floor's age", what holds a small plate back)
+- Access: paywalled.
+- Library: not fetched.
+- Read so far (by the project): the abstract (OpenAlex), 2026-10-26: "The distribution of dissipation among the mantle, lithosphere, and fault zone causes the speed of a plate to depend on its horizontal length scale. Using the observation that Earth's plate velocities are not correlated to plate size, we can constrain the lithosphere viscosity to be between 50 and 200 times the mantle viscosity."
+- Reference check: DOI, volume, issue and pages as fetched.
+
+### Neves2003
+- Reference: Neves, M. C., Searle, R. C. and Bott, M. H. P. (2003). Journal of Geophysical Research 108:2213.
+- DOI or URL: 10.1029/2001JB000908.
+- Cited as: "Neves, Searle & Bott 2003".
+- Ledger ids: none (plates.md "The ridge push by the floor's age")
+- Access: paywalled.
+- Library: not fetched.
+- Read so far (by the project): the abstract, 2026-10-26: "the mantle basal drag cannot drive the microplate rotation but opposes it"; "At most, the basal drag comprises 20% of the force resisting microplate rotation"; "the main driving torques come from the pull of the major plates acting across the narrowing and slowing rifts".
+- Reference check: DOI, volume and article number as fetched.
+
+### Schouten1993
+- Reference: Schouten, H., Klitgord, K. D. and Gallo, D. G. (1993). Journal of Geophysical Research 98(B4):6689-6701.
+- DOI or URL: 10.1029/92JB02749 (abstract at pubs.usgs.gov/publication/70137515).
+- Cited as: "Schouten, Klitgord & Gallo 1993".
+- Ledger ids: none (plates.md "The ridge push by the floor's age")
+- Access: paywalled.
+- Library: not fetched.
+- Read so far (by the project): the abstract (USGS record), 2026-10-26: "oceanic microplates undergo rapid rotation about a vertical axis"; "for most of its 5 m.y. history, block rotation could be driven by the drag of the Nazca and Pacific plates on the microplate's edges rather than by a shear flow of mantle underneath".
+- Reference check: a JGR paper, not Nature as one note had it; DOI, volume, issue and pages as fetched.
+
+### BeckerOConnell2001
+- Reference: Becker, T. W. and O'Connell, R. J. (2001). Geochemistry, Geophysics, Geosystems 2:1060.
+- DOI or URL: 10.1029/2001GC000171.
+- Cited as: "Becker & O'Connell 2001".
+- Ledger ids: none (plates.md "The ridge push by the floor's age")
+- Access: paywalled (the repository copies were bot-walled).
+- Library: not fetched.
+- Read so far (by the project): the abstract, 2026-10-26: "The main reason for the nonuniqueness of the inversions is plate boundary geometry since all plate motions are dominated by the trench-ridge system, and plates move from ridges to trenches"; parameterized edge forces "does not significantly improve the model fit".
+- Reference check: DOI, volume and article number as fetched.

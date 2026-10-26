@@ -53,8 +53,11 @@ import java.util.Optional;
  *       ground, as vanilla's {@code freeze_top_layer} lays them); the top block of dry ground, of
  *       the sea bed and of a lake's bed from the level's own surface rule wherever the part of it
  *       that reads no chunk decides it ({@link PackSurfaceRule}: Expanded Ecosphere's coral and sand
- *       at y 58 to 62), a sea bed in vanilla's shallow band drawn as a lake's bed (BAK-050), and water
- *       in place of the top block where the whole rule paints it there (vanilla's swamp water, BAK-067);</li>
+ *       at y 58 to 62), a sea bed in vanilla's shallow band drawn as a lake's bed (BAK-050), water
+ *       in place of the top block where the whole rule paints it there (vanilla's swamp water, BAK-067),
+ *       and dry ground drawn lower where the rule cuts it to air (Expanded Ecosphere's windswept
+ *       savanna above y 63, its beaches and rivers down to y 62; BAK-068), the ring of neighbours
+ *       around the area included, so a column beside a cut shows its side;</li>
  *   <li><b>the blocks</b>: rock classes through the {@link RockPalette} with the strata pass's
  *       member choice ({@link StrataPass#horizonKey}), so a bed is the same block far and near.</li>
  * </ul>
@@ -73,8 +76,12 @@ import java.util.Optional;
  * ({@link CubeFill#foldedBiome}). An area wholly on the faces takes the plain path.
  *
  * <p><b>What is not here.</b> Trees and other features, caves, and the parts of the pack's surface
- * rules that read a chunk (its noise, its heightmap). Thread-safe: one scratch per thread, everything
- * read is immutable.
+ * rules that read a chunk beyond the two answers {@link PackSurfaceRule} gives (the noise's
+ * preliminary surface; {@code steep}, which counts only where the steep and the not steep answers
+ * agree): what such a part paints, and any cut or water it decides, is the surface table's. A cut
+ * under the sea is not drawn (the sea bed stays where it lies), and on a bank the cut is taken from
+ * the bank pass's ground, not the higher or lower ground the chunk's rule saw. Thread-safe: one
+ * scratch per thread, everything read is immutable.
  */
 public final class FarTerrain {
 
@@ -200,6 +207,9 @@ public final class FarTerrain {
         long[] fx = new long[0], fz = new long[0];
         int[] fk = new int[0];
         boolean[] ocean = new boolean[0];
+        /** Each grid position's top block from the level's surface rule ({@link #ruleTops}), and the soil a cut leaves (-1: the table's). */
+        BlockState[] tops = new BlockState[0];
+        int[] cutSoil = new int[0];
 
         @SuppressWarnings("unchecked")
         void size(int m, int biomeCells) {
@@ -207,6 +217,10 @@ public final class FarTerrain {
                 shapes = new FarColumn.Shape[m * m];
                 for (int i = 0; i < shapes.length; i++)
                     shapes[i] = new FarColumn.Shape();
+            }
+            if (tops.length < m * m) {
+                tops = new BlockState[m * m];
+                cutSoil = new int[m * m];
             }
             if (fx.length < m * m) {
                 fx = new long[m * m];
@@ -242,7 +256,7 @@ public final class FarTerrain {
 
     private static final BlockState AIR = Blocks.AIR.defaultBlockState(), WATER = Blocks.WATER.defaultBlockState(),
             ICE = Blocks.ICE.defaultBlockState(), SNOW = Blocks.SNOW.defaultBlockState(), STONE = Blocks.STONE.defaultBlockState(),
-            GRAVEL = Blocks.GRAVEL.defaultBlockState(), SAND = Blocks.SAND.defaultBlockState();
+            GRAVEL = Blocks.GRAVEL.defaultBlockState(), SAND = Blocks.SAND.defaultBlockState(), DIRT = Blocks.DIRT.defaultBlockState();
 
     /** The biome a real chunk stores for block (x, y, z): the biome source at its quart cell, x folded. */
     public Holder<Biome> biomeAt(int x, int y, int z) {
@@ -278,6 +292,9 @@ public final class FarTerrain {
         } else {
             FarColumn.grid(wd, spec, x0, z0, step, n, s.shapes);
         }
+        // The level's surface rule at every position's top, the ring's too: where it cuts dry ground
+        // to air (BAK-068) the ground drops before a neighbour's exposure reads it.
+        ruleTops(x0, z0, step, m, half, folded, s);
 
         RasterSampler strata = wd.has(WorldData.HORIZONS) ? wd.layer(WorldData.HORIZONS) : null;
         PaletteRules.Result<BlockState>[] rocks = strata == null ? null : RockPalette.get().forClasses(wd.classes());
@@ -318,11 +335,10 @@ public final class FarTerrain {
                     biome = biomeAt(bx, topY, bz);
                 }
                 FarSurface.Choice soil = surface.of(biome);
-                // The top block where the part of the level's surface rule run here decides it: on
-                // dry ground, the sea bed and a lake's bed (the water pass fills a lake after the
-                // rule, so the rule saw it dry, and leaves its bed as the rule painted it, grass as
-                // dirt); a river's bed is the water pass's own sand or gravel.
-                BlockState packTop = null;   // ledger: BAK-048
+                // The top block where the part of the level's surface rule run here decides it
+                // ({@link #ruleTops}, ledger BAK-048): on dry ground, the sea bed and a lake's bed; a
+                // river's bed is the water pass's own sand or gravel.
+                BlockState packTop = s.tops[at];
                 // Where the table stands in, a sea bed in vanilla's shallow band is painted as under
                 // a dry floor's top: the lake's bed, grass as dirt (BAK-050); the table's sea bed is deeper.
                 BlockState seaBed = soil.seaBed();
@@ -330,16 +346,12 @@ public final class FarTerrain {
                 // that block is water and the soil under it shows (BAK-067); on a bank at the water
                 // beside it the bank pass fills that water with the block under it.
                 boolean painted = false;
-                if (shape.ground >= levelMinY && shape.ground <= levelMaxY
-                        && (!shape.water() || shape.kind == Water.Kind.SEA || shape.kind == Water.Kind.LAKE)) {
-                    int waterHeight = shape.water() && shape.kind == Water.Kind.SEA ? shape.waterTop + 1 : Integer.MIN_VALUE;
-                    packTop = packRule.top(wx, shape.ground, z, waterHeight);
-                    if (packTop != null && packTop.is(Blocks.WATER)) {
-                        painted = !shape.sealed;
-                        packTop = shape.sealed ? soil.under() : null;
-                    } else if (packTop == null && waterHeight != Integer.MIN_VALUE && packRule.shallowFloor(wx, shape.ground, z, waterHeight)) {
-                        seaBed = soil.lakeBed();
-                    }
+                if (packTop != null && packTop.is(Blocks.WATER)) {
+                    painted = !shape.sealed;
+                    packTop = shape.sealed ? soil.under() : null;
+                } else if (packTop == null && shape.water() && shape.kind == Water.Kind.SEA && shape.ground >= levelMinY
+                        && shape.ground <= levelMaxY && packRule.shallowFloor(wx, shape.ground, z, shape.waterTop + 1)) {
+                    seaBed = soil.lakeBed();
                 }
                 // A lava flow's block tops dry ground where one shows, as LavaFlowPass paints it in a chunk
                 // after the surface rule (ledger VOL-140 on; the flows come from the world data alone).
@@ -357,6 +369,8 @@ public final class FarTerrain {
                     bare = false;  // a bare biome's top block painted: one block over the rock
                     depth = 1;
                 }
+                if (!bare && s.cutSoil[at] > 0)
+                    depth = s.cutSoil[at];   // under a cut, the soil the rule paints before it leaves the stone (BAK-068)
                 s.soil.depth = depth;
                 s.soil.bare = bare;
                 s.soil.frozen = topY < spec.maxY() && biome.value().coldEnoughToSnow(s.pos.set(wx, topY + 1, z));
@@ -438,7 +452,55 @@ public final class FarTerrain {
         out.channel = false;
         out.wideRiver = false;
         out.sealed = false;
+        out.minGround = Integer.MIN_VALUE;
         out.ice = 0;
+    }
+
+    /**
+     * The top block the level's surface rule gives each of the area's m × m grid positions where the
+     * part of it run here decides it ({@link PackSurfaceRule#top}; null where the table stands in),
+     * into {@code s.tops}: on dry ground, the sea bed and a lake's bed. The water pass fills a lake
+     * after the rule, so the rule saw it dry, and leaves its bed as the rule painted it, grass as dirt;
+     * where the rule left the bed open (air, or water in place of the block) the pass plugs it with
+     * dirt at the bed ({@code WaterBodies}, so far terrain draws dirt there). Where the rule cuts dry
+     * ground (land or a bank) to air (ledger BAK-068) the position's ground drops by the cut
+     * ({@link PackSurfaceRule#cut}, {@link FarColumn#cut}) and its top is the block the cut ends on; a
+     * bank the bank pass raises again keeps it where it is soil and gets dirt otherwise, as the pass
+     * does. The ring is run too, so a column beside a cut shows its side.
+     */
+    private void ruleTops(int x0, int z0, int step, int m, int half, boolean folded, Scratch s) {
+        for (int j = 0; j < m; j++) {
+            for (int i = 0; i < m; i++) {
+                int k = j * m + i;
+                s.tops[k] = null;
+                s.cutSoil[k] = -1;
+                FarColumn.Shape shape = s.shapes[k];
+                if (folded && s.ocean[k] || shape.ground < levelMinY || shape.ground > levelMaxY)
+                    continue;
+                boolean sea = shape.water() && shape.kind == Water.Kind.SEA;
+                if (shape.water() && !sea && shape.kind != Water.Kind.LAKE)
+                    continue;   // a river's bed is the water pass's
+                int x = folded ? (int) s.fx[k] : x0 + (i - 1) * step + half;
+                int z = folded ? (int) s.fz[k] : z0 + (j - 1) * step + half;
+                int wx = terrain.wrapX(x);
+                BlockState top = packRule.top(wx, shape.ground, z, sea ? shape.waterTop + 1 : Integer.MIN_VALUE);   // ledger: BAK-048
+                boolean lakeBed = shape.kind == Water.Kind.LAKE && shape.waterTop >= shape.ground;
+                if (top != null && lakeBed && (top.isAir() || top.is(Blocks.WATER))) {
+                    top = DIRT;   // the lake pass plugs an open bed (ledger: BAK-068)
+                } else if (top != null && top.isAir()) {
+                    PackSurfaceRule.Cut cut = shape.kind.isWater() ? null : packRule.cut(wx, shape.ground, z);
+                    top = null;
+                    if (cut != null) {   // ledger: BAK-068
+                        boolean raised = FarColumn.cut(shape, cut.depth(), levelMinY);
+                        top = cut.top();
+                        if (raised && !top.is(Blocks.WATER))
+                            top = WaterBodies.skin(top) ? top : DIRT;
+                        s.cutSoil[k] = raised ? -1 : cut.soil();
+                    }
+                }
+                s.tops[k] = top;
+            }
+        }
     }
 
     /** Sends the column past a cube net's corners: the level's default block, then its fluid up to the sea, then air. */

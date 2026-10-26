@@ -134,8 +134,8 @@ public final class WaterBodies {
         return s.getBlock() instanceof SpreadingSnowyDirtBlock || s.is(Blocks.DIRT) || s.is(Blocks.COARSE_DIRT) || s.is(Blocks.ROOTED_DIRT);
     }
 
-    /** A top block worth keeping on a bank that moves: soil, sand, gravel, snow. */
-    static boolean skin(BlockState s) {
+    /** A top block worth keeping on a bank that moves: soil, sand, gravel, snow (and far terrain's bank a surface rule cuts, BAK-068). */
+    public static boolean skin(BlockState s) {
         return s.getBlock() instanceof SpreadingSnowyDirtBlock || s.is(BlockTags.DIRT) || s.is(BlockTags.SAND)
                 || s.is(Blocks.GRAVEL) || s.is(Blocks.SNOW_BLOCK) || s.is(Blocks.CLAY);
     }
