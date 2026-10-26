@@ -409,9 +409,10 @@ fn the_nudges_reach_their_targets_gently() {
     // With the saturating suction (PLT-540, on by default since 2026-10-24) the steered run warms
     // past the band's top in its last step (16.8 °C against 16.0) and the outgassing turns back
     // once; the test is about the nudges, not the plates, so it keeps its planet. Likewise with
-    // subduction initiation near trenches (fix C, PLT-690, on by default since 2026-10-26): the
-    // steered run ends with land 0.382 against the plain run's 0.379, short of the 0.01 asked,
-    // so the planet keeps PLT-062's siting.
+    // subduction initiation near trenches (fix C, PLT-690, on by default since 2026-10-26): with
+    // its first version (the trench length read from the TRENCH flag) the steered run ended with
+    // land 0.382 against the plain run's 0.379, short of the 0.01 asked, so the planet keeps
+    // PLT-062's siting.
     let fixed_suction = |planet: String| {
         let mut v: Value = serde_json::from_str(&planet).unwrap();
         v["tectonics"]["suction_saturates"] = json!(false);
