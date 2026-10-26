@@ -45,7 +45,9 @@ from scipy.spatial import cKDTree
 MAP, POOLS = 11, 9
 R_KM = 6370.0
 KM3_PER_M = 5.1007e5  # planet-mean m to km3 on Earth's 5.1007e8 km2
-PELAGIC = 5.0  # m/Myr, PLT-103
+# m/Myr, PLT-103. Since 2026-10-25 (branch pelagic-rain) the plates lay no rain: the surface stage's pelagic rain
+# (surface/pelagic.rs) is part of its deposits, so runs of that code take PELAGIC=0.
+PELAGIC = float(os.environ.get("PELAGIC", "5.0"))
 EARTH_MEAN_AGE = float(os.environ.get("EARTH_MEAN_AGE", "64.2"))  # Seton et al. 2020, section 3.1 (read 2026-10-25)
 PHI0 = float(os.environ.get("PHI0", "0.63"))
 LAM_KM = float(os.environ.get("LAM_KM", "1.96"))

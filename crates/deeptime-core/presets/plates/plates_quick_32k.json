@@ -100,7 +100,6 @@
     "cordillera_height_m": 2500.0,
     "trench_half_life_myr": 2.0,
     "trench_release_half_life_myr": 2.0,
-    "pelagic_m_per_myr": 5.0,
     "sediment_subduction_share": 0.12,
     "subduction_erosion_km3_per_km_myr": 90.0,
     "hotspots_initial": 8,

@@ -1043,7 +1043,6 @@ pub fn resample(
         s.elevation_m = z as f32;
         s.formed_myr = (t - age) as f32;
         s.pools = oceanic_column();
-        s.pools[pool::SEDIMENT] = (k.pelagic_m_per_myr * age) as f32;
         s.thickness_m = thickness(&s.pools);
         s.heat_flow_mw_m2 = ocean_heat_flow(age) as f32;
         if let Some(p2) = p2 {
