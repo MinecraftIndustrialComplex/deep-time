@@ -9458,6 +9458,14 @@ guard binds in 7 of 8 runs again, so the switch stays off on this head. With it 
 master's planet bit for bit: one run (`sp-off3`, supercontinent 1, base13's arguments) has the
 state_sha256 and rec_sha256 of base13's.
 
+**PLT-582 had not reached the force balance** (noted 2026-10-26). sp-fu2 and sp-fu3 were read as if
+the current-geometry fronts held throughout, but PLT-582's test was applied by the arcs' fronts and
+the boundary mix only. The force balance gathered its fronts from the frozen lattice until
+2026-10-26 ("The force balance's front on the current geometry (2026-10-26)" below), so these arms'
+slab pull, suction and friction stood on the stale fronts. The plates that bound under PLT-585 were
+small overriding plates drawn by suction, which attaches at the same fronts; how much of their
+binding was the stale fronts' was not measured.
+
 **The boundaries by the 60 degree rule** (a VM-only probe at PLT-585's fixed point on the same two
 planets as above, not committed). Of the planet's boundary, 0.28 to 0.29 is transform, 0.56 to 0.58
 converging and 0.13 to 0.15 diverging; Earth's by Table 1 is 30 % transform, 34 % convergent and 35 %
@@ -9595,6 +9603,53 @@ reference plate) up to 7/3 of it times the weight (a plate with a long trench fo
 Over all plate-steps, the pull beyond the law's most on the current front is small: 1.7 % of all
 pull on base17-s4 and 2.7 % on the arm. The sp-fu arms above (PLT-585) were read with this force
 balance; PLT-582 did not reach it.
+
+## The force balance's front on the current geometry (2026-10-26)
+
+PLT-582 (2026-10-25, "The front on the current geometry" above) made a front stand only while a
+visible sample of the subducting plate is within `subduction::trench_row_rad` (two spacings) of
+the overriding sample now. The arcs' fronts (`subduction::fronts_begin`) and the boundary mix asked
+it; the force balance (`forces.rs`, `balance_step`) did not. It gathered a front from any lattice
+neighbour of a plate with an active contact, hidden or carried on. Between resamplings the lattice
+is frozen, so a plate being consumed down its trench kept its pull, its suction and its slab
+resistance on the trench as it stood at the last resampling, while its basal drag shrank with its
+area. That was what bound PLT-022's guard on three of the four plates in the arm sp-v75 ("Speed
+scale 75, the calibration's first read" above).
+
+The amendment (PLT-582, the coordinator's call of 2026-10-26) asks the force balance the same test,
+by the same code (`subduction::SlabBeside`, over a k-d tree of the step's positions):
+
+- **A front** counts a subducting neighbour only while a visible sample of its plate stands within
+  the row. The slab pull, the suction, the slab resistance, the incipient resistance (PLT-610) and a
+  collision's resistance act at the fronts, with Forsyth & Uyeda's front friction (PLT-585), so all
+  of them follow. So does the slab's growth, which the fronts' convergence feeds.
+- **A hanging slab** (no front this step) pulls only at samples with a visible sample of the
+  subducting plate within the row.
+- **A collision's incoming side** (a continental sample on the subducting side, which takes no
+  edge energy) counts the overriding plate only within the row.
+
+The rest of the edge pass is unchanged: its outward direction, the boundary resistance's links and
+the friction away from a front still read every lattice neighbour. They resist and do not drive. It
+rides on `tectonics.front_current_geometry` (on): off, the force balance reads the lattice as
+before, as the fronts and the mix do.
+
+**The test** (`a_consumed_plates_pull_falls_with_its_visible_trench`, written first): the ocean
+plate of `a_consumed_slab_leaves_no_front`, 3 spacings deep and 30 degrees long, given a slab at full
+depth and driven under the continent at 50 mm/yr until none of it is visible (20,000 samples, 9
+steps). Before the amendment the pull stayed at full size with no trench left (5.46 × 10²⁶ N m at the
+first step, 6.14 × 10²⁶ at the last with no front, the slab's weight growing with its age), and the
+test failed on its "on" assertion. After it, with the rule off and on:
+
+| Step | Fronts on the current geometry | Pull off, 10²⁶ N m | Pull on | Suction off | Suction on |
+|---|---|---|---|---|---|
+| 1 | 24 | 5.457 | 5.457 | 1.637 | 1.637 |
+| 3 | 24 | 5.635 | 5.635 | 1.691 | 1.691 |
+| 4 | 22 | 5.723 | 5.319 | 1.717 | 1.596 |
+| 5 | 15 | 5.809 | 3.672 | 1.743 | 1.101 |
+| 6 to 9 | 0 | 5.894 to 6.141 | 0 | 1.768 to 1.842 | 0 |
+
+On the live margin the pull is the same off and on; on the way down it falls with the visible
+trench (step 5: 0.67 of the first step's for 0.63 of its fronts); with no trench it is gone.
 
 ## The overriding plate's share (PLT-652, 2026-10-25)
 

@@ -4501,7 +4501,11 @@ fn a_consumed_plates_pull_falls_with_its_visible_trench() {
         o1[0],
         o0[0]
     );
-    assert_eq!(n1, [0.0, 0.0], "on, no pull and no suction without the trench");
+    assert_eq!(
+        n1,
+        [0.0, 0.0],
+        "on, no pull and no suction without the trench"
+    );
     // On the way, the pull is the visible trench's: not above its share of the first front (a
     // spacing's slack for the front's ends).
     for (k, &([_, n], fronts)) in seen.iter().enumerate() {
