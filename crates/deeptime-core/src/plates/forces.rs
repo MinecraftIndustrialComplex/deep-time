@@ -2369,8 +2369,8 @@ mod tests {
         let k = old_law();
         let c = coeffs(&k);
         // A flat-ish cap of the reference area pulled by a straight trench across its rim: drag
-        // (1 + slab resistance + boundary resistance) c_b A v = F L, so v is about 45 mm/yr when
-        // the trench is one slab of 80 Myr at full length.
+        // (1 + slab resistance + boundary resistance) c_b A v = F L, so v is about the speed scale
+        // (`plate_speed_scale_mm_yr`) when the trench is one slab of 80 Myr at full length.
         let area = 4.0 * std::f64::consts::PI * c.radius_m.powi(2) / 14.0;
         let r_deg = (1.0 - area / (2.0 * std::f64::consts::PI * c.radius_m.powi(2)))
             .acos()
@@ -2419,10 +2419,12 @@ mod tests {
             "the reference plate on the ring moves at {:.1} mm/yr (the speed scale {:.0})",
             ans.speed_mm_yr, k.plate_speed_scale_mm_yr
         );
-        // The sphere's cap is not flat, so the factor of the reference only holds roughly.
+        // The sphere's cap is not flat, so the factor of the reference only holds roughly (49.5
+        // mm/yr at 45, 82.6 at 75).
+        let s = k.plate_speed_scale_mm_yr;
         assert!(
-            (25.0..70.0).contains(&ans.speed_mm_yr),
-            "speed {}",
+            (0.55 * s..1.55 * s).contains(&ans.speed_mm_yr),
+            "speed {} at the scale {s}",
             ans.speed_mm_yr
         );
         // It moves towards the trench: the velocity at the centroid points along +X.
@@ -2564,8 +2566,12 @@ mod tests {
             let (u_f, rest_f, fixed, v_t) = run(r_deg, trench_km, edges, false);
             let (u_s, rest_s, _, v_t2) = run(r_deg, trench_km, edges, true);
             assert_eq!(v_t, v_t2);
-            // About 105 mm/yr at Earth's settings: 45 × (1 + 3 + 3) / 3.
-            assert!((100.0..110.0).contains(&v_t), "{v_t}");
+            // The speed scale × (1 + 3 + 3) / 3 at Earth's settings: 105 mm/yr at 45, 175 at 75.
+            let k = old_law();
+            let want = k.plate_speed_scale_mm_yr
+                * (1.0 + k.slab_resistance + k.boundary_resistance)
+                / k.slab_resistance;
+            assert!((v_t / want - 1.0).abs() < 0.05, "{v_t} {want}");
             assert!((rest_f / fixed - 1.0).abs() < 1e-9 && (rest_s / fixed - 1.0).abs() < 1e-9);
             let expect = u_f / (1.0 + u_f / v_t);
             eprintln!(
