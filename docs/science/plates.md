@@ -9293,6 +9293,152 @@ The V1 census moves nothing at p < 0.05. The coast with high ground's median pas
 km of island front. The front lane's current-geometry check in `forces.rs` will move where A's and
 B's force terms act.
 
+### Step 14: subduction initiation where Crameri et al. 2020 find it (fix C, PLT-690 to PLT-692) (2026-10-26)
+
+The M5 lane's stage 2, by the coordinator's order: initiation siting per Crameri et al. 2020, read
+first, built as sourced physics with no knob tuned to a V1 number, on by default with unit tests.
+Until now a subduction initiation needed floor older than 150 Myr (PLT-062, no source), at least
+1,000 km from every trench (PLT-064, a game choice), drawn at a rate calibrated to keep the floor
+recycled (PLT-063). Crameri et al.'s database of the thirteen initiations since about 105 Ma
+contradicts both the age gate and the clearance. "All SZI events start less than 1500 km away from
+other active subduction zones and, in most cases, less than 500 km"; "we find no event that is
+purely plate-buoyancy driven or, in other words, spontaneous"; "SZI events occur predominantly in
+the vicinity of pre-existing subduction zones, indicating that subduction breeds subduction"; and
+the subducting plates' mean ages at nine of them run from 31.7 to 117.4 Myr (Supplementary Data 1).
+The plate-geometry task tried initiation within 1,500 km once (2026-10-21, arm i1) and did not keep
+it: it split off slivers, with no law then for a young subduction zone to fail or grow. Since then
+incipient subduction (Step 12), the island-front fixes A and B (Step 13), the margin and the
+compression weight (PLT-503, PLT-505) and the polarity by age (PLT-655) have come in.
+
+**Where** (`tectonics.initiation_near_trenches`, PLT-690, PLT-691). The active trenches are the
+step's subduction zones: the overriding side's samples of the oceanic fronts past incipient
+(`subduction::Pull::subducting_fronts`, computed in `fronts_finish` before the initiation runs), the
+samples the plate check counts as `boundary_subduction_km` against Bird 2003. An initiation's seed
+is visible ocean floor within 1,500 km of one, of any age, and not a front or TRENCH sample itself.
+No subduction zone, no initiation.
+
+**How often** (PLT-692). Crameri et al.'s Table 1 has four newly destructive initiations, South
+Sandwich (34 ± 5 Ma), Izu-Bonin-Mariana (52 ± 0.5), Anatolia and Oman (104 ± 1), so four in 105
+Myr. The other nine are episodic subduction (5) and polarity reversals (4), "the latter two of which
+occur in a pre-existing subduction-zone setting": here a polarity reversal is PLT-655's and the
+contacts' own law, and the episodic jump of a working zone has no default law (transference,
+PLT-516, is off). Over Bird 2003's 51,310 km of subduction zones the rate is 4 / (105 × 51,310) =
+7.42 × 10^-7 initiations per km of subduction zone per Myr. The planet's expected initiations per
+step are that rate × the length of its subduction zones (one lattice spacing per front sample, as
+the plate check counts it) × the step, spread evenly over the qualifying floor of the plates that
+can be drawn and weighted by PLT-505's compression. At base22's subducting boundary (seeds 1 to 4,
+median 57,450 km) that would be about 43 initiations in 1,000 Myr; base22 under PLT-063 makes 121
+a run. Thirteen is a floor
+(some events "were deemed too unclear to be included"), and today's length stands for the window's;
+both are the agent's reading, in PLT-692's row.
+
+**The fracture** (PLT-690). The fracture is the bisector of the seed and its foot on the nearest
+front, so the new trench runs parallel to the old one at half the seed's distance, within 750 km of
+it. Table 1's freshness strings put ten of the thirteen at "a normal offset, but otherwise parallel
+to the closest, pre-existing subduction trench" (P), three at an oblique one (O), none "laterally
+offset along strike or in continuation" (C). Their distance classes are upper limits: 100 km 2
+events, 250 km 6, 500 km 2, 1000 km 1, 2000 km 2 (Halmahera and Oman, past the text's 1,500 km; the
+text's bound is taken). The foot (`trench_foot`) is the seed dropped onto the line fitted through
+the fronts within three lattice spacings of the nearest one (their principal axis in the gnomonic
+projection, where a great circle is straight), about 210 km on the quick presets' 100,000 samples;
+the nearest sample alone tilts the fracture by the lattice's offset along the trench, 7.7° in the
+unit test. Halfway is the agent's: Crameri give the offset's upper bound, not where in it the
+fracture falls. PLT-503's margin, PLT-066's sizes and PLT-655's polarity are unchanged.
+
+**The length is the subducting fronts, not the TRENCH flag.** The first version read the trenches
+from the samples flagged TRENCH (a visible sample with an edge to a hidden sample of its group). That
+flag also marks collisions, incipient and slow fronts, and the rims of floor held under after its
+contact ended (one-way subduction keeps held samples hidden until the resampling, PLT-542). On
+base20 the TRENCH samples summed to about 110,000 km against the plate check's 52,000 km of
+subducting boundary, so the hazard read about twice its source's length. The first version's arm
+(key 67688ca66764, below) is kept as the datum of the hazard at that length.
+
+**Measured.** The records count `initiations_reach_250`, `_500`, `_1000` and `_1500` (the new
+plate's fracture within that distance of a front that was there before it: Crameri's distance
+classes, `fracture_reach`) and `initiations_refused` (drawn, but the margin left no seed or the
+fracture left fewer than 32 samples on a side). The world global `plates/initiation_trench_km_myr`
+sums the length × the step over the run, so the realized initiations read against PLT-692's rate ×
+that sum.
+
+**Tests** (`rifting.rs`). `subduction_starts_near_trenches_at_any_age`: a plate of 10 Myr floor with
+a subduction zone 2,200 km long on the equator; with fix C an initiation starts, its fracture within
+half the reach, in the 1,000 km class and none refused, and the global holds the fronts' length ×
+the step; off, floor that young stays (PLT-062); with no front nothing starts, and a TRENCH rim with
+no front this step starts nothing. `the_fracture_runs_parallel_to_the_nearest_trench`: a seed 6°
+north of an equatorial trench splits the plate along 3° N (the young floor's centroid would put it
+at 42° S). `the_initiation_hazard_is_the_trench_length_rate`: with Bird's length a planet expects
+four in 105 Myr, however its floor is shared. The nudge test (`epochs_tests.rs`) keeps PLT-062's
+siting, as it keeps the fixed suction: it is about the nudges, not the plates.
+
+**The arm** (fixc2, 2026-10-26: `pool.sh run fixc2 --seeds 1,2,3,4` with the crust budget, key
+461402667488, argkey cd665cef, on the branch's merge of master 9e88eec3, so the speed scale at 75
+and PLT-684; against base22-s4, base22's seeds 1 to 4, key bb3e4feae93e, the same argkey;
+`pool.sh table` for v1census, guard and islab with `--registry
+tools/review/islfront/measures_islab.json`; the initiations, the global and the plate checks
+through `build/m4b/fixc_read22.sh` and `build/m4b/checkflip22.sh`):
+
+- **The hazard reads its source's length.** Its mean length is 39,790 km a step (31,481 to 44,587
+  by run), against the plate check's subducting boundary of 39,410 km (within 7 % in every run).
+  Initiations 26 a run (19 to 38) against base22's 121. The global's expectation is 29.5 a run
+  (23.4 to 33.1): 219 realized against 230.6 expected over the 8 runs, 0.95 (one Poisson standard
+  deviation is 15). Refused 0 (0 to 1).
+- **Where.** A run's initiations with the fracture within 250 km of an older front: 21.5; within
+  500 km 23.5, 1,000 km 25, 1,500 km 25.5. Crameri's Table 1 has 8, 10 and 11 of 13 in the classes
+  up to 250, 500 and 1000 km, and all 13 up to 2000. 16.5 a run have their seed within PLT-064's
+  old 1,000 km (0 before).
+- **Their plates.** Dead within 20 Myr 0.061 of the initiated plates against 0.178 (p 0.010); their
+  median life 73 against 69.5 Myr (p 0.49); absorbed 15 a run against 72.5.
+- **The plates.** Alive 12 against 20.5 (p < 0.001); births 92 against 212.5 a run. The largest plate's share 0.340 against 0.265 (p 0.007), above half for 13.1 % of the run
+  against 3.1 %. Boundary 165,300 against 252,500 km (Bird 260,487); subducting 39,410 against
+  57,450 km (Bird 51,310), its share 0.238 against 0.225 (Bird 0.197, p 0.33). Plate speed 39.1
+  against 35.0 mm/yr (p 0.010). Partings 10.5 against 19.8 per 100 Myr.
+- **The floor.** Its median age 97.8 against 73.4 Myr (the plate check's 50 to 80: 0 of 8 runs pass,
+  against 7), the mean of its 90th percentile 273 against 212 Myr (at most 230: 0 of 8, against
+  6); older than 180 Myr 24.7 against 14.4 % of the ocean, older than 250 Myr 14.2 against 6.7 %.
+- **Fronts.** Island subducting 21,445 against 26,797 km a step, continental subducting 18,744
+  against 29,814 (p 0.0002 each); contacts maturing 30.1 against 60.5 per 100 Myr. Emergent island
+  arcs 9.1 against 11.1 % (the check's at least 10: 1 of 8 runs, against 8).
+- **V1.** Collisions 2.80 against 4.55 per 100 Myr (p < 0.001; target at most 6). Nothing else at p
+  < 0.05: land 0.288 against 0.274, largest landmass 0.149 against 0.161, crust under the sea 0.174
+  against 0.275 (p 0.13), coast with high ground 0.153 against 0.139 (target at most 0.11, p 0.88),
+  crust's net change −0.111 against −0.097; criteria met 6, mean 5.62, against 6, 6.12 (p 0.20).
+  The sea over the datum 228 / 113 m against 318 / 324.
+- **Guard.** Clean: worst 9,930 against 10,098 m (p 0.40), no step beyond two reliefs.
+- **Plate checks.** 26 against 28.5 passed (p 0.009). Lost: the floor's median age (7 to 0 of 8)
+  and 90th percentile (6 to 0), the emergent island arcs (8 to 1), the largest plate over half (7
+  to 4) and its median share (7 to 5), the largest land gain (5 to 2), speeds over 150 mm/yr (5 to
+  2). Gained: the continental arcs' median height (2 to 5), rifts alive (6 to 8), oceanic over
+  continental speed (2 to 4).
+- **Off.** Base22's planet bit for bit (fixc2-off: `--set tectonics.initiation_near_trenches=false`,
+  argkey fd51d1d7, seed 1, both starts: the world state's 109 files, the dumped fields and the
+  dynamics record, sha256 for sha256). Only the summary's parameter dump (the three new parameters)
+  and the new counters' names differ.
+
+**The first version's datum** (key 67688ca66764, the TRENCH length, on master 7546a670's planet at
+speed scale 45, against base21-s4): initiations 62 a run against 148, plates alive 17 against 26,
+floor older than 250 Myr 16.5 against 14.1 %, dead within 20 Myr 19.2 against 22.3 %. Its off
+check is base21's planet bit for bit (seed 1, both starts: the world state's 109 files, the dumped
+fields and the dynamics record, sha256 for sha256).
+
+**Reading.** Fix C does what its sources say: initiations at Crameri's newly destructive rate per
+km of subduction zone, at their distances, and its new plates live (dead within 20 Myr a third as
+often). What it takes away is PLT-063's other role. The old rule recycled old floor far from every
+trench by starting a subduction zone in it; Crameri find no such event, so old floor far from a
+subduction zone now waits for a trench to reach it. In this model a trench reaches it only with
+its plate: there is no rollback and no along-strike propagation (law 2 is parked). The floor ages,
+fewer plates are born, and the plates merge into fewer, larger ones. These are findings, not
+targets (V1 and the plate checks are realism checks, decisions log 2026-10-23); the lever is the
+missing laws of a moving trench, not the rate.
+
+**What it is not.** It places and paces newly destructive initiation only. It has no law for a
+young subduction zone to propagate or roll back (law 2 is parked), none for the episodic jump with
+transference off, and the polarity reversals stay the contacts' own. Crameri's transform faults
+("Transform faults are also often present in the proximity of the SZI event location") are not
+read: the reach is from subduction zones alone. The 150 Myr gate, the old rate and the 1,000 km
+clearance hold with the switch off. The viewer's editor still lists `subduction_start_rate`, `_age`
+and `_clearance` (`crates/deeptime-viewer/assets/editor_fields.json`), which are inert with fix C
+on.
+
 ## Plate speed (2026-10-25)
 
 The coordinator's brief for the plate speed lane: CHK-020's `speed_rms_mm_yr` (the plate check's
