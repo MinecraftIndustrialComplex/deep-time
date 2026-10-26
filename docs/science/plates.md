@@ -9830,8 +9830,9 @@ arcs (their median 814 to 1,062 m) and with less continental crust under a lower
 ruling of 2026-10-26). CLAUDE.md's default-on rule asks for no guard failure on the pool, PLT-022 is
 a guard that should never bind, and PLT-585 was kept off for the same reason. Branch
 `speed-scale-75-parked` holds the 75 in params.rs and the 13 presets, with the two tests that now
-read the scale instead of pinning 45. (Applied later the same day with PLT-582's amendment, which
-cleared the guard: "The force balance's front on the current geometry" below.)
+read the scale instead of pinning 45. (PLT-582's amendment cleared the guard on the pool later the
+same day, but on the test planet 75 still binds it on many seeds where 45 binds on none, so 75
+stays parked: "The force balance's front on the current geometry" below.)
 
 **What binds** (measured from the arm's records; no fix built). Three of the four plates that bound
 were born by subduction initiation and were being consumed down their own trench: scattered 1 plates
@@ -9984,12 +9985,62 @@ and the area crossing it from 0.194 to 0.352 km²/yr. The island-arc front short
 change of the continental volume is −1.52 to −2.63, and the continental crust at the end 0.357 to
 0.307 of the planet.
 
-**On by default.** The guard being clean, PLT-022 included, the amendment stays on with
-`front_current_geometry` and the speed scale goes to 75 in params.rs and every built-in preset
-(PLT-181 `calibrated`; the coordinator's call of 2026-10-26: the fix and the 75 go on together).
 CHK-028 is past its 0.5 % in 3 of 8 runs, and coast with high ground is above its target; both are
 realism checks, not a gate. The faster plates take more continental crust down at the collisions:
 the suturing zones lose four times Earth's figure.
+
+**With the island-front fixes A and B.** Master then took the M5 lane's fixes (f182f189, on by
+default): A, an incipient front's net resistance with no slab pull of its own (PLT-680), and B, an
+oceanic front sample converging under 10 mm/yr is incipient (PLT-681), with the `matured` count
+(PLT-683). All three read the fronts `balance_step` gathers (A's and B's terms through the front's
+sum, B per front sample through its convergence, `matured` through the fronts the slabs are grown
+from), so with the amendment they act only at fronts on the current geometry: a stale front takes no
+incipient resistance, no slow-sample rule and no `matured` count, and a contact whose only fronts
+were stale has no front that step, so its slab is not fed and idles. Before the amendment those
+terms also read the frozen lattice's fronts. The branch merges master and keeps both changes.
+
+**The test planet's guard.** After the merge, at the scale of 75, the gate's
+`recording_does_not_change_the_world_and_matches_the_run` (8,000 samples, `scattered_continents`
+seed 2, 300 Myr) failed: PLT-022 bound. On that planet only the full combination bound (at step 94
+on plate 30, 39 visible samples, the balance's answer 287 mm/yr); the scale at 45, A and B off, the
+amendment off and master did not. A sweep on the same planet then asked how often (300 Myr, seeds 1
+to 24, each start; each variant with the motion fix below; guarded plate-steps, on how many seeds):
+
+| Variant | `scattered_continents` | `supercontinent` |
+|---|---|---|
+| master (45, A and B, no amendment) | 0, on 0 of 24 | 0, on 0 of 24 |
+| amendment + 75 + A and B | 20, on 12 of 24 | 36, on 11 of 24 |
+| amendment + 75, A and B off | 12, on 4 of 24 | 20, on 8 of 24 |
+| 75 + A and B, no amendment | 9, on 5 of 24 | 16, on 7 of 24 |
+
+At 75 the guard binds on many seeds in every variant; at 45 on none. The plates that bind are small
+(1 to 500 visible samples, most under 120), and the balance asks 111 to 600 mm/yr of them. Where it
+asks under 250 the guard binds on the plate's fastest point, not its centroid (a small plate
+turning fast). For 31 of the full combination's 56 binds the answer is over 250. With the amendment
+in, no stale front is left in the balance, so these come from its answer itself, as sp-v75's fourth
+plate did: small plates whose basal drag, which goes with the area, is small beside the forces on
+their boundary, which go with its length. The lane did not decompose them further. The same seed's
+binds also moved between
+runs of the sweep (seed 2's at steps 125 and 127 on plate 45 in the sweep, at step 94 on plate 30
+alone), which the lane did not trace.
+
+**The motion fix** (`collision::Collided::moved`, no switch: the correction of a bug against the
+code's own comment). The gate's other failure after the merge,
+`a_deferred_collision_leaves_both_plates_to_the_balance`, held plate 12's rotation at step 129.
+`collide` has early returns that do nothing: a plate already dead (welded earlier in the step) and a
+terrane gone, so that the collision ends emptied. They returned `Collided::default()`, which
+`motion_set_by` read as a transfer, so both plates skipped the step's relaxation towards the balance
+(PLT-191). After one weld every other contact of the dead plate held its partner (plate 2 welded at
+step 122; its contacts held plates 5, 6 and 23). `Collided::moved` is now true only at the weld's and
+the transfer's own return, and `motion_set_by` reads it. The unit test
+`only_a_weld_or_a_transfer_holds_its_plates_motion_for_the_step` gains the case (a collision that
+did nothing sets no motion). PLT-080's note.
+
+**75 parked again** (the coordinator's rule of 2026-10-26: 75 goes on only if the guard is clean on
+the pool, and a bind under the full combination where master binds on none is evidence about 75,
+not noise in the test). The amendment and the motion fix are on by default; the speed scale stays
+45 in params.rs and every built-in preset, and branch `speed-scale-75-parked` keeps the 75 (PLT-181,
+PLT-022). The arm that decides the amendment is read at 45 on master's A and B below.
 
 ## The overriding plate's share (PLT-652, 2026-10-25)
 
