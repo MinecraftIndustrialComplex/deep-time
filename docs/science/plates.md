@@ -9570,7 +9570,8 @@ arcs (their median 814 to 1,062 m) and with less continental crust under a lower
 ruling of 2026-10-26). CLAUDE.md's default-on rule asks for no guard failure on the pool, PLT-022 is
 a guard that should never bind, and PLT-585 was kept off for the same reason. Branch
 `speed-scale-75-parked` holds the 75 in params.rs and the 13 presets, with the two tests that now
-read the scale instead of pinning 45.
+read the scale instead of pinning 45. (Applied later the same day with PLT-582's amendment, which
+cleared the guard: "The force balance's front on the current geometry" below.)
 
 **What binds** (measured from the arm's records; no fix built). Three of the four plates that bound
 were born by subduction initiation and were being consumed down their own trench: scattered 1 plates
@@ -9650,6 +9651,85 @@ test failed on its "on" assertion. After it, with the rule off and on:
 
 On the live margin the pull is the same off and on; on the way down it falls with the visible
 trench (step 5: 0.67 of the first step's for 0.63 of its fronts); with no trench it is gone.
+
+**The arm** (the coordinator's call of 2026-10-26: one cumulative arm, the amendment with the speed
+scale at 75). `fx582-v75`: this branch on master 77a95f86 with `--set
+tectonics.plate_speed_scale_mm_yr=75` (key 0fc664149f3b, argkey d0cd1773), `earthlike_quick_16k`,
+both starts, seeds 1 to 4, 1,000 Myr, 2 threads, `+DEEPTIME_CRUST_BUDGET=1
++DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`. It was read against base18-s4 (key 4c55ab83c7a1, base18's
+seeds 1 to 4, cached) with `pool.sh table --base base18-s4 --arm fx582-v75` (and `--measure guard`,
+after `pool.sh measure --measures guard` on both) and with the lane's readers over the run folders.
+Medians and exact Mann-Whitney p; sp-v75 (the scale alone, on master 1c2946f2 against base17-s4) is
+given for its values only, since base17 and base18 differ:
+
+| Measure | base18-s4 (8) | fx582-v75 (8) | p | sp-v75 (8) |
+|---|---|---|---|---|
+| CHK-020 RMS plate speed, mm/yr (40 to 100) | 28.5 | 44.4 (42.1 to 46.2) | < 0.001 | 42.3 |
+| CHK-028 plate-steps over 150 mm/yr, % (at most 0.5) | 0.000 | 0.460 (0.290 to 0.945); past 0.5 in 3 of 8 | < 0.001 | 0.883; 7 of 8 |
+| PLT-022's guard, steps that bind | 0 in all 8 | 0 in all 8 | | 8 steps in 3 of 8 |
+| the fastest plate centroid, mm/yr | 129.7 | 186.4 | < 0.001 | 214.3 |
+| big plates' median and 90th percentile, mm/yr | 26.0 and 68.8 | 40.8 and 98.3 | | 39.6 and 99.6 |
+| slab plates' speed over free plates' | 3.205 | 2.962 | 0.015 | 2.85 |
+| ocean floor's mean age, Myr (Earth 64) | 117.8 | 90.9 | < 0.001 | 96.0 |
+| floor older than 180 Myr (Earth 0.006) | 0.213 | 0.125 | < 0.001 | 0.144 |
+| floor older than 250 Myr | 0.128 | 0.062 | < 0.001 | 0.071 |
+| A/C0, Myr | 130.2 | 101.5 | < 0.001 | 109.7 |
+| the floor's 90th percentile age, Myr | 254.9 | 186.5 | < 0.001 | 195.0 |
+| plates at the end | 21.5 | 18.5 | 0.003 | 17.5 |
+| collisions per 100 Myr | 4.85 | 4.20 | 0.31 | 4.05 |
+
+The guard is clean. PLT-022 bound in no run (sp-v75: 3 of 8). The relief guard: worst 9,943 m
+against 9,962 (p 0.65), no step beyond 2 Earth reliefs, the highest plate elevation 5,264 against
+5,274 m (p 0.80), the largest excess over Airy 2,419 against 2,591 m (p 0.007), the largest rise and
+fall in one step 7,552 and 6,660 against 6,780 and 6,738 m. The level moved ×1.56 for the scale's
+×1.67 (sp-v75 ×1.50). Over all plate-steps the pull beyond the law's most on the current front
+(4.5 × 10¹³ N/m, FRC-002 × FRC-004) fell from 1.8 % of all pull on base18-s4 to 0.1 % (sp-v75
+2.7 %), the plate-steps whose pull per metre of current front passes that most from 4.6 to 0.4 %,
+and the pull on plate-steps with no recorded front from 1.2 to 0.6 %.
+
+The census, medians with p: land 0.254 to 0.285 (0.19), the largest landmass 0.122 to 0.147 (0.65),
+continental crust under the sea 0.334 to 0.195 (0.001), land above 2 km 0.020 to 0.041 (0.021),
+coast with high ground 0.096 to 0.166 (0.010; its target at most 0.11), land under ice 0.046 to
+0.075 (0.13), the crust's net change −0.064 to −0.116 (< 0.001), criteria met (median, mean) 6.5
+and 6.25 to 6 and 5.88 (0.27). The sea over the datum after 100 Myr and at the end is 279 and 34 m
+against 434 and 419.
+
+Speeds by class (area-weighted RMS, mm/yr; each class's share of the area about the same on both):
+slab plates 46.5 to 64.6 (×1.39, area 0.13), plates in a collision 25.6 to 42.2 (×1.65, 0.81), free
+plates 20.3 to 30.7 (×1.51, 0.06); big plates (over 5 % of the planet) 23.3 to 39.9 (×1.71), mid
+(1 to 5 %) 38.5 to 56.8, small (under 1 %) 46.7 to 69.5; oceanic plates 39.4 to 56.7 (×1.44),
+plates at least 30 % continental 22.3 to 37.9 (×1.70). The slab plates' resistance is basal drag
+5.6 %, slab resistance 56.5 % and boundary 38.0 % (base18-s4 4.2, 63.7 and 32.1); the collision
+resistance's share of the colliding plates' rose from 16.0 to 21.2 %, as on sp-v75, since it is
+plastic and does not scale.
+
+The fast fronts. The share of the ocean-continent front (km-steps) converging faster than 80 mm/yr
+rose from 17.2 % to 40.2 % (sp-v75 40.9 %), of the ocean-ocean front from 4.3 to 14.8 %, and the
+front of plates whose centroid moves faster than 80 mm/yr from 7.1 to 25.7 %. Earth's side, by the
+M4 lane's `earthvel.py` (Bird 2003's PB2002 steps, CRUST1.0 for the island rule) with Earth's
+convergence scaled by the planet's CHK-020 level over Earth's 47.1 mm/yr: at base18-s4's level
+(×0.605) 0.1 % of Earth's subduction front that is not an island arc converges faster than 80 mm/yr
+and 7.0 % of its island arcs; at the arm's level (×0.943) 8.6 % and 29.0 %, its oceanic and
+continental convergent boundaries 0.9 % and 0.0 %. At a matched level the planet's fast
+ocean-continent front is about 4.7 times Earth's, its fast ocean-ocean front half of Earth's island
+arcs'.
+
+The crust budget, means over the 8 runs, km³/yr: island arcs 1.24 to 1.51 and continental arcs 0.58
+to 0.79 (Earth 1.5 and 1.0), sediment subduction 0.90 to 1.36, subduction erosion 0.41 to 0.62
+(erosive fronts 9,570 to 14,922 km), the suturing zones 1.70 to 2.74 (Earth 0.7; PLT-242's share
+0.29 to 0.54, "no room" left over 0.40 to 0.80 and at the strength height 1.01 to 1.40). The
+collision front at any time grew from 9,343 to 12,699 km, its convergence from 20.8 to 27.6 mm/yr
+and the area crossing it from 0.194 to 0.352 km²/yr. The island-arc front shortened from 42.6k to
+38.2k km and the continental-arc front from 26.7k to 25.7k (sp-v75: 36.5k and 23.2k). The net
+change of the continental volume is −1.52 to −2.63, and the continental crust at the end 0.357 to
+0.307 of the planet.
+
+**On by default.** The guard being clean, PLT-022 included, the amendment stays on with
+`front_current_geometry` and the speed scale goes to 75 in params.rs and every built-in preset
+(PLT-181 `calibrated`; the coordinator's call of 2026-10-26: the fix and the 75 go on together).
+CHK-028 is past its 0.5 % in 3 of 8 runs, and coast with high ground is above its target; both are
+realism checks, not a gate. The faster plates take more continental crust down at the collisions:
+the suturing zones lose four times Earth's figure.
 
 ## The overriding plate's share (PLT-652, 2026-10-25)
 
