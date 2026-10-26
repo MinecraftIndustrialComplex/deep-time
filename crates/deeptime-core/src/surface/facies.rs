@@ -8,12 +8,16 @@
 //! euxinic basins of the deposit engine), and splits evaporites into halite and gypsum by
 //! aridity. Every number below is a design value, documented here and tuned in P1-07.
 //! Pelagic chalk (2026-10-19): a deposit that is mostly the open sea's calcareous ooze
-//! (`carbonate::pelagic`) is chalk. Periplatform carbonate (2026-10-20) votes with the factory's
+//! (`pelagic::Rain`) is chalk. Periplatform carbonate (2026-10-20) votes with the factory's
 //! for the class but, laid mostly below the photic zone, is no platform (`Kind::Periplatform`);
 //! euxinic water makes black shale of carbonate ooze too.
+//! The pelagic rain's opal and dust (2026-10-26, `pelagic.rs`): a deposit that is mostly opal is
+//! chert (siliceous ooze lithifies to chert), one that is mostly dust is shale (the deep sea's
+//! clay), black shale in euxinic water as the other muds and oozes.
 //!
 //! A step's deposit takes one class: the process that laid down most of it decides (evaporite,
-//! carbonate, lake, sea, river or the pelagic rain), then the setting.
+//! carbonate, lake, sea, river, glacier or the pelagic rain's chalk, opal or dust), then the
+//! setting.
 
 use super::carbonate::PHOTIC_M;
 use super::lithology::Classes;
@@ -23,7 +27,7 @@ use super::lithology::Classes;
 pub enum Kind {
     Clastic,
     Carbonate,
-    /// Pelagic chalk: carbonate, but no platform (the deposit engine's `carbonate_platform`
+    /// Pelagic ooze, chalk or chert: no platform (the deposit engine's `carbonate_platform`
     /// field leaves it out).
     Pelagic,
     /// Periplatform limestone: carbonate the marine diffusion carried off a platform and laid
@@ -64,8 +68,11 @@ pub struct Setting {
     pub evaporite: f64,
     /// Till and glaciomarine diamict (`glacial.rs`), m.
     pub glacial: f64,
-    /// Pelagic carbonate ooze (`carbonate::pelagic`), m.
+    /// Pelagic carbonate ooze (the pelagic rain's chalk, `pelagic.rs`), m.
     pub pelagic: f64,
+    /// The pelagic rain's opal and dust, m.
+    pub siliceous: f64,
+    pub dust: f64,
     /// Net deposition rate, m/Myr.
     pub rate_m_myr: f64,
     /// Land plants exist (the atmosphere clock; coal needs them).
@@ -120,6 +127,8 @@ pub fn classify(s: &Setting, c: &Classes) -> (u16, Kind) {
         (s.fluvial, 4),
         (s.glacial, 5),
         (s.pelagic, 6),
+        (s.siliceous, 7),
+        (s.dust, 8),
     ];
     let total: f64 = parts.iter().map(|p| p.0.max(0.0)).sum();
     let main = parts
@@ -143,6 +152,9 @@ pub fn classify(s: &Setting, c: &Classes) -> (u16, Kind) {
         5 => (c.till, Kind::Clastic),
         6 if euxinic => (c.black_shale, Kind::Euxinic), // ledger: ERO-196
         6 => (c.chalk, Kind::Pelagic),                  // ledger: ERO-194
+        7 | 8 if euxinic => (c.black_shale, Kind::Euxinic), // ledger: ERO-216
+        7 => (c.chert, Kind::Pelagic),                      // ledger: ERO-216
+        8 => (c.shale, Kind::Clastic),                      // ledger: ERO-216
         1 => {
             if s.aridity < EVAPORITE_ARIDITY && s.depth_m < DOLOMITE_DEPTH_M {
                 (c.dolostone, Kind::Carbonate)
@@ -321,6 +333,41 @@ mod tests {
             ..basin
         };
         assert_eq!(classify(&shed, &c), (c.black_shale, Kind::Euxinic));
+    }
+
+    /// The pelagic rain's opal makes chert and its dust shale where they outweigh the rest; in
+    /// euxinic water both are black shale (ERO-216).
+    #[test]
+    fn the_rains_opal_is_chert_and_its_dust_shale() {
+        let c = Classes::get();
+        let floor = Setting {
+            marine: true,
+            depth_m: 5200.0,
+            t_c: 2.0,
+            aridity: 1.0,
+            siliceous: 0.6,
+            dust: 0.4,
+            pelagic: 0.1,
+            ..Setting::default()
+        };
+        assert_eq!(classify(&floor, &c), (c.chert, Kind::Pelagic));
+        let red_clay = Setting {
+            siliceous: 0.2,
+            ..floor
+        };
+        assert_eq!(classify(&red_clay, &c), (c.shale, Kind::Clastic));
+        let restricted = Setting {
+            restricted: true,
+            t_c: 15.0,
+            depth_m: 800.0,
+            ..floor
+        };
+        assert_eq!(classify(&restricted, &c), (c.black_shale, Kind::Euxinic));
+        let chalk = Setting {
+            pelagic: 2.0,
+            ..floor
+        };
+        assert_eq!(classify(&chalk, &c), (c.chalk, Kind::Pelagic));
     }
 
     /// Periplatform carbonate votes with the factory's for the class (limestone either way), but
