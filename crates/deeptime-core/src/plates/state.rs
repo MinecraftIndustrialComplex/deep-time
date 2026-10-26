@@ -757,7 +757,7 @@ pub struct PlateState {
     pub propagations: Vec<Propagation>,
     /// Back-arc slivers holding a subducting front (`rifting::maybe_rift_backarc`, ledger
     /// PLT-710, PLT-715); empty while `tectonics.backarc_rifting` is off.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
     pub backarcs: Vec<BackArc>,
     /// The land's gap budget (`gap_budget.rs`): measurement only, absent unless switched on; not
     /// kept in checkpoints.
