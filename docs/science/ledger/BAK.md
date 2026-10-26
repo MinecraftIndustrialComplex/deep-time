@@ -2,7 +2,7 @@
 
 Part of the claims ledger ([claims.md](../claims.md): how to read the columns and the status marks). Feature page: [world-scale-and-bake.md](../world-scale-and-bake.md). Extraction notes with flags: [extraction-notes/SCL.md](../extraction-notes/SCL.md).
 
-Rows: 56. By status: `verified` 2, `calibrated` 1, `game-choice` 48, `uncited` 5 (BAK-055 and BAK-056 added 2026-10-20, below sea level; BAK-057 to BAK-059 added 2026-10-21, the biome layers' land call; BAK-065 added 2026-10-21, far terrain's sea beds; BAK-067 added 2026-10-22, far terrain's painted water).
+Rows: 57. By status: `verified` 2, `calibrated` 1, `game-choice` 49, `uncited` 5 (BAK-055 and BAK-056 added 2026-10-20, below sea level; BAK-057 to BAK-059 added 2026-10-21, the biome layers' land call; BAK-065 added 2026-10-21, far terrain's sea beds; BAK-067 added 2026-10-22, far terrain's painted water; BAK-068 added 2026-10-26, far terrain's air cuts).
 
 Extracted from the code as it stood on 2026-10-01/02 by a stage-1 agent. Nothing here has been checked against its source. Paths are relative to the repository root; line numbers are left out on purpose.
 
