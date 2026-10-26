@@ -14,6 +14,11 @@ numpy and scipy, and run with `python3 -I`. On the VM, use the pool's
 | `islrec.py <pool arm folder>[@N] ...` | each run's `rec.json` (the dynamics record's boundary mix and `front_bands`) and `summary.txt` (`cb_globals` lines); `@N` keeps seeds up to N | per arm: the island (setting 0) and continental (setting 1) front from the record, as run means, with its splits by slab length, contact age, normal speed (`v_n`, mm/yr), coast distance, continental share and pair origin (initiation, rift, other); the crust budget's `front_o` and `front_c` per window. Writes `islrec_<key>.json` in the working directory |
 | `islmap.py <out.jsonl> <every Myr> <run folder> ...` | each run's maps (`maps/t*.bin`, `maps/plate/`, `maps/age/`, `maps/pools/`), skipping the first 100 Myr and resampled snapshots | one JSON row per run on `<out.jsonl>` (appended): the island front's length as raw Voronoi, Bird's divider at 77 and 380 km and through `../pool/measure_boundgeom.py`'s k7 lattice, and its Voronoi length split by overriding and subducting plate area, continental share, path distance to the plate's own continent (and to start continent), fragments, mutual contacts, floor age, plate pair and chain length. `ISL_PROCS` sets the worker count (default 2) |
 | `islshow.py <islmap jsonl> ...` | `islmap.py`'s rows | the splits summed over runs and snapshots as shares of the island (or continental) front, and the per-snapshot lengths as means and medians |
+| `cbread.py <pool arm folder>[@N] ...` | each run's last `cb_globals` line in `summary.txt` (cumulative over the run) | per arm, medians and ranges: the arcs' rate per km of front (`arc_c / front_c`, `arc_o / front_o`), the mean `v_n` at each front (`front_n_* / front_*`), the share of each front whose arc is younger than the 10 Myr early pulse (`front_young_* / front_*`, PLT-670), the fronts' run-mean km and the sediment fluxes, km³ a year |
+
+`islmap.py` skips the pool's `<run>.lock` folders and any folder without `rec.json` and `maps/`.
+The last map of a pool run is taken at a resampling (no front flags), so no script here can pair
+the last step's plate rotations (`rec.json`'s `prev_omega`) with a front.
 
 A base and an arm on the VM, for example:
 

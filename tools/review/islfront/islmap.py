@@ -371,7 +371,8 @@ def run_one(run, every):
 
 def main():
     out, every = Path(sys.argv[1]), int(sys.argv[2])
-    runs = sys.argv[3:]
+    # A pool folder also holds <run>.lock folders; keep only finished runs with maps.
+    runs = [r for r in sys.argv[3:] if (Path(r) / "rec.json").is_file() and (Path(r) / "maps").is_dir()]
     from multiprocessing import Pool
     with Pool(int(__import__("os").environ.get("ISL_PROCS", "2"))) as pool, out.open("a") as fh:
         for row in pool.imap_unordered(_job, [(r, every) for r in runs]):
