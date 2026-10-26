@@ -10320,6 +10320,104 @@ nearest rule's unbiased mass. The margins switch is off in the shipped presets, 
 not run on the pool; PLT-667 acts with it off as well, where a collapse's spread or a resampling's accretion
 leaves a sediment margin.
 
+#### The cumulative arm m5-cum (PLT-663 to PLT-667, 2026-10-25)
+
+Branch head f468a76f with the switches off: the class blend (PLT-663), the nearest-old-sample labels
+(PLT-664), the arc rate R × v_n / v_ref with no cap (PLT-665, PLT-666) and the margin class from the
+current state (PLT-667); no new source rule. `pool.sh run m5-cum` (key 411f799c9d94, argkey
+cd665cef), `earthlike_quick_16k`, 1000 Myr, both starts, seeds 1 to 4, against base16's same eight
+runs (master c5203e38) and m5-blendoff (7f14a0031e94, the blend alone, switches off); read with
+`build/m4b/m5cumread.sh` (v1census, guard, crust-budget globals, loss-budget.py, m5resample,
+m5hxreach, m5cont, sedstock).
+
+V1 census (medians of 8, Mann-Whitney p against base16's 8 in brackets): land 0.220 (0.80), largest
+landmass 0.069 (0.44), continental crust under the sea 0.464 (0.96), land above 2 km 0.026 (0.57),
+coast with high ground 0.110 (0.65), land under ice 0.086 (0.33), collisions per 100 Myr 5.55
+(0.016), the continental crust's net change −0.056 (0.021) against base16's −0.043 and m5-blendoff's
+−0.062; criteria met 6 of 7 at the median as base16 (mean 5.75 against 6.12, p 0.33). No V1
+criterion is lost at the median, so nothing was split. The guard is unchanged: worst 10,026 m from
+the sea against 10,014, no step past two Earth reliefs.
+
+The crust cycle (loss-budget.py, km³ a year, means of 8):
+
+| | base16 | m5-blendoff | m5-cum | Earth |
+|---|---|---|---|---|
+| island arcs | 1.31 | 1.29 | 1.26 | 1.5 (Stern & Scholl 2010) |
+| continental arcs | 0.37 | 0.36 | 0.56 | 1.0 |
+| arcs together | 1.68 | 1.65 | 1.82 | 2.5; 3.8 to keep the volume (Clift et al. 2009) |
+| rifts and hotspots | 0.04 | 0.04 | 0.03 | 0.5 |
+| sediment subduction | 1.12 | 1.10 | 1.21 | 1.1; 1.65 (Clift et al. 2009) |
+| subduction erosion | 0.34 | 0.34 | 0.34 | 1.4; 1.33 (Clift et al. 2009) |
+| suturing (all three) | 1.66 | 1.80 | 1.81 | 0.7 |
+| resampling drops | 0.12 | 0.11 | 0.13 | |
+| net change of the continental volume | −0.99 | −1.25 | −1.26 | 0 |
+| continental crust at the end, share of the planet | 0.380 | 0.368 | 0.365 | |
+
+The arcs' rate per km of front and the mean v_n at the arcs (crust-budget globals, medians of 8):
+
+| | base16 | m5-cum | Stern & Scholl | v_ref (PLT-666) |
+|---|---|---|---|---|
+| island arcs, km³/km/Myr | 30.9 | 29.4 | 100 | |
+| continental arcs, km³/km/Myr | 13.8 | 20.9 | 35 | |
+| mean v_n at island arcs, mm/yr | | 32.1 | | 86.6 |
+| mean v_n at continental arcs, mm/yr | | 49.4 | | 58.6 |
+| island front, km | 42,020 | 42,520 | 14,500 | |
+| continental front, km | 27,360 | 27,140 | 27,500 | |
+
+Counting the convergence once lifted the continental arcs by half (their v_n / v_ref, 0.84, is well
+above the old g's 0.30) and left the island arcs where they were (0.37 against the old g's 0.47 on
+the whole speed). At those v_n the law gives 37.0 and 29.5; the arcs make 0.79 and 0.71 of that.
+The gap was not split here; fronts that count length and make no arc (an incipient slab, PLT-610;
+past the slab's ends, PLT-561) and the felsic cones taken off (PLT-286) are the candidates. The island
+arcs' slow convergence, 0.37 of Earth's, is now the island rate's gap; their long front (2.9 times
+Earth's) carries the island total to 0.84 of Stern & Scholl's.
+
+PLT-667 with the switches off: the margins it turns back to ocean floor are 0.027 km³ a year (median,
+0.023 to 0.039), 2.7 × 10⁷ km³ over the run, of which more than half is sediment and sedimentary rock
+by the margin's definition. That is 2 % of the arm's net change of the continental volume and a
+thirty-fifth of its range (−1.86 to −0.91), so the budget's net change is the same with and without
+PLT-667 within the arm's noise; m5-cum's −1.26 sits on m5-blendoff's −1.25. On the sediment stock
+(sedstock.py, map t0000, Earth-normalised km³, medians; base16 has no pool maps, so against
+m5-blendoff): the sea's sediment 1.03 × 10⁹ against 1.02 × 10⁹ (seed range 0.89 to 1.13 × 10⁹), on
+oceanic crust 9.11 × 10⁸ against 8.69 × 10⁸, on continental crust 1.27 × 10⁸ against 1.48 × 10⁸.
+PLT-667 alone moves at most 2.7 × 10⁷, 1.5 to 3 % of the oceanic stock, inside the seed spread. The
+ocean's excess over GlobSed stands as it was: within 200 km of a continent 4.87 × 10⁸ against
+GlobSed's 7.6 × 10⁷, beyond it 4.0 × 10⁸ against 1.13 × 10⁸.
+
+The sediment reaching the trenches (`plates/sediment_reaching_trench_km3`, measure only, before
+PLT-440's share): 5.95 km³ a year (5.22 to 7.11), of it under continental crust 2.24 (38 %), under
+oceanic crust 3.21 (54 %) and the one-way slab's 0.53 (9 %). Sediment subduction takes 1.21, the
+whole slab path and 0.12 of the rest, so 4.7 km³ a year accretes back onto the overriding columns,
+2.0 onto continental and 2.8 onto oceanic crust. The field counts what goes under at each
+resampling, so a forearc pile that accretes and goes under again is counted each time: it is the
+resampling's trench flux, not Earth's trench input.
+
+The resampling's own loss (m5resample, share of the planet, net over the run and the first three
+steps after a resampling): base16 −0.0445 and −0.0282, m5-blendoff −0.0578 and −0.0328, m5-cum
+−0.0610 and −0.0286. The nearest labels bring the resampling's share back to base16's; the loss
+between resamplings grew from −0.0163 to −0.0324, and is not split here. m5hxreach: hyper-extended
+continental crust is 0.0029 of the planet, all of it matured island arcs, none at any distance past
+its continent's crust.
+
+##### Toward front-loaded arcs (a design, not built)
+
+Stern & Scholl's intra-oceanic 100 is "500 km3/million years for first 10 million years plus 30
+km3/million years for 60 million years thereafter" (PLT-045's quote, p. 11). Clift et al. 2009's
+pulses at initiation and at back-arc extension come with no numbers, so they are not buildable from
+the sources. How long the planet's contacts live sets what the burst would do. From the record's
+collisions and partings (`build/m4b/contactage.py`, start_myr − contact_onset_myr, count-weighted,
+the contacts that end in a collision record or a parting): base16's 4,314 ends live 55.8 Myr on
+average (median 30 to 46 by kind), 10 to 14 % under 10 Myr and 66 to 76 % under 70; m5-blendoff's
+4,094 live 52.7. Over those lives the 500-then-30 law gives 109 and 113 km³/km/Myr against 97 at
+Earth's 70 Myr. With no v_n factor on the burst, the planet's island front (42,500 km at about 55 Myr
+a life) would start about 770 km of arc a Myr, which at 5,000 km³ a km (0.92 of it, for the lives
+under 10 Myr) is about 3.6 km³ a year from the bursts, 3.9 with the mature rate, against today's 1.26
+and Stern & Scholl's 1.5, near Clift's 3.8 for all arcs. The continental front (27,140 km, Earth's
+length) under the same law would add about 2.5 km³ a year against Stern & Scholl's 1.0: Stern &
+Scholl put the continental arcs' lower average down to their longer lives (p. 13), and the planet's
+continental contacts live as briefly as its island ones. The burst's crust is 5,000 km³ a km; on the
+arc band (106 km) that is 47 km at the axis in 10 Myr.
+
 ## The sea floor's age and the initiation's polarity (2026-10-25)
 
 The floor-age diagnosis (build log 2026-10-25, "Front lane: why floor older than 180 Myr does not go
