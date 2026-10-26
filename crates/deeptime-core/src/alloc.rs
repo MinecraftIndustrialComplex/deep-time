@@ -909,20 +909,27 @@ mod tests {
         #[cfg(target_os = "linux")]
         {
             let len = 3 * LARGE_BYTES + 5;
-            let v = vec![1u8; len];
-            let start = v.as_ptr() as usize;
-            let maps = std::fs::read_to_string("/proc/self/maps").unwrap();
-            let own = maps.lines().any(|l| {
-                let range = l.split_whitespace().next().unwrap();
-                let (a, b) = range.split_once('-').unwrap();
-                let a = usize::from_str_radix(a, 16).unwrap();
-                let b = usize::from_str_radix(b, 16).unwrap();
-                // The kernel may merge it with a neighbouring anonymous mapping, so it must
-                // start or end exactly at the block's page-rounded bounds.
-                a <= start && start + pages(len) <= b && (a == start || b == start + pages(len))
+            // A test on another thread that maps a block between this one's allocation and the
+            // read can merge with it on the far side too, so try again until one read sees an end;
+            // a block inside a heap arena never shows one. The tries stay held, so each is a new
+            // mapping and not the last one's kept block.
+            let mut held = Vec::new();
+            let own = (0..8).any(|_| {
+                held.push(vec![1u8; len]);
+                let start = held.last().unwrap().as_ptr() as usize;
+                let maps = std::fs::read_to_string("/proc/self/maps").unwrap();
+                maps.lines().any(|l| {
+                    let range = l.split_whitespace().next().unwrap();
+                    let (a, b) = range.split_once('-').unwrap();
+                    let a = usize::from_str_radix(a, 16).unwrap();
+                    let b = usize::from_str_radix(b, 16).unwrap();
+                    // The kernel may merge it with a neighbouring anonymous mapping, so it must
+                    // start or end exactly at the block's page-rounded bounds.
+                    a <= start && start + pages(len) <= b && (a == start || b == start + pages(len))
+                })
             });
             assert!(own, "a {len}-byte block is not a mapping of its own");
-            drop(v);
+            drop(held);
         }
     }
 
