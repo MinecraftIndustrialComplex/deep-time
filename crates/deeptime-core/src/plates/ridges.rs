@@ -146,6 +146,47 @@ fn nearest_corner(geo: &Geo, c: &Cover, rot: DQuat, q: DVec3) -> u32 {
     best
 }
 
+/// TEMPORARY experiment (the M5 lane): the class with the largest barycentric weight among the
+/// cover's corners, and of its corners the one nearest `q`.
+fn vote_corner(src: &[Sample], geo: &Geo, c: &Cover, rot: DQuat, q: DVec3) -> u32 {
+    let class = |v: u32| {
+        let x = &src[v as usize];
+        (x.kind, x.kind == CONTINENTAL && super::transition::hyper_extended(x))
+    };
+    let near = nearest_corner(geo, c, rot, q);
+    let weight = |cl: (u8, bool)| -> f64 {
+        (0..3)
+            .filter(|&k| c.w[k] > 0.0 && class(c.tri[k]) == cl)
+            .map(|k| c.w[k])
+            .sum()
+    };
+    let mut best = (class(near), weight(class(near)));
+    for k in 0..3 {
+        if c.w[k] > 0.0 {
+            let cl = class(c.tri[k]);
+            let w = weight(cl);
+            if w > best.1 {
+                best = (cl, w);
+            }
+        }
+    }
+    if best.0 == class(near) {
+        return near;
+    }
+    let local = rot.inverse() * q;
+    let pts = geo.points();
+    let mut out = (u32::MAX, f64::NEG_INFINITY);
+    for k in 0..3 {
+        if c.w[k] > 0.0 && class(c.tri[k]) == best.0 {
+            let d = pts[c.tri[k] as usize].dot(local);
+            if d > out.1 {
+                out = (c.tri[k], d);
+            }
+        }
+    }
+    out.0
+}
+
 /// Interpolates a sample from a cover of the old crust; vectors come out in the mantle frame,
 /// which is the new lattice's frame (every group starts unrotated). `m` is the old sample nearest
 /// the new point (`nearest_corner`): the sample's kind, its class and every other categorical
@@ -756,9 +797,15 @@ pub fn resample(
     let mut limits: Vec<[f32; 3]> = vec![[f32::INFINITY, 0.0, f32::INFINITY]; n];
     // A cover of group `g` interpolated at the new point `q`, its labels from the old sample
     // nearest `q` (ledger: PLT-664).
+    let vote = std::env::var("DEEPTIME_EXP_VOTE").is_ok(); // TEMPORARY experiment
     let interp = |g: u32, c: &Cover, q: DVec3| {
         let rot = rots[g as usize];
-        interpolate(src, c, rot, nearest_corner(old, c, rot, q))
+        let m = if vote {
+            vote_corner(src, old, c, rot, q)
+        } else {
+            nearest_corner(old, c, rot, q)
+        };
+        interpolate(src, c, rot, m)
     };
     let mut samples: Vec<Sample> = found
         .par_iter()
