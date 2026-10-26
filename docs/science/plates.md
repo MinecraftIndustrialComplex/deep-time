@@ -10222,6 +10222,104 @@ vector and convergence velocity vector"). DEF-029 has no source: its numbers are
 assume the same convention. So nothing is converted; both rows carry the note, and the field being
 unsigned means an angle past 90° (a front opening) sits at the ramp's cap.
 
+#### Which old sample a new one follows (PLT-664, PLT-667, 2026-10-25)
+
+A resampling builds a new lattice and fills each new sample from the old one: the blends from the
+three corners of the old triangle that covers the point, with their barycentric weights, and the
+categorical labels (the kind, PLT-663's class and the rest) from one corner. Until
+2026-10-25 that corner was the one with the largest weight. In a triangle that is not equilateral
+that corner's region is not its Voronoi cell, so a label did not follow the material at the point.
+Since PLT-664 the labels come from the old sample nearest the new point in the group's frame (the
+coordinator's call: "a categorical label follows the material, not the corner vote").
+
+##### The residual ratchet
+
+The ratchet test of plates/tests.rs (`ratchet`: a 20k planet, a continent's own ocean floor ring of
+271 columns under 2,500 m of its sediment, the margins switch on, each resampling followed by a
+transition step) kept growing the zone with either corner. With the nearest old sample the
+hyper-extended count goes 271, 316, 349, 372, 398, 421, 442 over six resamplings (major corner 314,
+343, 364, 393, 411, 441), and over 24 it reaches 470 at a lowest z of −0.142. With no step after
+each resampling the count stays 257 to 302 while the lowest z still wanders to −0.110. A label
+copied from one old sample keeps a class's area on average (the union of a stationary lattice's
+cells over a shape has the shape's area as its mean) but moves its edge by a fraction of a spacing
+each time, without bias, so the edge walks. PLT-661's conversion was one-way and kept every move
+that put an ocean-side column in the zone. PLT-667 makes it two-way: a sediment margin outside the
+zone turns back to ocean floor with all its rock, 16 to 50 columns a step against the 21 to 65
+PLT-661 turns. The zone still grows, because it follows the core's own edge, and that edge walks
+too: 27 of the core's columns stand past the start's edge after one resampling and 130 after 24,
+the farthest at z −0.012 and then −0.118, with the steps or without them.
+
+##### Four rules on the quick planet's lattice
+
+The coordinator asked for the rule with the smallest physical error, judged by the felsic mass kept
+first, then area and edge width, then flecks, and no knob either way. Four rules were built behind
+a temporary switch (removed after) and run on the quick planet's lattice (100,000 samples on the
+6,370 km model sphere, spacing h 71.4 km, one cell 5,099 km²) through 70 resamplings with no plate
+motion and no steps, one 1000 Myr run's worth (the base runs have 67 to 72). The shapes, on one
+plate with their ocean: a supercontinent of 0.3 of the planet, a continent 2,000 km across, five
+microcontinents 500 km across, and nine strips 1,000 km long, three each 1, 2 and 3 spacings wide.
+An island arc's band (a Gaussian of `arc_width_km` 60, about 100 km wide at half height) is about
+1.4 spacings. Each rule ran on 32 lattice sequences, so each number below is a mean ± standard
+deviation over 32 supercontinents and continents, 160 micros and 96 strips of each width.
+
+- **nearest** (PLT-664): a new sample takes the labels of the old sample nearest it.
+- **median** (a vote): core if the core corners' weight is over half the live weight, continental
+  if the continental corners' is. A barycentric threshold at one half is the Merriman, Bence and
+  Osher scheme, which moves an edge by its curvature. On the ratchet planet it gives the same
+  labels as a vote by class level, since no triangle there holds three classes.
+- **conserve**: the median's labels, with the rock pools blended over all corners whatever their
+  kind, so no rock is lost at a label's change.
+- **conserve_volume**: the kind from the corners' crust volume, the pools as conserve. Its
+  effective threshold is a continental weight of about 1/6. It ran on one sequence only.
+
+The change after 70 resamplings, in % of the start:
+
+| rule | super felsic | continent felsic | micro felsic | strip 3 / 2 / 1 felsic | continental-kind volume (continent, micro) | farthest crust past the edge (super, continent, micro) | flecks / holes (super) |
+|---|---|---|---|---|---|---|---|
+| nearest | −0.00 ± 0.27 | +0.05 ± 5.4 | −4.9 ± 37 | +0.5 ± 42 / +1.6 ± 52 / +9.0 ± 89 | −0.02, −5.1 | 465, 403, 286 km | 143 / 138 |
+| median | +0.03 ± 0.24 | −3.05 ± 5.0 | −50 ± 29 | −61 / −84 / −98 | −3.1, −50 | 242, 149, 38 km | 15.5 / 14.5 |
+| conserve | −0.06 ± 0.09 | −0.68 ± 1.4 | −3.7 ± 16 | −2.4 / −2.0 / −1.7 | −22, −82 | as median | as median |
+| conserve_volume (one sequence) | −0.05 | −1.4 | −14 | not run | area +5, +40, +84 | | 462 flecks |
+
+Flecks are continental samples more than 2h outside their shape and holes ocean samples more than 2h
+inside it; "felsic" is the felsic plutonic pool of every column within 1,500 km of the shape,
+whatever its kind.
+
+- **Felsic mass.** The nearest rule is unbiased within the noise: every mean is within 1.7
+  standard errors of zero (an 8-sequence run had put the narrowest strips at +50 %, which the 32
+  sequences show was noise). The median loses rock systematically. The micro lost 19.4 cells and
+  the continent 18.8 by the 70th resampling, a quarter of a cell per resampling for any closed body
+  whatever its size, as motion by curvature gives (Gauss-Bonnet: every simple closed edge has the
+  same total turning). So a run takes about 19 cells, 97,000 km², from every body: half a 500 km
+  micro, and the strips are eaten from both sides, 97 % of the one-spacing strips gone by the 70th
+  resampling and 76 % by the 24th. An island arc would not survive. Conserve keeps the felsic rock
+  but puts it on ocean-kind columns: the continental-kind crust volume falls 22 % on the continent
+  and 82 % on a micro, which PLT-293's own-kind rule forbids; on the ratchet planet the core grew
+  (2.3 % over a chain of 24 resamplings) and `a_resampling_keeps_a_converted_margin_apart_from_its_core`
+  failed.
+  Conserve_volume grows every continent.
+- **Area and edge width.** The nearest rule keeps the area on average. Its cost is the walk: one
+  standard deviation of the edge's position after 70 resamplings is about 46 km on a micro, 27 km on
+  the continent and 11 km on the supercontinent, all under a spacing; the edge's band widens, the
+  farthest crust standing 465 km past the supercontinent's edge against the median's 242.
+- **Flecks.** The median wins, with a tenth of the flecks and holes.
+
+Nearest kept the mass and its label, the first two criteria; the median and conserve each failed
+one. It stays, and no rule was added. A rule with no flecks that also keeps the mass would track the
+interface itself (a volume-of-fluid or front-tracking remap), a design question left open.
+`a_resampling_keeps_thin_crust_on_average` (plates/tests.rs) now asserts the unbiasedness: twelve
+strips one spacing wide and eight caps two spacings in radius on a 20k planet, one resampling on
+each of 24 lattices, the continental count's mean change within three standard errors of zero. The
+flatness test `a_converted_margins_zone_stays_flat_over_six_resamplings` fails under every rule,
+since it reads the core edge's roughness (with the vote the zone went 274 to 337 over 24 and its
+lowest z still to −0.121, and 84 core columns stood past the start's edge at −0.092). It stays
+ignored as the margins stage's acceptance test (the coordinator's call, 2026-10-25): the margins
+stage (PLT-661), and anything else with a one-way conversion measured from the core's edge, cannot
+go on until a remap passes it, and that remap is interface-tracking or volume-of-fluid, with the
+nearest rule's unbiased mass. The margins switch is off in the shipped presets, so the ratchet does
+not run on the pool; PLT-667 acts with it off as well, where a collapse's spread or a resampling's accretion
+leaves a sediment margin.
+
 ## The sea floor's age and the initiation's polarity (2026-10-25)
 
 The floor-age diagnosis (build log 2026-10-25, "Front lane: why floor older than 180 Myr does not go

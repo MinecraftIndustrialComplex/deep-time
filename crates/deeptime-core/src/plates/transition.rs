@@ -243,9 +243,16 @@ pub struct Transition {
     /// rock it holds (`margin_sediment_continental`; ledger: PLT-661).
     pub margins: u32,
     /// Sediment margins ([`sediment_margin`]) outside the zone's ocean side turned ocean floor
-    /// again this step (ledger: PLT-667).
+    /// again this step (ledger: PLT-667) …
     pub margins_left: u32,
+    /// … and their crust less the basement, which leaves the continental crust for the ocean
+    /// floor's (its pools stay in the column), km² × m (Earth-normalized area).
+    pub margins_left_km2_m: f64,
 }
+
+/// `WorldState::globals` (measurement): the crust of sediment margins turned ocean floor again
+/// (PLT-667), less their basement, over the run, km³ (Earth-normalized).
+pub const MARGINS_LEFT_GLOBAL: &str = "plates/transition_margins_left_km3";
 
 /// The transition's width W as an angle on the unit sphere: `transition_width_km` is a length on
 /// the model sphere (R_model, `tectonics.model_radius_km`), so the planet's radius does not enter.
@@ -551,8 +558,8 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
     // distal margin's continental crust (the module docs; ledger: PLT-661). The zone was found
     // from the samples as the step began, so a column turned now is the ocean side's next step
     // too and the next ring out is no margin of it.
+    let mut in_zone = vec![false; n];
     if margins {
-        let mut in_zone = vec![false; n];
         for m in &members {
             in_zone[m.i] = side[m.i] == OCEANIC;
             let s = &mut state.samples[m.i];
@@ -562,16 +569,19 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
                 out.margins += 1;
             }
         }
-        // The margin is the zone's, measured on this lattice from the continent's own crust as
-        // it is now: a sediment margin outside the zone's ocean side is ocean floor (ledger:
-        // PLT-667). A resampling moves a class's edge without bias, a fraction of a spacing each
-        // time, and a margin kept wherever the zone once reached grew with every move outward
-        // (the residual ratchet, plates.md "The residual ratchet").
-        for (i, s) in state.samples.iter_mut().enumerate() {
-            if eligible[i] && !in_zone[i] && sediment_margin(s) {
-                s.make_oceanic();
-                out.margins_left += 1;
-            }
+    }
+    // The margin is the zone's, measured on this lattice from the continent's own crust as it is
+    // now: a sediment margin outside the zone's ocean side is ocean floor under thick sediment,
+    // wherever it lies (ledger: PLT-667), with the margin's sediment off too, where no column is
+    // in the zone's ocean side and crust a collapse spread onto the floor can be one. A resampling
+    // moves a class's edge without bias, a fraction of a spacing each time, and a margin kept
+    // wherever the zone once reached grew with every move outward (the residual ratchet, plates.md
+    // "The residual ratchet"). Only the label changes: the column's pools stay as they are.
+    for (i, s) in state.samples.iter_mut().enumerate() {
+        if eligible[i] && !in_zone[i] && sediment_margin(s) {
+            out.margins_left_km2_m += f64::from(s.own_thickness_m()) * env.norm.sample_area_km2();
+            s.make_oceanic();
+            out.margins_left += 1;
         }
     }
     out
@@ -1197,5 +1207,33 @@ mod tests {
         st.samples.clone_from(&off);
         fx.run(&mut st, 30);
         assert!(st.samples.iter().all(|s| s.lithosphere_km == 0.0));
+    }
+
+    /// PLT-667 changes a label and no rock (the coordinator's check, 2026-10-25): a sediment margin
+    /// (ocean crust under 3.5 km of the continents' sediment, turned continental by PLT-661)
+    /// turned ocean floor again keeps every pool, its thickness and its height, and what leaves
+    /// the continental crust is its crust less the basement, the sediment, to the metre.
+    #[test]
+    fn a_sediment_margin_turned_ocean_floor_keeps_its_rock() {
+        let mut s = Sample::blank(0);
+        s.pools = oceanic_column();
+        s.pools[pool::SEDIMENT] = 500.0;
+        s.pools[pool::SEDIMENTARY] = 3000.0;
+        s.thickness_m = s.pools.iter().sum();
+        s.elevation_m = -3000.0;
+        s.make_continental();
+        assert!(sediment_margin(&s), "a sediment margin: {s:?}");
+        let before = s;
+        assert_eq!(before.own_thickness_m(), 3500.0);
+        s.make_oceanic();
+        assert_eq!(s.kind, OCEANIC);
+        assert_eq!(s.pools, before.pools);
+        assert_eq!(s.thickness_m, before.thickness_m);
+        assert_eq!(s.elevation_m, before.elevation_m);
+        assert_eq!(s.basement(), 0.0);
+        // An emerged arc's crust is mostly crystalline rock of its own: no sediment margin.
+        let mut arc = before;
+        arc.pools[pool::FELSIC_VOLCANIC] = 4000.0;
+        assert!(!sediment_margin(&arc));
     }
 }

@@ -4622,7 +4622,10 @@ fn an_arcs_rate_is_its_types_rate_at_earths_convergence_scaled_by_its_own() {
     let magma = |pull: &subduction::Pull| pull.arc_continental_km3 + pull.arc_oceanic_km3;
     assert!(magma(&slow) > 0.0, "no arc");
     let ratio = magma(&fast) / magma(&slow);
-    assert!((ratio - 4.0).abs() < 1e-6 * 4.0, "4× the convergence, {ratio}× the magma");
+    assert!(
+        (ratio - 4.0).abs() < 1e-6 * 4.0,
+        "4× the convergence, {ratio}× the magma"
+    );
     for pull in [&slow, &fast] {
         let front = pull.front_continental_km_myr + pull.front_oceanic_km_myr;
         // Each type's rate over its reference convergence, times the type's v_n-weighted front.
@@ -5251,7 +5254,11 @@ fn a_resampling_keeps_a_converted_margin_apart_from_its_core() {
         r.kept,
         change * 100.0
     );
-    assert!(r.mixes.iter().all(|&m| m == 0), "mixed columns {:?}", r.mixes);
+    assert!(
+        r.mixes.iter().all(|&m| m == 0),
+        "mixed columns {:?}",
+        r.mixes
+    );
     let grown = r.cores[r.cores.len() - 1] as f64 / r.core0 as f64 - 1.0;
     assert!(
         grown.abs() < 0.005,
@@ -5274,10 +5281,24 @@ fn a_resampling_keeps_a_converted_margin_apart_from_its_core() {
 /// each, the count stayed 257 to 302 while the lowest z still wandered out to −0.110. So a
 /// categorical label resampled from any one corner moves the class's edge without bias, a
 /// fraction of a spacing each time, and the one-way conversion keeps every move that puts an
-/// ocean-side column in the zone (plates.md "The residual ratchet"). Ignored until a fix that adds
-/// no knob is chosen.
+/// ocean-side column in the zone (plates.md "The residual ratchet").
+///
+/// No rule tried passes it (2026-10-25, plates.md "Which old sample a new one follows"). A vote of
+/// the corners' weight at one half (motion by curvature) slows the count (274 to 337 over 24) but
+/// the lowest z still goes to −0.121, since the core's own edge roughens under every rule (the core
+/// south of the start's edge: 130 columns at −0.118 with the nearest label, 84 at −0.092 with the
+/// vote); and the vote eats any body a fixed 0.14 to 0.22 cells per resampling, so on the quick
+/// planet's lattice it took all of a strip one spacing wide (an island arc's band) by the 35th and
+/// half of a 500 km microcontinent by the 70th. A conservative remap keeps the felsic rock but
+/// spreads it onto ocean-kind columns and grows the core (+2.3 % in 24). The nearest label keeps
+/// the mass without bias ([`a_resampling_keeps_thin_crust_on_average`]), so it stays.
+///
+/// This is the margins stage's acceptance test (the coordinator's call, 2026-10-25): the margins
+/// stage (PLT-661's switch), and anything else with a one-way conversion measured from the core's
+/// edge, cannot go on until a remap passes it. That remap is interface-tracking or
+/// volume-of-fluid, with the nearest label's unbiased mass.
 #[test]
-#[ignore = "fails: the zone grows at each resampling's step (PLT-664, plates.md \"The residual ratchet\")"]
+#[ignore = "the margins stage's acceptance test: fails until an interface-tracking remap (PLT-664, plates.md \"Which old sample a new one follows\")"]
 fn a_converted_margins_zone_stays_flat_over_six_resamplings() {
     let r = ratchet(6, true);
     let band = |v0: f64, v: &[f64]| {
@@ -6166,72 +6187,95 @@ fn a_deferred_collision_leaves_both_plates_to_the_balance() {
     );
 }
 
-/// TEMPORARY (the M5 lane's diagnosis, removed before the merge): the ratchet's chain at 24
-/// resamplings, with and without the steps.
+/// A resampling keeps thin continental crust on average (ledger: PLT-664). Twelve strips one
+/// spacing wide and 2,000 km long, an island arc's band, and eight caps two spacings in radius lie
+/// on one plate's ocean; one resampling on each of 24 lattices. A label from the nearest old sample
+/// carries each old sample's crust to the new points in its cell, so the continental area's mean
+/// over the lattices stays within three standard errors of where it was, the spread being the
+/// lattices' own (no tuned value). A threshold of the corners' weight at one half (a class vote,
+/// tried 2026-10-25) eats such strips from both sides: on the quick planet's lattice it took
+/// 6.7 % of a strip one spacing wide at the first resampling and all of it by the 35th.
 #[test]
-#[ignore = "diagnosis"]
-fn ratchet_chain_24_diagnosis() {
-    ratchet(24, true);
-    ratchet(24, false);
-}
-
-/// TEMPORARY (the M5 lane's diagnosis): a small continent (a cap 0.25 rad round +z, on one plate
-/// with its ocean) over 24 resamplings: its columns, and those more than 0.05 rad outside the cap.
-#[test]
-#[ignore = "diagnosis"]
-fn small_continent_24_diagnosis() {
-    let p = preset(20_000, 20.0, "supercontinent", 5);
+fn a_resampling_keeps_thin_crust_on_average() {
+    let n_samples = 20_000u32;
+    let p = preset(n_samples, 20.0, "supercontinent", 5);
     let stage = PlatesStage::new(p.clone());
     let env = stage.env(&p.tectonics, 1);
+    let r_km = env.norm.model_km;
+    let h_km = r_km * (4.0 * std::f64::consts::PI / f64::from(n_samples)).sqrt();
     let (mut st, geo, pos) = plates_split(&p, &env, 0.0, |q| q.z > -0.9);
-    let pts = geo.points();
-    let edge = 0.25_f64.cos();
+    let inside = |q: DVec3| -> bool {
+        for k in 0..12 {
+            let th = (30.0 * f64::from(k)).to_radians();
+            let c = DVec3::new(th.cos(), th.sin(), 0.0);
+            let a = DVec3::new(-th.sin(), th.cos(), 0.0);
+            if q.dot(c) > 0.0 {
+                let along = q.dot(a).atan2(q.dot(c)) * r_km;
+                let across = q.dot(c.cross(a)).clamp(-1.0, 1.0).asin() * r_km;
+                if along.abs() < 1000.0 && across.abs() < 0.5 * h_km {
+                    return true;
+                }
+            }
+        }
+        (0..8).any(|k| {
+            let th = (45.0 * f64::from(k)).to_radians();
+            let c = DVec3::new(0.7 * th.cos(), 0.7 * th.sin(), 0.714).normalize();
+            q.dot(c).clamp(-1.0, 1.0).acos() * r_km < 2.0 * h_km
+        })
+    };
     for (i, s) in st.samples.iter_mut().enumerate() {
-        if s.group == 0 && pts[i].z < edge {
+        if s.group != 0 {
+            continue;
+        }
+        if inside(pos[i]) {
+            s.kind = CONTINENTAL;
+            s.pools = pools::continental_column();
+            s.elevation_m = 500.0;
+        } else {
             s.kind = state::OCEANIC;
             s.pools = pools::oceanic_column();
             s.elevation_m = -4000.0;
             s.formed_myr = (env.t_myr - 60.0) as f32;
-            s.thickness_m = pools::thickness(&s.pools);
         }
+        s.thickness_m = pools::thickness(&s.pools);
     }
-    let count = |st: &PlateState, pos: &[DVec3]| {
-        let c = st
-            .samples
+    let continental = |st: &PlateState| {
+        st.samples
             .iter()
-            .filter(|s| !s.is_hidden() && s.kind == CONTINENTAL)
-            .count();
-        let far = st
-            .samples
-            .iter()
-            .zip(pos)
-            .filter(|(s, q)| !s.is_hidden() && s.kind == CONTINENTAL && q.z.acos() > 0.30)
-            .count();
-        (c, far)
+            .filter(|s| !s.is_hidden() && s.group == 0 && s.kind == CONTINENTAL)
+            .count() as f64
     };
-    let resampled = |st: &PlateState, geo: &Geo, pos: &[DVec3], k: u64| {
-        let mut s2 = st.clone();
-        s2.rng = crate::sphere::SplitMix64::new(500 + k);
-        let mut world = WorldState::new(1, 16_384, p.t_start_years());
-        let geo2 = ridges::resample(
-            &mut s2,
-            &mut world,
-            pos,
-            &Tree::over(pos, |_| true),
-            geo,
-            &env,
-        )
-        .unwrap();
-        let pos2 = geometry::positions(&s2, &geo2);
-        s2.recount(&pos2);
-        (s2, geo2, pos2)
-    };
-    let mut out = vec![count(&st, &pos)];
-    let mut cur = resampled(&st, &geo, &pos, 0);
-    out.push(count(&cur.0, &cur.2));
-    for k in 1..24u64 {
-        cur = resampled(&cur.0, &cur.1, &cur.2, k);
-        out.push(count(&cur.0, &cur.2));
-    }
-    eprintln!("small continent (columns, beyond 0.30 rad): {out:?}");
+    let n0 = continental(&st);
+    assert!(n0 > 200.0, "the strips and caps hold {n0} samples");
+    let changes: Vec<f64> = (0..24u64)
+        .map(|k| {
+            let mut s2 = st.clone();
+            s2.rng = crate::sphere::SplitMix64::new(4000 + k);
+            let mut world = WorldState::new(1, 16_384, p.t_start_years());
+            let geo2 = ridges::resample(
+                &mut s2,
+                &mut world,
+                &pos,
+                &Tree::over(&pos, |_| true),
+                &geo,
+                &env,
+            )
+            .unwrap();
+            let pos2 = geometry::positions(&s2, &geo2);
+            s2.recount(&pos2);
+            continental(&s2) / n0 - 1.0
+        })
+        .collect();
+    let n = changes.len() as f64;
+    let mean = changes.iter().sum::<f64>() / n;
+    let sd = (changes.iter().map(|c| (c - mean).powi(2)).sum::<f64>() / (n - 1.0)).sqrt();
+    assert!(
+        mean.abs() <= 3.0 * sd / n.sqrt(),
+        "the continental area changed by {:+.2} % on average (standard error {:.2} %) over {} \
+         lattices: {:+.3?}",
+        mean * 100.0,
+        sd / n.sqrt() * 100.0,
+        changes.len(),
+        changes
+    );
 }

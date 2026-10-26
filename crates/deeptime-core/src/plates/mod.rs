@@ -739,6 +739,10 @@ impl PlatesStage {
             .globals
             .entry(transition::MOVED_GLOBAL.to_owned())
             .or_insert(0.0) += taper.moved_km2_m / 1000.0;
+        *world
+            .globals
+            .entry(transition::MARGINS_LEFT_GLOBAL.to_owned())
+            .or_insert(0.0) += taper.margins_left_km2_m / 1000.0;
         // The visible continental crust's volume (measurement: the crust budget, km³).
         let volume_m: f64 = st
             .samples

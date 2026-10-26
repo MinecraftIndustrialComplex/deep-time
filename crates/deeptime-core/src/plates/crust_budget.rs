@@ -120,7 +120,7 @@ pub const EDGES_KM: [f64; 10] = [
 ];
 
 /// The globals each snapshot copies (cumulative over the run, km³ or km² Earth-normalized).
-const GLOBALS: [(&str, &str); 60] = [
+const GLOBALS: [(&str, &str); 66] = [
     ("flow_steps", super::flow::STEPS_GLOBAL),
     ("flow_substeps", super::flow::SUBSTEPS_GLOBAL),
     ("flow_short_myr", super::flow::SHORT_GLOBAL),
@@ -175,7 +175,29 @@ const GLOBALS: [(&str, &str); 60] = [
         super::subduction::FRONT_G_CONTINENTAL_NORMAL_GLOBAL,
     ),
     ("transition_moved", super::transition::MOVED_GLOBAL),
+    ("margins_left", super::transition::MARGINS_LEFT_GLOBAL),
     ("sed_subducted", super::ridges::SEDIMENT_SUBDUCTED_GLOBAL),
+    // Measurement only: the floor's sediment reaching the trenches, before the share the slab
+    // takes, by the crust on top (the sediment diagnosis, tools/review/seddiag/).
+    ("sed_trench", super::ridges::SEDIMENT_REACHING_TRENCH_GLOBAL),
+    (
+        "sed_trench_c",
+        super::ridges::SEDIMENT_REACHING_TRENCH_CONTINENTAL_GLOBAL,
+    ),
+    (
+        "sed_trench_o",
+        super::ridges::SEDIMENT_REACHING_TRENCH_OCEANIC_GLOBAL,
+    ),
+    // The arcs' fronts' length × dt × normal convergence (PLT-665): over front_c and front_o,
+    // the mean v_n at the arcs.
+    (
+        "front_n_c",
+        super::subduction::ARC_FRONT_NORMAL_CONTINENTAL_GLOBAL,
+    ),
+    (
+        "front_n_o",
+        super::subduction::ARC_FRONT_NORMAL_OCEANIC_GLOBAL,
+    ),
     ("forearc_c", super::subduction::FOREARC_CONTINENTAL_GLOBAL),
     ("forearc_o", super::subduction::FOREARC_OTHER_GLOBAL),
     ("forearc_short", super::subduction::FOREARC_SHORT_GLOBAL),
