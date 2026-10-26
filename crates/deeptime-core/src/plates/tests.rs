@@ -7002,7 +7002,15 @@ fn a_backarc_sliver_opens_at_earth_s_rates() {
         fronts
             .iter()
             .map(|&v| {
-                shortening::boundary_normal(&geo, &pos, &rots, &st.samples, &plate_of, v as usize, 1)
+                shortening::boundary_normal(
+                    &geo,
+                    &pos,
+                    &rots,
+                    &st.samples,
+                    &plate_of,
+                    v as usize,
+                    1,
+                )
             })
             .collect()
     };
@@ -7039,7 +7047,13 @@ fn a_backarc_sliver_opens_at_earth_s_rates() {
         st.plates[s].samples,
         fronts.len()
     );
-    assert!((2.8..=142.1).contains(&vd), "the back-arc opens at {vd} mm/yr");
-    assert!(vt > vt_before, "the trench rolls back: {vt} against {vt_before}");
+    assert!(
+        (2.8..=142.1).contains(&vd),
+        "the back-arc opens at {vd} mm/yr"
+    );
+    assert!(
+        vt > vt_before,
+        "the trench rolls back: {vt} against {vt_before}"
+    );
     assert!(vt.abs() <= 160.0, "the trench moves {vt} mm/yr");
 }

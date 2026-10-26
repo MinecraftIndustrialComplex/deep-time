@@ -1056,11 +1056,8 @@ pub fn maybe_rift_backarc(
     state.backarcs.retain(|b| {
         plates.get(b.plate as usize).is_some_and(|p| p.alive) && holders.contains(&b.plate)
     });
-    let parent_of: BTreeMap<u32, u32> = state
-        .backarcs
-        .iter()
-        .map(|b| (b.plate, b.parent))
-        .collect();
+    let parent_of: BTreeMap<u32, u32> =
+        state.backarcs.iter().map(|b| (b.plate, b.parent)).collect();
     let slab_km: BTreeMap<(u32, u32), f64> = state
         .slabs
         .iter()
@@ -1099,7 +1096,9 @@ pub fn maybe_rift_backarc(
         }
         // ledger: PLT-712, PLT-713
         let old = state.samples[u as usize].age_myr(t) > BACKARC_SLAB_AGE_MYR;
-        let deep = slab_km.get(&(up, o)).is_some_and(|&km| km >= BACKARC_SLAB_KM);
+        let deep = slab_km
+            .get(&(up, o))
+            .is_some_and(|&km| km >= BACKARC_SLAB_KM);
         if up != o && old && deep && vt < 0.0 {
             sums[6] += km_myr;
             qualifying.entry((up, o)).or_default().push(v);
@@ -2069,7 +2068,10 @@ pub(in crate::plates) mod tests {
             if st.plate_of(v) != 1 {
                 continue;
             }
-            if let Some((u, _)) = geo.edges(v as u32).find(|&(u, _)| st.plate_of(u as usize) == 0) {
+            if let Some((u, _)) = geo
+                .edges(v as u32)
+                .find(|&(u, _)| st.plate_of(u as usize) == 0)
+            {
                 fronts.push(v as u32);
                 detail.push((u, (-DVec3::Z - x * x.dot(-DVec3::Z)).normalize()));
             }
@@ -2126,7 +2128,10 @@ pub(in crate::plates) mod tests {
         for &i in &sliver {
             assert_eq!(before[i], 1);
             let (_, d2) = tree.nearest(pos[i]).unwrap();
-            assert!(angle_of_chord2(d2) <= reach + 1e-12, "sample {i} beyond the arc");
+            assert!(
+                angle_of_chord2(d2) <= reach + 1e-12,
+                "sample {i} beyond the arc"
+            );
         }
         assert!(fronts.iter().all(|&v| st.plate_of(v as usize) == s));
         assert_eq!(st.plates[3].omega, st.plates[1].omega);
@@ -2151,16 +2156,21 @@ pub(in crate::plates) mod tests {
                 .all(|e| e.params.get("origin") == Some(&origin))
         );
         // The measures: every front qualified and no sliver held one this step.
-        let g = |key: &str| world.globals.get(key).copied().unwrap_or(f64::NAN);
-        assert!((g(BACKARC_QUALIFYING_GLOBAL) - g(TRENCH_FRONT_GLOBAL)).abs() < 1e-9);
-        assert_eq!(g(BACKARC_FRONT_GLOBAL), 0.0);
-        assert!(g(TRENCH_VT_GLOBAL) < 0.0, "O moves away from its trench: Vt < 0");
+        let g = |w: &WorldState, key: &str| w.globals.get(key).copied().unwrap_or(f64::NAN);
+        assert!(
+            (g(&world, BACKARC_QUALIFYING_GLOBAL) - g(&world, TRENCH_FRONT_GLOBAL)).abs() < 1e-9
+        );
+        assert_eq!(g(&world, BACKARC_FRONT_GLOBAL), 0.0);
+        assert!(
+            g(&world, TRENCH_VT_GLOBAL) < 0.0,
+            "O moves away from its trench: Vt < 0"
+        );
         // A step later the sliver holds the fronts and keeps its place on the list.
         let fronts2: Vec<u32> = fronts.clone();
         maybe_rift_backarc(&mut st, &mut world, &geo, &pos, &env(&k), &fronts2, &detail).unwrap();
         assert_eq!(st.plates.len(), 4, "a held front draws no second sliver");
         assert_eq!(st.backarcs.len(), 1);
-        assert!(g(BACKARC_FRONT_GLOBAL) > 0.0);
+        assert!(g(&world, BACKARC_FRONT_GLOBAL) > 0.0);
         // Without a front it leaves the list.
         maybe_rift_backarc(&mut st, &mut world, &geo, &pos, &env(&k), &[], &[]).unwrap();
         assert!(st.backarcs.is_empty());
@@ -2184,7 +2194,16 @@ pub(in crate::plates) mod tests {
         let (mut st, pos, fronts, detail) = backarc_planet(&geo, 80.0, 30.0, 400.0);
         let rng = st.rng.clone();
         let mut world = WorldState::new(1, 16_384, 0.0);
-        maybe_rift_backarc(&mut st, &mut world, &geo, &pos, &env(&off), &fronts, &detail).unwrap();
+        maybe_rift_backarc(
+            &mut st,
+            &mut world,
+            &geo,
+            &pos,
+            &env(&off),
+            &fronts,
+            &detail,
+        )
+        .unwrap();
         assert_eq!(st.plates.len(), 3);
         assert!(world.globals.is_empty() && world.events.is_empty());
         assert_eq!(st.rng, rng, "off draws nothing");
