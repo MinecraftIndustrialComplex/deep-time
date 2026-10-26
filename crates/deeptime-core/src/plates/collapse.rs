@@ -478,7 +478,7 @@ impl Sheet {
             t_myr: env.t_myr,
             dt_myr: env.dt_myr,
             normal_m,
-            u_normal: column_energy(z_n, true, 0.0, 0.0, sea_m, env.gravity), // ledger: FRC-014
+            u_normal: column_energy(z_n, true, 0.0, 0.0, f64::INFINITY, sea_m, env.gravity), // ledger: FRC-014
             sea_m,
             z_0,
             gravity: env.gravity,
@@ -499,7 +499,8 @@ impl Sheet {
         }
         let z =
             iso_height(&s.pools, self.z_0, self.gravity) + self.thermal.uplift_m(s.lithosphere_km);
-        let du = column_energy(z, true, 0.0, 0.0, self.sea_m, self.gravity) - self.u_normal;
+        let du = column_energy(z, true, 0.0, 0.0, f64::INFINITY, self.sea_m, self.gravity)
+            - self.u_normal;
         if du.is_nan() || du <= 0.0 {
             return 0.0;
         }

@@ -1179,6 +1179,7 @@ fn upper_plate(
             true,
             k.ridge_elevation_m,
             k.oceanic_floor_elevation_m,
+            f64::INFINITY,
             sea_m,
             env.gravity,
         )
@@ -1996,7 +1997,17 @@ mod tests {
         // nothing for a belt lower than the lowland.
         let fx = Fixture::new();
         let k = &fx.preset.tectonics;
-        let u = |z: f64| column_energy(z, true, k.ridge_elevation_m, -5000.0, 0.0, 9.81);
+        let u = |z: f64| {
+            column_energy(
+                z,
+                true,
+                k.ridge_elevation_m,
+                -5000.0,
+                f64::INFINITY,
+                0.0,
+                9.81,
+            )
+        };
         let f = belt_push_n_m(k, u(5000.0) - u(0.0));
         assert!((f - 6.7e12).abs() < 0.1e12, "{f}");
         assert_eq!(belt_push_n_m(k, u(0.0) - u(1000.0)), 0.0);
