@@ -1,9 +1,13 @@
 """earthvel.py <PB2002_steps.dat> <earthisl.json>: Bird 2003's convergence rate (minus the step's
 divergence, mm/a, PB2002_steps.dat) on SUB and OCB steps, in the dynamics record's normal-speed bands,
 by length; for all SUB, for SUB that the model's rule calls island (CRUST1.0 whole crust 20 km within
-154 km) and for OCB."""
+154 km) and for OCB. EARTHVEL_SCALE=<x> multiplies every convergence by x first (Earth at a planet's
+speed level: the planet's CHK-020 level over Earth's 47.1 mm/yr)."""
 import json
+import os
 import sys
+
+SCALE = float(os.environ.get("EARTHVEL_SCALE", "1"))
 
 EDGES = [0.0, 5.0, 10.0, 20.0, 40.0, 80.0]
 rows = []
@@ -27,7 +31,7 @@ def show(name, sel):
     km = [0.0] * len(EDGES)
     neg = 0.0
     for r in sel:
-        c = -r["div"]
+        c = -r["div"] * SCALE
         if c < 0.0:
             neg += r["length"]
             c = 0.0
@@ -37,7 +41,7 @@ def show(name, sel):
           + f"  (diverging {neg / tot:.3f})")
 
 
-print("== convergence rate bands (mm/a), shares of length")
+print(f"== convergence rate bands (mm/a), shares of length; convergence x {SCALE}")
 show("SUB", [r for r in rows if r["cls"] == "SUB"])
 show("SUB island by the model's rule", [r for k, r in enumerate(rows) if r["cls"] == "SUB" and k in isl])
 show("SUB not island", [r for k, r in enumerate(rows) if r["cls"] == "SUB" and k not in isl])
