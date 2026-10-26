@@ -4528,7 +4528,77 @@ amount rises on the overriding edge).
 
 ### The arm (noroom against base23-s4)
 
-ARM_PENDING
+`pool.sh run noroom --seeds 1,2,3,4 +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`
+from the branch at 3b967e24 (key b7986727efa9, argkey cd665cef), against base23-s4 (base23's seeds
+1 to 4 on both starts, key 461402667488, the same runs as fixc2). Medians of 8 runs, two-sided
+Mann-Whitney p against the base in brackets (`pool.sh table`, measures v1census and guard):
+
+| | land | largest landmass | crust under the sea | above 2 km | coast with high ground | under ice | collisions per 100 Myr | crust net change | criteria met | sea over the datum (100 Myr / end) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| base23-s4 | 0.288 | 0.149 | 0.174 | 0.029 | 0.153 | 0.044 | 2.80 | −0.111 | 6, mean 5.62 | 228 / 113 m |
+| noroom | 0.316 (0.65) | 0.168 (0.96) | 0.211 (0.72) | 0.059 (0.44) | 0.109 (0.96) | 0.117 (0.28) | 3.40 (0.14) | −0.065 (0.13) | 5.5, mean 5.50 (0.78) | 520 / 597 m |
+
+The guard is clean: worst 10,172 against 9,930 m (p 0.65), no step beyond 2 Earth reliefs, the
+highest plate elevation 5,688 against 5,212 m (p 0.33).
+
+The crust budget (mean of the 8 runs, km³ a year; `collseries.py base23-s4 noroom noroom-off`):
+
+| | base23-s4 | noroom |
+|---|---|---|
+| crossing | 8.42 | 9.81 |
+| kept | 6.40 | 9.27 |
+| lost at the fronts | 2.02 | 0.54 |
+| of it the share (PLT-242) | 0.42 | 0.48 |
+| left over with room / at the strength height | 0.85 / 0.76 | 0 / 0 |
+| clipped at `max_elevation_m` (30 km) | 0.00 | 0.06 |
+| kept by PLT-700 (`noroom_stays`) | | 1.32 |
+| the founder's sink / the rate limit's | 0.000 / 0.010 | 0.002 / 0.023 |
+| front in collision at any time | 8,573 km | 9,707 km |
+| lost per km of front | 234 km³/km/Myr | 55 |
+| lost fraction of the crossing | 0.239 | 0.055 |
+
+The fronts now lose 0.54 km³ a year, 55 km³ per km and Myr: Stern & Scholl's 50 of deep
+lower-plate loss at the model's front gives 0.49, 65 (with sediment) 0.63 and 115 (with the upper
+plate's erosion, which the model's fronts do not take) 1.12. The kept crust stays: the founder and
+the rate limit sink 0.025 km³ a year of the 1.32 kept. 0.06 is clipped at the highest elevation,
+30 km, on the narrowest belts before the founder spreads it (the old rule sent that crust down
+anyway); handing such a stack to the spread directly would keep it too.
+
+The no-room split by class, on the off check's 2 runs (the old rule) and the arm (km³ a year):
+
+| class | front-time off / on | crossing off / on | lost for want of room, off | kept by PLT-700, on |
+|---|---|---|---|---|
+| no continental crust in reach (empty) | 0.064 / 0.016 | 0.61 / 0.23 | 0.58 (all at the strength height) | 0.22 |
+| narrower than half a full belt | 0.158 / 0.132 | 1.47 / 1.66 | 0.58 (0.37 left over, 0.21 at the height) | 0.55 |
+| wider | 0.779 / 0.852 | 5.34 / 7.92 | 0.27 (left over after six passes) | 0.55 |
+
+Of the old rule's 1.79 there, the arcs in collision took 32 %, the narrow belts 32 %, the wide
+belts' six passes 15 % and the share 20 %. With the switch the arcs in collision take a sixth of
+the front-time they had: their edge holds a continent's crust within a few steps (PLT-289) and the
+belt behind the next front is continental.
+
+The plate check (medians; fails of 8): continental crust's lowest share 0.306 to 0.342 (p 0.015;
+still under 0.37 in every run), the plates' median life 70 to 72 Myr (fails 8 to 7), collisions
+2.80 to 3.40 (all in 2 to 6), the most land gained in a step 1.74 to 2.42 per 2 Myr (fails 6 to 8),
+emergent island arcs 9.1 to 10.3 % (fails 7 to 3), supercontinent tenure 94.5 to 61.5 Myr (fails 4
+to 5), assembly period 278 to 182 Myr (fails 5 to 7). Checks passed per run, median 26 to 25 (p
+0.63).
+
+The sea stands higher over the datum, 228 / 113 to 520 / 597 m. The likely reading, not traced
+further: the continental crust kept is continental area taken from the basins (its share of the
+planet at the end 0.312 to 0.358), and the same water over 0.642 of the planet instead of 0.688
+stands about 270 m higher at a mean depth near 3.7 km; the continental share is still under the
+plate check's 0.37 at its lowest. Land and the crust under the sea moved by less than their spread
+(p 0.65, 0.72).
+
+The off check (`noroom-off`, `--set tectonics.collision_noroom_stays=false`, argkey ed59aded,
+seed 1 on both starts) is base23's planet bit for bit: state_sha256 and rec_sha256 equal on both
+runs.
+
+Physics on by default once correct: the unit tests pass, the guard is clean and the off check is
+the base, so PLT-700 is on. What it does not fix: the continental minimum and the plates' life
+still fail (the fronts were not their only cause), and the share against the India mass balances
+stays an open question.
 
 ## The transition's width and the drowned continents (2026-10-22)
 
