@@ -580,7 +580,7 @@ mod tests {
             weights: &weights,
             allowed: &allowed,
         };
-        let semi = vec![[3.0, 2.0]; 12];
+        let semi = [[3.0, 2.0]; 12];
         let radii = vec![3.0; 12];
         let (mut placed_total, mut near) = (0, 0);
         for adjoining in [false, true] {
