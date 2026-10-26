@@ -719,6 +719,7 @@ mod tests {
             limits: None,
             shown: None,
             one_way: None,
+            propagations: Vec::new(),
             level_set: None,
         }
     }

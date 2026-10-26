@@ -425,7 +425,22 @@ pub fn maybe_initiate_subduction(
         .map(|(i, _)| pos[i])
         .collect();
     let trench_tree = (!trenches.is_empty()).then(|| Tree::over(&trenches, |_| true));
-    let clearance = env.norm.rad(k.subduction_initiation_clearance_km);
+    // No initiation within one lattice spacing of a front where along-strike propagation
+    // carries subduction to the margins (Crameri et al. 2020 source both); else the old 1,000 km.
+    // ledger: PLT-064, PLT-656
+    let old_clearance = env.norm.rad(k.subduction_initiation_clearance_km);
+    let clearance = if k.margin_propagation {
+        env.norm.spacing_rad()
+    } else {
+        old_clearance
+    };
+    // An initiation the old clearance would have refused (counted, PLT-064).
+    let near_front = |i: usize| {
+        trench_tree.as_ref().is_some_and(|tr| {
+            tr.nearest(pos[i])
+                .is_some_and(|(_, d2)| angle_of_chord2(d2) <= old_clearance)
+        })
+    };
     // Off the passive margin (V1 gap 2's stage C1): the reach of the arc the new trench builds
     // on the plate, and a lattice spacing for where the front falls. ledger: PLT-503
     let margin = if k.subduction_initiation_offshore {
@@ -486,6 +501,7 @@ pub fn maybe_initiate_subduction(
                     continue;
                 }
                 let seed = far[state.rng.below(far.len() as u64) as usize];
+                let n = state.plates.len();
                 initiate(
                     state,
                     world,
@@ -497,9 +513,16 @@ pub fn maybe_initiate_subduction(
                     o,
                     Some(near.as_slice()),
                 )?;
+                if state.plates.len() > n && near_front(seed as usize) {
+                    state.counters.initiations_near_fronts += 1;
+                }
             } else {
                 let seed = o[state.rng.below(o.len() as u64) as usize];
+                let n = state.plates.len();
                 initiate(state, world, geo, pos, env, id, seed, o, None)?;
+                if state.plates.len() > n && near_front(seed as usize) {
+                    state.counters.initiations_near_fronts += 1;
+                }
             }
         }
     }
@@ -976,6 +999,7 @@ pub(in crate::plates) mod tests {
             limits: None,
             shown: None,
             one_way: None,
+            propagations: Vec::new(),
             level_set: None,
         };
         let pos = positions(&st, geo);
