@@ -32,7 +32,7 @@ fn arcs_line_up_along_the_front_at_the_spacing() {
     let spacing = 60_000.0;
     let mut occupied = Vec::new();
     let mut rng = Rng::stream(5, "test");
-    let born = place_arcs(&grid, mh, &flux, 0.25, spacing, &mut occupied, &mut rng);
+    let (born, _) = place_arcs(&grid, mh, &flux, 0.25, spacing, &mut occupied, &mut rng);
     let km = |a: (f64, f64), b: (f64, f64)| (a.0 - b.0).hypot(a.1 - b.1) * mh / 1000.0;
     assert!(!born.is_empty());
     for &(x, z, c) in &born {
@@ -65,11 +65,11 @@ fn arcs_line_up_along_the_front_at_the_spacing() {
         "{count} volcanoes on 2,400 km of arc"
     );
     // Saturated: a second pass with the same occupancy adds almost nothing.
-    let again = place_arcs(&grid, mh, &flux, 0.25, spacing, &mut occupied, &mut rng);
+    let (again, _) = place_arcs(&grid, mh, &flux, 0.25, spacing, &mut occupied, &mut rng);
     assert!(again.len() <= count / 5, "{} more", again.len());
     // Density halves the spacing: about twice as many.
     let mut occ2 = Vec::new();
-    let dense = place_arcs(&grid, mh, &flux, 0.25, spacing / 2.0, &mut occ2, &mut rng);
+    let (dense, _) = place_arcs(&grid, mh, &flux, 0.25, spacing / 2.0, &mut occ2, &mut rng);
     assert!(
         dense.len() as f64 > 1.6 * count as f64,
         "{} vs {count}",
@@ -99,7 +99,7 @@ fn arcs_are_spaced_on_the_planet_at_high_latitude() {
         flux[(row + 1) * w + i] = 0.8;
     }
     let spacing = 60_000.0;
-    let born = place_arcs(
+    let (born, _) = place_arcs(
         &grid,
         mh,
         &flux,
@@ -137,6 +137,68 @@ fn arcs_are_spaced_on_the_planet_at_high_latitude() {
     assert!(
         (len_km / 80.0 - 1.0..=len_km / 48.0 + 1.0).contains(&count),
         "{count} volcanoes on {len_km} km of arc"
+    );
+}
+
+#[test]
+fn no_arc_volcano_is_born_past_a_pole() {
+    // The sim grid's rows run to the quantum past each pole (Zo = 704 blocks on a 4,096-block
+    // planet whose pole is 651.9): rows 0 to 2 and 86 to 87 lie wholly past one, and rows 3 and
+    // 85 straddle it, with 24 % of their cell inside. A vent drawn at a point of such a cell past
+    // the pole is not on the planet: the planet's metric holds it at the pole, and a segment
+    // centroid or an event drawn from it is off the map. A fault (DEF-081), a pluton (RCK-097) and
+    // a deposit cluster were guarded the same way.
+    let grid = GridDesc::for_planet("L1", 4_096, 16).unwrap();
+    let (w, n) = (grid.w as usize, grid.cells());
+    let pole = grid.projection().pole_z();
+    let mh = 300.0;
+    let mut flux = vec![0.0f64; n];
+    let mut reaching = 0;
+    for j in 0..grid.h {
+        if grid.area_share(j) < 1.0 {
+            reaching += 1;
+            for i in 0..w {
+                flux[j as usize * w + i] = 1.0;
+            }
+        }
+    }
+    assert!(reaching >= 6, "{reaching} rows reach past a pole");
+    // An arc on the equator, which the pole's rows must not disturb.
+    let equator = grid.h as usize / 2;
+    for i in 0..w {
+        flux[equator * w + i] = 1.0;
+    }
+    let (mut past, mut at_pole, mut on_equator, mut dropped) = (0, 0, 0, 0);
+    for seed in 0..8 {
+        let (born, past_pole) = place_arcs(
+            &grid,
+            mh,
+            &flux,
+            0.25,
+            60_000.0,
+            &mut Vec::new(),
+            &mut Rng::stream(seed, "past-pole"),
+        );
+        dropped += past_pole;
+        for &(_, z, _) in &born {
+            if z.abs() >= pole {
+                past += 1;
+            } else if z.abs() > 0.5 * pole {
+                at_pole += 1;
+            } else {
+                on_equator += 1;
+            }
+        }
+    }
+    assert_eq!(past, 0, "{past} vents born at a z past a pole of {pole}");
+    assert!(on_equator > 20, "{on_equator} vents on the equatorial arc");
+    assert!(at_pole <= 16, "{at_pole} vents on the pole's own cells");
+    // Every candidate of the five rows wholly past a pole is counted as dropped (and a share of
+    // the two straddling rows' with it), whether or not the pole's other vents would have cleared
+    // it.
+    assert!(
+        dropped >= 8 * 5 * w as u64,
+        "{dropped} candidates dropped past a pole"
     );
 }
 
@@ -365,7 +427,7 @@ fn stratovolcano_heights_fall_in_earths_range() {
     }
     let mut occupied = Vec::new();
     let mut rng = Rng::stream(7, "heights");
-    let born = place_arcs(
+    let (born, _) = place_arcs(
         &grid,
         mh,
         &flux,

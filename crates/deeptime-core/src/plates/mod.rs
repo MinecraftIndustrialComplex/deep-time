@@ -68,6 +68,7 @@ pub mod noise;
 pub mod normalise;
 pub mod peaks;
 pub mod pools;
+pub mod propagation;
 pub mod rate;
 pub mod ridges;
 pub mod rifting;
@@ -907,6 +908,9 @@ impl PlatesStage {
         cut_trace::mark(st, &cache.geo, "rift");
         rifting::maybe_initiate_subduction(st, world, &cache.geo, &pos, &env, &balance.stress_mpa)?;
         cut_trace::mark(st, &cache.geo, "initiate");
+        // Along-strike propagation to a passive margin (law 2; ledger: PLT-656).
+        propagation::step(st, world, &cache.geo, &pos, &env)?;
+        cut_trace::mark(st, &cache.geo, "propagate");
         book(st, gap_budget::Part::Rifting);
         lap(&mut clock, "motion_rifting");
 

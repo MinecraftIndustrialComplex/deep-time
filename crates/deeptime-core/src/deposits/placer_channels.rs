@@ -851,7 +851,18 @@ mod tests {
         let r = river();
         let half = deeptime_format::Projection::of(4096.0).pole_z();
         let range = (-half, half);
-        for (z, want) in [(640.0, 634), (-640.0, -634)] {
+        // Centres at the pole's edge and past it: `spawn_placer` jitters a placer over its whole
+        // cell, so a placer born in the grid row that straddles a pole can be drawn past it (RCK-097
+        // keeps the plutons from that; a placer is repaired here instead, and lands on the same
+        // block however far past the pole it was drawn).
+        for (z, want) in [
+            (640.0, 634),
+            (-640.0, -634),
+            (660.0, 634),
+            (-660.0, -634),
+            (700.0, 634),
+            (-700.0, -634),
+        ] {
             let (s, b) = placer(3, 900.0, z);
             let out = settle(&[s], std::slice::from_ref(&b), &r, range, &reach, &hill);
             assert_eq!(out.note["benches"], 1);
