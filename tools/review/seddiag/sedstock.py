@@ -27,7 +27,10 @@ Counterfactuals (measurement only):
     sedimentary rock metre for metre), so its pile is the solid's volume, while GlobSed's thickness is the porous pile
     in place. Each wet sample's pile is stood up as the porous pile holding that solid under an exponential
     porosity-depth law phi = phi0 exp(-z/lam): H - phi0 lam (1 - exp(-H/lam)) = pile. PHI0=0.63 LAM_KM=1.96 (shale,
-    Sclater & Christie 1980, from memory until read) by default. The plates' own pelagic rain (PLT-103) states no
+    Sclater & Christie 1980, as pyBacktrack's lithologies/primary.txt credits it; the paper itself not read) by
+    default; the same file's Kominz et al. 2011 "Average_ocean_floor_sediment" is PHI0=0.66 LAM_KM=1.333. GlobSed's
+    thickness is in place, pore water included (Straume et al. 2019, sections 2.1 and 2.2: no compaction or
+    decompaction step). The plates' own pelagic rain (PLT-103) states no
     porosity; it is taken as solid like the rest.
 Medians over runs. Needs numpy and scipy."""
 import json
@@ -43,9 +46,13 @@ MAP, POOLS = 11, 9
 R_KM = 6370.0
 KM3_PER_M = 5.1007e5  # planet-mean m to km3 on Earth's 5.1007e8 km2
 PELAGIC = 5.0  # m/Myr, PLT-103
-EARTH_MEAN_AGE = float(os.environ.get("EARTH_MEAN_AGE", "64.2"))  # Seton et al. 2020 (to check)
+EARTH_MEAN_AGE = float(os.environ.get("EARTH_MEAN_AGE", "64.2"))  # Seton et al. 2020, section 3.1 (read 2026-10-25)
 PHI0 = float(os.environ.get("PHI0", "0.63"))
 LAM_KM = float(os.environ.get("LAM_KM", "1.96"))
+# Earth's ocean floor by age, 1e6 km2 per 10-Myr bin from 0 to 180 Myr, then all older floor: the EarthByte 6-arcmin
+# grid of Seton et al. 2020 (GeeK2007 time scale), weighted by cos(latitude), as a research sub-agent computed it
+# 2026-10-25 (mean 62.8 Myr against the paper's 64.2; 0.56 % older than 180 Myr).
+SETON_BINS = [30.3, 29.4, 30.1, 25.8, 21.3, 20.9, 19.2, 18.7, 15.4, 12.9, 15.7, 14.4, 11.4, 8.3, 6.0, 6.5, 3.4, 1.5, 1.64]
 THICK = [(0, 8), (8, 10), (10, 15), (15, 25), (25, 1e9)]
 AGES = [(0, 20), (20, 60), (60, 120), (120, 180), (180, 300), (300, 1e9)]
 DIST = [(0, 100), (100, 200), (200, 500), (500, 1000), (1000, 1e9)]
@@ -157,6 +164,15 @@ def one(run, name):
     out["earth_ages_oc"] = earth_mean_pile * float(mo.sum()) / n * KM3_PER_M
     out["earth_ages_ratio"] = out["earth_ages_oc"] / max(out["sea_sed_oc"], 1e-9)
     out["pel_earth_ages"] = PELAGIC * EARTH_MEAN_AGE * float(mo.sum()) / n * KM3_PER_M
+    # The same on the Seton grid's own age bins (10-Myr bins to 180 Myr, then one bin for all older floor).
+    sb = np.minimum((agef[mo] // 10.0).astype(np.int64), len(SETON_BINS) - 1)
+    ssum = np.bincount(sb, weights=pile[mo], minlength=len(SETON_BINS))
+    scnt = np.bincount(sb, minlength=len(SETON_BINS))
+    sw = np.array(SETON_BINS)
+    sok = scnt > 0
+    seton_mean_pile = float((ssum[sok] / scnt[sok] * sw[sok]).sum() / sw[sok].sum())
+    out["seton_ages_oc"] = seton_mean_pile * float(mo.sum()) / n * KM3_PER_M
+    out["seton_ages_ratio"] = out["seton_ages_oc"] / max(out["sea_sed_oc"], 1e-9)
     # The pile as a porous pile in place, as GlobSed measures it.
     comp = in_place_km(pile / 1e3) * 1e3
     out["sea_sed_compacted"] = km3(comp * w)
@@ -172,12 +188,19 @@ def one(run, name):
     # of that boundary against wet oceanic samples within and beyond 200 km of continental crust; the ocean younger
     # than 82 Myr within 72 degrees of the equator against wet oceanic samples so.
     regions = {"margin": w & cont, "near200": w & oc & (dist < 200.0), "far200": w & oc & (dist >= 200.0),
-               "young82": w & oc & (agef < 82.0) & (np.abs(a[:, 0]) < 72.0)}
+               "young82": w & oc & (agef < 82.0) & (np.abs(a[:, 0]) < 72.0) & (dist >= 200.0)}
     for key, m in regions.items():
         out[f"G{key}:km2"] = float(m.sum()) / n * KM3_PER_M * 1e3
         out[f"G{key}:pile"] = float(pile[m].mean()) if m.any() else float("nan")
         out[f"G{key}:inplace"] = float(comp[m].mean()) if m.any() else float("nan")
         out[f"G{key}"] = km3(pile * m)
+    # GlobSed's thickness-age-latitude law for that young floor (Straume et al. 2019, Eq. 2a, fitted on floor under
+    # 82 Myr, within 72 degrees of the equator and beyond 200 km of the margins): Z = sqrt(age) (52 - 2.46 |lat| +
+    # 0.045 lat^2) m, at each of the model's samples there.
+    m = regions["young82"]
+    lat = np.abs(a[:, 0])
+    eq2a = np.sqrt(np.maximum(agef, 0.0)) * (52.0 - 2.46 * lat + 0.045 * lat ** 2)
+    out["Gyoung82:eq2a"] = float(eq2a[m].mean()) if m.any() else float("nan")
     # Thick oceanic-labelled crust (15 km and more): its share of the sea's sediment, its arc magma.
     m = w & oc & (T >= 15e3)
     out["thick_iarc_km"] = float(a[m, 7].mean() / 1e3) if m.any() else float("nan")
@@ -218,18 +241,23 @@ def table(rows, name):
           f" {md['earth_ages_ratio']:.3f}; pelagic rain at that mean age {md['pel_earth_ages']:.3g}")
     print(f"  in place, porous (phi0 {PHI0}, lambda {LAM_KM} km): {md['sea_sed_compacted']:.3g}, ratio {md['compacted_ratio']:.3f};"
           f" earth ages and in place, with the continental part: {md['earth_ages_compacted']:.3g}")
-    # GlobSed's regions: (area km2, mean m in place, km3); the third is Table 3's total less its two named regions.
+    # GlobSed's regions: (area km2, mean m in place, km3). Section 2.5: "~7.6 x 10^7 km3 (~22.5 %) ... lies on the
+    # oceanic crust less than 200 km away from the COBs"; that region's area is Table 3's total less its two named rows.
+    near_km2 = 3.63e8 - 4.69e7 - 2.79e8
     globsed = {"margin": ("continental margins | wet continental crust", 4.69e7, 3044, 1.43e8),
                "near200": ("ocean floor within 200 km of the COB | wet oceanic within 200 km of continental crust",
-                           3.63e8 - 4.69e7 - 2.79e8, (3.37e8 - 1.43e8 - 1.13e8) / (3.63e8 - 4.69e7 - 2.79e8) * 1e3,
-                           3.37e8 - 1.43e8 - 1.13e8),
+                           near_km2, 7.6e7 / near_km2 * 1e3, 7.6e7),
                "far200": ("ocean floor beyond 200 km of the COB | wet oceanic beyond 200 km", 2.79e8, 404, 1.13e8),
-               "young82": ("ocean younger than 82 Myr, 72S to 72N | wet oceanic so", float("nan"), 267, float("nan"))}
+               "young82": ("ocean younger than 82 Myr, 72S to 72N, beyond 200 km of the margins | wet oceanic so",
+                           float("nan"), 267, float("nan"))}
     print("  against GlobSed (Straume et al. 2019; region: GlobSed's | the model's): area km2, mean pile m (model: solid,"
           " in place), km3")
     for k, (label, ga, gm, gv) in globsed.items():
         print(f"    {label}: GlobSed {ga:.3g} km2, {gm:.0f} m, {gv:.3g} km3 | model {md[f'G{k}:km2']:.3g} km2,"
               f" {md[f'G{k}:pile']:.0f} m solid, {md[f'G{k}:inplace']:.0f} m in place, {md[f'G{k}']:.3g} km3")
+    print(f"    GlobSed's Eq. 2a at the model's young samples: {md['Gyoung82:eq2a']:.0f} m (model in place over it"
+          f" {md['Gyoung82:inplace'] / md['Gyoung82:eq2a']:.2f})")
+    print(f"  earth ages on the Seton grid's own bins: oceanic {md['seton_ages_oc']:.3g}, ratio {md['seton_ages_ratio']:.3f}")
     print(f"  oceanic crust 15 km and more: island-arc magma {md['thick_iarc_km']:.1f} km, metamorphic"
           f" {md['thick_meta_km']:.1f} km, felsic {md['thick_felsic_km']:.1f} km, distance p50 {md['thick_dist_p50']:.0f} km,"
           f" floor age p50 {md['thick_age_p50']:.0f} Myr")
