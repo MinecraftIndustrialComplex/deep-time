@@ -9901,6 +9901,34 @@ Candidates, none built: initiation within reach of active collision fronts as of
 pair's collided and still-subducting stretches (Govers & Wortel 2005's STEP, as law 2 uses), so a collision does not
 stop a whole rigid boundary; trench invasion with Schellart et al.'s slab-width rule for rollback.
 
+**The first candidate is dropped, and the welds are measured** (the coordinator, 2026-10-27, after PR #14). A Sonnet
+research sub-agent read Crameri et al. 2020's Table 1 and Supplementary Notes 1 to 13: collision is the trigger, or
+the likely one, of 6 of the 13 initiations (the Olutorsky arc at the Aleutians, Palawan at the Philippine trench, the
+Ontong Java plateau at New Hebrides-New Britain, Papuan blocks at Tonga-Kermadec, Siletzia at Cascadia, the Gagua
+Ridge at the Ryukyus), all arcs, plateaus, ridges or microcontinents arriving at a trench that was already there, none a
+continental collision belt, and all within 1,500 km of active subduction. Four of the six are Table 1's polarity
+reversals (Aleutian, Philippine, New Hebrides-New Britain, Tonga-Kermadec) and two its episodic jumps of a trench to
+the front of what docked (Cascadia, Ryukyu). Fix C's rate (PLT-692) counts none of them (only the four newly
+destructive initiations); the model has them elsewhere, at the jammed trench itself: the reversal (PLT-371) and the
+docked terrane's transfer to the overriding plate (PLT-068, and PLT-516's transference for a continent), after which the
+force balance decides what the new boundary does. So the six are no evidence for new trenches starting near a collision
+belt, which is what the candidate would add (corrected after Graphide's review of PR #15: the first draft said fix C
+would count them twice). Duarte et al. 2013's "nearby subduction zone or collisional belt" stays the setting of one
+margin (South-West Iberia, where the Gibraltar arc is a subduction zone), not a rate. Stern & Gerya 2021 (Encyclopedia of Geology, read in full) define transference as the
+"trench jump" after an arc or plateau docks and write "There are no Cenozoic examples of SI by transference": India
+went on colliding rather than start a trench in the Indian Ocean. base27 transfers 14.2 continents per 1,000 Myr (the
+24 runs' mean, 29 % of its 49 collisions), 0.94 expected in the Cenozoic's 66 Myr, so none there has a chance of 0.39
+(PLT-516's row).
+
+The welds (tools/review/oldfloor/oldfloor_welds.py, base27's 24 runs): a run welds 33 plates (median), the plate that
+goes holds 2.9 % of the planet at the median and 11.9 % at the 90th percentile, and 54 % of it is ocean floor; the
+floor taken into other plates sums to 0.94 of the planet's area over a run (0.63 to 1.18), and 112 of the 838 welds
+take a plate of a tenth of the planet or more. That floor keeps its age and loses its plate's boundary with the
+continents it has just met, which fits Step 18's map, floor ringed by one plate's continents. PLT-246's weld is a
+`game-choice` (5 mm/yr for 10 Myr, no source for either), so the next step is the weld itself: whether a plate with
+open floor left between it and the other plate should become one with it, against Earth's record of plates that
+stopped converging (India has not, after 50 Myr), before any new hazard.
+
 ## Plate speed (2026-10-25)
 
 The coordinator's brief for the plate speed lane: CHK-020's `speed_rms_mm_yr` (the plate check's
