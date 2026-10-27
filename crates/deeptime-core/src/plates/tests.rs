@@ -6540,7 +6540,9 @@ fn an_incipient_fronts_resistance_is_net() {
 /// boundary mix counts it incipient (all of it the floor's, `slow`) with no ocean-continent
 /// front, the margins count no subduction margin, and the straight front at 5 mm/yr builds no
 /// arc; off, the full slab's trench subducts. Pushed at 40 mm/yr, over the floor along the whole
-/// trench, on and off are the same.
+/// trench, on and off are the same. The floor here acts at any slab, as it was built
+/// (`slab_floor_forming_only` off; PLT-720's own test is
+/// [`a_formed_slab_pulls_under_the_thermal_floor`]).
 #[test]
 fn a_front_too_slow_for_a_slab_is_incipient() {
     let oc = dynamics::mix::OCEAN_CONTINENT;
@@ -6549,6 +6551,7 @@ fn a_front_too_slow_for_a_slab_is_incipient() {
         let (mut p, mut st, geo, pos, x_t) =
             an_incipient_reference(true, full, mm_yr, forces::SLAB_AGE_REF_MYR);
         p.tectonics.slab_thermal_floor = floor;
+        p.tectonics.slab_floor_forming_only = false;
         let stage = PlatesStage::new(p.clone());
         let env = stage.env(&p.tectonics, 1);
         let tree = Tree::over(&pos, |_| true);
@@ -6629,6 +6632,76 @@ fn a_front_too_slow_for_a_slab_is_incipient() {
     assert!(
         known_front_arcs_at(true, full, 40.0, true) == known_front_arcs_at(true, full, 40.0, false)
     );
+}
+
+/// The slab's thermal floor acts on a forming slab only (PLT-720): Toth & Gurnis 1998's floor is
+/// the rate under which "thermal diffusion inhibits slab formation" (p. 18,063). The reference
+/// plate of [`an_incipient_reference`] with the floor on (PLT-681), pushed at 5 mm/yr, under the
+/// floor along its whole trench. With its full slab (formed, past PLT-611's incipient stage) and
+/// `slab_floor_forming_only` on, the force balance is the floor-off balance to the bit: the slab
+/// pulls, no incipient resistance, and the trench runs past the floor in the one balance (the
+/// lock-in that held base25's stalled planets is gone); the boundary mix still counts the front
+/// incipient, all of it the floor's (`slow`), and the slow front builds no arc, as those read the
+/// floor per sample. With the switch off, PLT-681's answer: no pull, the incipient resistance,
+/// the trench held under `COLLISION_FLOOR_MM_YR`. A forming slab (40 km) under the floor is held
+/// with the switch on or off: no pull, the incipient resistance.
+#[test]
+fn a_formed_slab_pulls_under_the_thermal_floor() {
+    let full = TectonicParams::default().slab_depth_km;
+    let run = |slab_km: f64, floor: bool, forming_only: bool| {
+        let (mut p, mut st, geo, pos, x_t) =
+            an_incipient_reference(true, slab_km, 5.0, forces::SLAB_AGE_REF_MYR);
+        p.tectonics.slab_thermal_floor = floor;
+        p.tectonics.slab_floor_forming_only = forming_only;
+        let stage = PlatesStage::new(p.clone());
+        let env = stage.env(&p.tectonics, 1);
+        let tree = Tree::over(&pos, |_| true);
+        let mix = dynamics::boundary_mix(&st, &geo, &pos, &tree, &env, None);
+        let under = st.contacts[0].under;
+        let pull = forces::slab_torques(&st, &geo, &pos, &env)[under as usize]
+            .0
+            .length();
+        let ans = forces::step(&mut st, &geo, &pos, &env, DVec3::Z, 0.0);
+        assert!(ans.solved);
+        let resistance: f64 = ans.incipient_n.values().sum();
+        let v = trench_speed(&env, &ans, x_t);
+        eprintln!(
+            "slab {slab_km} km, floor {floor}, forming only {forming_only}: the trench at \
+             {v:.3} mm/yr; pull torque {pull:.4e} N m, incipient resistance {resistance:.4e} N; \
+             the mix's incipient {:?}, slow {:?}",
+            mix.bands.incipient, mix.bands.slow
+        );
+        (mix, pull, resistance, v, ans.omega)
+    };
+    // A formed slab: the switch gives the floor-off balance, the mix stays the floor's.
+    let on = run(full, true, true);
+    let held = run(full, true, false);
+    let no_floor = run(full, false, true);
+    assert!(on.4 == no_floor.4, "{:?} {:?}", on.4, no_floor.4);
+    assert!(on.1 > 0.0 && on.1 == no_floor.1);
+    assert_eq!(on.2, 0.0);
+    assert!(
+        on.3 > forces::SLAB_THERMAL_FLOOR_MM_YR,
+        "the formed slab's trench moves at {} mm/yr",
+        on.3
+    );
+    assert_eq!(on.0.bands, held.0.bands);
+    assert!(on.0.km == held.0.km);
+    assert!(on.0.bands.incipient[1] > 0.0);
+    assert_eq!(on.0.bands.slow, on.0.bands.incipient);
+    assert_eq!(held.1, 0.0);
+    assert!(held.2 > 0.0);
+    assert!(held.3 < forces::COLLISION_FLOOR_MM_YR);
+    // The slow front builds no arc with the switch on (its default).
+    assert!(TectonicParams::default().slab_floor_forming_only);
+    assert_eq!(arc_total(&known_front_arcs_at(true, full, 5.0, true)), 0.0);
+    // A forming slab is held either way.
+    let young_on = run(40.0, true, true);
+    let young_off = run(40.0, true, false);
+    assert_eq!(young_on.1, 0.0);
+    assert!(young_on.2 > 0.0 && young_on.2 == young_off.2);
+    assert!(young_on.4 == young_off.4, "{:?} {:?}", young_on.4, young_off.4);
+    assert!(young_on.3 < forces::COLLISION_FLOOR_MM_YR);
 }
 
 /// The boundary mix's cross-tabs (PLT-683) add up to its bands, within the rounding of their
