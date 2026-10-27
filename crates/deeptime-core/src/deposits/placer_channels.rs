@@ -507,18 +507,18 @@ pub fn planet_ribbons(p: &PlanetPreset) -> Result<(Vec<DepositType>, Scales), Co
 /// and terrain, rewrites the sites and bodies and their manifest entries (the caller writes the
 /// manifest), and records `notes.bake.placers`. The run calls it once the folder is complete, and
 /// `deeptime hydro` after it re-made the channels. Does nothing (and says so) in a folder without
-/// a river network, sites or bodies.
+/// sites or bodies. A folder without a river network (`hydro.enabled` false) has no channel, so
+/// its placers all become benches: left where the deposit stage drew them, one could stand past a
+/// pole, where the cube projection blows a body up (ORE-284).
 pub fn settle_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<Value, CoreError> {
-    let (Some(rivers), Some((sites, _)), Some(bodies)) = (
-        deeptime_format::rivers::read_rivers(dir)?,
-        read_sites(dir)?,
-        read_bodies(dir)?,
-    ) else {
-        return Ok(json!({"placers": 0, "why": "no river network, sites or bodies in the folder"}));
+    let (Some((sites, _)), Some(bodies)) = (read_sites(dir)?, read_bodies(dir)?) else {
+        return Ok(json!({"placers": 0, "why": "no sites or bodies in the folder"}));
     };
     if !sites.iter().any(|s| s.kind == SiteKind::Placer) {
         return Ok(json!({"placers": 0}));
     }
+    let rivers = deeptime_format::rivers::read_rivers(dir)?
+        .unwrap_or_else(|| Rivers::empty(p.scale.circumference_blocks));
     let (types, sc) = planet_ribbons(p)?;
     let world = ColumnWorld::open(dir)?;
     let ground = |x: i64, z: i64| {
@@ -1034,6 +1034,12 @@ mod tests {
         for p in out.bodies.iter().filter(|x| x.site == Some(3)) {
             assert!(p.center[2].abs() < half, "{:?}", p.center);
         }
+        // A world without a river network (`settle_folder` with `hydro.enabled` false settles on
+        // an empty one): a placer the deposit stage drew past the pole becomes a bench inside.
+        let (s, b) = placer(3, 900.0, 690.0);
+        let out = settle(&[s], &[b], &Rivers::empty(4096), range, &reach, &hill);
+        assert_eq!(out.note["benches"], 1);
+        assert_eq!(out.sites[0].center[2], 634);
         // Far from the poles nothing changes: the test river of the other tests, every range.
         let (s, b) = placer(3, 60.0, 104.0);
         let far = settle(
