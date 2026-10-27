@@ -535,13 +535,28 @@ mod tests {
             bed: i32::MIN,
             rivers: RiverSample::default(),
         };
-        let seam = finish(&none, &[river(63, 57), river(62, 60), none, none], &[63, 63, i32::MIN, i32::MIN]);
+        let seam = finish(
+            &none,
+            &[river(63, 57), river(62, 60), none, none],
+            &[63, 63, i32::MIN, i32::MIN],
+        );
         assert_eq!(seam.kind, WaterKind::River);
         assert_eq!((seam.top, seam.bed), (Some(62), Some(60)));
         // North and south (the second pair) count the same; one river side alone stays a bank.
-        let ns = finish(&none, &[none, none, river(63, 58), river(63, 59)], &[i32::MIN, i32::MIN, 63, 63]);
-        assert_eq!((ns.kind, ns.top, ns.bed), (WaterKind::River, Some(63), Some(59)));
-        let bank = finish(&none, &[river(63, 57), none, none, none], &[63, i32::MIN, i32::MIN, i32::MIN]);
+        let ns = finish(
+            &none,
+            &[none, none, river(63, 58), river(63, 59)],
+            &[i32::MIN, i32::MIN, 63, 63],
+        );
+        assert_eq!(
+            (ns.kind, ns.top, ns.bed),
+            (WaterKind::River, Some(63), Some(59))
+        );
+        let bank = finish(
+            &none,
+            &[river(63, 57), none, none, none],
+            &[63, i32::MIN, i32::MIN, i32::MIN],
+        );
         assert_eq!(bank.kind, WaterKind::Bank);
     }
 
