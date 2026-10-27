@@ -9642,3 +9642,35 @@ The sources of the old-floor lane (plates.md "Step 16"; build log 2026-10-27). T
 - TothGurnis1998: read again for PLT-720 in the library's text: p. 18,063 to 18,064, "There is no simple criteria to determine that subduction has not initiated. However, we found that models which proceeded with a convergence rate of <10 mm/yr did not show the later increase in subduction rate ... Therefore we judged that if the convergence velocity has not reached 10 mm/yr after 20 Myr, then subduction has failed to initiate and is unlikely to do so"; Figure 10's caption: "Subduction is deemed to have successfully started when the convergence rate exceeds 10 mm/yr". The floor is the paper's test of whether a new subduction zone has formed. Ledger ids now PLT-681, PLT-682, PLT-720.
 - Bradley2008: Table 2 parsed from the repository copy by the lane (74 of the 76 Group 1 margins; A19 and A20, written "(a,b)", missed): mean lifespan 180 Myr (Bradley: 181), longest 590; the 26 with a start under 541 Ma, mean 134, longest 220. As standing ages (each margin weighted by its lifespan, as a snapshot sees them): all margins mean 121 Myr, of the margin-time 0.109 older than 250 Myr, 0.044 older than 350 and 0.007 older than 500; Phanerozoic starts mean 79 Myr and none older than 220. §2.3: "Most passive margins since the Neoarchean met the first fate: they formed by rifting, endured for a time, and ultimately collided with an arc"; §10.2: "Direct conversion of a passive to a convergent margin is rare indeed".
 - Nikolaeva2010: the full abstract now read through Crossref (2026-10-27): "at most passive margins, elastic and frictional forces exceed gravitational instability and ridge-push forces, which precludes subduction initiation"; "the age of the oceanic plate is a factor of secondary importance for subduction initiation and only plays a role if other parameters are of critical values"; favourable margins are where "chemically buoyant (depleted) continental lithosphere becomes thin and hot (Moho temperature >660°C)".
+
+### PindellKennan2009
+- Reference: Pindell, J. L. and Kennan, L. (2009). Tectonic evolution of the Gulf of Mexico, Caribbean and northern South America in the mantle reference frame: an update. Geological Society, London, Special Publications 328:1-55.
+- DOI or URL: 10.1144/SP328.1 (a preprint read).
+- Cited as: "Pindell & Kennan 2009".
+- Ledger ids: none (the old floor's invasion research, 2026-10-27)
+- Read so far (by the project): about 85 % of a preprint through a text proxy, by a Sonnet research sub-agent, 2026-10-27. SW-dipping subduction began "Aptian, or 125-114 Ma" (p. 15); Lesser Antilles magmatism "requires significant (c. 1000 km) Caribbean-North America displacement" (p. 34); the foredeep advanced "at an average rate of 20 mm/a over the Cenozoic" (p. 41); "at least 1500 km of subducted Atlantic slab" (p. 46); the Proto-Caribbean seaway "wider than the Yucatan-Guajira bottleneck" (p. 29, no width given).
+
+### Livermore2005
+- Reference: Livermore, R., Nankivell, A., Eagles, G. and Morris, P. (2005). Paleogene opening of Drake Passage. Earth and Planetary Science Letters 236:459-470.
+- Cited as: "Livermore et al. 2005".
+- Ledger ids: none (the old floor's invasion research, 2026-10-27)
+- Read so far (by the project): the text through a proxy, by a Sonnet research sub-agent, 2026-10-27: 278 km of WNW-ESE extension between 50 and 33 Ma; a shallow gateway (under 1,000 m) in the Middle Eocene and a deep one at "34-30 Ma"; spreading "20-25 km/Ma". No gateway width in km.
+
+### Eagles2016
+- Reference: Eagles, G. (2016). Plate kinematics of the Scotia Sea region (book chapter; preprint read).
+- Cited as: "Eagles 2016".
+- Ledger ids: none (the old floor's invasion research, 2026-10-27)
+- Read so far (by the project): the preprint, by a Sonnet research sub-agent, 2026-10-27: the ancestral South Sandwich subduction zone "slowly propagated northwards and migrated eastwards" (p. 156, no rate); it "reached as far north as South Georgia" by 30 Ma (p. 147); Tierra del Fuego and South Georgia "1600 km apart" today (pp. 127-128); the West Scotia Ridge's half rate "~10 km/Myr" (p. 137). Title and venue to check.
+
+### Rychert2025
+- Reference: Rychert, C. A. et al. (2025). Nature (the Lesser Antilles subduction zone; full citation to check).
+- Cited as: "Rychert et al. 2025".
+- Ledger ids: none (the old floor's invasion research, 2026-10-27)
+- Read so far (by the project): through a Sonnet research sub-agent, 2026-10-27: subduction for "roughly the past 120 Myr"; convergence "1.5-2.0 cm per year"; the floor at the trench "present-day age of 80 Myr" (Methods); rollback "relatively minimal".
+
+### Notes on entries above (2026-10-27, the coordinator: trench invasion)
+- Read for the old floor's second closure law by a Sonnet research sub-agent (WebFetch through a text proxy; publisher pages refused it). Not yet tied to a ledger row.
+- Duarte2013: pp. 839 to 841 now read (a capture that stops on p. 841): subduction initiation at a passive margin "requires the action of an external tectonic force", "transmitted from a nearby subduction zone or collisional belt" (p. 840); compression "propagated northward by ~300 km along the SIM" (p. 840); the Gibraltar Arc's westward movement "3-6 mm yr-1" against Africa-Eurasia convergence "~4 mm yr-1" (Fig. 1C); slab negative buoyancy "~8 x 10^13 N/m" (p. 841); "almost absence of oceanic lithosphere older than 200 Ma" in the Atlantic (p. 840); Atlantic trenches "do not seem to have propagated laterally along the adjacent passive margins" (p. 840).
+- Duarte2024: the EarthArXiv preprint read in full: the Gibraltar slab's radial rollback through a narrowing oceanic corridor, "the trench retreat accelerates to a velocity of ~11 cm/yr (Fig. 3)", then "continues to decelerate for another 20 m.y., when it almost stops" ("the narrow Gibraltar slab must pull the wider Atlantic lithosphere down"); "In the case of a wider corridor, subduction propagation is faster"; the model's Mediterranean lithosphere 95 km thick at 90 Ma, the Atlantic's about 120 km. No corridor, slab or trench width in km.
+- Schellart2007, Schellart2008 (already read): narrow slabs (at most 1,500 km) retreat fast, 6 to 16 cm/yr only within 1,200 km of a slab edge, under 2 cm/yr more than 2,000 km from one; Table 1 of Schellart2008 gives slab widths Betic-Rif 250, Calabria 300, Scotia 800, Lesser Antilles 2,450 km.
+- Scotia's rollback of 35 to 50 mm/yr since at least 32 Ma (Livermore 2006) and 5 to 6 cm/yr lately (Schellart 2010) were seen in search summaries only, not read.
