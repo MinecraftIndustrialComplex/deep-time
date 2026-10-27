@@ -242,6 +242,16 @@ public final class WorldDataTerrain implements TerrainSource {
                 new GeothermalEnv(wd), wd.circumference(), seaLevel, wd.manifest().mPerBlockH(), step);
     }
 
+    /** {@link Geothermal#springPlaces} on this world's active volcanoes (the GameTests' odds, GEO-065). */
+    public int geothermalSpringPlaces(int cell, int seaLevel, int rings, int spokes) {
+        WorldData wd = data();
+        var spec = com.minecraftindustrialcomplex.deeptime.worlddata.Water.Spec.of(wd, cell);
+        var none = com.minecraftindustrialcomplex.deeptime.worlddata.Water.Kind.NONE;
+        return Geothermal.springPlaces(wd.volcanoes().list(), geothermalRules(), (x, z) -> wd.height(wrapX(x), z),
+                (x, z) -> com.minecraftindustrialcomplex.deeptime.worlddata.Water.column(wd, spec, wrapX(x), z).kind() != none,
+                new GeothermalEnv(wd), wd.circumference(), seaLevel, wd.manifest().mPerBlockH(), rings, spokes);
+    }
+
     /**
      * How the level asks its biome source where the pack has a peatland biome (BIO-106): set by the
      * generator, called at the first flagged cold-wetland column of a world whose mapping has no verdict

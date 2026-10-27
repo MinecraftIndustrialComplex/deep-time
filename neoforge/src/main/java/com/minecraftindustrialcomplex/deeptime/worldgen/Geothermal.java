@@ -592,6 +592,39 @@ public final class Geothermal {
         return new HeatFlowOdds(samples, continental, km2, grid.nx * grid.nz, hotCells, expected, Math.exp(logNone));
     }
 
+    /**
+     * Where the volcanoes' fields could be hot-spring fields, for the GameTests' odds (GEO-064's kind, GEO-065):
+     * of each active volcano's flank ring that its later fields draw from ({@link #SUMMIT_ZONE} to the full reach
+     * of its basal radius: closer in a field is fumarolic whatever the climate), sampled on {@code rings} rings
+     * of {@code spokes} points, the points where a field may stand ({@link Env#onPlanet}, the top at least
+     * {@link #MIN_ABOVE_SEA} + 2 blocks above the sea, dry, clear of ice) and a spring field may form (the year's
+     * rain at the setting, the mean temperature at least {@link #POOL_MIN_C}). Zero means no volcano of the world
+     * can have a pool; a place found can still be refused by the placement (a slope, a crater, water).
+     */
+    public static int springPlaces(List<Volcanoes.Volcano> volcanoes, GeothermalRules rules, Magma.Heights heights,
+                                   Magma.Wet wet, Env env, int circumference, int seaLevel, double mH, int rings, int spokes) {
+        if (rules.density() <= 0.0)
+            return 0;
+        Ctx c = new Ctx(rules, null, heights, wet, env, circumference, seaLevel, mH, new ArrayList<>());
+        int places = 0;
+        for (Volcanoes.Volcano v : volcanoes) {
+            double radius = Math.max(6.0, v.radiusM() / mH);
+            for (int i = 0; i < rings; i++) {
+                double rad = (SUMMIT_ZONE + (1.0 - SUMMIT_ZONE) * (i + 0.5) / rings) * radius * rules.reach();
+                for (int k = 0; k < spokes; k++) {
+                    double angle = 2.0 * Math.PI * k / spokes;
+                    int fx = c.wrap((int) Math.round(v.x() + rad * Math.cos(angle))), fz = (int) Math.round(v.z() + rad * Math.sin(angle));
+                    if (!env.onPlanet(fx, fz) || Magma.top(c.h(fx, fz)) < seaLevel + MIN_ABOVE_SEA + 2 || wet.at(fx, fz) || env.iced(fx, fz))
+                        continue;
+                    double precip = env.precipMm(fx, fz), mean = env.meanC(fx, fz);
+                    if ((Double.isNaN(precip) || precip >= rules.springMinPrecipMm()) && (Double.isNaN(mean) || mean >= POOL_MIN_C))
+                        places++;
+                }
+            }
+        }
+        return places;
+    }
+
     private static void volcano(Ctx c, Volcanoes.Volcano v) {
         GeothermalRules rules = c.rules;
         int sx = c.wrap((int) Math.round(v.x())), sz = (int) Math.round(v.z());
