@@ -56,12 +56,39 @@ public final class VolcanicBiomeGameTests {
      * give them; the biomes that take the kept-out biomes' places are land biomes (no ocean, river or cave
      * biome at the surface of land); and the placed biomes are areas, not specks (at most
      * {@link #MAX_SPECK_SHARE} of their surface cells stand alone). The test planet always has active
-     * volcanoes (arcs on its subduction margins) and hot-spring pools (its preset's heat-flow fields), so
-     * where the level places volcanic biomes it must place some for the test to read: none fails (Ben's
-     * rule, decisions log 2026-10-01). A profile without volcanic biomes (vanilla) has nothing of the
+     * volcanoes (arcs on its subduction margins), so where the level places volcanic biomes it must place
+     * some for the test to read: none fails (Ben's rule, decisions log 2026-10-01). It has hot-spring pools
+     * wherever its volcanoes' flanks or its hot dry ground give a spring field a place, and a planet with
+     * none fails only where it had such a place ({@link #poolsDue}, GEO-065). A profile without volcanic biomes (vanilla) has nothing of the
      * kind to place; it passes with a line saying so, and {@link #volcanicBiomesChangeNothingWithoutThem}
      * checks that profile.
      */
+    /** Rings and spokes of each volcano's flank ring that {@link #poolsDue} samples (GEO-065). */
+    private static final int SPRING_RINGS = 8, SPRING_SPOKES = 32;
+
+    /**
+     * Why the test planet should have hot-spring pools, or null when it gave them no place (GEO-065, as GEO-064 for
+     * the heat-flow fields): a place on an active volcano's flank where a spring field may stand
+     * ({@link Geothermal#springPlaces}), or hot dry ground that made a heat-flow field likely
+     * ({@link Geothermal#heatFlowOdds} under {@link GeothermalGameTests#HEAT_NONE_P}). A place found can still be
+     * refused by the placement (a slope, a crater, water), so a planet fails no sooner than the odds say. (2026-10-27:
+     * transference's test planet has ten active volcanoes, all seamounts or a summit's island, and no pool.)
+     */
+    static String poolsDue(GameTestHelper helper, ServerLevel level) {
+        var g = (GeologicChunkGenerator) level.getChunkSource().getGenerator();
+        var t = RealPlanetGameTests.terrain(helper, level);
+        int sea = g.getSeaLevel();
+        int springs = t.geothermalSpringPlaces(g.waterReach(), sea, SPRING_RINGS, SPRING_SPOKES);
+        Geothermal.HeatFlowOdds odds = t.geothermalHeatFlowOdds(g.waterReach(), sea, GeothermalGameTests.HEAT_ODDS_STEP);
+        DeepTime.LOGGER.info("[gametest] poolsDue: {} spring places on the volcanoes' flanks ({} rings of {}); heat flow: {}",
+                springs, SPRING_RINGS, SPRING_SPOKES, odds);
+        if (springs > 0)
+            return springs + " places on its active volcanoes' flanks where a hot-spring field may stand";
+        if (odds.pNone() < GeothermalGameTests.HEAT_NONE_P)
+            return "hot dry ground that made a heat-flow field likely: " + odds;
+        return null;
+    }
+
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
     public static void volcanicBiomesOnlyAtVolcanoes(GameTestHelper helper) {
         ServerLevel level = RealPlanetGameTests.level(helper);
@@ -72,8 +99,13 @@ public final class VolcanicBiomeGameTests {
         DeepTime.LOGGER.info("[gametest] volcanicBiomesOnlyAtVolcanoes filters: activeVolcanoes={} pools={} zonesByRole={} "
                         + "landColumns={} volcanicColumns={} volcanicCells={} levelPlacesThem={}", activeVolcanoes, r.pools(),
                 zoneCounts(r), r.now().columns, r.now().volcanic, r.now().volcanicCells, places);
-        helper.assertTrue(activeVolcanoes > 0 && r.pools() > 0, "the test planet has " + activeVolcanoes + " active volcanoes and "
-                + r.pools() + " hot-spring pools: it should always have both (arcs on its subduction margins, heat-flow fields)");
+        helper.assertTrue(activeVolcanoes > 0, "the test planet has no active volcano: it should always have some (arcs on its "
+                + "subduction margins)");
+        if (r.pools() == 0) {
+            String due = poolsDue(helper, level);
+            helper.assertTrue(due == null, "the test planet has " + activeVolcanoes + " active volcanoes and no hot-spring pool, "
+                    + "where it had " + due);
+        }
         if (!places) {
             DeepTime.LOGGER.info("[gametest] volcanicBiomesOnlyAtVolcanoes: this profile has no volcanic biome to place "
                     + "(volcanicBiomesChangeNothingWithoutThem checks it)");
@@ -102,9 +134,10 @@ public final class VolcanicBiomeGameTests {
      * pool column) does not ice it (a hot spring's water stays open: GEO-062; before it, Biomes O' Plenty's hot springs,
      * temperature 0.17, froze a pool over at generation); the mod's own rule ({@link LakeFreeze#keepsOpen}) says
      * so at every pool surface. A pack whose seasons mod stops vanilla's freezing everywhere (Serene Seasons) makes
-     * the cold-biome probe inconclusive, which the direct assertion covers. The test planet always has pools (its preset's heat-flow
-     * fields), so a planet without any fails; a pack without such a biome has nothing to check of the first and
-     * passes it with a line saying so, and the second runs in every profile.
+     * the cold-biome probe inconclusive, which the direct assertion covers. A test planet without pools fails only
+     * where its volcanoes' flanks or its hot dry ground gave a spring field a place ({@link #poolsDue}, GEO-065), and
+     * otherwise has nothing to check; a pack without such a biome has nothing to check of the first and passes it
+     * with a line saying so, and the second runs in every profile.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
     public static void hotSpringPoolsSitInTheirBiome(GameTestHelper helper) {
@@ -113,8 +146,13 @@ public final class VolcanicBiomeGameTests {
         String role = r.roles().get(VolcanicZones.Role.HOT_SPRING_FIELD.id);
         DeepTime.LOGGER.info("[gametest] hotSpringPoolsSitInTheirBiome pools={} byPlaya={} inRole={} (plain search: {}) role={} roles={}", r.pools(),
                 r.poolsByPlaya(), r.now().poolsInRole, r.plain().poolsInRole, role, r.roles());
-        helper.assertTrue(r.pools() > 0, "the test planet has no hot-spring pool: its preset's heat-flow fields should always "
-                + "place some");
+        if (r.pools() == 0) {
+            String due = poolsDue(helper, level);
+            helper.assertTrue(due == null, "the test planet has no hot-spring pool, where it had " + due);
+            DeepTime.LOGGER.info("[gametest] hotSpringPoolsSitInTheirBiome: no pool on this planet and none was due; nothing to check");
+            helper.succeed();
+            return;
+        }
         if ("-".equals(role)) {
             DeepTime.LOGGER.info("[gametest] hotSpringPoolsSitInTheirBiome: the pack has no hot-spring biome; no biome to check");
         } else {
