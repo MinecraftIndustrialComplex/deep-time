@@ -9609,9 +9609,170 @@ young subduction zone to propagate or roll back (law 2 is parked), none for the 
 transference off, and the polarity reversals stay the contacts' own. Crameri's transform faults
 ("Transform faults are also often present in the proximity of the SZI event location") are not
 read: the reach is from subduction zones alone. The 150 Myr gate, the old rate and the 1,000 km
-clearance hold with the switch off. The viewer's editor still lists `subduction_start_rate`, `_age`
-and `_clearance` (`crates/deeptime-viewer/assets/editor_fields.json`), which are inert with fix C
-on.
+clearance hold with the switch off. The viewer's editor listed `subduction_start_rate`, `_age` and
+`_clearance` (`crates/deeptime-viewer/assets/editor_fields.json`), which are inert with fix C on;
+since 7d0506e3 (2026-10-26) it leaves them out, with the catalogue's comment saying why.
+
+### Step 15: the moving trench, back-arc rifting and law 2 in Zhou's geometry (PLT-710 to PLT-717) (2026-10-26)
+
+The M5 lane's stage 3, by the coordinator's order: the laws of a moving trench that Step 14 found
+missing, trench rollback and along-strike propagation, diagnosed and sourced first, built behind
+switches with unit tests against the sources, one cumulative arm and an off check (against
+base24-s4: master moved to 3ce1a373, the collision belts' PLT-700, before the arm started, and
+the branch merged it).
+
+**The diagnosis.** A front is fixed in the plate that holds it: the overriding plate's samples on
+the boundary are the trench. So every trench moves with its overriding plate, Heuret & Lallemand
+2005's Vt = Vup + Vd with Vd always 0, and nothing in the model lets a trench move on its own. That
+half is Earth's: Heuret & Lallemand find "spontaneous trench rollback related to slab pull is
+negligible with respect to upper plate motion", and Vt follows the sign of Vup at three non-neutral
+zones in four. The other half is missing: Earth's trenches roll back where the overriding plate
+splits and a back-arc basin opens behind its forearc (Table 1 has 29 of its 158 two-degree
+segments in class E3, back-arc spreading, opening at 2.8 to 142.1 mm/yr, median 34.8). In a model
+of rigid plates that is a split: the forearc and arc become a microplate, which the slab's suction
+can then pull seaward of the rest. The model forbids such plates twice over: nothing splits an
+overriding plate at its arc, and PLT-091 absorbs any plate under 0.003 of the sphere (0.0377 sr) at
+the next resampling, while Bird 2003's back-arc microplates are 0.0002 to 0.016 sr.
+
+**Why law 2 was parked, and whether the reason holds.** Law 2 (along-strike propagation onto a
+passive margin, PLT-656 to PLT-659, "Law 2" below) was parked on 2026-10-26 because it never
+advanced: its starts fired where the trench meets the margin at 45 to 90°, where U moves along the
+margin, so the convergence across it at the tip was 0 to 15 km a step against the 100 km an
+advance needs. That reason holds on today's master for the same starts: the geometry is the
+lattice's and the plates', and neither fix C nor the speed scale changes which way U moves at such
+a junction. The front lane's note names the remedy, a start only in Zhou et al. 2020's geometry,
+where the trench runs on along the margin; this stage builds it (PLT-717).
+
+**Back-arc rifting** (`tectonics.backarc_rifting`, PLT-710, `rifting::maybe_rift_backarc`, after
+the step's initiations). Sdrolias & Müller 2006 read the Cenozoic back-arc basins of eight
+subduction systems against the floor's age and the plates' absolute motions: back-arc basins
+"develop when the age of subducting normal oceanic lithosphere is greater than 55 million years";
+"back-arc basin formation is always preceded by an absolute motion of the overriding plate away
+from the subduction hinge"; "Once back-arc extension is established, it continues regardless of
+overriding plate motion"; the locus is "commonly in between the remnant and active volcanic arc".
+Karig 1971 (abstract): "Active extension is restricted to arc systems with earthquakes deeper than
+about 350 km". So a subducting front (`subduction::Pull::subducting_fronts`, now with each front's
+subducting sample and boundary normal) qualifies where the floor coming in is older than 55 Myr
+(PLT-712), the plate holding the front moves away from it (its velocity along the normal below 0,
+in the mantle's frame, the model's stand-in for Sdrolias's hotspot frame), the pair's slab is 350
+km or longer (PLT-713: the slab's length stands for its depth, as the pull reads it) and no
+back-arc sliver holds it. Sdrolias's third condition, an intermediate dip steeper than 30°, has no
+counterpart: the model has no dip. Java-Sunda and the Aleutians met the age condition "with no
+resultant back-arc extension", so the conditions open a hazard, not a certainty.
+
+**How often** (PLT-711). Each pair of plates with a qualifying front draws once a step with
+probability 1 − e^(−λ), λ = h × dt, and a draw takes the pair's whole qualifying front, so h is the
+rate at which qualifying front converts. Heuret & Lallemand's Table 1 (tabulated from its text
+layer, 158 of its 159 segments) has 70 segments with a slab of 55 Myr or older, 68 of them under an
+upper plate moving landward, and 16 of those spreading (E3): f = 16 / 68. Sdrolias & Müller date
+four Cenozoic basins: South Fiji 33 to 25 Ma, Parece Vela and Shikoku 30 to 15 Ma, the Japan Sea
+30 to about 15 Ma, the West Philippine Basin about 55 to 30-33 Ma, a mean spreading life D of 15.4
+Myr. A front that converts at h and spreads for D holds a spreading back-arc on h D / (1 + h D) of
+its length, so h = f / ((1 − f) D) = 16 / (52 × 15.375) = 0.0200 per Myr, about one draw in 50
+Myr for a pair that keeps qualifying. Test `the_backarc_hazard_gives_earth_s_spreading_share`.
+
+**The split and the size rule** (PLT-714, PLT-715). A draw splits off the holding plate's samples
+within `arc_distance_km` (PLT-042, 200 km) of the pair's qualifying fronts: the forearc and the arc,
+where Taylor & Karner 1983 (abstract) find the arc rifting "on either side of the line of active
+volcanoes (±50 km)", below the quick lattice's spacing. The largest connected strip is the sliver;
+fewer than 32 samples on either side refuses the draw (`backarc_refused`). The sliver is a plate
+with the parent's motion (rift_onset and plate_birth with `origin` "back_arc"), linked to the
+parent so that a back-arc that does not open heals (PLT-272: under 5 mm/yr along the shared
+boundary for 10 Myr), and PLT-534's inheritance hands it the contact and the slab. It is on
+`PlateState::backarcs` while it holds a subducting front, and the burial at a resampling leaves a
+plate on that list alone below PLT-091's size: Bird 2003's back-arc microplates (Mariana 0.01037
+sr, Tonga 0.00625, South Sandwich 0.00317, Manus 0.00020) are all but one below PLT-091's 0.0377
+sr. Tests `a_backarc_rifts_over_an_old_deep_slab_behind_a_retreating_upper_plate` (the split, its
+reach, the contact, the slab, the events and the list; each gate alone; off, not a draw of the
+generator) and `a_sliver_holding_its_front_outlives_the_plate_size_rule`.
+
+**What moves the sliver.** Nothing new. The sliver holds the front, so the force balance's suction
+(PLT-186, PLT-540: a share of the pull and a mantle link along the trench's normal) acts on it and
+no longer on the parent; the slab's own pull and resistance stay on the subducting plate. Lallemand
+et al. 2008's anchoring (eq. 11, F_a = 6.6 η_m V_t sin α) would slow it; the model has no such term
+for any plate and this stage adds none. Test `a_backarc_sliver_opens_at_earth_s_rates`
+(`plates/tests.rs`): FRC-016's reference plate on the 40,000-sample lattice (a 3,000 km trench of a
+full-length 80 Myr slab) with the overriding plate's forearc and arc split off (69 samples, 32 on
+the front), through the force balance at the defaults: the back-arc opens at 75.5 mm/yr, inside
+Table 1's E3 range (2.8 to 142.1) and about twice its median (34.8); the trench, which moved 9.3
+mm/yr seaward with its plate before, rolls back at 77.3, under Schellart et al. 2007's fastest (6
+to 16 cm/yr "only observed close to slab edges"). A free sliver is fast because the suction's
+mantle link (0.3 × the slab's resistance) and the boundary links are all that hold it; Lallemand et
+al.'s eq. 11 at their η_m of 10^20 Pa s (Table 4) would add a mantle link of about 5.6 × 10^20 N s
+m^-2 per metre of trench and slow a free sliver by about a sixth (the agent's estimate, not built).
+
+**Law 2 in Zhou's geometry** (PLT-717, `tectonics.margin_propagation`, on with this stage). A
+start now needs the trench to run on along the margin: U's trench samples within 4 spacings of the
+trench sample and U's coast floor within 2 spacings of the stretch's end must each read as a line
+(PLT-659's rule), their strikes within atan(1.5 / 4) = 20.6° of each other (a border's offset,
+PLT-534, over the trench's window), the trench sample within the border of the margin's line, and
+the continent at least a plate's worth of samples (`min_samples`, 300 on the pool's lattice), which
+drops arm fl-law2's "continents" of 1 to 11 samples. The rest of law 2 (the force test, the tear,
+the advance, PLT-658's strength) is unchanged, and law 3 stays off. A first form of the gate, every
+trench sample within 1.5 spacings of the margin's line, let a 45° junction through on the test
+lattice; the strikes' angle does not (42° there, 0.6° where the trench runs on). Test
+`a_trench_meeting_the_margin_at_an_angle_starts_nothing`; law 2's five tests in Zhou's geometry
+pass unchanged.
+
+**The measures** (PLT-716, written only with back-arc rifting on). Over the step's subducting
+fronts, one spacing each: the trench's velocity along the normal (the holding plate's, seaward
+positive), the convergence, the length retreating and the length within ±50 mm/yr, the length the
+slivers hold and the length that qualifies, and the slivers' opening against their parents. Earth's
+numbers: Heuret & Lallemand's table, Vt mean 8.5 mm/yr, retreat 0.484 of the segments, 0.917 within
+±50, E3 0.184; Schellart et al. 2007's 244 segments, mean vT 15.1 mm/yr and "27.6% of the total
+subduction rate is due to trench migration".
+
+**The arm** (trench3c: both laws on by default, key c6e9fcafc97b, argkey cd665cef, `pool.sh run
+trench3c --seeds 1,2,3,4` with the crust-budget envs; against base24-s4, base24's cached seeds 1 to
+4 on master 3ce1a373; `pool.sh table` for guard and v1census, `build/m4b/s3_read.py` for the
+records). Medians of 8 runs against 8, two-sided Mann-Whitney p in brackets.
+
+- **Guard clean.** No step beyond 2 Earth reliefs in any run; the worst 10,471 m (base 10,172,
+  p 0.13); the highest plate elevation 5,963 m (5,688).
+- **V1.** Collisions 3.40 to 4.20 per 100 Myr (p 0.035), the only number at p < 0.05. Land 0.316 to
+  0.289 (0.38), largest landmass 0.168 to 0.131 (0.96), continental crust under the sea 0.211 to
+  0.252 (0.72), land above 2 km 0.059 to 0.030 (1.0), coast with high ground 0.109 to 0.124
+  (0.88), land under ice 0.117 to 0.097 (0.88), crust's net change −0.065 to −0.071 (0.96);
+  criteria met 5.5 to 6 (mean 5.50 to 5.38).
+- **Back-arcs.** 49.5 back-arc rifts a run, 43 more drawn and refused (a sliver or a rest under 32
+  samples: short qualifying fronts on the quick lattice); 3.5 alive at the end. They do open: none
+  healed, and the slivers' opening against their parents averages 43.7 mm/yr over the fronts they
+  hold (Heuret & Lallemand's E3 median 34.8, range 2.8 to 142.1). Their median life is 34.5 Myr
+  (Sdrolias & Müller's four basins spread for 8 to 25 Myr); 31.5 of them end absorbed (PLT-091
+  once they hold no subducting front), 8.5 sutured, 6 consumed. They hold 0.075 of the subducting
+  front over the run (Heuret & Lallemand's E3 segments 0.184), and 0.107 qualifies unheld.
+- **The trench's motion** (with the slivers in it). Mean Vt 15.6 mm/yr seaward (Schellart et al.
+  2007 15.1 in the Indo-Atlantic hotspot frame; Heuret & Lallemand's table 8.5 in HS3), retreating
+  on 0.743 of the front (Schellart 2008's 62 to 78 % of segments by frame; Heuret & Lallemand 0.484),
+  0.895 within ±50 mm/yr (0.917), and trench migration 0.234 of the subduction rate (Schellart et
+  al. 2007's 27.6 %; mean convergence 67.1 mm/yr). No base number exists: off, the measures are not
+  written (they would break the off check), and every trench moves with its overriding plate.
+- **Law 2.** 2.5 starts a run and 2.5 advances (arm fl-law2: 116 starts, none advanced), 15.5
+  stalls; the margin broken about 390 km a run Earth-normalized (48 km of the quick planet's), at
+  about 36 mm/yr while live (Zhou et al.'s model about 17 cm/yr); 2.5 new plates a run, median life
+  110 Myr.
+- **The plates.** Alive 12 to 15 (p 0.026), plate life 72 to 54.5 Myr (0.006), births 102 to 154.5
+  (0.002), slab breakoffs 8.85 to 10.55 per 100 Myr (0.004), sutures 34 to 42 (0.030), partings
+  11.7 to 14.3 per 100 Myr (0.040); the slab-attached plates' speed over the free ones 2.97 to 2.47
+  (0.010), the slab pull's share of the drive 0.665 to 0.514 (0.021): the slivers are small plates
+  whose drive is the suction, not a slab of their own.
+- **The floor**, Step 14's open question: median age 94.5 to 90.7 Myr (0.51), older than 180 Myr
+  23.2 to 22.0 % (0.51), older than 250 Myr 13.0 to 12.3 % (0.51). The moving trench does not
+  reach the old floor: it sits beside the continents, far from any trench (the age map, "The sea
+  floor's age" below), and law 2's few propagations take little of it.
+
+**The off check.** Both switches off (trench3c-off, `--set tectonics.backarc_rifting=false --set tectonics.margin_propagation=false`, key c6e9fcafc97b, argkey a3bb8920, seed 1 of both starts): base24's planet bit for bit, the world state's 109 and 108 files, the dumped fields and the dynamics record sha256 for sha256 (`build/m4b/offcheck_s3.sh`); only the parameter dump, the two new counters' names and the timings differ.
+
+**What it is not.** The sliver's speed comes from the model's suction and boundary terms alone:
+there is no slab-width law (Schellart et al. 2007: retreat "inversely related to slab width",
+fastest within 1,200 km of a slab edge), no anchoring (Lallemand et al. 2008), no dip, and no
+mantle flow or plume under the back-arc. A draw takes a pair's whole qualifying front, where
+Earth's back-arcs open along segments of a long trench. A back-arc's spreading does not end by a
+law of its own (Sdrolias & Müller: "The cessation of back-arc spreading cannot be correlated with
+any surface kinematic events"); here it ends when the sliver stops opening (it heals), loses its
+front (it is absorbed at a resampling) or collides. The trench-motion measures are written only
+with back-arc rifting on. Law 2's tolerances are the lattice's (PLT-717, `game-choice`), and its
+margin strength is still PLT-658's fallback.
 
 ## Plate speed (2026-10-25)
 
@@ -11852,6 +12013,8 @@ short of the 100 km an advance needs. Zhou et al.'s geometry, a trench running o
 is the one the law advances in (the unit tests), and the planet rarely makes it. The tip's hidden
 crust and the pull across the trench came after the arm; with them one diagnosis planet has 17
 starts (14) and still no advance.
+
+**Unparked (2026-10-26, the M5 lane's stage 3).** Starts only in Zhou et al.'s geometry since PLT-717, and on by default after the arm trench3c (Step 15: 2.5 starts and 2.5 advances a run, guard clean). What follows is the record of the parking.
 
 **Parked (2026-10-26, the coordinator's call).** `tectonics.margin_propagation` is off by default.
 The reason is correctness, not the V1 breaches (V1 is not a gate): under geometry A and Gurnis's
