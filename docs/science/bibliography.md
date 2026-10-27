@@ -9497,3 +9497,148 @@ The sources of the M5 lane's stage 3 (build log 2026-10-26, "M5 lane: the moving
 - Ledger ids: PLT-712 (support)
 - Access: paywalled; the abstract from a 2024 web archive copy of the publisher's page (fetched 2026-10-26).
 - Read so far (by the project): abstract only, 2026-10-26: "Interarc spreading occurs or occurred recently in the western Pacific, in the southern Atlantic, and possibly in the Mediterranean, where the subducted sea floor appears to be more than 50 m.y. old, and in many cases, is more than 100 m.y. old"; Cordilleran tectonics "where the subducted oceanic lithosphere is younger than about 50 m.y.".
+
+## The old floor: the stalled planets, invasion and Earth's floor through time (PLT-720; notes on CHK-032 to CHK-034, PLT-681, PLT-692), added 2026-10-27
+
+The sources of the old-floor lane (plates.md "Step 16"; build log 2026-10-27). Two literature sub-agents (Sonnet) read them; their downloads are in the lane's scratch (`build/oldfloor/src/`, not in the library) and the quotes below were spot-checked in those texts by the lane. Toth & Gurnis 1998, Bradley 2008, Nikolaeva et al. 2010, Crameri et al. 2020 and Schellart et al. 2007 (above) were read again; their entries, or the notes at the end of this section, record what.
+
+### Duarte2013
+- Reference: Duarte, J. C., Rosas, F. M., Terrinha, P., Schellart, W. P., Boutelier, D., Gutscher, M.-A. and Ribeiro, A. (2013). Are subduction zones invading the Atlantic? Evidence from the southwest Iberia margin. Geology 41(8):839-842.
+- DOI or URL: 10.1130/G34100.1
+- Cited as: "Duarte et al. 2013".
+- Ledger ids: none (the old-floor diagnosis, plates.md Step 16)
+- Access: paywalled; the abstract from the VU portal and HAL (insu-00835462), the authors' Reply (Geology 42(3):e329) from HAL.
+- Read so far (by the project): abstract only, 2026-10-27: "Currently there are two tectonic mechanisms operating in the SIM: migration of the Gibraltar Arc and Africa-Eurasia convergence"; "Our work suggests that the formation of new subduction zones in Atlantic-type oceans may not require the spontaneous foundering of its passive margins. Instead, subduction can be seen as an invasive process that propagates from ocean to ocean." The Reply: "what we propose is the nucleation and northward propagation of a new (convergent) plate boundary along the SIM".
+
+### Duarte2018
+- Reference: Duarte, J. C., Schellart, W. P. and Rosas, F. M. (2018). The future of Earth's oceans: consequences of subduction initiation in the Atlantic and implications for supercontinent formation. Geological Magazine 155(1):45-58 (online 3 October 2016).
+- DOI or URL: 10.1017/S0016756816000716; the VU research portal's copy.
+- Cited as: "Duarte et al. 2018".
+- Ledger ids: none (the old-floor diagnosis)
+- Access: open (the VU portal's PDF).
+- Read so far (by the project): full text, 2026-10-27. p. 46: "'subduction invasion' ... a general process of subduction initiation in an Atlantic-type ocean in which the formation of the subduction zone is or was induced by an external (to the pristine basin) mechanism or force"; "in passive margins there are generally no tectonic forces with the magnitude required to spontaneously initiate subduction"; "the only source to provide a force conceivably capable of inducing subduction initiation along a pristine passive margin is another subduction system or an associated collision belt"; p. 47: "trenches are highly movable and once they form they tend to migrate into places where negatively buoyant oceanic lithosphere is available"; p. 48: "it is conceivably very difficult, for whatever reason, to maintain a pristine Atlantic-type ocean for long periods (> 200 Ma)"; p. 47-48, citing Bradley 2008: "the 76 analysed passive margins ... had a mean life span of 178 Ma and a range of life spans from 25 to 590 Ma"; p. 51: "if subduction zones do not propagate along the Atlantic margins this ocean would thus continue to open for another ~300 Ma leaving very old (~500 Ma) oceanic lithosphere behind. It is, however, difficult to conceive 500 Ma old oceanic lithosphere"; Sec. 8, p. 54: spontaneous initiation in floor ">> 200 Ma" old is a hypothesis, "we do not have any present-day example of oceanic lithosphere of this age to test this hypothesis".
+
+### Duarte2024
+- Reference: Duarte, J. C., Riel, N., Rosas, F. M., Popov, A., Schuler, C. and Kaus, B. J. P. (2024). Gibraltar subduction zone is invading the Atlantic. Geology 52(5):331-335.
+- DOI or URL: 10.1130/G51654.1; the final peer-reviewed preprint on EarthArXiv.
+- Cited as: "Duarte et al. 2024".
+- Ledger ids: none (the old-floor diagnosis)
+- Access: open (EarthArXiv).
+- Read so far (by the project): full text of the preprint, 2026-10-27. Abstract: the Lesser Antilles and Scotia arcs "have been forced from the nearby Pacific subduction zones. The Gibraltar Arc is another place where a subduction zone is invading the Atlantic. This corresponds to a direct migration of a subduction zone that developed in the closing Mediterranean basin." The model: early retreat "~11 cm/yr"; "At 30 m.y., the Gibraltar Arc is formed with the trench positioned in the Atlantic"; "the abrupt deceleration of the trench retreat once it enters the Atlantic ... the narrow Gibraltar slab must pull the wider Atlantic lithosphere down"; "In the case of a wider corridor, subduction propagation is faster".
+
+### Waldron2014
+- Reference: Waldron, J. W. F., Schofield, D. I., Murphy, J. B. and Thomas, C. W. (2014). How was the Iapetus Ocean infected with subduction? Geology 42(12):1095-1098.
+- DOI or URL: 10.1130/G36194.1; the authors' accepted manuscript at the University of Alberta.
+- Cited as: "Waldron et al. 2014".
+- Ledger ids: none (the old-floor diagnosis)
+- Access: open (the accepted manuscript).
+- Read so far (by the project): full text of the manuscript, 2026-10-27. Abstract: "Because subduction in the Iapetus Ocean began only ~35 Myr after the end of rifting, spontaneous foundering of mature passive margins is an unlikely subduction-initiation mechanism. Subduction is more likely to have entered the Iapetus from the boundary with the external paleo-Pacific, similar to the incursion of the Scotia, Caribbean, and Gibraltar arcs into the modern Atlantic"; "no passive margin formed since Pangea breakup has been converted to subduction despite protracted cooling and local compressive stress"; "rapid trench roll-back caused it to migrate into the young Iapetus ... it progressively 'infected' (Mueller and Phillips, 1991) the Iapetus with subduction, eventually leading to ocean closure".
+
+### BaesSobolev2017
+- Reference: Baes, M. and Sobolev, S. V. (2017). Mantle flow as a trigger for subduction initiation: a missing element of the Wilson cycle concept. Geochemistry, Geophysics, Geosystems 18(12):4469-4486.
+- DOI or URL: 10.1002/2017GC006962; the GFZ repository's PDF.
+- Cited as: "Baes & Sobolev 2017".
+- Ledger ids: none (the old-floor diagnosis)
+- Access: open (GFZ).
+- Read so far (by the project): full text, 2026-10-27. Abstract: passive margin conversion "is impeded by the high strength of passive margins, and it has never occurred in Cenozoic times"; "additional forcing, provided by mantle flow, which is induced by neighboring subduction zones and midmantle slab remnants, can convert a passive margin into a subduction zone ... a long-term process". Sec. 3.1: with no flow, "no significant deformation occurs, even after 100 Myr"; Sec. 3.2: "Self-sustaining subduction is initiated at approximately 30.5 Myr"; Sec. 4: "The time of subduction initiation in most of our experiments is more than 20 Myr", and initiation "will likely start from the closest existing subduction zones ... and propagate along the margin". 2-D models; "in the real 3-D situation, subduction initiation may take much longer".
+
+### LallemandArcay2021
+- Reference: Lallemand, S. and Arcay, D. (2021). Subduction initiation from the earliest stages to self-sustained subduction: insights from the analysis of 70 Cenozoic sites. Earth-Science Reviews 221:103779.
+- DOI or URL: 10.1016/j.earscirev.2021.103779
+- Cited as: "Lallemand & Arcay 2021".
+- Ledger ids: none (a note on PLT-692)
+- Access: paywalled; the abstract from the HAL API (hal-03362249). The full text (HAL behind a proof-of-work challenge, ScienceDirect 403) was not read.
+- Read so far (by the project): abstract only, 2026-10-27: "a total of 70 candidate sites for subduction initiation cumulating ~70,000 km of trench, two thirds of which are still active and a majority still immature"; "new subduction zones regularly nucleate, at a mean rate of about once every Myr, and with a success rate of more than 70% to reach subduction maturity"; "A majority forms at the transition between an ocean and a continent, plateau or volcanic arc"; "There is no rule concerning the age of the subducting plate which varies from 0 to 140 Ma". How many of the 70 are new subduction zones in Crameri et al.'s sense, and how far each lies from older subduction, needs the full text.
+
+### Marques2014
+- Reference: Marques, F. O., Cabral, F. R., Gerya, T. V., Zhu, G. and May, D. A. (2014). Subduction initiates at straight passive margins. Geology 42(4):331-334.
+- DOI or URL: 10.1130/G35246.1
+- Cited as: "Marques et al. 2014".
+- Ledger ids: none (the old-floor diagnosis)
+- Access: paywalled; the abstract from OpenAlex.
+- Read so far (by the project): abstract only, 2026-10-27: gravitationally driven 3-D models in which "the curvature angle β can control subduction initiation: the greater β is, the more difficult subduction initiation becomes".
+
+### Auzemery2020
+- Reference: Auzemery, A., Willingshofer, E., Yamato, P., Duretz, T. and Sokoutis, D. (2020). Passive margin inversion controlled by stability of the mantle lithosphere. Global and Planetary Change 195:103323.
+- DOI or URL: 10.1016/j.gloplacha.2020.103323; the Utrecht repository's PDF.
+- Cited as: "Auzemery et al. 2020".
+- Ledger ids: none (the old-floor diagnosis)
+- Access: open (Utrecht).
+- Read so far (by the project): full text, 2026-10-27, models with imposed shortening (1 cm/yr). Abstract: "Suitable conditions for subduction initiation at passive margins correspond to an intermediate age (ca. 80 Myr) of the oceanic lithosphere"; Sec. 5.3: "if the margin is too old (age > 110 Myr) the strength of the mantle lithosphere is too high to allow for underthrusting"; "For an old passive margin, the migration of an existing plate boundary is probably the easiest way to initiate subduction (Duarte et al., 2013)".
+
+### Koptev2022
+- Reference: Koptev, A., Cloetingh, S., Gerya, T., Sternai, P. and Botsyun, S. (2022). Frontiers in Earth Science 10:1097922 (the title not recorded by the sub-agent).
+- DOI or URL: 10.3389/feart.2022.1097922
+- Cited as: "Koptev et al. 2022".
+- Ledger ids: none (the old-floor diagnosis)
+- Access: open.
+- Read so far (by the project): full text, 2026-10-27, through a sub-agent: "no irrefutable natural example of initiated self-sustained subduction at a passive margin has yet been documented"; Atlantic closure "is unlikely to occur by gravitational collapse of mature continental margins, but rather by cascading subduction initiations in the Caribbean region".
+
+### Schellart2023
+- Reference: Schellart, W. P., Strak, V., Beniest, A., Duarte, J. C. and Rosas, F. M. (2023). Earth-Science Reviews 236:104277 (the title not recorded by the sub-agent).
+- DOI or URL: 10.1016/j.earscirev.2022.104277
+- Cited as: "Schellart et al. 2023".
+- Ledger ids: none (the old-floor diagnosis)
+- Access: paywalled; the abstract.
+- Read so far (by the project): abstract only, 2026-10-27, on the Scotia arc's start: "Subduction initiation starts in the overriding plate after ~100 Myr of long-lived subduction", driven by "a long-lived subduction zone in another ocean basin" across "a narrow continental lithospheric (land) bridge".
+
+### Williams2021
+- Reference: Williams, S., Wright, N. M., Cannon, J., Flament, N. and Müller, R. D. (2021). Reconstructing seafloor age distributions in lost ocean basins. Geoscience Frontiers 12(2):769-780.
+- DOI or URL: 10.1016/j.gsf.2020.06.004; the ANU repository's PDF (CC BY-NC-ND).
+- Cited as: "Williams et al. 2021".
+- Ledger ids: notes on CHK-032 to CHK-034
+- Access: open.
+- Read so far (by the project): full text, 2026-10-27 (the supplement not read). Two reconstructions over the last 410 Myr; abstract: "variations in mean seafloor age of ~15 Myr during the late Paleozoic"; §4.1: "uniform mean plate velocities for Panthalassa between 50 mm/yr and 200 mm/yr define an envelope of mean seafloor ages from <30 Myr to >90 Myr"; §5.2: "The distribution is close to triangular before Pangea assembly ... Once Pangea is assembled, the distribution becomes more rectangular". The mean age read off Figs. 4 and 8 by the sub-agent: about 35 to 65 Myr over 410 Myr in both models, 75 to 95 Myr only on the 50 mm/yr Panthalassa curves; no share older than 180 or 250 Myr is given (the age axes stop at 200 Myr). §3.1: "Since these oceanic plates are synthetic, the configurations and spreading rates are conjectural."
+
+### Muller2016
+- Reference: Müller, R. D., Seton, M., Zahirovic, S., Williams, S. E., Matthews, K. J., Wright, N. M., Shephard, G. E., Maloney, K. T., Barnett-Moore, N., Hosseinpour, M., Bower, D. J. and Cannon, J. (2016). Ocean basin evolution and global-scale plate reorganization events since Pangea breakup. Annual Review of Earth and Planetary Sciences 44:107-138.
+- DOI or URL: 10.1146/annurev-earth-060115-012211; an open web archive copy (2020-05-07).
+- Cited as: "Müller et al. 2016".
+- Ledger ids: notes on CHK-032 to CHK-034
+- Access: open.
+- Read so far (by the project): full text, 2026-10-27. Fig. 7 read by the sub-agent: the mean age of the ocean floor about 49 Myr at 230 Ma, 54 to 55 near 200 to 185 Ma, about 37 at 120 to 100 Ma, about 63 today. Fig. 6b caption: "The early breakup of Pangea was characterized by a roughly rectangular distribution (bottom), which began morphing into a progressively skewed distribution after 170 Ma ... establishing the triangular distribution observed today (top)"; "generally we will overestimate the age of ancient ocean basins".
+
+### Coltice2013
+- Reference: Coltice, N., Seton, M., Rolf, T., Müller, R. D. and Tackley, P. J. (2013). Convergence of tectonic reconstructions and mantle convection models for significant fluctuations in seafloor spreading. Earth and Planetary Science Letters 383:92-100.
+- DOI or URL: 10.1016/j.epsl.2013.09.032; the EarthByte copy.
+- Cited as: "Coltice et al. 2013".
+- Ledger ids: notes on CHK-032 to CHK-034
+- Access: open.
+- Read so far (by the project): full text, 2026-10-27. §3: "Supercontinent amalgamation is related to a rectangular-like distribution and low/moderate crustal production rates whereas break-up is associated with a triangular distribution"; §5.2: "The maximum seafloor age barely changes in our calculations, being between 200 and 250 My" (convection models at a Rayleigh number 10 to 100 times below Earth's, time scaled to an 85 My transit time); §7: "The triangular-like distribution of the present-day Earth corresponds to an intermediate state".
+
+### Coltice2012
+- Reference: Coltice, N., Rolf, T., Tackley, P. J. and Labrosse, S. (2012). Dynamic causes of the relation between area and age of the ocean floor. Science 336(6079):335-338.
+- DOI or URL: 10.1126/science.1219120
+- Cited as: "Coltice et al. 2012".
+- Ledger ids: none
+- Access: paywalled; the abstract from HAL and Europe PMC.
+- Read so far (by the project): abstract only, 2026-10-27: "The distribution varies in time with the creation and destruction of new plate boundaries."
+
+### Granot2016
+- Reference: Granot, R. (2016). Palaeozoic oceanic crust preserved beneath the eastern Mediterranean. Nature Geoscience 9:701-705.
+- DOI or URL: 10.1038/ngeo2784; the advance-online version from CORDIS.
+- Cited as: "Granot 2016".
+- Ledger ids: notes on CHK-034
+- Access: open (CORDIS).
+- Read so far (by the project): full text, 2026-10-27: the Herodotus Basin's crust "formed about 340 million years ago" ("340 ± 25 Myr"), flanked by the Levant's stretched continental crust and the African margin, a transform that went inactive, "leaving the oceanic Herodotus crust juxtaposed against the African continental crust"; it is only now subducting at its western edge, beneath Anatolia.
+
+### Karlsen2020
+- Reference: Karlsen, K. S., Domeier, M., Gaina, C. and Conrad, C. P. (2020). A tracer-based algorithm for automatic generation of seafloor age grids from plate tectonic reconstructions. Computers & Geosciences 140:104508.
+- DOI or URL: 10.1016/j.cageo.2020.104508; arXiv 1910.03351.
+- Cited as: "Karlsen et al. 2020".
+- Ledger ids: none
+- Access: the arXiv preprint open; the published version not read.
+- Read so far (by the project): the preprint, 2026-10-27: "no in situ oceanic lithosphere older than 200 Ma has survived to the present-day"; "the triangular age-area distribution of the present-day ocean floor is unlikely to be a constant feature through Earth's history". No mean age or old-floor share in the text.
+
+### Becker2009
+- Reference: Becker, T. W., Conrad, C. P., Buffett, B. and Müller, R. D. (2009). Past and present seafloor age distributions and the temporal evolution of plate tectonic heat transport. Earth and Planetary Science Letters 278(3-4):233-242.
+- DOI or URL: 10.1016/j.epsl.2008.12.007
+- Cited as: "Becker et al. 2009".
+- Ledger ids: none
+- Access: the author's preprint through a truncated web archive copy; read in part.
+- Read so far (by the project): in part, 2026-10-27: "we interpret the present near-triangular distribution of ages as a snapshot of a transient state of the evolving oceanic plate system"; the reconstructions evolve to 110 Ma, "which stands out with a near-rectangular distribution".
+
+### Notes on entries above (2026-10-27, the old-floor lane)
+- TothGurnis1998: read again for PLT-720 in the library's text: p. 18,063 to 18,064, "There is no simple criteria to determine that subduction has not initiated. However, we found that models which proceeded with a convergence rate of <10 mm/yr did not show the later increase in subduction rate ... Therefore we judged that if the convergence velocity has not reached 10 mm/yr after 20 Myr, then subduction has failed to initiate and is unlikely to do so"; Figure 10's caption: "Subduction is deemed to have successfully started when the convergence rate exceeds 10 mm/yr". The floor is the paper's test of whether a new subduction zone has formed. Ledger ids now PLT-681, PLT-682, PLT-720.
+- Bradley2008: Table 2 parsed from the repository copy by the lane (74 of the 76 Group 1 margins; A19 and A20, written "(a,b)", missed): mean lifespan 180 Myr (Bradley: 181), longest 590; the 26 with a start under 541 Ma, mean 134, longest 220. As standing ages (each margin weighted by its lifespan, as a snapshot sees them): all margins mean 121 Myr, of the margin-time 0.109 older than 250 Myr, 0.044 older than 350 and 0.007 older than 500; Phanerozoic starts mean 79 Myr and none older than 220. §2.3: "Most passive margins since the Neoarchean met the first fate: they formed by rifting, endured for a time, and ultimately collided with an arc"; §10.2: "Direct conversion of a passive to a convergent margin is rare indeed".
+- Nikolaeva2010: the full abstract now read through Crossref (2026-10-27): "at most passive margins, elastic and frictional forces exceed gravitational instability and ridge-push forces, which precludes subduction initiation"; "the age of the oceanic plate is a factor of secondary importance for subduction initiation and only plays a role if other parameters are of critical values"; favourable margins are where "chemically buoyant (depleted) continental lithosphere becomes thin and hot (Moho temperature >660°C)".
