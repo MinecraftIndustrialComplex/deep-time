@@ -254,9 +254,7 @@ fn bars(r: &Rivers, site: u32, at: usize, rb: &Ribbon, z_range: (f64, f64)) -> B
     let (mut lo, mut hi) = (pos, pos);
     let (mut len, mut vol) = (0.0, 0.0);
     let mut down = true;
-    while (vol < rb.volume || len < MIN_LENGTH_BLOCKS)
-        && len < max_len
-        && (lo > first || hi < last)
+    while (vol < rb.volume || len < MIN_LENGTH_BLOCKS) && len < max_len && (lo > first || hi < last)
     {
         if (down && hi < last) || lo == first {
             let l = seg_len(hi);
