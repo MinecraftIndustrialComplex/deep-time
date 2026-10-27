@@ -552,6 +552,12 @@ pub struct TectonicParams {
     pub weld_speed_mm_yr: f64,
     /// … for this long, Myr. The larger plate keeps its id.
     pub weld_after_myr: f64,
+    /// The weld's stall also needs the plates' relative speed along the front (across it or along
+    /// it) below `weld_speed_mm_yr`: two plates are one plate when they have stopped moving
+    /// relative to each other (the force-balance design, 3.4), and a collision turned to
+    /// strike-slip is two plates still moving. Off: the convergence across the front alone, as
+    /// before 2026-10-27. ledger: PLT-721
+    pub weld_on_relative_speed: bool,
     /// Polarity reversal (`plates/subduction.rs`, PLT-056): `true` judges the overriding side by
     /// the crust its arc stands on (its plate's continental crust within `arc_distance_km` of the
     /// overlap, PLT-370; the default and every built-in preset since 2026-10-23, V1 gap 2) rather
@@ -1344,6 +1350,7 @@ impl Default for TectonicParams {
             collision_noroom_stays: true,     // ledger: PLT-700 (on since 2026-10-26)
             weld_speed_mm_yr: 5.0,            // ledger: PLT-246
             weld_after_myr: 10.0,             // ledger: PLT-246
+            weld_on_relative_speed: true,     // ledger: PLT-721
             reversal_by_arc_crust: true,      // ledger: PLT-371 (on since 2026-10-23)
             one_way_subduction: true,         // ledger: PLT-542 (on since 2026-10-24)
             contact_carry: true,              // ledger: PLT-550 (on since 2026-10-24)
