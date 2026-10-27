@@ -66,6 +66,84 @@ struct Info {
     j2: u32,
 }
 
+/// A spherical cap holding every point of a set: the unit direction of their sum and the largest
+/// angle from it to one of them (the whole sphere when the sum is too short to give a direction).
+#[derive(Clone, Copy, Debug)]
+struct Cap {
+    centre: DVec3,
+    radius: f64,
+}
+
+impl Cap {
+    fn over(pos: &[DVec3], index: &[u32]) -> Cap {
+        // Summed in fixed chunks, so the centre does not depend on how the pool split the work.
+        let sum: DVec3 = index
+            .par_chunks(4096)
+            .map(|ch| ch.iter().map(|&i| pos[i as usize]).sum::<DVec3>())
+            .collect::<Vec<DVec3>>()
+            .into_iter()
+            .sum();
+        let Some(centre) = sum.try_normalize().filter(|_| sum.length() > 1e-6) else {
+            return Cap {
+                centre: DVec3::Z,
+                radius: std::f64::consts::PI,
+            };
+        };
+        let radius = index
+            .par_iter()
+            .map(|&i| angle(centre, pos[i as usize]))
+            .reduce(|| 0.0, f64::max);
+        Cap { centre, radius }
+    }
+
+    /// A squared chord no point of the set can be nearer to `q` than (the triangle inequality on
+    /// the sphere, less a margin for the angles' round-off), 0 inside the cap.
+    fn floor_chord2(&self, q: DVec3) -> f64 {
+        let gap = angle(self.centre, q) - self.radius - 1e-7;
+        if gap > 0.0 {
+            crate::sphere::kdtree::chord2_of_angle(gap)
+        } else {
+            0.0
+        }
+    }
+}
+
+/// The angle between two unit vectors, accurate at every angle (atan2 rather than acos).
+fn angle(a: DVec3, b: DVec3) -> f64 {
+    a.cross(b).length().atan2(a.dot(b))
+}
+
+/// The nearest visible sample to `q` of any plate but `p1`, with its squared chord: the minimum
+/// over the plates' trees, ties to the plate first in `trees`. The trees are asked nearest cap
+/// first, and a plate whose cap lies farther than the best found so far cannot hold a nearer or
+/// equal sample, so it is skipped: the answer is the one asking every tree gives.
+fn nearest_other(trees: &[(u32, Tree, Cap)], p1: u32, q: DVec3) -> Option<(u32, f64)> {
+    let mut order: Vec<(f64, usize)> = trees
+        .iter()
+        .enumerate()
+        .filter(|(_, (p, _, _))| *p != p1)
+        .map(|(k, (_, _, cap))| (cap.floor_chord2(q), k))
+        .collect();
+    order.sort_unstable_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+    // (squared chord, the tree's place in `trees`, the sample)
+    let mut best: Option<(f64, usize, u32)> = None;
+    for (floor, k) in order {
+        if best.is_some_and(|(d, _, _)| floor > d) {
+            break;
+        }
+        if let Some((v, d)) = trees[k].1.nearest(q) {
+            let better = match best {
+                None => true,
+                Some((bd, bk, _)) => d.total_cmp(&bd).then(k.cmp(&bk)).is_lt(),
+            };
+            if better {
+                best = Some((d, k, v));
+            }
+        }
+    }
+    best.map(|(d, _, v)| (v, d))
+}
+
 /// Samples the crust onto the coupling's grid; returns `(layer name, values)` pairs. The one
 /// dispatch point of the GPU path: the session's device, if any, links the covered cells.
 pub fn sample(
@@ -297,11 +375,13 @@ pub(super) fn sample_with(
             .collect();
         ids.sort_unstable();
         ids.dedup();
-        let trees: Vec<(u32, Tree)> = ids
+        let trees: Vec<(u32, Tree, Cap)> = ids
             .into_iter()
             .map(|p| {
                 let keep = |i: usize| !samples[i].is_hidden() && plate_of(i as u32) == p;
-                (p, Tree::over(pos, keep))
+                let tree = Tree::over(pos, keep);
+                let cap = Cap::over(pos, &tree.index);
+                (p, tree, cap)
             })
             .collect();
         let w = coupling.grid().w as usize;
@@ -311,11 +391,7 @@ pub(super) fn sample_with(
             .map(|&c| {
                 let q = coupling.cell_unit((c % w) as i64, (c / w) as i64);
                 let p1 = plate_of(links[c].nearest);
-                trees
-                    .iter()
-                    .filter(|(p, _)| *p != p1)
-                    .filter_map(|(_, tree)| tree.nearest(q))
-                    .min_by(|a, b| a.1.total_cmp(&b.1))
+                nearest_other(&trees, p1, q)
             })
             .collect();
         for (&c, f) in far.iter().zip(found) {
@@ -728,3 +804,90 @@ pub const TOP_ORDER: [usize; 7] = [
 
 /// A pool thinner than this does not count as the top rock, metres.
 pub const TOP_POOL_M: f32 = 50.0;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sphere::fibonacci::fibonacci_sphere;
+
+    /// SplitMix64 to a unit-interval float (a fixed sequence for the test).
+    fn unit(state: &mut u64) -> f64 {
+        *state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut z = *state;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        (z ^ (z >> 31)) as f64 / u64::MAX as f64
+    }
+
+    fn direction(state: &mut u64) -> DVec3 {
+        let z = 2.0 * unit(state) - 1.0;
+        let a = std::f64::consts::TAU * unit(state);
+        let r = (1.0 - z * z).sqrt();
+        DVec3::new(r * a.cos(), r * a.sin(), z)
+    }
+
+    /// The far gap's search with the caps finds what asking every other plate's tree finds, the
+    /// sample and the distance, ties to the first plate: on Voronoi plates of a Fibonacci lattice
+    /// (some of them two pieces on opposite sides, so their caps are wide), with the samples of a
+    /// band hidden to open gaps, and with one sample copied onto another plate to make a tie.
+    #[test]
+    fn the_far_gaps_search_with_caps_equals_asking_every_plate() {
+        let mut s = 7u64;
+        let mut pos = fibonacci_sphere(20_000);
+        let seeds: Vec<DVec3> = (0..24).map(|_| direction(&mut s)).collect();
+        let plate_at = |p: DVec3| -> u32 {
+            let k = (0..seeds.len())
+                .max_by(|&a, &b| seeds[a].dot(p).total_cmp(&seeds[b].dot(p)))
+                .unwrap();
+            // Plates 20 to 23 join 0 to 3: plates in two pieces.
+            (k % 20) as u32
+        };
+        let mut plate: Vec<u32> = pos.iter().map(|&p| plate_at(p)).collect();
+        // A tie: sample 0's position again, on another plate.
+        pos.push(pos[0]);
+        plate.push((plate[0] + 1) % 20);
+        // Hidden: a band round the equator of one axis, so far cells sit in gaps.
+        let axis = direction(&mut s);
+        let visible: Vec<bool> = pos.iter().map(|p| p.dot(axis).abs() > 0.15).collect();
+        let mut ids: Vec<u32> = (0..pos.len())
+            .filter(|&i| visible[i])
+            .map(|i| plate[i])
+            .collect();
+        ids.sort_unstable();
+        ids.dedup();
+        let trees: Vec<(u32, Tree, Cap)> = ids
+            .into_iter()
+            .map(|p| {
+                let tree = Tree::over(&pos, |i| visible[i] && plate[i] == p);
+                let cap = Cap::over(&pos, &tree.index);
+                (p, tree, cap)
+            })
+            .collect();
+        let all = Tree::over(&pos, |i| visible[i]);
+        let mut queries: Vec<DVec3> = (0..4_000).map(|_| direction(&mut s)).collect();
+        queries.push(pos[0]);
+        let mut pruned = 0usize;
+        for q in queries {
+            let (j, _) = all.nearest(q).unwrap();
+            let p1 = plate[j as usize];
+            let every = trees
+                .iter()
+                .filter(|(p, _, _)| *p != p1)
+                .filter_map(|(_, tree, _)| tree.nearest(q))
+                .min_by(|a, b| a.1.total_cmp(&b.1));
+            let got = nearest_other(&trees, p1, q);
+            assert_eq!(got.map(|x| x.0), every.map(|x| x.0), "sample at {q}");
+            assert_eq!(
+                got.map(|x| x.1.to_bits()),
+                every.map(|x| x.1.to_bits()),
+                "distance at {q}"
+            );
+            pruned += trees
+                .iter()
+                .filter(|(p, _, cap)| *p != p1 && every.is_some_and(|e| cap.floor_chord2(q) > e.1))
+                .count();
+        }
+        // The caps do skip plates (else the test proves nothing about the skip).
+        assert!(pruned > 4_000, "only {pruned} plates skipped");
+    }
+}
