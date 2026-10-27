@@ -9862,6 +9862,43 @@ oceans whose continents never collide still age. Trench invasion of an Atlantic-
 2018; Waldron et al. 2014: subduction "entered the Iapetus from the boundary with the external paleo-Pacific")
 is the next candidate.
 
+### Step 18: where the old floor sits after transference (diagnosis, 2026-10-27)
+
+The coordinator, inline, on base27 (master f4662d49, transference on; 24 runs, seeds 1 to 4 read here). Floor older
+than 250 Myr is 5.9 % of the ocean (the plate check's median; 3 % its line, Earth's present trace). The research for
+the next law (trench invasion: Duarte et al. 2013, 2024; Waldron et al. 2014; Schellart et al. 2007, 2008; Pindell &
+Kennan 2009; bibliography notes of 2026-10-27) expected Atlantic-type oceans, open floor trailing a continent far from
+any trench, which a trench entering through a corridor would consume. The diagnosis does not find that.
+
+- **The plates that hold it** (tools/review/oldfloor/oldfloor_plates.py, every snapshot from -900 Myr): 55 % of it on
+  plates over 0.2 of the planet, 72 % on plates moving 20 mm/yr or more, 67 % on plates that go down at 5,000 km or
+  more of slab front, 80 % on plates a quarter or more continental; only 10 % on slow plates (under 20 mm/yr) with
+  under 2,000 km of front. The plates are working, not stalled.
+- **Which side of its continent**: on the great circle to its own plate's nearest trench, 55 % meets its own
+  continent first ("trails"), 39 % does not ("leads"), 5 % is on plates with no trench. Of the trailing floor 81 % is
+  more than 1,500 km from any subduction front and 86 % from any collision front; of the leading floor 55 % is within
+  1,500 km of a subduction front (fix C's reach) and still old.
+- **Enclosure** (tools/review/oldfloor/oldfloor_enclosed.py): of 16 directions from each old sample, the share that
+  meets continental crust within 2,000 km: 12 or more for 63 % of the old floor, all 16 for 23 %, mostly its own
+  plate's continent (12 or more: 53 %). The map of the worst run (tools/review/oldfloor/agemap.py: supercontinent-2,
+  t0000, 13,628 of 66,782 ocean samples older than 250 Myr) shows it: basins ringed by continents inside the
+  assembled continental masses, some joined to the open ocean only by a young rift, and floor near the north pole.
+- **Not the collisions' length**: base27's collisions last 40 Myr at the median (the plate check's 15 to 50), keep
+  0.46 of their onset convergence after 20 Myr (0.2 to 0.6) and shorten 913 km at the median, 2,060 km at the 90th
+  percentile (India-Asia about 2,000 to 3,000), so plates do not weld early across open basins on the whole.
+- **The passive margins** (oldfloor.py): mean standing age 181 Myr on base26, 154 on base27; older than 250 Myr 27 %
+  and 20 % of the margin snapshots, against Bradley 2008's 11 % of margin-time (Phanerozoic starts: mean 79 Myr, none
+  older than 220).
+
+Earth keeps enclosed oceanic basins too, and they hold its oldest floor (the Eastern Mediterranean's, about 340 Myr,
+Granot 2016), but they are small. So the next law is about how the model's basins become enclosed and what closes
+them, not about invasion alone: where the floor enclosed by one plate's continents came from (welds across a basin,
+healed rifts, arcs turned continental round a basin, PLT-668), and the closure Duarte et al. 2013 name for a passive
+margin, a force "transmitted from a nearby subduction zone or collisional belt" (fix C counts subduction zones only).
+Candidates, none built: initiation within reach of active collision fronts as of subduction zones; a tear between a
+pair's collided and still-subducting stretches (Govers & Wortel 2005's STEP, as law 2 uses), so a collision does not
+stop a whole rigid boundary; trench invasion with Schellart et al.'s slab-width rule for rollback.
+
 ## Plate speed (2026-10-25)
 
 The coordinator's brief for the plate speed lane: CHK-020's `speed_rms_mm_yr` (the plate check's

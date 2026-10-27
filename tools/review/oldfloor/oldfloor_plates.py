@@ -22,6 +22,9 @@ from scipy.spatial import cKDTree
 
 FIELDS = 11
 TRENCH = 2
+FRONT_SUB = 256
+FRONT_COL = 512
+R_KM = 6371.0
 
 
 def xyz(lat, lon):
@@ -46,7 +49,7 @@ def main():
             t_from = float(a.split("=", 1)[1])
         if a.startswith("--every="):
             every = int(a.split("=", 1)[1])
-    tables = {k: {} for k in ("speed", "front", "continental", "size", "slow_short", "side")}
+    tables = {k: {} for k in ("speed", "front", "continental", "size", "slow_short", "side", "trails_sub_km", "trails_col_km", "leads_sub_km", "leads_col_km")}
     total = 0
     for arm in args:
         for run in sorted(p for p in Path(arm).iterdir() if (p / "rec.json").is_file()):
@@ -73,7 +76,12 @@ def main():
                 p3 = xyz(a[:, 0].astype(np.float64), a[:, 1].astype(np.float64))
                 tree = cKDTree(p3)
                 cont = a[:, 4] > 0.5
-                trench = (np.rint(a[:, 10]).astype(np.int64) & TRENCH) != 0
+                fl = np.rint(a[:, 10]).astype(np.int64)
+                trench = (fl & TRENCH) != 0
+                fronts = {}
+                for name, bit in (("sub", FRONT_SUB), ("col", FRONT_COL)):
+                    idx = np.flatnonzero((fl & bit) != 0)
+                    fronts[name] = cKDTree(p3[idx]) if len(idx) else None
                 for pid in np.unique(plate[old]):
                     mine = old & (plate == pid)
                     tr = np.flatnonzero(trench & (plate == pid))
@@ -89,6 +97,17 @@ def main():
                         q /= np.linalg.norm(q, axis=1, keepdims=True)
                         _, j = tree.query(q)
                         trails |= cont[j] & (plate[j] == pid)
+                    for side, sel in (("trails", trails), ("leads", ~trails)):
+                        for name, tr in fronts.items():
+                            if tr is None:
+                                d = np.full(int(sel.sum()), np.inf)
+                            else:
+                                d, _ = tr.query(src[sel])
+                                d = 2.0 * np.arcsin(np.clip(d / 2.0, 0, 1)) * R_KM
+                            for km_ in d:
+                                b = band(km_, [500, 1500, 3000, 1e12], ["<500", "500-1500", "1500-3000", "3000+"]) if np.isfinite(km_) else "none"
+                                key = f"{side}_{name}_km"
+                                tables[key][b] = tables[key].get(b, 0) + 1
                     tables["side"]["trails"] = tables["side"].get("trails", 0) + int(trails.sum())
                     tables["side"]["leads"] = tables["side"].get("leads", 0) + int((~trails).sum())
                 ids, counts = np.unique(plate[old], return_counts=True)
