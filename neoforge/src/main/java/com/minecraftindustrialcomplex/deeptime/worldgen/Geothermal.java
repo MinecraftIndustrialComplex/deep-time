@@ -534,9 +534,29 @@ public final class Geothermal {
         if (!c.env.onPlanet(fx, fz))
             return false;
         double q = c.env.heatFlowMwM2(fx, fz);
-        if (!(q >= c.rules.heatFlowMinMwM2()))
-            return false;
-        return !(Magma.top(c.h(fx, fz)) < c.seaLevel + MIN_ABOVE_SEA + 2 || c.wet.at(fx, fz) || c.env.iced(fx, fz));
+        return q >= c.rules.heatFlowMinMwM2() && standsAt(c, fx, fz);
+    }
+
+    /**
+     * Whether a field may stand at (fx, fz), whatever its source: the planet's own ground ({@link Env#onPlanet}), the
+     * top at least {@link #MIN_ABOVE_SEA} + 2 blocks above the sea, no water column, no ice. The volcanoes' fields
+     * ({@link #volcano}), the heat-flow fields ({@link #heatFlowSpot}) and the GameTests' odds ({@link #springPlaces}).
+     */
+    private static boolean standsAt(Ctx c, int fx, int fz) {
+        return c.env.onPlanet(fx, fz) && Magma.top(c.h(fx, fz)) >= c.seaLevel + MIN_ABOVE_SEA + 2 && !c.wet.at(fx, fz)
+                && !c.env.iced(fx, fz);
+    }
+
+    /**
+     * Whether the climate at (fx, fz) lets a field be a hot-spring field: groundwater (the year's rain at the setting)
+     * and ground that does not freeze (the mean at least {@link #POOL_MIN_C}); NaN without a climate counts as enough.
+     * A field also needs to lie off the summit zone ({@link #field}).
+     */
+    private static boolean springClimate(Ctx c, int fx, int fz) {
+        double precip = c.env.precipMm(fx, fz), mean = c.env.meanC(fx, fz);
+        boolean groundwater = Double.isNaN(precip) || precip >= c.rules.springMinPrecipMm();
+        boolean thawed = Double.isNaN(mean) || mean >= POOL_MIN_C;
+        return groundwater && thawed;
     }
 
     /**
@@ -596,9 +616,8 @@ public final class Geothermal {
      * Where the volcanoes' fields could be hot-spring fields, for the GameTests' odds (GEO-064's kind, GEO-065):
      * of each active volcano's flank ring that its later fields draw from ({@link #SUMMIT_ZONE} to the full reach
      * of its basal radius: closer in a field is fumarolic whatever the climate), sampled on {@code rings} rings
-     * of {@code spokes} points, the points where a field may stand ({@link Env#onPlanet}, the top at least
-     * {@link #MIN_ABOVE_SEA} + 2 blocks above the sea, dry, clear of ice) and a spring field may form (the year's
-     * rain at the setting, the mean temperature at least {@link #POOL_MIN_C}). Zero means no volcano of the world
+     * of {@code spokes} points, the points where a field may stand ({@link #standsAt}) and a spring field may form
+     * ({@link #springClimate}), by the tests the fields themselves use. Zero means no volcano of the world
      * can have a pool; a place found can still be refused by the placement (a slope, a crater, water).
      */
     public static int springPlaces(List<Volcanoes.Volcano> volcanoes, GeothermalRules rules, Magma.Heights heights,
@@ -614,10 +633,7 @@ public final class Geothermal {
                 for (int k = 0; k < spokes; k++) {
                     double angle = 2.0 * Math.PI * k / spokes;
                     int fx = c.wrap((int) Math.round(v.x() + rad * Math.cos(angle))), fz = (int) Math.round(v.z() + rad * Math.sin(angle));
-                    if (!env.onPlanet(fx, fz) || Magma.top(c.h(fx, fz)) < seaLevel + MIN_ABOVE_SEA + 2 || wet.at(fx, fz) || env.iced(fx, fz))
-                        continue;
-                    double precip = env.precipMm(fx, fz), mean = env.meanC(fx, fz);
-                    if ((Double.isNaN(precip) || precip >= rules.springMinPrecipMm()) && (Double.isNaN(mean) || mean >= POOL_MIN_C))
+                    if (standsAt(c, fx, fz) && springClimate(c, fx, fz))
                         places++;
                 }
             }
@@ -641,8 +657,7 @@ public final class Geothermal {
                 double angle = 2.0 * Math.PI * rng.nextDouble();
                 double rad = frac * radius * rules.reach();
                 int fx = c.wrap((int) Math.round(sx + rad * Math.cos(angle))), fz = (int) Math.round(sz + rad * Math.sin(angle));
-                if (!c.env.onPlanet(fx, fz) || Magma.top(c.h(fx, fz)) < c.seaLevel + MIN_ABOVE_SEA + 2 || c.wet.at(fx, fz)
-                        || c.env.iced(fx, fz))
+                if (!standsAt(c, fx, fz))
                     continue;
                 field(c, new Source(v.id(), v.silicic()), rng, fx, fz, rad / radius);
                 break;
@@ -654,10 +669,7 @@ public final class Geothermal {
     private static void field(Ctx c, Source v, SplittableRandom rng, int fx, int fz, double share) {
         GeothermalRules rules = c.rules;
         double size = rules.size();
-        double precip = c.env.precipMm(fx, fz), mean = c.env.meanC(fx, fz);
-        boolean groundwater = Double.isNaN(precip) || precip >= rules.springMinPrecipMm();
-        boolean thawed = Double.isNaN(mean) || mean >= POOL_MIN_C;
-        boolean springs = share >= SUMMIT_ZONE && groundwater && thawed;
+        boolean springs = share >= SUMMIT_ZONE && springClimate(c, fx, fz);
         boolean sinter = !c.env.carbonate(fx, fz, (int) Math.floor(c.h(fx, fz)));
         long fieldSeed = rng.nextLong();
         if (springs) {
