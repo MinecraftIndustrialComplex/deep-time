@@ -207,7 +207,14 @@ align with earth by introducing extremely weird forcing functions").
 - The MIC jar set is whatever /home/greencheetah/Projects/mic/pack pins today: re-run
   `tools/smoke/install.sh mic` before any -PwithMic gate. Paths under mods/mic-climate are read-only
   and its smoke/ folder is a stale copy, never a reference.
-- Land your work: commit, `git merge --no-ff` finished branches into master, push master. Catch up a
+- **Land your work through a pull request that Graphide reviews** (Ben, 2026-10-26: "Set me up with Graphide
+  PR review"; decisions log 2026-10-26). The `graphide-review` GitHub App is installed on the organization and
+  turns deep-time on (`gr github repos` lists it `ready`; graphide.com/dashboard/github holds its review
+  switch). Commit on a branch, push it, open a PR to master (`nix shell nixpkgs#gh -c gh pr create`), wait for
+  the app's review on the PR, answer each finding on the PR (fix it on the branch, or say why not), then land
+  it yourself: `tools/dev/merge-branch.sh <head sha> "summary"` and push master, which marks the PR merged.
+  A lane pushes its branch and reports; the coordinator opens the PR, waits for the review and lands it.
+  Record what the review caught and missed for Ben (he wants feedback on Graphide's reviews). Catch up a
   behind checkout with `git merge --ff-only --autostash origin/master`.
 - **Science documentation is part of done** (Ben, 2026-10-02: "as backed by science as possible";
   decisions log 2026-10-02). A feature is not done until its page in `docs/science/`, its rows in
