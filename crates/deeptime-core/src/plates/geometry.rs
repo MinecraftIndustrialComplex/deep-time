@@ -786,6 +786,7 @@ mod tests {
             shown: None,
             one_way: None,
             propagations: Vec::new(),
+            backarcs: Vec::new(),
             level_set: None,
         };
         let all: Vec<u32> = (0..n as u32).collect();

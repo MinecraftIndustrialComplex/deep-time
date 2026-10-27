@@ -80,8 +80,10 @@ const T_ADV_TEAR: usize = 20;
 const T_ADV_STALL: usize = 21;
 const T_ADV_GO: usize = 27;
 const T_VISIT: usize = 28;
+const T_START_GEOMETRY: usize = 29;
+const T_START_SMALL_C: usize = 30;
 #[cfg(test)]
-pub(super) const TALLY_NAMES: [&str; 29] = [
+pub(super) const TALLY_NAMES: [&str; 31] = [
     "start stall: e or P not on U",
     "start stall: a continent sample not on K'",
     "start stall: K' in more than one piece",
@@ -111,10 +113,12 @@ pub(super) const TALLY_NAMES: [&str; 29] = [
     "advance stall: the stretch reaches past P'",
     "advances",
     "visits (tip found)",
+    "start none: the trench does not run on along the margin (Zhou's geometry)",
+    "start none: the continent under a plate's worth of samples",
 ];
 #[cfg(test)]
-pub(super) static TALLY: [std::sync::atomic::AtomicU32; 29] =
-    [const { std::sync::atomic::AtomicU32::new(0) }; 29];
+pub(super) static TALLY: [std::sync::atomic::AtomicU32; 31] =
+    [const { std::sync::atomic::AtomicU32::new(0) }; 31];
 
 fn tally(_i: usize) {
     #[cfg(test)]
@@ -326,6 +330,20 @@ impl<'a> View<'a> {
     /// tangent); `toward` itself where they are no line (fewer than three samples, or a variance
     /// along under [`STRIKE_ANISOTROPY`] times the variance across). ledger: PLT-659
     fn across(&self, x: DVec3, window: f64, line: impl Fn(usize) -> bool, toward: DVec3) -> DVec3 {
+        let Some(across) = self.line_normal(x, window, line) else {
+            return toward;
+        };
+        let side = across.dot(toward);
+        if side.abs() < 1e-9 {
+            return toward;
+        }
+        if side > 0.0 { across } else { -across }
+    }
+
+    /// The unit tangent at `x` across the strike of the visible samples `line` selects within
+    /// `window` lattice spacings, unsigned; None where they are no line (as [`View::across`]).
+    /// ledger: PLT-659
+    fn line_normal(&self, x: DVec3, window: f64, line: impl Fn(usize) -> bool) -> Option<DVec3> {
         let near: Vec<DVec3> = self
             .vis
             .within(x, window * self.sp)
@@ -335,7 +353,7 @@ impl<'a> View<'a> {
             .map(|j| tangent(x, self.pos[j] - x))
             .collect();
         if near.len() < 3 {
-            return toward;
+            return None;
         }
         let e1 = tangent(x, if x.x.abs() < 0.9 { DVec3::X } else { DVec3::Y }).normalize();
         let e2 = x.cross(e1);
@@ -353,16 +371,12 @@ impl<'a> View<'a> {
         let half = 0.5 * (sxx + syy);
         let dev = (0.25 * (sxx - syy) * (sxx - syy) + sxy * sxy).sqrt();
         if half + dev < STRIKE_ANISOTROPY * (half - dev) {
-            return toward;
+            return None;
         }
         let th = 0.5 * (2.0 * sxy).atan2(sxx - syy);
         let strike = e1 * th.cos() + e2 * th.sin();
         let across = x.cross(strike).normalize_or_zero();
-        let side = across.dot(toward);
-        if across == DVec3::ZERO || side.abs() < 1e-9 {
-            return toward;
-        }
-        if side > 0.0 { across } else { -across }
+        (across != DVec3::ZERO).then_some(across)
     }
 
     /// The nearest visible sample within `angle` of `x` that `of` selects (ties: the lower
@@ -687,6 +701,26 @@ fn plan_start(v: &View, env: &Env, u: u32) -> Plan<Cut> {
         .toward(pos[e], |j| v.visible(j, o))
         .unwrap_or_else(|| tangent(pos[e], pos[o_at] - pos[e]).normalize_or_zero());
     let drive = v.across(pos[e], TRENCH_STRIKE_SPACINGS, is_trench, to_o);
+    // Zhou et al. 2020's geometry (ledger: PLT-717): the trench runs on along the margin, so the
+    // tear across the margin is a STEP at the trench's end. The trench (U's trench samples within
+    // `TRENCH_STRIKE_SPACINGS` of e) and the margin (U's coast floor within `STRIKE_SPACINGS` of
+    // p) each read as a line, their strikes lie within atan(1.5 / 4), about 20°, of each other (a
+    // border's offset, PLT-534, over the trench's window: the angle at which the lattice can
+    // still tell the trench from the margin's own line), and e lies within the border of the
+    // margin's line through p. Where the trench meets the margin at an angle, U moves along the
+    // margin and the start is half a process (arm fl-law2: 116 starts a run, no advance).
+    let strike_cos = TRENCH_STRIKE_SPACINGS / TRENCH_STRIKE_SPACINGS.hypot(BORDER_SPACINGS);
+    let trench_n = v.line_normal(pos[e], TRENCH_STRIKE_SPACINGS, is_trench);
+    let margin_n = v.line_normal(pos[p], STRIKE_SPACINGS, |j| v.coast[j] && v.plate[j] == u);
+    let off_line = pos[e].dot(inward).abs().asin();
+    let zhou = match (trench_n, margin_n) {
+        (Some(tn), Some(mn)) => tn.dot(mn).abs() >= strike_cos && off_line <= v.reach,
+        _ => false,
+    };
+    if !zhou {
+        tally(T_START_GEOMETRY);
+        return Plan::None;
+    }
     let cos = drive.dot(inward);
     let age_e = st.samples[e].age_myr(t);
     let age_p = st.samples[p].age_myr(t);
@@ -695,8 +729,14 @@ fn plan_start(v: &View, env: &Env, u: u32) -> Plan<Cut> {
     if pull < strength {
         return Plan::None;
     }
-    // The cut: the continent and the floor beyond the tear go to K'.
+    // The cut: the continent and the floor beyond the tear go to K'. A continent of fewer
+    // samples than a plate may hold (`min_samples`) is a speck, no passive margin (arm fl-law2's
+    // starts at "continents" of 1 to 11 samples). ledger: PLT-717
     let cont = v.continent(p, u);
+    if cont.iter().filter(|&&c| c).count() < min_samples(env, n) {
+        tally(T_START_SMALL_C);
+        return Plan::None;
+    }
     let Some(tear) = v.tear(p, -inward, u, e) else {
         tally(T_START_TEAR);
         return Plan::Stall;
@@ -1435,6 +1475,54 @@ mod tests {
         assert_eq!(start(&geo, in_line, &k, 60.0).plates.len(), 3);
         assert_eq!(start(&geo, in_line, &k, 120.0).plates.len(), 3);
         assert_eq!(start(&geo, in_line, &k, 160.0).plates.len(), 4);
+    }
+
+    /// The trench runs along the equator west of 0° (U's floor south, O north beyond U's slab),
+    /// and C lies east of 0°, north-east of the line from 0° to the south-east at 45°: the trench
+    /// meets the margin at 45°, where arm fl-law2's starts fired, the trench is straight to its
+    /// end, and the slab pulls U's floor across the margin at cos 45°.
+    fn oblique(la: f64, lo: f64) -> Cell {
+        if !(-60.0..80.0).contains(&lo) || !(-40.0..30.0).contains(&la) {
+            Cell::Rest
+        } else if lo >= 0.0 {
+            if la > -lo { Cell::Land } else { Cell::Floor }
+        } else if la < 0.0 {
+            Cell::Floor
+        } else if la < 3.0 {
+            Cell::Slab
+        } else {
+            Cell::Over
+        }
+    }
+
+    /// Zhou et al. 2020's geometry only (ledger PLT-717): a trench meeting the margin at 45° with
+    /// a full 700 km slab, whose pull across the margin (cos 45° of 3 × 10¹³ N/m) beats the
+    /// margin's 5.9 × 10¹² N/m at 80 Myr, starts nothing, because the trench does not run on along
+    /// the margin's strike (on the 16,000-sample lattice the two strikes read 42° apart, cos 0.74,
+    /// against the gate's atan(1.5 / 4) = 20.6°; in [`in_line`] 0.6°); the same slab where the
+    /// trench does run on ([`in_line`]) starts. A continent of fewer samples than a plate may hold
+    /// starts nothing either.
+    #[test]
+    fn a_trench_meeting_the_margin_at_an_angle_starts_nothing() {
+        use std::sync::atomic::Ordering;
+        let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let k = law2();
+        let refused = TALLY[T_START_GEOMETRY].load(Ordering::Relaxed);
+        let st = start(&geo, oblique, &k, 700.0);
+        assert!(
+            st.plates.len() == 3 && st.counters.propagation_starts == 0,
+            "a trench at 45° to the margin started a propagation"
+        );
+        assert!(TALLY[T_START_GEOMETRY].load(Ordering::Relaxed) > refused);
+        assert_eq!(start(&geo, in_line, &k, 700.0).plates.len(), 4);
+        // A narrow continent (12° by 30°, about 135 samples) under a plate's worth of samples.
+        let big = TectonicParams {
+            min_plate_area_frac: 200.0 / N as f64,
+            ..law2()
+        };
+        let small = TALLY[T_START_SMALL_C].load(Ordering::Relaxed);
+        assert_eq!(start(&geo, in_line_small, &big, 700.0).plates.len(), 3);
+        assert!(TALLY[T_START_SMALL_C].load(Ordering::Relaxed) > small);
     }
 
     /// The advance: with U converging north on K' at about 40 mm/yr and the new margin's slab
