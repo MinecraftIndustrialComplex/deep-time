@@ -9674,3 +9674,23 @@ The sources of the old-floor lane (plates.md "Step 16"; build log 2026-10-27). T
 - Duarte2024: the EarthArXiv preprint read in full: the Gibraltar slab's radial rollback through a narrowing oceanic corridor, "the trench retreat accelerates to a velocity of ~11 cm/yr (Fig. 3)", then "continues to decelerate for another 20 m.y., when it almost stops" ("the narrow Gibraltar slab must pull the wider Atlantic lithosphere down"); "In the case of a wider corridor, subduction propagation is faster"; the model's Mediterranean lithosphere 95 km thick at 90 Ma, the Atlantic's about 120 km. No corridor, slab or trench width in km.
 - Schellart2007, Schellart2008 (already read): narrow slabs (at most 1,500 km) retreat fast, 6 to 16 cm/yr only within 1,200 km of a slab edge, under 2 cm/yr more than 2,000 km from one; Table 1 of Schellart2008 gives slab widths Betic-Rif 250, Calabria 300, Scotia 800, Lesser Antilles 2,450 km.
 - Scotia's rollback of 35 to 50 mm/yr since at least 32 Ma (Livermore 2006) and 5 to 6 cm/yr lately (Schellart 2010) were seen in search summaries only, not read.
+- Crameri2020, read again (Table 1 and Supplementary Notes 1 to 13, a Sonnet research sub-agent, 2026-10-27): collision is cited as the trigger, or the likely one, of 6 of the 13 events (Aleutian, Olutorsky arc, the new trench about 300 km away, "possibly"; Philippine, the Palawan block, 350 to 500 km; New Hebrides-New Britain, Ontong Java; Tonga-Kermadec, Papuan blocks; Cascadia, Siletzia; Ryukyu, the Gagua Ridge), two more hedged (South Sandwich, Izu-Bonin-Mariana); none a continent-continent collision belt. The rate 4 / (105 × 51,310) is the project's derivation (PLT-692), not a figure in the paper. Plates.md Step 18.
+- Duarte2013: the abstract's own wording, "propagation of compressive stresses from the Gibraltar Arc and stresses related to the large-scale Africa-Eurasia convergence"; the phrase "another subduction system or an associated collision belt" is in a search snippet of the 2016 Geological Magazine follow-up (Duarte, Schellart and Rosas), not read.
+
+### SternGerya2021
+- Reference: Stern, R. J. and Gerya, T. (2021). Subduction initiation. In Alderton, D. and Elias, S. A. (eds.), Encyclopedia of Geology, 2nd edition, vol. 3, 994-1000. Academic Press (Elsevier).
+- DOI or URL: 10.1016/B978-0-08-102908-4.00089-8; the authors' copy https://personal.utdallas.edu/~rjstern/pdfs/SubInitEoG221.pdf
+- Cited as: "Stern & Gerya 2021".
+- Ledger ids: PLT-516 (2026-10-27).
+- Access: the authors' copy open.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-27 (a Sonnet research sub-agent): the classification lists "subduction zone transference or 'trench jump' following collision and accretion of an arc or oceanic plateau"; "In the case of Transference, collision destroys an existing subduction zone and the existing plate forces cause the oceanic plate on the other side of the colliding block to form a new subduction zone. There are no Cenozoic examples of SI by transference. The collision of India with Asia beginning 50 Ma might be expected to have caused a new subduction zone to form southwards in the Indian Ocean but the strength of this oceanic lithosphere has made it easier for India to continue to collide with Asia rather than form a new subduction zone by transference."; "Polarity Reversal seems to happen easily"; about a third of active subduction zones formed in the last 65 Ma (citing Gurnis et al. 2004). No pre-Cenozoic example of transference is named.
+
+### LallemandArcay2021
+- Reference: Lallemand, S. and Arcay, D. (2021). Subduction initiation from the earliest stages to self-sustained subduction: insights from the analysis of 70 Cenozoic sites. Earth-Science Reviews 221:103779.
+- DOI or URL: 10.1016/j.earscirev.2021.103779
+- Cited as: "Lallemand & Arcay 2021".
+- Ledger ids: none yet.
+- Access: paywalled; not opened.
+- Library: not kept.
+- Read so far (by the project): search snippets and an EGU abstract's reference list only (2026-10-27, a Sonnet research sub-agent): 70 Cenozoic sites, about 70,000 km of trench, "a mean rate of slightly more than once every Myr", two thirds in the western Pacific "close to the continents and/or pre-existing subduction zones"; the count takes in immature and aborted sites, so it is not Crameri et al. 2020's 13. Not used for a value.
