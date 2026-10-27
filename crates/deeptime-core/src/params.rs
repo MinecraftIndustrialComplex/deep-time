@@ -1348,7 +1348,7 @@ impl Default for TectonicParams {
             wedge_slope_deg: 1.5,             // ledger: PLT-192
             collision_belt_taper: true,       // ledger: PLT-600, PLT-601 (on since 2026-10-25)
             collision_noroom_stays: true,     // ledger: PLT-700 (on since 2026-10-26)
-            weld_speed_mm_yr: 5.0,            // ledger: PLT-246
+            weld_speed_mm_yr: 2.0,            // ledger: PLT-246 (Bird 2003 [3], since 2026-10-27)
             weld_after_myr: 10.0,             // ledger: PLT-246
             weld_on_relative_speed: true,     // ledger: PLT-721
             reversal_by_arc_crust: true,      // ledger: PLT-371 (on since 2026-10-23)
