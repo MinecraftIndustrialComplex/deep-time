@@ -315,6 +315,19 @@ public final class Water {
         if (own.kind().isWater())
             return new Column(own.kind(), own.surface(), own.ground(), level, own.top(), own.bed(), null, null, null,
                     rs.biome(), rs.hit());
+        // A one-block seam between two river channels is channel (Rust finish; ledger: HYD-182): where two
+        // segments' corridors meet edge to edge, a column between them can fall outside both, and as a bank
+        // it kept its ground above the water, a dotted line of single dry blocks across the river. Between
+        // river columns on opposite sides it holds the lower of their waters on the shallower of their beds.
+        for (int k = 0; k < 4; k += 2) {
+            Core a = n[k], b = n[k + 1];
+            if (a.kind() != Kind.RIVER || b.kind() != Kind.RIVER)
+                continue;
+            Core w = b.top() < a.top() ? b : a;
+            int bed = Math.min(Math.max(a.bed(), b.bed()), w.top() - 1);
+            return new Column(Kind.RIVER, own.surface(), own.ground(), level, w.top(), bed, null, null, null,
+                    a.rivers().biome() || b.rivers().biome(), w.rivers().hit());
+        }
         Integer minGround = null, seal = null;
         for (int k = 0; k < 4; k++) {
             Core c = n[k];
