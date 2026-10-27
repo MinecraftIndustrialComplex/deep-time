@@ -131,10 +131,14 @@ host rock in the top 2 km) and three global clocks.
    1980) above 80 °C, migrates up to 50 km to the nearest trap with a seal, and charges it in order.
 9. **Playability.** Regional minimums for essential materials can add the smallest plausible
    deposit of the best type; placer gold is moved, at the bake, into the nearest real river channel
-   within 30 km as gravel bars, or else laid on the finished ground as a bench, which slides along
-   z by whole blocks to stay inside the world's z range at a pole (ORE-283). The grid's last rows run past the poles and a deposit
-   is jittered within its cell, so a cluster's point outside the poles is drawn again (test `nothing_is_placed_past_the_poles`) and a
-   placer jittered past a pole is moved inside by the same ORE-283 slide. The guarantee puts its body at a cell's own centre, and the
+   within 30 km and inside the poles as gravel bars, which stop at the last river vertex before a pole (ORE-284: the bake's
+   river network runs on past the poles, and on master 3ce1a373's 4k test planet a placer's bars followed a river to z 680, past
+   the pole at 651.9, and the cube bake made four of them boxes of ±2³¹ blocks), or else laid on the finished ground as a bench,
+   which slides along z by whole blocks to stay inside the world's z range at a pole (ORE-283); a placer whose channel inside the
+   poles has no room for a bar, and every placer of a world without a river network, is a bench. The grid's last rows run past the
+   poles and a deposit is jittered within its cell, so a cluster's point outside the poles is drawn again (test
+   `nothing_is_placed_past_the_poles`) and a placer jittered past a pole is moved inside by the same ORE-283 slide, or snapped to a
+   channel vertex inside (ORE-284). The guarantee puts its body at a cell's own centre, and the
    straddling row's centre lies past the pole, so a cell whose centre is past a pole is no candidate (DEP-223); the land set aside is
    counted in the census (`guarantee_past_pole`). A site counts toward an essential only when the material is its
    primary product (DEP-206): on the real planet of 2026-10-04 a 0.07 Mt impact deposit with copper

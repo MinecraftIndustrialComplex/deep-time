@@ -23,12 +23,23 @@
 //! - from the water's top block down to [`MIN_GRAVEL_BLOCKS`] (or the ribbon's own thickness, if
 //!   more) below the bed at the channel's centre.
 //!
-//! **On the ground.** A placer with no channel within reach (an old one, far from today's rivers
-//! or under today's sea) keeps its place and direction and becomes a **bench**: the ribbon cut
-//! into pieces of at most [`MAX_PIECE_BLOCKS`], each laid with its top at the finished ground (the
-//! bed under water) at its centre, at least [`MIN_GRAVEL_BLOCKS`] thick. A bench that would reach
-//! past the world's top or bottom edge (the poles, in the simulation's Lambert frame where the
-//! pass runs) slides along z by whole blocks until every piece lies inside (ORE-283): past the
+//! Only the channel inside the world's top and bottom edges counts (ORE-284): the bake's river
+//! network runs on past the poles (its block grid covers the simulation grid's rows, which reach
+//! past them), so a vertex past a pole is no channel to snap to, and the walk stops at the last
+//! vertex before one. Every bar then lies between two vertices inside, centred inside the poles,
+//! where the cube projection's Jacobian is not singular (on master 3ce1a373's 4k test planet,
+//! site 6's bars followed a river to z 654 to 680, past the pole at 651.9, and the cube bake made
+//! four of them boxes of ±2³¹ blocks, a footprint of 1.2e16 blocks that ran the GameTest server
+//! out of heap).
+//!
+//! **On the ground.** A placer with no channel within reach inside the poles (an old one, far
+//! from today's rivers or under today's sea), or whose channel there has no room for a bar (one
+//! vertex between the pole and the river's run past it), keeps its place and direction and
+//! becomes a **bench**: the ribbon cut into pieces of at most [`MAX_PIECE_BLOCKS`], each laid with
+//! its top at the finished ground (the bed under water) at its centre, at least
+//! [`MIN_GRAVEL_BLOCKS`] thick. A bench that would reach past the world's top or bottom edge (the
+//! poles, in the simulation's Lambert frame where the pass runs) slides along z by whole blocks
+//! until every piece lies inside (ORE-283): past the
 //! edge there is no ground, and the cube projection reads a body's shape from the map's Jacobian
 //! at its centre, which is singular at the pole (on master 7f53dabe's 4k test planet a piece at
 //! z −658.4, past the pole at 651.9, became a needle 1.3e10 blocks long whose box hung the game's
@@ -121,13 +132,22 @@ fn fold(c: f64, x: f64) -> f64 {
     (x + c / 2.0).rem_euclid(c) - c / 2.0
 }
 
-/// The nearest vertex to (x, z) within `reach` blocks: (vertex index, distance).
-fn nearest(r: &Rivers, x: f64, z: f64, reach: f64) -> Option<(usize, f64)> {
+/// Whether z lies strictly inside the world's z range `(lo, hi)` (the poles, in the simulation's
+/// Lambert frame: `Projection::inside_poles`).
+fn within(z: f64, (lo, hi): (f64, f64)) -> bool {
+    lo < z && z < hi
+}
+
+/// The nearest vertex to (x, z) within `reach` blocks and inside the world's z range `z_range`:
+/// (vertex index, distance). The bake's river network runs on past the poles (its block grid
+/// covers the simulation grid's rows, which reach past them), and a vertex there is no channel to
+/// lay gravel in (ORE-284).
+fn nearest(r: &Rivers, x: f64, z: f64, reach: f64, z_range: (f64, f64)) -> Option<(usize, f64)> {
     let c = f64::from(r.c);
     let mut best: Option<(usize, f64)> = None;
     for (i, v) in r.vertices.iter().enumerate() {
         let dz = f64::from(v.z) - z;
-        if dz.abs() > reach {
+        if dz.abs() > reach || !within(f64::from(v.z), z_range) {
             continue;
         }
         let mut dx = f64::from(v.x) - x;
@@ -191,10 +211,25 @@ struct Bars {
     length: f64,
 }
 
-fn bars(r: &Rivers, site: u32, at: usize, rb: &Ribbon) -> Bars {
+/// The bars of a placer snapped to vertex `at`, along the stretch of its centre line that lies
+/// inside the world's z range `z_range`: the walk up- and downstream stops at the last vertex
+/// before a pole (ORE-284). A river of the bake runs on past the poles, and a bar there would be
+/// centred where the cube projection's Jacobian is singular (on master 3ce1a373's 4k test
+/// planet, site 6's bars ran down a river to z 654 to 680, past the pole at 651.9, and four of
+/// them baked into boxes of ±2³¹ blocks).
+fn bars(r: &Rivers, site: u32, at: usize, rb: &Ribbon, z_range: (f64, f64)) -> Bars {
     let (line, pos) = path(r, at);
     let v = &r.vertices;
     let c = f64::from(r.c);
+    // The run of the line around `pos` whose vertices lie inside the poles (`at` does: `nearest`).
+    let on = |k: usize| within(f64::from(v[line[k]].z), z_range);
+    let (mut first, mut last) = (pos, pos);
+    while first > 0 && on(first - 1) {
+        first -= 1;
+    }
+    while last + 1 < line.len() && on(last + 1) {
+        last += 1;
+    }
     // Positions along the path with x continuous (a path may cross the seam at a confluence).
     let mut xs = Vec::with_capacity(line.len());
     for (k, &i) in line.iter().enumerate() {
@@ -216,12 +251,12 @@ fn bars(r: &Rivers, site: u32, at: usize, rb: &Ribbon) -> Bars {
     let section = |a: usize| 2.0 * half_width(a) * (depth(a) + below);
     // Grow [lo, hi] from the vertex, downstream first, until the bars hold the volume.
     let max_len = (MAX_STRETCH * rb.length).max(MIN_LENGTH_BLOCKS);
-    let last = line.len() - 1;
     let (mut lo, mut hi) = (pos, pos);
     let (mut len, mut vol) = (0.0, 0.0);
     let mut down = true;
-    while (vol < rb.volume || len < MIN_LENGTH_BLOCKS) && len < max_len && (lo > 0 || hi < last) {
-        if (down && hi < last) || lo == 0 {
+    while (vol < rb.volume || len < MIN_LENGTH_BLOCKS) && len < max_len && (lo > first || hi < last)
+    {
+        if (down && hi < last) || lo == first {
             let l = seg_len(hi);
             vol += l * 0.5 * (section(hi) + section(hi + 1));
             len += l;
@@ -351,7 +386,8 @@ fn inside(z: f64, reach: f64, (lo, hi): (f64, f64)) -> f64 {
 /// `rivers` as bars, or on the ground as benches (module docs). `ribbon(site)` is the site's
 /// [`Ribbon`] (None: not a placer type; the site is left alone); `ground(x, z)` the top solid
 /// block of a column (the bed under water); `z_range` the world's z range, which a bench keeps
-/// inside. Sites and bodies that are not placers come back unchanged, in their order.
+/// inside and past which no bar is laid (ORE-283, ORE-284). Sites and bodies that are not placers
+/// come back unchanged, in their order.
 pub fn settle(
     sites: &[Site],
     bodies: &[Body],
@@ -383,12 +419,13 @@ pub fn settle(
         };
         placers += 1;
         let (sx, sz) = (f64::from(s.center[0]), f64::from(s.center[2]));
-        let (pieces, centre) = match nearest(rivers, sx, sz, rb.reach) {
-            Some((at, d)) => {
-                let b = bars(rivers, s.id, at, &rb);
-                if b.pieces.is_empty() {
-                    continue;
-                }
+        // A channel within reach and inside the poles, with room for bars along it; else a bench
+        // (a placer left as the deposit stage laid it could stand past a pole: ORE-284).
+        let channel = nearest(rivers, sx, sz, rb.reach, z_range)
+            .map(|(at, d)| (at, d, bars(rivers, s.id, at, &rb, z_range)))
+            .filter(|(_, _, b)| !b.pieces.is_empty());
+        let (pieces, centre) = match channel {
+            Some((at, d, b)) => {
                 let v = rivers.vertices[at];
                 let bed = (f64::from(v.w) - f64::from(v.depth).max(1.0)).floor();
                 moved += 1;
@@ -468,18 +505,18 @@ pub fn planet_ribbons(p: &PlanetPreset) -> Result<(Vec<DepositType>, Scales), Co
 /// and terrain, rewrites the sites and bodies and their manifest entries (the caller writes the
 /// manifest), and records `notes.bake.placers`. The run calls it once the folder is complete, and
 /// `deeptime hydro` after it re-made the channels. Does nothing (and says so) in a folder without
-/// a river network, sites or bodies.
+/// sites or bodies. A folder without a river network (`hydro.enabled` false) has no channel, so
+/// its placers all become benches: left where the deposit stage drew them, one could stand past a
+/// pole, where the cube projection blows a body up (ORE-284).
 pub fn settle_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<Value, CoreError> {
-    let (Some(rivers), Some((sites, _)), Some(bodies)) = (
-        deeptime_format::rivers::read_rivers(dir)?,
-        read_sites(dir)?,
-        read_bodies(dir)?,
-    ) else {
-        return Ok(json!({"placers": 0, "why": "no river network, sites or bodies in the folder"}));
+    let (Some((sites, _)), Some(bodies)) = (read_sites(dir)?, read_bodies(dir)?) else {
+        return Ok(json!({"placers": 0, "why": "no sites or bodies in the folder"}));
     };
     if !sites.iter().any(|s| s.kind == SiteKind::Placer) {
         return Ok(json!({"placers": 0}));
     }
+    let rivers = deeptime_format::rivers::read_rivers(dir)?
+        .unwrap_or_else(|| Rivers::empty(p.scale.circumference_blocks));
     let (types, sc) = planet_ribbons(p)?;
     let world = ColumnWorld::open(dir)?;
     let ground = |x: i64, z: i64| {
@@ -895,6 +932,125 @@ mod tests {
         assert_eq!(out.note["benches_slid_off_the_edge"], 0);
         // A range narrower than the ribbon: its middle block.
         assert_eq!(inside(5.0, 30.0, (-20.0, 21.0)), 1.0);
+    }
+
+    /// A river at x 900 flowing north (+z) from z 560 to z 700, a vertex every 2 blocks: past the
+    /// pole of a 4,096-block Lambert world (651.9) from z 652 on, as the bake's river network runs
+    /// on into the grid's rows past the poles.
+    fn polar_river() -> Rivers {
+        let mut r = Rivers::empty(4096);
+        for i in 0..71 {
+            r.vertices.push(RiverVertex {
+                x: 900.0,
+                z: 560.0 + 2.0 * i as f32,
+                w: 70.0 - 0.05 * i as f32,
+                hw: 2.0,
+                depth: 1.5,
+                q: 20.0,
+            });
+        }
+        r.chains.push(Chain {
+            first: 0,
+            count: 71,
+            mouth: Mouth::Sea,
+            into: u32::MAX,
+            from: u32::MAX,
+        });
+        r.build_index();
+        r
+    }
+
+    /// No bar is laid past a pole (ORE-284). Master 3ce1a373's 4k test planet snapped site 6 to a
+    /// river at z 635 that runs on past the pole, and the walk downstream laid bars centred at z
+    /// 654 to 680, which the cube projection, reading a body's shape from the Jacobian at its
+    /// centre (singular at a pole), made boxes of ±2³¹ blocks. Here a placer by the pole gets
+    /// bars on the river's stretch inside it only; one drawn past the pole snaps to the last
+    /// vertex inside; and one whose channel inside the pole is a single vertex becomes a bench.
+    #[test]
+    fn no_bar_is_laid_past_a_pole() {
+        let half = deeptime_format::Projection::of(4096.0).pole_z();
+        let range = (-half, half);
+        let r = polar_river();
+        // The walk alternates down- and upstream: 6 blocks from the pole it would go some 20
+        // blocks past it.
+        for (z, snap) in [(646.0, 646), (690.0, 650)] {
+            let (s, b) = placer(3, 900.0, z);
+            let out = settle(&[s], std::slice::from_ref(&b), &r, range, &reach, &hill);
+            assert_eq!(out.note["in_channels"], 1, "{z}");
+            let site = &out.sites[0];
+            assert_eq!((site.center[0], site.center[2]), (900, snap), "{z}");
+            let bars: Vec<&Body> = out.bodies.iter().filter(|x| x.site == Some(3)).collect();
+            assert!(bars.len() >= 2, "{z}: {} bars", bars.len());
+            for bar in &bars {
+                assert!(
+                    bar.center[2].abs() < half,
+                    "{z}: a bar at {:?}, past the pole at {half}",
+                    bar.center
+                );
+            }
+            // The bars still hold the ribbon's volume, upstream of the pole.
+            let len = out.note["median_length_blocks"].as_f64().unwrap();
+            assert!(len >= MIN_LENGTH_BLOCKS, "{z}: {len}");
+            // The south pole the same way (the river mirrored).
+            let mut south = r.clone();
+            south.vertices.iter_mut().for_each(|v| v.z = -v.z);
+            south.build_index();
+            let (s, b) = placer(3, 900.0, -z);
+            let out = settle(&[s], std::slice::from_ref(&b), &south, range, &reach, &hill);
+            assert_eq!(out.sites[0].center[2], -snap, "{z}");
+            for bar in out.bodies.iter().filter(|x| x.site == Some(3)) {
+                assert!(bar.center[2].abs() < half, "-{z}: {:?}", bar.center);
+            }
+            let twice = settle(&out.sites, &out.bodies, &south, range, &reach, &hill);
+            assert_eq!(twice.sites[0].center, out.sites[0].center);
+        }
+        // A river along the pole with one vertex inside it: no room for a bar there, so a bench,
+        // which keeps inside (ORE-283).
+        let mut edge = Rivers::empty(4096);
+        for (i, z) in [655.0, 651.0, 655.0].into_iter().enumerate() {
+            edge.vertices.push(RiverVertex {
+                x: 900.0 + 4.0 * i as f32,
+                z,
+                w: 70.0,
+                hw: 2.0,
+                depth: 1.5,
+                q: 20.0,
+            });
+        }
+        edge.chains.push(Chain {
+            first: 0,
+            count: 3,
+            mouth: Mouth::Sea,
+            into: u32::MAX,
+            from: u32::MAX,
+        });
+        edge.build_index();
+        let (s, b) = placer(3, 904.0, 640.0);
+        let out = settle(&[s], std::slice::from_ref(&b), &edge, range, &reach, &hill);
+        assert_eq!(out.note["in_channels"], 0);
+        assert_eq!(out.note["benches"], 1);
+        for p in out.bodies.iter().filter(|x| x.site == Some(3)) {
+            assert!(p.center[2].abs() < half, "{:?}", p.center);
+        }
+        // A world without a river network (`settle_folder` with `hydro.enabled` false settles on
+        // an empty one): a placer the deposit stage drew past the pole becomes a bench inside.
+        let (s, b) = placer(3, 900.0, 690.0);
+        let out = settle(&[s], &[b], &Rivers::empty(4096), range, &reach, &hill);
+        assert_eq!(out.note["benches"], 1);
+        assert_eq!(out.sites[0].center[2], 634);
+        // Far from the poles nothing changes: the test river of the other tests, every range.
+        let (s, b) = placer(3, 60.0, 104.0);
+        let far = settle(
+            std::slice::from_ref(&s),
+            std::slice::from_ref(&b),
+            &river(),
+            FAR,
+            &reach,
+            &hill,
+        );
+        let near = settle(&[s], &[b], &river(), range, &reach, &hill);
+        assert_eq!(far.sites, near.sites);
+        assert_eq!(far.bodies, near.bodies);
     }
 
     /// Another kind of site, or a type without placer rules: unchanged.
