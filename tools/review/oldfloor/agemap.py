@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: LGPL-3.0-or-later
 """agemap.py <argkey folder> <out.png>: the floor's age on the last snapshot of the run (seeds 1 to 4) with the most
-floor older than 250 Myr, as an equirectangular PNG written with zlib alone (no matplotlib in the pool's env): the floor
+floor older than 250 Myr, as an equirectangular PNG (region_map.py's writer; no matplotlib in the pool's env): the floor
 blue (young) through green to yellow (300 Myr), white over 250 Myr, continents tan, TRENCH red, subduction fronts magenta,
 collision fronts black (the coordinator, 2026-10-27).
 """
-import sys, zlib, struct
+import sys
 from pathlib import Path
 import numpy as np
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from region_map import png  # noqa: E402
 FIELDS = 11
 arm = Path(sys.argv[1]); out = sys.argv[2]
 best = None
@@ -47,8 +49,5 @@ cols[(fl & 512) != 0] = (0, 0, 0)
 for dy in (-1, 0, 1):
     for dx in (-1, 0, 1):
         img[(y + dy).clip(0, H - 1), (x + dx) % W] = cols
-raw = b"".join(b"\x00" + img[r].tobytes() for r in range(H))
-def chunk(t, d): return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xffffffff)
-png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", W, H, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(raw, 6)) + chunk(b"IEND", b"")
-open(out, "wb").write(png)
+open(out, "wb").write(png(W, H, img.tobytes()))
 print(run.name, path.stem, old, "samples older than 250 Myr of", int(oc.sum()), "ocean")

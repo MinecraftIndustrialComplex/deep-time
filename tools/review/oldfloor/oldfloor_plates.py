@@ -6,7 +6,7 @@ The coordinator's diagnosis for the old floor's second closure law (2026-10-27).
 snapshot from --from on (maps/t*.bin with maps/plate/ and maps/age/; a resampling's snapshot is skipped as in
 oldfloor.py), the visible oceanic samples older than 250 Myr are joined with their plate's row of the dynamics
 record's nearest step (rec.json steps[].plates: id, visible, continental, speed mm/yr, front_km the slab fronts it
-goes down at, boundary_km). Prints, pooled over runs and snapshots, the old floor's share by its plate's speed, by its
+goes down at, boundary_km). Prints, pooled over runs and snapshots (each table over its own count), the old floor's share by its plate's speed, by its
 plate's slab front (none, under 2,000 km, 2,000 to 5,000, more), by its plate's continental share and by its plate's
 size, and the share on plates that both move under 20 mm/yr and have under 2,000 km of slab front. And whether the floor
 trails its continent: on the great circle from the sample to its own plate's nearest TRENCH sample (where its plate
@@ -58,7 +58,9 @@ def main():
             r = json.loads((run / "rec.json").read_text())
             N, steps = r["samples"], r["steps"]
             step_t = np.array([s["t"] for s in steps])
-            paths = [p for p in sorted((run / "maps").glob("t*.bin")) if float(p.stem[1:]) >= t_from][::every]
+            # In time order (the names are signed times: t-1000, t-050, t0000), so the stride steps through time.
+            paths = [p for p in sorted((run / "maps").glob("t*.bin"), key=lambda p: float(p.stem[1:]))
+                     if float(p.stem[1:]) >= t_from][::every]
             for path in paths:
                 a = np.fromfile(path, "<f4").reshape(-1, FIELDS)
                 n = len(a)
@@ -127,8 +129,11 @@ def main():
                     for t, k in keys.items():
                         tables[t][k] = tables[t].get(k, 0) + int(c)
             print(f"{run.name}: {len(paths)} snapshots read", file=sys.stderr, flush=True)
+    # Each table over its own count: the plate tables leave out plates with no row in the record's step, the side
+    # tables do not, and the distance tables are within their side (trails_* over the trailing floor).
     print(json.dumps({"old250_samples": total,
-                      "shares": {t: {k: round(v / max(total, 1), 3) for k, v in sorted(d.items())} for t, d in tables.items()}},
+                      "shares": {t: {k: round(v / max(sum(d.values()), 1), 3) for k, v in sorted(d.items())}
+                                 for t, d in tables.items()}},
                      indent=1))
 
 
