@@ -9774,6 +9774,51 @@ front (it is absorbed at a resampling) or collides. The trench-motion measures a
 with back-arc rifting on. Law 2's tolerances are the lattice's (PLT-717, `game-choice`), and its
 margin strength is still PLT-658's fallback.
 
+### Step 16: the slab's thermal floor acts on a forming slab only (PLT-720) (2026-10-27)
+
+The old-floor lane, then the coordinator (Ben paused the sub-agents on 2026-10-27). Step 14 and Step 15 left the floor
+old (base25: median 90.7 Myr, older than 250 Myr 12.2 % on seeds 1 to 4; Earth 0.06 %, CHK-034). The lane's diagnosis
+(tools/review/oldfloor/: oldfloor.py and oldfloor_read.py over the crust-budget maps, plateseries.py over rec.json)
+found where much of it came from: planets that stalled. On base25 (24 runs) 5 runs had steps with under 2,000 km of
+subduction front, 643 of 10,824 steps (5.9 %), and those steps held 0.238 of the summed share of floor older than
+250 Myr; scattered_continents-3 had no subduction front from -600 to -50 Myr while 8 to 16 plates moved at 1.5 to
+6.5 mm/yr with 12 or more slabs of 184 to 700 km and no pull on any plate (rec.json `forces`). Base18 to base22, before
+fix C, had none such.
+
+**Why they stalled.** PLT-681 (the slab's thermal floor) made any oceanic front sample converging under 10 mm/yr
+incipient: no pull, no suction, no slab resistance, the incipient resistance instead. A collision that slowed the
+large plates took every slab's pull away at once, and with fix C (PLT-690, no initiation without an active trench) no
+new subduction zone could start, so the planet stayed still. Toth & Gurnis 1998's floor is narrower than that: "at
+subduction velocities of <10 mm/yr thermal diffusion inhibits slab formation and no substantial slab pull force
+develops" (p. 18,063), a test of whether a new subduction zone on a preexisting fault has formed within 20 Myr
+(their title: "Dynamics of subduction initiation at preexisting fault zones"). A slab that has formed keeps its
+negative buoyancy whatever its plate's speed this step.
+
+**The rule** (`tectonics.slab_floor_forming_only`, PLT-720, on by default). In the force balance the floor holds an
+oceanic front sample only while its contact's slab is forming (at PLT-610's incipient stage); a mature slab keeps its
+pull, suction and slab resistance and the trench's Forsyth & Uyeda friction at any convergence, and takes no incipient
+resistance (`forces::floor_holds_in_balance`). The arcs, the boundary mix, the margins and fix C's active trenches
+still read PLT-681 per sample. Test: `a_formed_slab_pulls_under_the_thermal_floor` (the reference plate with a full
+slab pushed at 5 mm/yr, the floor on: with the switch its slab pulls).
+
+**The arm** (oldfloor720, key ff5d8ceda63e, argkey cd665cef, seeds 1 to 4 of both starts, against base25-s4; medians,
+two-sided Mann-Whitney p in brackets):
+- the guard: clean, worst 10,471 to 10,253 m (0.51), no step beyond two Earth reliefs;
+- the floor (the plate check): median age 90.7 to 81.1 Myr, older than 180 Myr 22.0 to 19.1 %, older than 250 Myr
+  12.2 to 10.1 %; plate life 54.5 to 47.0 Myr; plates alive 15 to 16; continental minimum 0.340 to 0.339;
+- V1: nothing at p < 0.05; land 0.289 to 0.316, largest landmass 0.131 to 0.163, crust under the sea 0.252 to 0.192,
+  land above 2 km 0.030 to 0.056, ice 0.097 to 0.060, collisions 4.20 to 4.15, crust net -0.071 to -0.072, criteria 6
+  in both; coast with high ground 0.124 to 0.215 (0.33), up on 6 of the 8 seeds run by run (a finding for the coast
+  work, not a target here: moving plates keep more active margins).
+
+**The off check** (oldfloor720-off, `--set tectonics.slab_floor_forming_only=false`, argkey 100da219, seed 1 of both
+starts): base25's planet bit for bit, the world state, the record and the fields equal by sha256.
+
+**What it is not.** The floor still ages: floor older than 250 Myr stays near 10 %, against Earth's trace. The rest of
+it sits beside the continents, far from any trench, which no law here reaches; trench invasion of an Atlantic-type
+ocean (Duarte et al. 2013) and induced initiation at a passive margin (Stern & Gerya 2018) are the lane's candidates,
+not built.
+
 ## Plate speed (2026-10-25)
 
 The coordinator's brief for the plate speed lane: CHK-020's `speed_rms_mm_yr` (the plate check's
