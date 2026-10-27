@@ -1114,11 +1114,40 @@ pub struct TectonicParams {
     /// cut, under the same force test, moves the next stretch of the margin's floor from K' to U.
     /// The rule replaces PLT-064's clearance: with it on, a new subduction initiation keeps one
     /// lattice spacing from a front, not `subduction_initiation_clearance_km` (Crameri et al.
-    /// 2020: most initiations start within 500 km of another subduction zone). Off by default
-    /// (parked 2026-10-26, the coordinator's call): under these starts and the 100 km gate it
-    /// never advances in the sim, so it does not do the sourced process; off, PLT-064's 1,000 km
-    /// holds. ledger: PLT-656
+    /// 2020: most initiations start within 500 km of another subduction zone). Parked on
+    /// 2026-10-26 (under starts where the trench met the margin at 45 to 90° and the 100 km gate
+    /// it never advanced); since the M5 lane's stage 3 (2026-10-26) a start needs Zhou et al.'s
+    /// geometry, the trench running on along the margin's strike (PLT-717), and the law is on by
+    /// default. Off, PLT-064's 1,000 km holds where `initiation_near_trenches` is off.
+    /// ledger: PLT-656, PLT-717
     pub margin_propagation: bool,
+    /// Back-arc rifting, the moving trench (the M5 lane's stage 3, 2026-10-26): where an
+    /// overriding plate O moves away from its trench over an old, deep slab, its forearc and arc
+    /// can split off as a microplate that the slab's suction then pulls seaward, so the trench
+    /// rolls back and a back-arc basin opens behind it. Sdrolias & Müller 2006: back-arc basins
+    /// "develop when the age of subducting normal oceanic lithosphere is greater than 55 million
+    /// years", their initiation "is preceded by the landward migration of the overriding plate,
+    /// in an absolute reference frame", and the locus is "commonly in between the remnant and
+    /// active volcanic arc"; Karig 1971: "Active extension is restricted to arc systems with
+    /// earthquakes deeper than about 350 km". Where a front past incipient has floor older than
+    /// 55 Myr coming in, O moving away from it and the slab past 350 km, each pair of plates
+    /// draws at `backarc_rifting_per_myr`; a draw splits off O's samples within
+    /// `arc_distance_km` of those fronts (`rifting::maybe_rift_backarc`). The sliver keeps the
+    /// front, the slab and its suction; the force balance decides whether it opens, and a
+    /// back-arc that does not open heals (PLT-272). A sliver is kept below
+    /// `min_plate_area_frac` while it holds a subducting front (Bird 2003's back-arc
+    /// microplates). Off, no back-arc forms: every trench moves with its overriding plate.
+    /// ledger: PLT-710
+    pub backarc_rifting: bool,
+    /// Back-arc rifting's hazard per pair of plates with a qualifying front, per Myr: the share
+    /// of Earth's qualifying trench whose back-arc spreads now (Heuret & Lallemand 2005, Table 1:
+    /// 16 of the 68 two-degree segments with a slab of 55 Myr or older under a landward upper
+    /// plate are class E3, back-arc spreading) over the rest of it, over the mean spreading
+    /// life of Sdrolias & Müller 2006's Cenozoic back-arc basins (South Fiji 33 to 25 Ma, Parece
+    /// Vela and Shikoku 30 to 15 Ma, the Japan Sea 30 to about 15 Ma, the West Philippine Basin
+    /// 55 to 30-33 Ma: 15.4 Myr). A draw takes the pair's whole qualifying front, so this is the
+    /// rate the qualifying front converts at. ledger: PLT-711
+    pub backarc_rifting_per_myr: f64,
     /// Law 3: the resistance an incipient subduction zone pushes against scales with the elastic
     /// thickness of the floor going under (Gurnis, Hall & Lavier 2004 [46]: the force to start
     /// underthrusting "increases by a factor of 2.2" from 7 Myr to 30 Myr floor, elastic thickness
@@ -1401,17 +1430,22 @@ impl Default for TectonicParams {
             subduction_initiation_reach_km: 1500.0, // ledger: PLT-691
             // 4 newly destructive initiations in 105 Myr over 51,310 km. ledger: PLT-692
             subduction_initiation_per_trench_km_myr: 4.0 / (105.0 * 51_310.0),
-            initiation_slab_km: 150.0,                // ledger: PLT-270
-            incipient_subduction: true,               // ledger: PLT-610 (on since 2026-10-25)
-            initiation_polarity_by_age: true,         // ledger: PLT-655
-            margin_propagation: false, // ledger: PLT-656 (parked 2026-10-26: no advance)
+            initiation_slab_km: 150.0,        // ledger: PLT-270
+            incipient_subduction: true,       // ledger: PLT-610 (on since 2026-10-25)
+            initiation_polarity_by_age: true, // ledger: PLT-655
+            margin_propagation: true, // ledger: PLT-656, PLT-717 (Zhou's geometry only; on since 2026-10-26)
+            backarc_rifting: true,    // ledger: PLT-710 (on since 2026-10-26)
+            // E3 share 16 / 68 over (1 - 16 / 68) and 15.375 Myr: 16 / (52 x 15.375) = 0.020013, to
+            // three figures (a 17-digit default does not survive the presets' JSON round trip).
+            // ledger: PLT-711
+            backarc_rifting_per_myr: 0.0200,
             incipient_resistance_by_thickness: false, // ledger: PLT-657 (parked with law 2)
-            incipient_net_resistance: true, // ledger: PLT-680
-            slab_thermal_floor: true,  // ledger: PLT-681
-            subduction_initiation_offshore: true, // ledger: PLT-503 (on since 2026-10-23)
+            incipient_net_resistance: true,           // ledger: PLT-680
+            slab_thermal_floor: true,                 // ledger: PLT-681
+            subduction_initiation_offshore: true,     // ledger: PLT-503 (on since 2026-10-23)
             initiation_stress_mpa: 20.0, // ledger: PLT-505 (game-choice; on since 2026-10-23)
-            transference: false,       // ledger: PLT-516
-            contact_timeout_myr: 24.0, // ledger: PLT-059
+            transference: false,         // ledger: PLT-516
+            contact_timeout_myr: 24.0,   // ledger: PLT-059
             collision_orogeny_myr: 30.0,
             l1_every_steps: 0,
             forsyth_uyeda_balance: false, // ledger: PLT-585 (built 2026-10-25, off)
@@ -1899,6 +1933,10 @@ impl PlanetPreset {
             (
                 k.subduction_initiation_per_trench_km_myr,
                 "$.tectonics.subduction_initiation_per_trench_km_myr",
+            ),
+            (
+                k.backarc_rifting_per_myr,
+                "$.tectonics.backarc_rifting_per_myr",
             ),
             (k.ridge_segment_km, "$.tectonics.ridge_segment_km"),
             (k.rift_stress_mpa, "$.tectonics.rift_stress_mpa"),

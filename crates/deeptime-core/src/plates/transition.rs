@@ -694,6 +694,7 @@ mod tests {
             shown: None,
             one_way: None,
             propagations: Vec::new(),
+            backarcs: Vec::new(),
             level_set: None,
         };
         let pos = positions(&st, geo);

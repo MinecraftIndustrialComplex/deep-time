@@ -941,6 +941,17 @@ impl PlatesStage {
             &pull.subducting_fronts,
         )?;
         cut_trace::mark(st, &cache.geo, "initiate");
+        // Back-arc rifting, the moving trench (ledger: PLT-710).
+        rifting::maybe_rift_backarc(
+            st,
+            world,
+            &cache.geo,
+            &pos,
+            &env,
+            &pull.subducting_fronts,
+            &pull.subducting_detail,
+        )?;
+        cut_trace::mark(st, &cache.geo, "backarc");
         // Along-strike propagation to a passive margin (law 2; ledger: PLT-656).
         propagation::step(st, world, &cache.geo, &pos, &env)?;
         cut_trace::mark(st, &cache.geo, "propagate");

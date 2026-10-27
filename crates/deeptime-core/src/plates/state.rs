@@ -647,6 +647,23 @@ pub struct Counters {
     /// realized rate reads against PLT-692's hazard.
     #[serde(default)]
     pub initiations_refused: u32,
+    /// Back-arc rifts made (`rifting::maybe_rift_backarc`, ledger PLT-710): each split a forearc
+    /// and arc sliver off an overriding plate.
+    #[serde(default)]
+    pub backarc_rifts: u32,
+    /// Back-arc rifts drawn but not made: the sliver or the rest of the plate under 32 samples.
+    #[serde(default)]
+    pub backarc_refused: u32,
+}
+
+/// A back-arc sliver (`tectonics.backarc_rifting`, ledger PLT-710): plate `plate`, split off
+/// `parent`'s forearc and arc at `born_myr`. Kept below `min_plate_area_frac` (PLT-091) while it
+/// holds a subducting front (PLT-715); the entry goes when it holds none or dies.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct BackArc {
+    pub plate: u32,
+    pub parent: u32,
+    pub born_myr: f64,
 }
 
 /// A subduction zone propagating along a passive margin (law 2, `tectonics.margin_propagation`,
@@ -738,6 +755,10 @@ pub struct PlateState {
     /// PLT-656).
     #[serde(default)]
     pub propagations: Vec<Propagation>,
+    /// Back-arc slivers holding a subducting front (`rifting::maybe_rift_backarc`, ledger
+    /// PLT-710, PLT-715); empty while `tectonics.backarc_rifting` is off.
+    #[serde(default)]
+    pub backarcs: Vec<BackArc>,
     /// The land's gap budget (`gap_budget.rs`): measurement only, absent unless switched on; not
     /// kept in checkpoints.
     #[serde(skip)]
