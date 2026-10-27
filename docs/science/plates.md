@@ -9874,10 +9874,12 @@ any trench, which a trench entering through a corridor would consume. The diagno
   plates over 0.2 of the planet, 72 % on plates moving 20 mm/yr or more, 67 % on plates that go down at 5,000 km or
   more of slab front, 80 % on plates a quarter or more continental; only 10 % on slow plates (under 20 mm/yr) with
   under 2,000 km of front. The plates are working, not stalled.
-- **Which side of its continent**: on the great circle to its own plate's nearest trench, 55 % meets its own
-  continent first ("trails"), 39 % does not ("leads"), 5 % is on plates with no trench. Of the trailing floor 81 % is
-  more than 1,500 km from any subduction front and 86 % from any collision front; of the leading floor 55 % is within
-  1,500 km of a subduction front (fix C's reach) and still old.
+- **Which side of its continent**: on the great circle to its own plate's nearest trench, 53 % meets its own
+  continent first ("trails"), 42 % does not ("leads"), 4 % is on plates with no trench. Of the trailing floor 80 % is
+  more than 1,500 km from any subduction front and 87 % from any collision front; of the leading floor 50 % is within
+  1,500 km of a subduction front (fix C's reach) and still old. (Corrected after Graphide's review of PR #14: the side
+  and distance tables had been divided by the plate tables' count, which leaves out plates missing from the record's
+  step; first read 55, 39, 5, 81, 86 and 55 %.)
 - **Enclosure** (tools/review/oldfloor/oldfloor_enclosed.py): of 16 directions from each old sample, the share that
   meets continental crust within 2,000 km: 12 or more for 63 % of the old floor, all 16 for 23 %, mostly its own
   plate's continent (12 or more: 53 %). The map of the worst run (tools/review/oldfloor/agemap.py: supercontinent-2,
