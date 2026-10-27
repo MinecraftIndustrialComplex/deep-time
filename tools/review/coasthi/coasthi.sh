@@ -5,6 +5,7 @@
 #   coasthi.sh plates <out name> <workers> <arm folder>    coasthi_plates.py over every run of the folder
 #   coasthi.sh earth <out name>                            coasthi.py on SRTM15+ 15' and PB2002
 #   coasthi.sh paleodem <out name>                         coasthi.py on the PaleoDEMs of 0, 5, 10, 280 and 380 Ma
+#   coasthi.sh etopo <out name> [block arc-min]            coasthi.py on ETOPO 2022 bedrock (by rock), block means (15')
 # Writes /data/ban/deeptime-runs/coasthi/<out name>.jsonl (model, plates) or .json (Earth).
 set -uo pipefail
 cd "$(dirname "$0")/../../.."
@@ -32,6 +33,14 @@ case "$1" in
     nix shell --impure --expr '(builtins.getFlake "nixpkgs").legacyPackages.${builtins.currentSystem}.python3.withPackages (p: [p.numpy p.scipy p.h5py])' \
       -c python3 -I tools/review/coasthi/coasthi.py paleodem "$OUT/$name.json" "$D"/Map01_*_0Ma.nc "$D"/*_5Ma.nc "$D"/*_10Ma.nc \
       "$D"/*_280Ma.nc "$D"/*_380Ma.nc
+    ;;
+  etopo)
+    # ETOPO 2022 bedrock (downloaded data, its own folder, not committed):
+    #   curl -sSL -o ETOPO_2022_v1_60s_N90W180_bed.nc https://www.ngdc.noaa.gov/thredds/fileServer/global/ETOPO2022/60s/60s_bed_elev_netcdf/ETOPO_2022_v1_60s_N90W180_bed.nc
+    name=$2
+    nix shell --impure --expr '(builtins.getFlake "nixpkgs").legacyPackages.${builtins.currentSystem}.python3.withPackages (p: [p.numpy p.scipy p.h5py])' \
+      -c python3 -I tools/review/coasthi/coasthi.py etopo "$OUT/$name.json" "$OUT/etopo-bed/ETOPO_2022_v1_60s_N90W180_bed.nc" \
+      /data/ban/deeptime-runs/m5diag/earth/PB2002_steps.dat.txt "${3:-15}"
     ;;
   earth)
     name=$2

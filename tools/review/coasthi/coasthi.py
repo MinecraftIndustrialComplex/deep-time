@@ -131,6 +131,17 @@ def analyse(p, z, sp, keep, hcls=None, ncls=0, reg=None, sub_d=None, coll_d=None
            "f_near": (H & near).sum() / max(H.sum(), 1), "s": Q.sum() / max((H & near).sum(), 1),
            "coast_pts": int(C.sum()), "q_pts": int(Q.sum()), "hi_pts": int(H.sum()), "land_pts": int(L.sum())}
     out["ratio"] = out["M5"] / max(out["M4"], 1e-9)
+    # The relief at the points' scale: the height difference between neighbouring land points (joined
+    # within 1.6 spacings), its percentiles over all land and over land above 1 km. Two planets read
+    # at the same smoothing show the same steepness here; a sharper field reads higher.
+    li = np.nonzero(L)[0]
+    if li.size > 10:
+        pr = cKDTree(p[li]).query_pairs(cc.chord(1.6 * sp), output_type="ndarray")
+        dz = np.abs(z[li[pr[:, 0]]] - z[li[pr[:, 1]]])
+        up = (z[li[pr[:, 0]]] > 1000) | (z[li[pr[:, 1]]] > 1000)
+        out["relief_p50"], out["relief_p90"], out["relief_p99"] = (float(x) for x in np.percentile(dz, [50, 90, 99]))
+        if up.any():
+            out["relief_hi_p50"], out["relief_hi_p90"] = (float(x) for x in np.percentile(dz[up], [50, 90]))
     # The land's hypsometry: shares of the land by height over the sea, and its median.
     out["land_z_hist"] = hist(z[L], [0, 200, 500, 1000, 2000, 1e9])
     out["land_z_edges"] = "0-200, 200-500, 500-1000, 1000-2000, >2000 m"
@@ -367,6 +378,47 @@ def paleodem(paths):
     return res
 
 
+def etopo_bed(path, steps_path=None, f=15):
+    """Earth by rock: ETOPO 2022's bedrock grid at 60 arc-seconds (NOAA NCEI 2022; the ice sheets'
+    bed in place of their surface), block-averaged to 15' (as earth_relief_15m is a filtered 15'
+    grid), then the census's Fibonacci points at the nearest 15' node. `all` is by rock everywhere;
+    `no_sheets` keeps the Antarctica and Greenland box out of the shares as the realism checks did."""
+    import h5py
+    with h5py.File(path, "r") as h:
+        zd = h["z"]
+        lat = np.asarray(h["lat"][()], float)
+        lon = np.asarray(h["lon"][()], float)
+        ny, nx = zd.shape
+        rows = []
+        for i in range(0, ny - ny % f, f):
+            blk = zd[i:i + f, :nx - nx % f].astype(np.float64)
+            rows.append(blk.reshape(f, -1, f).mean(axis=(0, 2)))
+    zg = np.array(rows)
+    la = lat[:ny - ny % f].reshape(-1, f).mean(1)
+    lo = lon[:nx - nx % f].reshape(-1, f).mean(1)
+    if la[0] > la[-1]:
+        la, zg = la[::-1], zg[::-1]
+    n = 332_800
+    plat, plon = cc.fib_points(n)
+    iy = np.clip(np.rint((plat - la[0]) / (la[1] - la[0])), 0, la.size - 1).astype(int)
+    lon_w = ((plon + 180.0) % 360.0) - 180.0
+    ix = np.clip(np.rint((lon_w - lo[0]) / (lo[1] - lo[0])), 0, lo.size - 1).astype(int)
+    z = zg[iy, ix]
+    p = cc.xyz(plat, plon)
+    sp = float(np.sqrt(cc.EARTH_KM2 / n))
+    sheets = cc.ice_sheets(plat, lon_w)
+    sub_d = coll_d = None
+    if steps_path:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "m5diag"))
+        import m5earth  # noqa: E402
+        st = m5earth.load_steps(steps_path)
+        sub_d = cc.arc_km(cKDTree(st["SUB"]).query(p)[0])
+        coll_d = cc.arc_km(cKDTree(np.concatenate([st[k] for k in ("CCB", "OCB") if k in st])).query(p)[0])
+    return {"all": analyse(p, z, sp, np.ones(n, bool), sub_d=sub_d, coll_d=coll_d),
+            "no_sheets": analyse(p, z, sp, ~sheets, sub_d=sub_d, coll_d=coll_d),
+            "no_greenland": analyse(p, z, sp, ~(sheets & (plat > 0)), sub_d=sub_d, coll_d=coll_d)}
+
+
 def main():
     mode, out = sys.argv[1], Path(sys.argv[2])
     if mode == "model":
@@ -384,6 +436,12 @@ def main():
             print(f"{k}: M5 {v['M5']:.4f} M4 {v['M4']:.4f} f_near {v['f_near']:.3f} s {v['s']:.3f} kappa {v['kappa']:.4f}")
     elif mode == "paleodem":
         out.write_text(json.dumps(paleodem(sys.argv[3:]), indent=1))
+    elif mode == "etopo":
+        res = etopo_bed(sys.argv[3], sys.argv[4] if len(sys.argv) > 4 else None,
+                        int(sys.argv[5]) if len(sys.argv) > 5 else 15)
+        out.write_text(json.dumps(res, indent=1))
+        for k, v in res.items():
+            print(f"{k}: M5 {v['M5']:.4f} M4 {v['M4']:.4f} f_near {v['f_near']:.3f} s {v['s']:.3f} kappa {v['kappa']:.4f}")
     print("COASTHI_DONE")
 
 
