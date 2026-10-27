@@ -65,7 +65,9 @@ import java.util.Map;
  * answers as the partner's region does, Deep Time's passes, the air carvers as
  * {@code NoiseBasedChunkGenerator.applyCarvers} runs them and the water's wake. The columns are then
  * copied block for block, each state turned by {@link BlockState#rotate}, and the fluid updates the
- * fill and the carvers asked for carried over. Columns past the net's corners are deep ocean. Every
+ * fill and the carvers asked for carried over, as is the partner's air carving mask (what the carvers
+ * cut and the water Deep Time kept from them), so the copy tells a carver's cut apart as a chunk on a
+ * face does. Columns past the net's corners are deep ocean. Every
  * biome search of a cube world's chunks starts cold ({@code ColdBiomeSearch}, the generator's
  * {@code createBiomes}, {@code buildSurface} and {@code applyCarvers}), so at a climate tie a copy
  * holds its partner's biome.
@@ -231,12 +233,18 @@ public final class CubeFill {
         ChunkPos pos = chunk.getPos();
         Rotation rot = rotation(iso.k());
         int sections = chunk.getSectionsCount();
+        CarvingMask cut = src.getCarvingMask(GenerationStep.Carving.AIR);
+        CarvingMask into = cut != null && chunk instanceof ProtoChunk p ? p.getOrCreateCarvingMask(GenerationStep.Carving.AIR) : null;
         boolean[] mine = new boolean[256];
         for (int col : cols) {
             mine[col] = true;
             int lx = col & 15, lz = col >> 4;
             long bx = pos.getMinBlockX() + lx, bz = pos.getMinBlockZ() + lz;
             int sx = (int) (iso.cellX(bx, bz) & 15), sz = (int) (iso.cellZ(bx, bz) & 15);
+            if (into != null)
+                for (int y = chunk.getMinBuildHeight(); y < chunk.getMaxBuildHeight(); y++)
+                    if (cut.get(sx, y, sz))
+                        into.set(lx, y, lz);
             for (int si = 0; si < sections; si++) {
                 LevelChunkSection from = src.getSection(si);
                 if (from.hasOnlyAir())
