@@ -6700,7 +6700,12 @@ fn a_formed_slab_pulls_under_the_thermal_floor() {
     let young_off = run(40.0, true, false);
     assert_eq!(young_on.1, 0.0);
     assert!(young_on.2 > 0.0 && young_on.2 == young_off.2);
-    assert!(young_on.4 == young_off.4, "{:?} {:?}", young_on.4, young_off.4);
+    assert!(
+        young_on.4 == young_off.4,
+        "{:?} {:?}",
+        young_on.4,
+        young_off.4
+    );
     assert!(young_on.3 < forces::COLLISION_FLOOR_MM_YR);
 }
 
