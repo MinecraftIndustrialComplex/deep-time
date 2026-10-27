@@ -9906,10 +9906,15 @@ research sub-agent read Crameri et al. 2020's Table 1 and Supplementary Notes 1 
 the likely one, of 6 of the 13 initiations (the Olutorsky arc at the Aleutians, Palawan at the Philippine trench, the
 Ontong Java plateau at New Hebrides-New Britain, Papuan blocks at Tonga-Kermadec, Siletzia at Cascadia, the Gagua
 Ridge at the Ryukyus), all arcs, plateaus, ridges or microcontinents arriving at a trench that was already there, none a
-continental collision belt, and all within 1,500 km of active subduction. Fix C's rate (PLT-692) is drawn from the
-same table, so a second hazard near collision fronts would count those events twice; Duarte et al. 2013's "nearby
-subduction zone or collisional belt" stays the setting of one margin (South-West Iberia, where the Gibraltar arc is a
-subduction zone), not a rate. Stern & Gerya 2021 (Encyclopedia of Geology, read in full) define transference as the
+continental collision belt, and all within 1,500 km of active subduction. Four of the six are Table 1's polarity
+reversals (Aleutian, Philippine, New Hebrides-New Britain, Tonga-Kermadec) and two its episodic jumps of a trench to
+the front of what docked (Cascadia, Ryukyu). Fix C's rate (PLT-692) counts none of them (only the four newly
+destructive initiations); the model has them elsewhere, at the jammed trench itself: the reversal (PLT-371) and the
+docked terrane's transfer to the overriding plate (PLT-068, and PLT-516's transference for a continent), after which the
+force balance decides what the new boundary does. So the six are no evidence for new trenches starting near a collision
+belt, which is what the candidate would add (corrected after Graphide's review of PR #15: the first draft said fix C
+would count them twice). Duarte et al. 2013's "nearby subduction zone or collisional belt" stays the setting of one
+margin (South-West Iberia, where the Gibraltar arc is a subduction zone), not a rate. Stern & Gerya 2021 (Encyclopedia of Geology, read in full) define transference as the
 "trench jump" after an arc or plateau docks and write "There are no Cenozoic examples of SI by transference": India
 went on colliding rather than start a trench in the Indian Ocean. base27 transfers 14.2 continents per 1,000 Myr (the
 24 runs' mean, 29 % of its 49 collisions), 0.94 expected in the Cenozoic's 66 Myr, so none there has a chance of 0.39
