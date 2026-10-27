@@ -98,12 +98,7 @@ fn fill_level_with<G: SurfaceGrid, A: Fn(usize) -> f64 + Sync>(
     debug_assert_eq!(h.len(), n);
     let water = layer_m.max(0.0) * total;
     // 1. The plain hypsometric level.
-    let mut order: Vec<u32> = (0..n as u32).collect();
-    order.par_sort_unstable_by(|&x, &y| {
-        h[x as usize]
-            .total_cmp(&h[y as usize])
-            .then_with(|| x.cmp(&y))
-    });
+    let mut order = ascending(n, |c| h[c]);
     let s0 = walk(
         order
             .iter()
@@ -120,11 +115,7 @@ fn fill_level_with<G: SurfaceGrid, A: Fn(usize) -> f64 + Sync>(
     let mut spill = vec![0.0f64; n];
     pflood::flood_with(method, d, h, h, &mut kind, &mut spill);
     // 3. The walk up the spill heights.
-    order.par_sort_unstable_by(|&x, &y| {
-        spill[x as usize]
-            .total_cmp(&spill[y as usize])
-            .then_with(|| x.cmp(&y))
-    });
+    order = ascending(n, |c| spill[c]);
     let s1 = walk(
         order.iter().map(|&c| {
             let c = c as usize;
@@ -168,6 +159,27 @@ fn fill_level_with<G: SurfaceGrid, A: Fn(usize) -> f64 + Sync>(
     hi
 }
 
+/// The cells `0..n` in ascending order of `key` (`f64::total_cmp`), ties in cell order: the
+/// permutation sorting the indices with that comparison gives (the keys and indices together are
+/// distinct, so every correct sort gives it), sorted on packed keys, the key's total-order bits and
+/// the index in one `u128`, so the sort reads contiguous memory instead of looking each key up
+/// (the 2026-10-27 profile: the two indirect sorts were most of the sea level's time).
+fn ascending(n: usize, key: impl Fn(usize) -> f64 + Sync) -> Vec<u32> {
+    let mut packed: Vec<u128> = (0..n)
+        .into_par_iter()
+        .map(|c| (u128::from(total_order_bits(key(c))) << 32) | c as u128)
+        .collect();
+    packed.par_sort_unstable();
+    packed.into_par_iter().map(|x| x as u32).collect()
+}
+
+/// An unsigned integer whose order is `f64::total_cmp`'s (IEEE 754 totalOrder): negative values
+/// with their bits flipped, the rest with the sign bit set.
+fn total_order_bits(x: f64) -> u64 {
+    let b = x.to_bits();
+    if b >> 63 == 1 { !b } else { b | (1 << 63) }
+}
+
 /// How close the level found by halving comes to the open sea's own (`fill_level`, step 4), m
 /// (game-choice: numerical, agent 2026-10-21).
 const FILL_TOLERANCE_M: f64 = 1.0e-3;
@@ -196,6 +208,37 @@ fn walk(cells: impl Iterator<Item = (f64, f64, f64)>, water: f64) -> Option<f64>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The packed sort gives the permutation the indirect `total_cmp` sort gave, on heights with
+    /// ties, both zeros, infinities and NaNs.
+    #[test]
+    fn the_packed_sort_equals_the_indirect_one() {
+        let mut s = 12345u64;
+        let mut next = || {
+            s ^= s << 13;
+            s ^= s >> 7;
+            s ^= s << 17;
+            s
+        };
+        let special = [0.0, -0.0, f64::INFINITY, f64::NEG_INFINITY, f64::NAN, -f64::NAN, 1.5, -1.5];
+        let h: Vec<f64> = (0..50_000)
+            .map(|_| {
+                let r = next();
+                match r % 10 {
+                    0 => special[(r / 10 % 8) as usize],
+                    1 => ((r / 10) % 7) as f64 - 3.0,
+                    _ => (r as f64 / u64::MAX as f64 - 0.5) * 2.0e4,
+                }
+            })
+            .collect();
+        let mut old: Vec<u32> = (0..h.len() as u32).collect();
+        old.par_sort_unstable_by(|&x, &y| {
+            h[x as usize]
+                .total_cmp(&h[y as usize])
+                .then_with(|| x.cmp(&y))
+        });
+        assert_eq!(ascending(h.len(), |c| h[c]), old);
+    }
 
     fn flat(w: usize, h: usize) -> (Dims, Vec<f64>) {
         (Dims::new(w, h, 1.0, true), vec![1.0; h])
