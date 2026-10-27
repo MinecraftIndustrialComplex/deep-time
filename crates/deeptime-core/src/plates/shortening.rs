@@ -253,6 +253,9 @@ pub struct Front {
     pub normal_sum: DVec3,
     /// Σ Voronoi edge length, km: the front's length along the jagged edge.
     pub edge_km: f64,
+    /// Σ Voronoi edge length × the plates' relative speed at the edge sample, km × mm/yr: their
+    /// motion against each other in any direction, across the front or along it.
+    pub slip: f64,
     /// Σ position over the samples.
     pub position_sum: DVec3,
     /// The subducting plate's continental samples standing at the front, sorted, each once.
@@ -280,6 +283,16 @@ impl Front {
         }
     }
 
+    /// The plates' relative speed along the front, mm/yr: its slip over its edge length (the
+    /// mean over the edge, whatever the direction of the motion).
+    pub fn relative_speed_mm_yr(&self) -> f64 {
+        if self.edge_km > 0.0 {
+            self.slip / self.edge_km
+        } else {
+            0.0
+        }
+    }
+
     /// The front's unit centroid.
     pub fn centroid(&self) -> DVec3 {
         self.position_sum.normalize_or_zero()
@@ -297,6 +310,7 @@ struct Piece {
     flux: f64,
     normal: DVec3,
     edge_km: f64,
+    slip: f64,
     continental: bool,
     crust: u32,
 }
@@ -367,6 +381,7 @@ pub fn fronts(
                 flux: 0.0,
                 normal: DVec3::ZERO,
                 edge_km: 0.0,
+                slip: 0.0,
                 continental: sv.kind == CONTINENTAL,
                 crust: j,
             };
@@ -379,6 +394,7 @@ pub fn fronts(
                 piece.flux += len * normal_convergence(rel, out);
                 piece.normal += len * out;
                 piece.edge_km += len;
+                piece.slip += len * rel.length();
             }
             Some(piece)
         })
@@ -392,6 +408,7 @@ pub fn fronts(
             e.flux += p.flux;
             e.normal_sum += p.normal;
             e.edge_km += p.edge_km;
+            e.slip += p.slip;
             e.position_sum += pos[v];
             e.crust.push(p.crust);
             e.edge.push(v as u32);
@@ -418,14 +435,16 @@ pub enum Change {
     Parted,
 }
 
-/// The step a collision is advanced by: its number, the time at its end and its length, and the
-/// convergence below which the collision counts as stalled (`weld_speed_mm_yr`).
+/// The step a collision is advanced by: its number, the time at its end and its length, the
+/// convergence below which the collision counts as stalled (`weld_speed_mm_yr`), and whether the
+/// plates' relative speed along the front must be below it too (`weld_on_relative_speed`).
 #[derive(Clone, Copy, Debug)]
 pub struct StepClock {
     pub step: u64,
     pub t_myr: f64,
     pub dt_myr: f64,
     pub stall_mm_yr: f64,
+    pub stall_on_speed: bool,
 }
 
 /// Advances one contact's collision state by a step: `front` is its collision front this step (if
@@ -499,8 +518,15 @@ pub fn step_collision(
     // ledger: PLT-246 (the stall that welds: under `weld_speed_mm_yr` either way, timed from its
     // first step). Since the switch to the force balance two plates in collision can also move
     // apart (a slab pulling one end swings the plate about the collision); that is no stall, and
-    // the state ends as `parted` once the front is gone.
-    if conv.abs() < clock.stall_mm_yr {
+    // the state ends as `parted` once the front is gone. With `weld_on_relative_speed` the plates
+    // must also have stopped sliding past each other: a collision turned to strike-slip is two
+    // plates still moving (PLT-721).
+    let sliding = if clock.stall_on_speed {
+        f.relative_speed_mm_yr()
+    } else {
+        0.0
+    };
+    if conv.abs() < clock.stall_mm_yr && sliding < clock.stall_mm_yr {
         c.stalled_since_myr.get_or_insert(clock.t_myr);
     } else {
         c.stalled_since_myr = None;
@@ -539,6 +565,7 @@ pub fn advance(
         t_myr: env.t_myr,
         dt_myr: env.dt_myr,
         stall_mm_yr: env.k.weld_speed_mm_yr,
+        stall_on_speed: env.k.weld_on_relative_speed,
     };
     for k in 0..state.contacts.len() {
         let live = state.contacts[k].last_step == env.step;
@@ -967,6 +994,7 @@ mod tests {
             flux: conv * length,
             normal_sum: DVec3::X * length,
             edge_km: length,
+            slip: conv.abs() * length,
             position_sum: DVec3::Y * f64::from(samples),
             crust: Vec::new(),
             edge: Vec::new(),
@@ -995,7 +1023,34 @@ mod tests {
             t_myr: 2.0 * step as f64,
             dt_myr: 2.0,
             stall_mm_yr: 5.0,
+            stall_on_speed: true,
         }
+    }
+
+    /// A collision whose plates stop converging but slide past each other along the front does not
+    /// stall with `weld_on_relative_speed` (PLT-721): they are still two plates. Off, the
+    /// convergence alone decides, as before.
+    #[test]
+    fn a_collision_turned_strike_slip_does_not_stall() {
+        let sliding = |conv: f64, speed: f64| {
+            let mut f = front(10, conv);
+            f.slip = speed * f.edge_km;
+            f
+        };
+        let mut col: Option<Collision> = None;
+        step_collision(&mut col, Some(&front(10, 40.0)), true, clock(1));
+        step_collision(&mut col, Some(&sliding(1.0, 30.0)), true, clock(2));
+        assert_eq!(col.as_ref().unwrap().stalled_since_myr, None);
+        step_collision(&mut col, Some(&sliding(1.0, 3.0)), true, clock(3));
+        assert_eq!(col.as_ref().unwrap().stalled_since_myr, Some(6.0));
+        let off = StepClock {
+            stall_on_speed: false,
+            ..clock(4)
+        };
+        let mut col: Option<Collision> = None;
+        step_collision(&mut col, Some(&front(10, 40.0)), true, clock(1));
+        step_collision(&mut col, Some(&sliding(1.0, 30.0)), true, off);
+        assert_eq!(col.as_ref().unwrap().stalled_since_myr, Some(8.0));
     }
 
     /// The boundary x = 0 seen from plate 0's edge: the normal points along +x, a pure
