@@ -1,0 +1,6 @@
+# Both sides of a merge append rows and entries to these: keep both, as
+# tools/dev/merge-branch.sh does, so a plain git merge and Graphide's
+# gr check merge them the same way.
+STATUS.md merge=union
+docs/deeptime-design-decisions.md merge=union
+docs/science/bibliography.md merge=union
