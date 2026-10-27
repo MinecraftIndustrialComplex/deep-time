@@ -371,8 +371,10 @@ public final class BiomeGameTests {
      * the table's blocks from the ground's top down, as many as the cover is thick. A column of a chunk
      * another test took past its carvers, where a cave cut the cover (packed ice and snow are in
      * {@code #minecraft:overworld_carver_replaceables}), is set aside: the air or fluid lies in the chunk's
-     * air carving mask, or the chunk is full and its mask gone (2026-10-27: a cave through the 12-block
-     * cover at (-776, -1368) on the planet of PLT-720).
+     * air carving mask, or the chunk is full and its mask gone. The columns are read on a cube's faces only
+     * ({@link ChunkSampling#onFaces}): off them a chunk is its partner's copy up to its carvers
+     * ({@code CubeFill}), at the surface status with the partner's caves already cut (2026-10-27: a cave
+     * through the 12-block cover at (-776, -1368), in a void square of PLT-720's test planet).
      */
     /** Column (x, z) of {@code chunk} from y {@code hi} down to {@code lo} as runs of one block, for a failure's log. */
     private static String columnRuns(net.minecraft.world.level.chunk.ChunkAccess chunk, int x, int z, int hi, int lo) {
@@ -418,7 +420,7 @@ public final class BiomeGameTests {
                 long k = n > 0 && kp != null ? Math.round(kp.nearest(x, z)) : 30;
                 if (k != 30 && notEf++ < 8)
                     notEfAt.append(String.format(java.util.Locale.ROOT, " (%d,%d) class %d;", x, z, k));
-                if (n > 0 && t.height(x, z) > sea + 2)
+                if (n > 0 && t.height(x, z) > sea + 2 && ChunkSampling.onFaces(wd, x, z))
                     columns.add(new int[] {x, z, n});
             }
         helper.assertTrue(notEf == 0, notEf + " covered columns not of class EF:" + notEfAt);
