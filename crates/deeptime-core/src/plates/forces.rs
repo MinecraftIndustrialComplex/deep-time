@@ -286,6 +286,17 @@ pub fn below_floor(k: &TectonicParams, v_n_mm_yr: f64) -> bool {
     v_n_mm_yr < slab_floor_mm_yr(k)
 }
 
+/// Whether the slab's thermal floor (PLT-681) holds an oceanic front sample converging at
+/// `v_n_mm_yr` in the force balance (no pull, suction, slab resistance or trench friction of its
+/// own, the incipient resistance instead). With `slab_floor_forming_only` (PLT-720) only while
+/// its contact's slab is `forming` (at PLT-610's incipient stage): Toth & Gurnis 1998's floor is
+/// the rate under which "thermal diffusion inhibits slab formation" (p. 18,063), and a slab that
+/// has formed keeps its negative buoyancy whatever its plate's speed this step. Off, as
+/// [`below_floor`] at any slab.
+pub fn floor_holds_in_balance(k: &TectonicParams, v_n_mm_yr: f64, forming: bool) -> bool {
+    below_floor(k, v_n_mm_yr) && (forming || !k.slab_floor_forming_only) // ledger: PLT-720
+}
+
 /// Law 3 (`tectonics.incipient_resistance_by_thickness`, PLT-657): the incipient resistance of
 /// floor of [`INCIPIENT_CASE1_AGE_MYR`], N per metre at Earth's gravity. Gurnis, Hall & Lavier
 /// 2004 [59], their Case 1 (30 Myr homogeneous lithosphere): a peak of "3 × 10^12 N/m".
@@ -1531,12 +1542,18 @@ fn balance_step(
             // incipient resistance alone, which stands for the trench's resistance until the
             // slab sinks by itself (a continental sample at its front is a collision's, as at a
             // mature contact). An oceanic front sample converging below the slab's thermal floor
-            // (PLT-681) is incipient whatever its contact's slab, and takes none either.
+            // (PLT-681) is incipient whatever its contact's slab, and takes none either; with
+            // PLT-720 only while that slab is forming.
             if friction {
                 let front_q = e.front.map(|f| plate_of[f.u as usize]);
+                // ledger: PLT-610, PLT-681, PLT-720
+                let held = |q: u32, conv: f64| {
+                    let forming = incipient_pairs.contains(&(q, pv));
+                    forming || floor_holds_in_balance(k, conv, forming)
+                };
                 if let Some(f) = e.front
                     && let Some(q) = front_q
-                    && !((incipient_pairs.contains(&(q, pv)) || below_floor(k, f.conv)) && samples[f.u as usize].kind != CONTINENTAL) // ledger: PLT-610, PLT-681
+                    && !(held(q, f.conv) && samples[f.u as usize].kind != CONTINENTAL)
                     && let Some(i) = e.others[..usize::from(e.n_others)]
                         .iter()
                         .position(|&o| o == q)
@@ -1787,8 +1804,8 @@ fn balance_step(
                     // force until its slab sinks by itself (PLT-610), linearised as the
                     // collision's; booked with the collision resistance. A front sample
                     // converging below the slab's thermal floor is incipient whatever its
-                    // contact's slab (PLT-681).
-                    let slow = below_floor(k, sf.conv);
+                    // contact's slab (PLT-681), or with PLT-720 only while that slab is forming.
+                    let slow = floor_holds_in_balance(k, sf.conv, young.contains(&ci));
                     let incipient_here = young.contains(&ci) || slow;
                     if incipient_here {
                         let force = incipient_resistance_n_m(k, su.age_myr(env.t_myr), env.gravity)
@@ -1806,7 +1823,8 @@ fn balance_step(
                     }
                     // Gurnis et al. 2004's resisting force is net, the young slab's own weight
                     // in it: an incipient front has no pull, suction or slab resistance of its
-                    // own (PLT-680), nor a sample too slow for a slab (PLT-681).
+                    // own (PLT-680), nor a sample too slow for a slab (PLT-681; with PLT-720 a
+                    // forming one only: a formed slab pulls at its plate's speed, whatever it is).
                     if slow || (young.contains(&ci) && k.incipient_net_resistance) {
                         None
                     } else {

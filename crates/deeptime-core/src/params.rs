@@ -1178,6 +1178,18 @@ pub struct TectonicParams {
     /// fast pair would otherwise subduct as the pair does. The slab's growth is unchanged. Off,
     /// only the slab's length (PLT-611) makes a front incipient. ledger: PLT-681
     pub slab_thermal_floor: bool,
+    /// The slab's thermal floor acts on a forming slab only (the old-floor lane, 2026-10-27):
+    /// Toth & Gurnis 1998's criterion is for a slab forming at a new subduction zone, so in the
+    /// force balance a front sample of a mature contact (its slab past PLT-611's incipient
+    /// stage) keeps its slab's pull, suction and resistance and the trench's friction at any
+    /// convergence, and takes no incipient resistance. The arcs, the boundary mix, the margins
+    /// and the active trenches of fix C still read `slab_thermal_floor` per sample. With
+    /// `slab_thermal_floor` taking a mature slab's pull away whenever its convergence fell under
+    /// 10 mm/yr, a planet whose fronts all slowed (a collision holding the large plates) lost
+    /// every pull and, with fix C (no initiation without an active trench), stayed still for up
+    /// to 550 Myr (base25: 5 of 24 runs). Off, the floor acts on every front sample as
+    /// `slab_thermal_floor` says. ledger: PLT-720
+    pub slab_floor_forming_only: bool,
     /// Subduction initiation off the passive margin (V1 gap 2's stage C1): the old floor within
     /// the reach of the arc the new trench builds (`arc_distance_km` + `arc_width_km`, and one
     /// lattice spacing for where on the lattice the front falls; great circle) of the plate's
@@ -1442,6 +1454,7 @@ impl Default for TectonicParams {
             incipient_resistance_by_thickness: false, // ledger: PLT-657 (parked with law 2)
             incipient_net_resistance: true,           // ledger: PLT-680
             slab_thermal_floor: true,                 // ledger: PLT-681
+            slab_floor_forming_only: true,            // ledger: PLT-720
             subduction_initiation_offshore: true,     // ledger: PLT-503 (on since 2026-10-23)
             initiation_stress_mpa: 20.0, // ledger: PLT-505 (game-choice; on since 2026-10-23)
             transference: false,         // ledger: PLT-516
