@@ -368,7 +368,11 @@ public final class BiomeGameTests {
      * surface pass ({@code IcePass}) lays snow, packed ice and blue ice over the top of the ground
      * whatever biome the pack drew. On the real baked planet, columns across its ice cover (one per
      * 16 blocks, about two dozen spread over them, each in its own chunk at the surface status) have
-     * the table's blocks from the ground's top down, as many as the cover is thick.
+     * the table's blocks from the ground's top down, as many as the cover is thick. A column of a chunk
+     * another test took past its carvers, where a cave cut the cover (packed ice and snow are in
+     * {@code #minecraft:overworld_carver_replaceables}), is set aside: the air or fluid lies in the chunk's
+     * air carving mask, or the chunk is full and its mask gone (2026-10-27: a cave through the 12-block
+     * cover at (-776, -1368) on the planet of PLT-720).
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
     public static void iceCoverLaidOnGlaciatedGround(GameTestHelper helper) {
@@ -401,7 +405,7 @@ public final class BiomeGameTests {
             }
         helper.assertTrue(notEf == 0, notEf + " covered columns not of class EF:" + notEfAt);
         int stride = Math.max(1, columns.size() / 24);
-        int checked = 0, wet = 0, thick = 0;
+        int checked = 0, wet = 0, thick = 0, carved = 0;
         StringBuilder bad = new StringBuilder();
         java.util.Set<Long> chunks = new java.util.HashSet<>();
         for (int k = 0; k < columns.size() && checked < 24; k += stride) {
@@ -424,6 +428,19 @@ public final class BiomeGameTests {
                 wet++;
                 continue;
             }
+            boolean full = chunk instanceof net.minecraft.world.level.chunk.ImposterProtoChunk
+                    || chunk instanceof net.minecraft.world.level.chunk.LevelChunk;
+            var cut = chunk.getPersistedStatus().isOrAfter(ChunkStatus.CARVERS) && !full && chunk instanceof ProtoChunk p
+                    ? p.getCarvingMask(net.minecraft.world.level.levelgen.GenerationStep.Carving.AIR) : null;
+            boolean cave = false;
+            for (int i = 0; i < n && !cave && (full || cut != null); i++) {
+                var have = chunk.getBlockState(pos.set(x, y - i, z));
+                cave = (have.isAir() || !have.getFluidState().isEmpty()) && (full || cut.get(x, y - i, z));
+            }
+            if (cave) {
+                carved++;
+                continue;
+            }
             checked++;
             thick = Math.max(thick, n);
             // The biome names the pack's surface the cover went on (2026-10-18: Expanded Ecosphere's ice cap,
@@ -440,7 +457,8 @@ public final class BiomeGameTests {
                 }
             }
         }
-        DeepTime.LOGGER.info("[gametest] iceCoverLaidOnGlaciatedGround ice columns={} checked={} underWater={} thickest={} notEf={}", columns.size(), checked, wet, thick, notEf);
+        DeepTime.LOGGER.info("[gametest] iceCoverLaidOnGlaciatedGround ice columns={} checked={} underWater={} carved={} thickest={} notEf={}",
+                columns.size(), checked, wet, carved, thick, notEf);
         helper.assertTrue(columns.isEmpty() || checked + wet > 0, "no column of ice cover could be checked (of " + columns.size() + ")");
         helper.assertTrue(bad.isEmpty(), "columns without their ice cover:" + bad);
         helper.succeed();
