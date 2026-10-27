@@ -9819,6 +9819,49 @@ it sits beside the continents, far from any trench, which no law here reaches; t
 ocean (Duarte et al. 2013) and induced initiation at a passive margin (Stern & Gerya 2018) are the lane's candidates,
 not built.
 
+### Step 17: transference on by default (PLT-516) (2026-10-27)
+
+The coordinator, inline (no lane runs while Ben has the sub-agents paused). Step 16 left about a tenth of the
+floor older than 250 Myr, most of it beside continents far from any trench. With fix C (PLT-690) a subduction zone
+starts only within 1,500 km of an active one, so where a collision chokes an ocean's last trench nothing new
+starts there, and base26 counts no transference in any of its 26 runs (the switch was off). The sources read for
+the old floor agree on what closes such an ocean: Stern 2004's transference ("the oceanic lithosphere outboard of
+the collision zone ultimately ruptures to become a new subduction zone"), Crameri et al. 2020's episodic subduction
+(5 of their 13 events since 104 Ma: "an arc is accreted to the overriding plate and subduction jumps to the front";
+"collisional events along a pre-existing subduction trench ... temporally and spatially coincide with SZI events"),
+and Duarte et al. 2018 ("the only source to provide a force conceivably capable of inducing subduction initiation
+along a pristine passive margin is another subduction system or an associated collision belt"). PLT-516 is that
+law, built by the docking lane on 2026-10-23 and held off then because the plate check failed under it (the
+continental share's highest, the arcs' continental heights, the largest land gain) before the model had a sink
+of continental area; it has one now (PLT-660's sediment subduction among them: base26-s4's continents lose 7.2 %
+of their crust over a run).
+
+**The arm** (trans26, `--set tectonics.transference=true` on base26's key ff5d8ceda63e, whose planet master's
+5e032be54eab reproduces bit for bit (the alias check, seed 1, 100 Myr: state, record and fields equal); seeds 1 to
+4 of both starts against base26-s4; medians, two-sided Mann-Whitney p in brackets):
+- transference: 14.5 a run (0 on the base); initiations 33 to 37.5, collisions 41.5 to 48, sutures 41.5 to 33.5;
+- the guard: clean, worst 10,253 to 10,318 m (0.67), no step beyond two Earth reliefs;
+- V1: nothing at p < 0.05; land 0.316 to 0.311, largest landmass 0.163 to 0.169, crust under the sea 0.192 to
+  0.239, land above 2 km 0.056 to 0.048, coast with high ground 0.215 to 0.140 (0.19), ice 0.060 to 0.075,
+  collisions 4.15 to 4.80 (0.064), crust net -0.072 to -0.064, criteria 6 in both;
+- the floor (the plate check): older than 250 Myr 10.1 to 6.9 % (0.105; lower on 6 of the 8 seeds, the same on
+  one), older than 180 Myr 19.1 to 15.5 % (0.083), the p90's mean 256 to 208 Myr (target at most 230: 2 of 8 runs
+  inside it before, 7 of 8 after), median age 81.1 to 75.1 Myr;
+- the plate check's other moves: largest land gain 3.1 to 2.2 % (0.28), continental minimum 0.340 to 0.354
+  (0.054), the plate over half the planet 10.3 to 13.6 % of the steps (0.86), and the arcs on continental crust
+  1,292 to 1,102 m (0.007), under the check's 1,200 m: the new trenches at transferred margins carry young arcs,
+  the same change that lowers the coast with high ground.
+
+**The call** (the coordinator's, undoable): on by default. It is a verified law from Stern 2004 and Crameri et al.
+2020, not a knob; it moves no V1 measure out of its target and moves the one that was out (the coast with high
+ground) toward it; the floor goes the way Earth's does. With the switch off the planet is base26's
+(`--set tectonics.transference=false`). A 24-run base follows on the merged master.
+
+**What it is not.** The floor older than 250 Myr stays near 7 %, against the check's 3 % and Earth's trace: the
+oceans whose continents never collide still age. Trench invasion of an Atlantic-type ocean (Duarte et al. 2013,
+2018; Waldron et al. 2014: subduction "entered the Iapetus from the boundary with the external paleo-Pacific")
+is the next candidate.
+
 ## Plate speed (2026-10-25)
 
 The coordinator's brief for the plate speed lane: CHK-020's `speed_rms_mm_yr` (the plate check's
