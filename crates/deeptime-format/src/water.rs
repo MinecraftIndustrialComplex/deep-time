@@ -348,6 +348,24 @@ pub fn finish(own: &Core, neighbours: &[Core; 4], holds: &[i32; 4]) -> WaterColu
         out.bed = Some(own.bed);
         return out;
     }
+    // A one-block seam between two river channels is channel (ledger: HYD-182): where two
+    // segments' corridors meet edge to edge, a column between them can fall outside both, and as
+    // a bank it kept its ground above the water, a dotted line of single dry blocks across the
+    // river. Between river columns on opposite sides it holds the lower of their waters on the
+    // shallower of their beds.
+    for k in [0, 2] {
+        let (a, b) = (&neighbours[k], &neighbours[k + 1]);
+        if a.kind != WaterKind::River || b.kind != WaterKind::River {
+            continue;
+        }
+        let w = if b.top < a.top { b } else { a };
+        out.kind = WaterKind::River;
+        out.top = Some(w.top);
+        out.bed = Some(a.bed.max(b.bed).min(w.top - 1));
+        out.river_biome = a.rivers.biome || b.rivers.biome;
+        out.river = w.rivers.hit;
+        return out;
+    }
     let mut min_ground: Option<i32> = None;
     let mut seal: Option<i32> = None;
     for (n, &hold) in neighbours.iter().zip(holds) {
@@ -493,6 +511,53 @@ mod tests {
         }];
         r.build_index();
         Toy { rivers: r }
+    }
+
+    #[test]
+    fn a_one_block_seam_between_two_channels_is_channel() {
+        // ledger: HYD-182. East and west are river columns of two segments whose corridors left this
+        // column out: it takes the lower water (62) on the shallower bed (60), not a bank's ground.
+        let river = |top: i32, bed: i32| Core {
+            kind: WaterKind::River,
+            surface: 64.4,
+            ground: 64,
+            level: f64::NAN,
+            top,
+            bed,
+            rivers: RiverSample::default(),
+        };
+        let none = Core {
+            kind: WaterKind::None,
+            surface: 64.4,
+            ground: 64,
+            level: f64::NAN,
+            top: i32::MIN,
+            bed: i32::MIN,
+            rivers: RiverSample::default(),
+        };
+        let seam = finish(
+            &none,
+            &[river(63, 57), river(62, 60), none, none],
+            &[63, 63, i32::MIN, i32::MIN],
+        );
+        assert_eq!(seam.kind, WaterKind::River);
+        assert_eq!((seam.top, seam.bed), (Some(62), Some(60)));
+        // North and south (the second pair) count the same; one river side alone stays a bank.
+        let ns = finish(
+            &none,
+            &[none, none, river(63, 58), river(63, 59)],
+            &[i32::MIN, i32::MIN, 63, 63],
+        );
+        assert_eq!(
+            (ns.kind, ns.top, ns.bed),
+            (WaterKind::River, Some(63), Some(59))
+        );
+        let bank = finish(
+            &none,
+            &[river(63, 57), none, none, none],
+            &[63, i32::MIN, i32::MIN, i32::MIN],
+        );
+        assert_eq!(bank.kind, WaterKind::Bank);
     }
 
     #[test]
