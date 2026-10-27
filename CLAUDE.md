@@ -212,9 +212,11 @@ align with earth by introducing extremely weird forcing functions").
   turns deep-time on (`gr github repos` lists it `ready`; graphide.com/dashboard/github holds its review
   switch). Commit on a branch, push it, open a PR to master (`nix shell nixpkgs#gh -c gh pr create`), wait for
   the app's review on the PR, answer each finding on the PR (fix it on the branch, or say why not), then land
-  it yourself. Where the app has posted nothing (it posted nothing on PRs #2 to #4, even after a close and
-  reopen), run Graphide's review from the CLI, `gr check --branch <branch>` (the checks a PR gets; mind that
-  its `main` can lag master, which inflates its changed functions), and record its result on the PR. Land: `tools/dev/merge-branch.sh <head sha> "summary"` and push master, which marks the PR merged.
+  it yourself. The app's review (a "Graphide review" check run and a PR comment, a few minutes after the push) is
+  the review of record since 2026-10-27 (PR #13; the review switch had been off on Graphide's side, so PRs #2 to
+  #11 carry `gr check` results instead). Where the app posts nothing, run Graphide's review from the CLI,
+  `gr check --branch <branch>` (the checks a PR gets; mind that its `main` can lag master, which inflates its
+  changed functions), and record its result on the PR. Land: `tools/dev/merge-branch.sh <head sha> "summary"` and push master, which marks the PR merged.
   A lane pushes its branch and reports; the coordinator opens the PR, waits for the review and lands it.
   Record what the review caught and missed for Ben (he wants feedback on Graphide's reviews). Catch up a
   behind checkout with `git merge --ff-only --autostash origin/master`.
