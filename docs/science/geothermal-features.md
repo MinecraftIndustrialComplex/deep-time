@@ -2,13 +2,13 @@
 
 Status of this page: `stage 2 (written 2026-10-02, WP-16), extended the same day with the heat-flow
 fields, on 2026-10-20 with the rule that a pool's water never freezes (GEO-062), and on 2026-10-24 with the
-GameTest's heat-flow odds and the thermal state's heat flow (GEO-064)`. Of the 63 rows, `verified` ones are the sinter and travertine rule (GEO-022), the Earth
+GameTest's heat-flow odds and the thermal state's heat flow (GEO-064)`. Of the 64 rows (GEO-065 on 2026-10-27: the pool tests' odds), `verified` ones are the sinter and travertine rule (GEO-022), the Earth
 heat-flow figures (GEO-059), the model-against-Earth arithmetic (GEO-060) and the threshold hint
 (GEO-057); the rest are `game-choice` or `uncited`. Almost nothing in the feature's numbers comes from
 a source: the sources checked below support the kinds of feature and the order in which they occur,
 and (for the heat-flow threshold) the level of young extended crust, not a size or a count.
 
-Ledger ids on this page: `GEO-001` to `GEO-062` and `GEO-064` ([ledger/GEO.md](ledger/GEO.md)). The editor hints
+Ledger ids on this page: `GEO-001` to `GEO-062`, `GEO-064` and `GEO-065` ([ledger/GEO.md](ledger/GEO.md)). The editor hints
 that describe these settings are rows GEO-047 to GEO-051. The geothermal gradient (the rise of
 temperature with depth that drives metamorphism and the oil window) is a different thing and is
 ledgered under rock and metamorphism and under deposits.
@@ -219,6 +219,28 @@ only, wholly (item 4), the odds count the faces' ground only (a cube world's odd
 void squares too, so their hot dry ground and expected counts were up to twice the faces'), and the test fails
 first if any site has a column off the faces.
 
+
+### The pool tests' odds (2026-10-27, GEO-065)
+
+Two GameTests read hot-spring pools on the test planet: `volcanicBiomesOnlyAtVolcanoes` (the pools are among the
+places a volcanic biome may stand) and `hotSpringPoolsSitInTheirBiome` (every pool in the hot-spring biome, none
+frozen). Both asked for at least one pool, on the premise that the test planet always has some. Transference
+(PLT-516, master f4662d49) changed the test planet. Its ten active volcanoes are seamounts and one summit's island:
+of 336 points on each volcano's flank ring, none stands 5 blocks above the sea. Their fields made 5 sites, all vents
+and patches of the one emergent summit. Of 6,675 land cells sampled every 8 blocks, 163 reach 50 mW/m2 (median 41),
+and no heat-flow field came of them. Four times the volcanoes' field density made the same 5 sites.
+
+So the tests now ask the world whether a pool had a place, as GEO-064 does for the heat-flow fields.
+`Geothermal.springPlaces` samples the flank ring each volcano's later fields draw from (`SUMMIT_ZONE` to the full
+reach; nearer the summit a field is fumarolic) on 8 rings of 32 points. It counts the points where a field may stand
+(on the faces, 5 blocks above the sea, dry, no ice) and a spring field may form (rain at the setting, a mean of
+3 °C or more). A planet without pools fails when that count is above zero, or when GEO-064's chance of no heat-flow
+field is under 1 in 1,000. Otherwise there is no pool to check, and the tests say so.
+
+| Planet | Flank places for springs | Heat-flow chance of none | Pools | The two tests |
+|---|---|---|---|---|
+| master 475a0a25 | (not measured) | (not measured) | some | passed |
+| master f4662d49 (transference) | 0 of 2,560 (10 volcanoes, 8 rings of 32) | 0.55 (hot dry ground 238 km2 in 7 of 391 cells, 0.52 expected) | 0 | failed before GEO-065; pass with it (both, alone, standalone set) |
 ## Simplifications and limits
 
 - **Heat from volcanoes and continental heat flow only** (GEO-012, GEO-013; changed 2026-10-02).
