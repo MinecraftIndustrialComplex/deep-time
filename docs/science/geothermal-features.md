@@ -240,7 +240,7 @@ field is under 1 in 1,000. Otherwise there is no pool to check, and the tests sa
 | Planet | Flank places for springs | Heat-flow chance of none | Pools | The two tests |
 |---|---|---|---|---|
 | master 475a0a25 | (not measured) | (not measured) | some | passed |
-| master f4662d49 (transference) | see the decisions log, 2026-10-27 | | 0 | failed before GEO-065 |
+| master f4662d49 (transference) | 0 of 2,560 (10 volcanoes, 8 rings of 32) | 0.55 (hot dry ground 238 km2 in 7 of 391 cells, 0.52 expected) | 0 | failed before GEO-065; pass with it (both, alone, standalone set) |
 ## Simplifications and limits
 
 - **Heat from volcanoes and continental heat flow only** (GEO-012, GEO-013; changed 2026-10-02).
