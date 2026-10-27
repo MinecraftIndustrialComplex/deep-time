@@ -220,7 +220,16 @@ mod tests {
             s ^= s << 17;
             s
         };
-        let special = [0.0, -0.0, f64::INFINITY, f64::NEG_INFINITY, f64::NAN, -f64::NAN, 1.5, -1.5];
+        let special = [
+            0.0,
+            -0.0,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NAN,
+            -f64::NAN,
+            1.5,
+            -1.5,
+        ];
         let h: Vec<f64> = (0..50_000)
             .map(|_| {
                 let r = next();
