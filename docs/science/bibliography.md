@@ -4167,7 +4167,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Bird, P. (2003). An updated digital model of plate boundaries. Geochemistry, Geophysics, Geosystems 4(3):1027.
 - DOI or URL: (PLT) 10.1029/2001GC000252 (open access at AGU/Wiley; blocked to WebFetch with 403). (CLM) 10.1029/2001GC000252
 - Cited as: (PLT) "Bird 2003, G3 4(3):1027" (52 plates; Pacific 103.3 million km2; seven largest about 92 percent); editor hint "Earth: about 14". (CLM) "Bird 2003" (no title or journal in the code; I assigned this paper because the claim concerns subduction-zone length and rate)
-- Ledger ids: CLM-054, PLT-143, PLT-145, PLT-203, PLT-311, PLT-330 (2026-10-20: the transform test the arcs' fronts take), PLT-372 (2026-10-21: Table 1, the plate count by area), PLT-614 and PLT-615 (2026-10-25, the front lane: paragraphs [126] and [127] again, a subduction zone has "a Benioff zone of intermediate to deep earthquakes and/or a parallel volcanic arc", else an oceanic convergent boundary (OCB); the incipient fronts counted as OCB, and the Benioff census column), PLT-692 (2026-10-26, the M5 lane's fix C: Table 3's 51,310 km of subduction zones, through PLT-213, as the length fix C's initiation rate is per)
+- Ledger ids: CLM-054, PLT-143, PLT-145, PLT-203, PLT-311, PLT-330 (2026-10-20: the transform test the arcs' fronts take), PLT-372 (2026-10-21: Table 1, the plate count by area), PLT-614 and PLT-615 (2026-10-25, the front lane: paragraphs [126] and [127] again, a subduction zone has "a Benioff zone of intermediate to deep earthquakes and/or a parallel volcanic arc", else an oceanic convergent boundary (OCB); the incipient fronts counted as OCB, and the Benioff census column), PLT-692 (2026-10-26, the M5 lane's fix C: Table 3's 51,310 km of subduction zones, through PLT-213, as the length fix C's initiation rate is per), PLT-715 (2026-10-26: the back-arc microplates' areas)
 - Access: open access (G3 is open), not fetched as full text here. [other sections: paywalled (Unpaywall closed)]
 - Library (the project's source library, not distributed): fetched in WP-13a (full text PDF, author's site). From: http://peterbird.name/publications/2003_PB2002/2001GC000252.pdf. Text file: Bird2003.txt.
 - Read so far (by the project): (PLT) "confirmed from abstract or secondary pages"; areas from Wikipedia. (CLM) not stated; no title or journal given
@@ -4176,6 +4176,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read in WP-13a (2026-10-02): Table 1 (areas in steradians): Pacific 2.57685 sr, 20.5 % of the sphere; seven plates above 5 %, together 81 % (not 92 %); Table 3 re-read: subduction 51,310 of 260,487 km (19.7 %). PLT-143, PLT-145, PLT-213, CHK-001, CHK-003.
 - Read in the land-shape task (2026-10-20): the PDF fetched again from the author's site into the source library (`Bird2003/`, the VM's library had lost it in the 2026-10-16 rebuild), text extracted; paragraphs [126] and [127]: a subduction zone is a step "with a convergent (component of) velocity and a Benioff zone ... and/or a parallel volcanic arc with Quaternary activity"; other steps are "strike-slip if the computed relative velocity ... has an azimuth within ±20 of the azimuth of the plate boundary step". PLT-311.
 - Read in the plate-geometry task (2026-10-21): Table 1's 52 areas in steradians copied into `tools/review/plate-geometry.py` (BIRD_SR); the counts above 1, 0.3, 0.1, 0.0377 and 0.01 sr are 7, 10, 14, 19 and 31. PLT-372.
+- Read again for the moving trench (2026-10-26): Table 1's areas of the back-arc and forearc microplates (Mariana 0.01037 sr, Tonga 0.00625, New Hebrides 0.01585, South Sandwich 0.00317, Okinawa 0.00802, Burma 0.01270, Futuna 0.00079, Niuafo'ou 0.00306, Manus 0.00020, Balmoral Reef 0.00481, Conway Reef 0.00356), from the library's Bird2003.txt. PLT-715.
 
 ### Morra2013
 - Reference: Morra, G., Seton, M., Quevedo, L., Müller, R. D. (2013). Organization of the tectonic plates in the last 200 Myr. Earth and Planetary Science Letters 373:93-101.
@@ -7570,10 +7571,11 @@ The source of the cordillera's shortening rate since the crust-budget task (buil
 - Reference: Heuret, A. and Lallemand, S. (2005). Plate motions, slab dynamics and back-arc deformation. Physics of the Earth and Planetary Interiors 149(1-2):31-51.
 - DOI or URL: 10.1016/j.pepi.2004.08.022
 - Cited as: "Heuret & Lallemand 2005".
-- Ledger ids: PLT-048 (the value since 2026-10-20), PLT-320, HNT-127, HYP-018, PLT-540
+- Ledger ids: PLT-048 (the value since 2026-10-20), PLT-320, HNT-127, HYP-018, PLT-540, PLT-710, PLT-711, PLT-716 (2026-10-26, the moving trench)
 - Access: paywalled at the publisher; a full-text PDF was fetched 2026-10-20 (kept in the agent's scratch, not in the library).
 - Read so far (by the project): full text, 2026-10-20. Section 3.2: "upper plate absolute motion appears to exert a dominant control on back-arc deformation, relative to the influence of trench absolute motion"; "back-arc deformation rates cannot exceed the Vup(n) value"; section 1: "among a set of 26 parameters tested by Jarrard (1986), Vup was found to be the best single predictor of strain regime". Table 1, read in its text layer and tabulated by the agent: 88 two-degree segments of continental upper plates (Andaman, Sumatra, Java, Ryukyu, Nankai, Japan, Kamchatka, Alaska, Cascadia, Mexico, Costa Rica, Colombia, Peru, North Chile, Juan Fernandez, South Chile, the Chile triple junction and Patagonia); 21 of them are class C3, "lithospheric scale back-arc thrusting", with a mean measured back-arc deformation rate Vd(n) of 7.1 mm/yr over the 14 that give one; the others shorten little or extend. The length-weighted mean shortening is about 1.7 mm/yr (21 x 7.1 / 88, the agent's arithmetic), and the mean of max(Vup(n), 0) over the 88 is 18.1 mm/yr (the shortening about 0.09 of it). Segments over oceanic upper plates (Izu-Bonin, Mariana, Tonga, Kermadec, the Aleutians, the Antilles, the Sandwich arc and others) were left out.
 - Read again in the plate speed lane (2026-10-25), full text (a PDF in the agent's scratch): the abstract, "spontaneous trench rollback related to slab pull is negligible with respect to upper plate motion", trench motion "globally limited to 50 mm y−1"; the histogram of trench-normal motion, "92% of the trenches" within ±50 mm/yr. PLT-540.
+- Read again for the moving trench (2026-10-26), full text from the agent's scratch: Table 1's text layer tabulated (`build/m4b/hl_table.py`, 158 of the 159 segments): the classes (E3 29, E2 14, E1 21, neutral 43, C1 20, C2 9, C3 22), Vt mean 8.5 mm/yr, median −1.6, retreat 0.484, within ±50 0.917; 70 segments with a slab of 55 Myr or older, 68 under a landward upper plate, 16 of those E3; E3's back-arc opening |Vd| 2.8 to 142.1 mm/yr, median 34.8. PLT-711, PLT-716.
 
 ## The arc's basement and the arcs' fronts (PLT-330, PLT-331), added 2026-10-20
 
@@ -9202,10 +9204,11 @@ The sources of the floor-age lane's law 2 (a subduction zone propagates along a 
 - Reference: Zhou, X., Li, Z.-H., Gerya, T. V. and Stern, R. J. (2020). Lateral propagation-induced subduction initiation at passive continental margins controlled by preexisting lithospheric weakness. Science Advances 6(10):eaaz1048 (title from memory).
 - DOI or URL: 10.1126/sciadv.aaz1048; Europe PMC PMC7056308.
 - Cited as: "Zhou et al. 2020".
-- Ledger ids: PLT-656, PLT-658 (the age dependence the fallback does not give)
+- Ledger ids: PLT-656, PLT-658 (the age dependence the fallback does not give), PLT-717 (2026-10-26: law 2's start in their geometry)
 - Access: open.
 - Library: not kept (read from Europe PMC's XML and the Supplementary PDF).
 - Read so far (by the project): full text and Table S2, 2026-10-25. Abstract: "Passive margin SP requires a significant preexisting lithospheric weakness and a strong slab pull from neighboring subduction zones." Results: "After about 4 million years (Ma), subduction commences in the adjacent OCT regions"; "After about 7 Ma, the whole plate begins to subduct"; "The rate of lateral propagation–induced SI at passive margins is about 17 cm/year"; "With increasing slab pull, the subduction zone propagates laterally and leads to SI in neighboring passive continental margins"; "subduction and trench retreat rates slow significantly during SI at passive margins because slab pull is partially applied to bend the adjacent region to initiate subduction"; "SP is never predicted in existing numerical models for passive continental margins lacking a lithospheric weak zone"; "weaker zones at passive margins allow the large slab pull from older subducting slab to drag down the neighboring plate"; with young slabs "subduction will be aborted by break-off of the subducted young slab"; "The longer subducted slab leads to faster SP; however, it plays a minor role in determining whether or not subduction propagates". Table S2: slabs of 60 Ma and older propagate (friction 0, a 50 km weak zone), 30 Ma slabs break off. No force in N/m.
+- Used again for the moving trench (2026-10-26), not re-read: law 2's start restricted to the geometry of their models, the passive margin continuing the trench's strike (PLT-717).
 
 ### GoversWortel2005
 - Reference: Govers, R. and Wortel, M. J. R. (2005). Lithosphere tearing at STEP faults: response to edges of subduction zones. Earth and Planetary Science Letters 236:505-523 (title from memory).
@@ -9450,3 +9453,47 @@ The sources of the suture-loss lane (build log 2026-10-26 "Suture loss"; plates.
 - Access: paywalled; the abstract and highlights only, as a search tool rendered them (the PDF behind a challenge, not solved).
 - Library: not fetched.
 - Read so far (by the project): 2026-10-26 (`abstract-only`, through a search tool's rendering): "Crustal loss into the mantle accounts for at least 30% of the shortened crust" (Himalaya-Tibet and Zagros), the Alps 15 to 50 %, and a highlight "~20-50% of crust shortening ... is unaccounted for".
+
+## The moving trench: back-arc rifting and law 2's geometry (PLT-710 to PLT-717), added 2026-10-26
+
+The sources of the M5 lane's stage 3 (build log 2026-10-26, "M5 lane: the moving trench"). Heuret & Lallemand 2005, Lallemand et al. 2005 and 2008, Schellart et al. 2008, Bird 2003, Crameri et al. 2020 and Zhou et al. 2020 (above) were read again for it; their entries record what.
+
+### SdroliasMuller2006
+- Reference: Sdrolias, M. and Müller, R. D. (2006). Controls on back-arc basin formation. Geochemistry, Geophysics, Geosystems 7(4):Q04016.
+- DOI or URL: 10.1029/2005GC001090
+- Cited as: "Sdrolias & Müller 2006".
+- Ledger ids: PLT-710, PLT-711, PLT-712, PLT-714
+- Access: open at the publisher (AGU); the full text was read from a 2017 web archive copy of the Wiley page (fetched 2026-10-26, kept in the agent's scratch, not in the library).
+- Read so far (by the project): full text, 2026-10-26. Abstract: back-arc basins "develop when the age of subducting normal oceanic lithosphere is greater than 55 million years"; "the intermediate dip angle of the subducting slab is always greater than 30° with back-arc spreading"; "back-arc basin formation is always preceded by an absolute motion of the overriding plate away from the subduction hinge"; "Once back-arc extension is established, it continues regardless of overriding plate motion". Section 7, outcomes 1 to 6 (the 55 Myr gate; "preceded by the landward migration of the overriding plate, in an absolute reference frame"; persistence; cessation "not dependent on the age of the subducting lithosphere or the motion of the overriding plate"; no correlation of age with rollback speed; the dip). The dates of four Cenozoic basins: South Fiji 33 to 25 Ma, Parece Vela and Shikoku 30 to 15 Ma, the Japan Sea 30 to about 15 Ma, the West Philippine Basin about 55 to 30-33 Ma. Conclusions: the locus "commonly in between the remnant and active volcanic arc"; "rollback of the subduction hinge becomes the dominant mechanism driving back-arc spreading once it is initiated". Java-Sunda and the Aleutians subducted floor older than 55 Myr "with no resultant back-arc extension".
+
+### Karig1971
+- Reference: Karig, D. E. (1971). Origin and development of marginal basins in the western Pacific. Journal of Geophysical Research 76(11):2542-2561.
+- DOI or URL: 10.1029/JB076i011p02542
+- Cited as: "Karig 1971".
+- Ledger ids: PLT-713
+- Access: paywalled; the abstract from OpenAlex (fetched 2026-10-26).
+- Read so far (by the project): abstract only, 2026-10-26: "Active extension is restricted to arc systems with earthquakes deeper than about 350 km"; "as the inter-arc basin opens, the trench is forced to migrate".
+
+### TaylorKarner1983
+- Reference: Taylor, B. and Karner, G. D. (1983). On the evolution of marginal basins. Reviews of Geophysics 21(8):1727-1741.
+- DOI or URL: 10.1029/RG021i008p01727
+- Cited as: "Taylor & Karner 1983".
+- Ledger ids: PLT-714
+- Access: paywalled; the abstract from OpenAlex (fetched 2026-10-26).
+- Read so far (by the project): abstract only, 2026-10-26: "arc-trench systems without currently spreading back arc basins are in the majority"; "rifting of the volcanic arc may occur on either side of the line of active volcanoes (±50 km) and may vary from one side to the other along strike"; "some dynamic back arc force seems required to move the New Hebrides, Tonga, and South Sandwich forearc plates seaward"; "Arc rifting and back arc spreading are both secondary phenomena to subduction".
+
+### Schellart2007
+- Reference: Schellart, W. P., Freeman, J., Stegman, D. R., Moresi, L. and May, D. (2007). Evolution and diversity of subduction zones controlled by slab width. Nature 446:308-311.
+- DOI or URL: 10.1038/nature05615
+- Cited as: "Schellart et al. 2007".
+- Ledger ids: PLT-716
+- Access: paywalled; a full-text PDF was fetched 2026-10-26 (kept in the agent's scratch, not in the library).
+- Read so far (by the project): full text, 2026-10-26. Abstract: "trench migration rate is inversely related to slab width and depends on proximity to a lateral slab edge"; "maximum velocities (6–16 cm yr−1) only observed close to slab edges (<1,200 km), whereas far from edges (>2,000 km) retreat velocities are always slow (<2.0 cm yr−1)". "For the ∼48,800 km of trench considered, 27.6% of the total subduction rate is due to trench migration (mean vTH of 1.51 cm yr−1"; Figure 2's histogram, n = 244, mean 1.51, median 1.22, σ 2.68 cm/yr. Not used as a law: the model has no slab-width term (Step 15, "What it is not").
+
+### MolnarAtwater1978
+- Reference: Molnar, P. and Atwater, T. (1978). Interarc spreading and Cordilleran tectonics as alternates related to the age of subducted oceanic lithosphere. Earth and Planetary Science Letters 41(3):330-340.
+- DOI or URL: 10.1016/0012-821X(78)90187-5
+- Cited as: "Molnar & Atwater 1978".
+- Ledger ids: PLT-712 (support)
+- Access: paywalled; the abstract from a 2024 web archive copy of the publisher's page (fetched 2026-10-26).
+- Read so far (by the project): abstract only, 2026-10-26: "Interarc spreading occurs or occurred recently in the western Pacific, in the southern Atlantic, and possibly in the Mediterranean, where the subducted sea floor appears to be more than 50 m.y. old, and in many cases, is more than 100 m.y. old"; Cordilleran tectonics "where the subducted oceanic lithosphere is younger than about 50 m.y.".
