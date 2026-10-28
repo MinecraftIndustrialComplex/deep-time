@@ -1546,33 +1546,31 @@ impl SurfaceStage {
                 .into_par_iter()
                 .filter(|&m| kind[m] == BASE && qin[m] > 0.0)
                 .collect();
-            let loads: Vec<(usize, f64)> = mouths.iter().map(|&m| (m, sc.qin[m] * dts)).collect();
-            for &(_, vol) in &loads {
+            for m in mouths {
+                let vol = sc.qin[m] * dts;
                 to_sea += vol;
-            }
-            let last = sub + 1 == subs;
-            let (mix, prov) = (&sc.mix, &mut parts.prov_marine);
-            // The mouths' fills in turn, planned in parallel (`marine::fill_all`).
-            marine::fill_all(
-                &d,
-                &sea_mask,
-                &loads,
-                &fill_p,
-                &mut sc.h,
-                &mut parts.marine,
-                &mut sc.fill,
-                |k, touched| {
-                    if last && let Some(code) = mix.get(loads[k].0).and_then(dominant) {
-                        // Cells this mouth reached first take its provenance.
-                        for &c in touched {
-                            let c = c as usize;
-                            if prov[c] == IN_SITU {
-                                prov[c] = code;
-                            }
+                marine::fill(
+                    &d,
+                    &sea_mask,
+                    m,
+                    vol,
+                    &fill_p,
+                    &mut sc.h,
+                    &mut parts.marine,
+                    &mut sc.fill,
+                );
+                if sub + 1 == subs
+                    && let Some(code) = sc.mix.get(m).and_then(dominant)
+                {
+                    // Cells this mouth reached first take its provenance.
+                    for &c in &sc.fill.touched {
+                        let c = c as usize;
+                        if parts.prov_marine[c] == IN_SITU {
+                            parts.prov_marine[c] = code;
                         }
                     }
-                },
-            );
+                }
+            }
             self.time("marine_fill", started);
 
             // Glaciers: erosion, till, and their loads into lakes and the sea (`glacial.rs`).
