@@ -81,6 +81,19 @@ def cmd_pick(a):
     c = d["circumference"]
     sites = d["sites"]
     bodies = [b["body"] for b in d["bodies"]]
+    # Every site and body in Toroidal World's lap, x in [-c/2, c/2) (tools/smoke/run.py `region_span`): the dump's x can
+    # lie past it (a 2026-10-27 pick at x 8,730 on a 15,360-block world, the column the game holds at -6,630), and the
+    # Chunky square, the probes and deeptime-inspect's footprint then miss the chunks (item 3: "no chunks on the section
+    # line"). Each site and each body by its own centre, a whole number of laps (the boxes stay in whole blocks): a body
+    # near the seam can lie on the other side of it from its site's anchor (Graphide's review of PR #18).
+    def to_lap(o):
+        dx = -c * math.floor((o["center"][0] + c / 2) / c)
+        if dx:
+            o["center"][0] += dx
+            if o.get("aabb"):
+                o["aabb"] = [[o["aabb"][0][0] + dx] + list(o["aabb"][0][1:]), [o["aabb"][1][0] + dx] + list(o["aabb"][1][1:])]
+    for o in sites + bodies:
+        to_lap(o)
     by_site = {}
     for b in bodies:
         by_site.setdefault(b["site"], []).append(b)
