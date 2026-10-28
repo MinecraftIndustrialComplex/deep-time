@@ -15,6 +15,11 @@ Statements are marked **measured** (a run made for this page), **read** (from th
 
 ## Summary
 
+- **Two rounds of exact fixes against master e4bf5d4b (2026-10-28; "Idle cores by part" and "A
+  second round" below).** Measured in pairs: full 16k, 1000 Myr, 8 pinned threads, x86-64-v3.
+  Master took 979.6 to 985.5 s. The first round took 915.4 s. With the second, the branch took
+  **888.2 s**, 11.8 s under the 900 s gate. Worlds were identical in every pair (91 of 91 files),
+  and swapping the two CPU sets moved the times by under half a second.
 - **The shipped builds (2026-10-18; below).** Measured: full 16k, 100 Myr, 8 threads, pairs run both
   ways round. Against plain `release`, the `ship` profile's x86-64-v3 build is **1.08×** faster
   in wall time (1.10× in CPU time). Its baseline build matches plain in wall time (1.00×) and is
@@ -307,6 +312,182 @@ The pair, 1000 Myr, set A against set B: the branch (the parallel initiation sca
 summed its rows with a rayon `reduce`, whose grouping follows the threads' work stealing. It
 differed in the last digit between two runs of identical worlds. It now sums the rows in row
 order.
+
+### Idle cores by part, and nine exact fixes (2026-10-28)
+
+**Where the cores sat idle on master e4bf5d4b.** Two measurements at 300 Myr:
+- A fresh frame-pointer profile (`P117_CPU=x86-64-v3 tools/review/p1-17-profile.sh`: 325 s, 4.96
+  busy threads, 123 s of idle-core wall). Its `serial.txt` lists what the driver thread ran while
+  the workers waited.
+- A run with the per-part CPU clock (`DEEPTIME_LAP_CPU=1 DEEPTIME_BENCH_NO_OVERLAP=1`). Busy cores
+  are a part's CPU over its wall.
+
+The idle time sits in many small places. The largest:
+- the climate's `ice` part: 18.1 s wall at 3.5 cores;
+- the surface's `advect`: 10.6 s at 1.6 cores;
+- `glacial`: 6.7 s at 1.3 cores;
+- the climate clock: the 1-D EBM, serial by nature.
+
+The perf readers needed one fix. `perf script -F tid,...` right-aligns the thread id, so a sample's
+header line can start with spaces. The readers now tell frame lines by their leading tab.
+
+**Speed with identical worlds.** Each change keeps every value's bits. What is summed is still
+summed in the same order. What runs in parallel only reads. A largest value or a count does not
+depend on order.
+- **The spread's search stops once the release is placed** (`plates::collapse::spread`, the
+  collapse, the founder and the rate release). Each plate's Dijkstra went over the whole reach
+  (5,000 km) before the nearest room was taken. It settles samples in order of distance, ties by
+  sample: the order the room list was sorted in. So the room is now taken as the search settles
+  it, and the search stops when the release is placed (`geometry::dijkstra_settled`).
+  Continent-first room (`collapse_continent_first`, off by default) still sorts the whole reach.
+  The test `the_settled_search_takes_the_room_the_sorted_search_does` covers it.
+- **The dissolved load's cells and weights in parallel** (the climate's `ice` part). The cell list
+  was built on one thread, and each cell's weight (an `exp_m1`) twice. The band sums still take
+  the weights in cell order.
+- **The flexure belts' two searches side by side** (`surface::flexure::belt_reach`). The two
+  breadth-first labellings are independent; they ran one after the other. The source scan and the
+  last filter now run in parallel, in cell order.
+- **The regional fields' line passes put back by rows in parallel**
+  (`deposits::regional::pass`). The column and diagonal passes wrote their lines back on one
+  thread. The test `line_passes_put_the_lines_back_where_the_serial_scatter_did` covers it.
+- **The lakes' open sea at the step's end by strips** (`lakes::at_step_end`). It used the serial
+  labelling; `pflood::parallel::open_sea` gives the same cells.
+- **The erosion bands' reliefs read in parallel.** The bands' sums take them in cell order, as
+  before.
+- **The EBM keeps its insolation shapes while the orbit stays the same** (`climate::ebm`). The
+  test `the_kept_insolation_shapes_give_the_same_bits` covers it.
+- The surface's dissolved field converted in parallel, and the plates' reach (the speed guard's
+  largest radius) in parallel.
+
+**Pairs** (`p1-19-pair.sh`, ab, the branch on set B, master e4bf5d4b on set A):
+- 300 Myr, without the reach: 334.4 s against 352.6 s.
+- 1000 Myr: **915.4 s against 979.6 s**.
+  - plates 264.9 against 291.5 s: collapse 19.5 to 4.5, rate 7.8 to 1.7;
+  - climate 114.1 against 132.9 s: ice 66.6 to 49.4;
+  - surface 397.2 against 410.8 s: flexure 54.9 to 44.6;
+  - deposits 22.9 against 29.2 s.
+- `p1-17-cmp.py`: 91 files, 0 differ.
+
+That leaves 15.4 s to the gate.
+
+**Measured, then reverted: the feedback's sums in parallel.** The plates' feedback adds each L1
+cell to its triangle's three samples in cell order. The parallel version cut the cells into runs.
+A sample belonged to the run of its first cell, and that run read on to the sample's last cell, so
+each sample still took its cells in order. But a call has only 1.33 million cells for 250,000
+samples, and the per-sample bookkeeping cost more than the serial pass: feedback went from 5.0 to
+9.1 s at 300 Myr.
+
+**Considered, not built:**
+- Keeping the relink's nearest sample from cell to cell, behind a margin from the two nearest.
+  There are 5.3 L1 cells per sample, so the margin would rarely cover the next cell.
+- The slope failure's moved metres: a sum in cell order, already beside the parallel apply.
+
+### A second round: kept trees, the hydrology's bodies, the sea level's walks (2026-10-28)
+
+**Where the cores sat idle after the first round.** Two measurements of the branch at commit
+df6eaaa5:
+- A frame-pointer profile at 300 Myr (`P117_CPU=x86-64-v3 tools/review/p1-17-profile.sh`): 300 s,
+  5.25 busy threads, 104 s of idle-core wall.
+- A per-part CPU run at the full 1000 Myr (`DEEPTIME_LAP_CPU=1 DEEPTIME_BENCH_NO_OVERLAP=1`).
+  Some parts' costs grow faster than the run: the mouth fill takes 2.2 s at 300 Myr and 17 s at
+  1000 Myr.
+
+Two traps in the per-part CPU:
+- A part timed beside another books its CPU to the part its lap follows. The surface's `advect`
+  and `setup` run beside the flood, so their CPU lands in `flood_beside`.
+- `glacial_sea`'s lap holds the whole glacial step's CPU (134 CPU-s in 0.4 s of wall), so
+  `glacial` reads 1.1 cores when it runs at 5.7.
+
+The serial parts at 1000 Myr, wall seconds and busy cores:
+
+| part | wall | cores |
+|---|--:|--:|
+| surface `marine_fill` | 17.0 | 1.08 |
+| surface `lakes` | 5.4 | 1.00 |
+| climate `clock` (the 1-D EBM) | 14.9 | 1.87 |
+| climate `ice` | 47.6 | 4.54 |
+| plates `motion_rifting` | 19.7 | 2.97 |
+| plates `stats_margins` | 10.5 | 2.73 |
+| plates `forces` | 10.3 | 2.60 |
+
+**Speed with identical worlds.** As in the first round, each change keeps every value's bits.
+- **The plates' trees kept for builds over the same points** (`plates::geometry::Tree::over`). A
+  plate step builds the k-d tree of all its samples, or of the visible ones, in several parts
+  while the samples stand still: the forces' balance, the margins, the propagation and the L1
+  sampling. A build whose items and points equal a kept tree's, bit for bit, takes that tree.
+  At most three trees over half the samples or more are kept, and they are let go at the end of
+  every plate step. 1,049 of 2,979 such builds were taken from the kept trees. The test
+  `a_tree_over_the_same_points_is_the_kept_one` covers it.
+- **The hydrology's sea bodies by a parallel union-find** (`hydro::bodies`). The open sea and the
+  ground it reaches at its own level were serial floods, run twice in the water bake and again on
+  the world's grid. The union-find links the larger root under the smaller, so each body's root is
+  its least cell whatever the threads' order. The test
+  `the_parallel_bodies_give_the_serial_floods_cells` covers it.
+- **The sea level's walks read their cells a block at a time in parallel**
+  (`sea_level::fill_level`). Each walk read the cells' heights and areas in height order, one
+  cache miss after another. The block's values are read in parallel and the walk adds them in the
+  same order. The check for a body the first walk missed is now a parallel `any`.
+- **The propagation's starts planned in parallel** (`plates::propagation::step`). A plan only reads
+  the state, and the state changes only where a plate starts a propagation. So the plates still to
+  come are planned side by side and taken in turn up to the first start, after which the rest are
+  planned again.
+- **The lakes labelled by a union-find, each lake walked on its own** (`surface::lakes`). A
+  lake's cells keep the order of its depth-first walk, which its sums follow. On a grid whose
+  walks and joins part, the serial labelling runs. The test
+  `the_lakes_labelled_in_parallel_are_the_serial_ones` covers it.
+- **The routing stack's donors and basins in parallel, and its forest's arrays**
+  (`surface::routing`). The test `the_parallel_stack_is_the_serial_stack` covers it.
+- **The cube biome settle's three nearest-cell searches side by side** (`bake::project_cube`).
+- **Each thread keeps the cube net it asked for last** (`deeptime_format::cube::Cube::shared`).
+  A cube grid's reader asks for its net at every point it folds, through one lock for the whole
+  process. In the bake's biome land call that lock was 30 of 47 CPU-s on eight threads, and
+  the projection's write part took 8.5 to 14.7 s from run to run on the same code. The test
+  `a_sides_shared_net_is_one_net_on_every_thread` covers it.
+
+**Pairs** (`p1-19-pair.sh`, full 16k, 1000 Myr, master e4bf5d4b against the branch):
+
+| branch | master (set A) | branch (set B) | files differing |
+|---|--:|--:|--:|
+| first round (r6) | 979.6 | 915.4 | 0 of 91 |
+| + routing, cube settle (r7) | 980.5 | 918.7 | 0 of 91 |
+| + bodies, sea-level walks (r9) | 981.4 | 916.0 | 0 of 91 |
+| + kept trees (r10) | 985.5 | 900.6 | 0 of 91 |
+| + propagation, lakes (r11), set B | 982.0 | 895.2 | 0 of 91 |
+| r11 with the sets swapped (branch on A) | 982.1 | 894.8 | 0 of 91 |
+| + each thread's cube net (r12) | 982.4 | **888.2** | 0 of 91 |
+
+**Measured, then reverted:**
+- The mouths' fills planned in parallel and applied in turn, a plan made again when an earlier
+  mouth of its batch raised ground it read. Most mouths are tiny, about 12,700 a step. The large
+  fills all head for the same deep cells, so 43 % of the plans had to be made again: 2.3 to
+  4.0 s at 300 Myr.
+- A four-way heap of packed keys for the mouth fill and the periplatform export. It pops the
+  same cells, but the fill's time is in its walk, not in its heap: marine_fill went 17.3 to
+  17.2 s, periplatform 18.8 to 18.4 s.
+
+The swapped pair puts the branch on set A, where the gate runs its v3 build. The sets give the
+same times to within half a second.
+
+**Not exact, so not kept: the plates note kept as a value.** The plates note grows to 4.6 MB
+with the dynamics record, and every 10 Myr `record_margins` parsed it and wrote it twice. Keeping
+the value between records saves the parses, but serde_json's default float parsing is
+best-effort: a double written and read back can come back one ulp off (the test showed it). The
+old path rounds every record through that parse at each write, and so does a resumed run, so a
+run that kept the value parted from a resumed one (`resumed_run_is_identical` failed).
+
+**Considered, not built:**
+- The amplifier's tiles two at a time, the serial flood repair of one beside the passes of the
+  next. The repair costs 6 s once per run. But the run holds 2,893 of its 4,096 MiB then, and a
+  tile's window takes about 560 MB (7.1 million cells at 79 B), so a second window does not fit
+  beside the first and the level's layers.
+- The 1-D EBM: it steps on its own last state, and its 90 bands are too few to share a step.
+
+**Not speed: the mouth fill's order.** `marine::fill` pops the deepest sea cell first: `Item::cmp`
+reverses the height, and `BinaryHeap` pops its greatest. The module notes and ledger row ERO-050
+say "shallowest cell first". Since P1-04 a river's load has gone down the slope to the deepest
+cell its fill reaches, building out at the toe, rather than filling the nearest room at the
+mouth. Which rule is meant is a science question for the ledger. Changing it changes the planet,
+so it needs a pool base, not a pair.
 
 ## P1-19 exit item 1: full 16k on eight pinned cores (2026-10-18)
 

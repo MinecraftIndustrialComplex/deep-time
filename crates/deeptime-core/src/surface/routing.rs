@@ -89,9 +89,58 @@ pub fn receivers<G: SurfaceGrid>(d: &G, f: &[f64], kind: &[u8], out: &mut Routin
 /// has donors. Land cells without a path to any root (impossible after the flood) are left out.
 pub fn stack<G: SurfaceGrid>(d: &G, kind: &[u8], r: &mut Routing) {
     let n = d.cells();
+    let (count, donors) =
+        donors_by_neighbours(d, &r.rcv).unwrap_or_else(|| donors_in_order(n, &r.rcv));
+    // Each root's basin in parallel, each as the serial walk took it, and the basins in root
+    // order (the speed work of 2026-10-28; one walk after another before).
+    let roots: Vec<u32> = (0..n as u32)
+        .into_par_iter()
+        .filter(|&root| {
+            let root = root as usize;
+            kind[root] != LAND && count[root] != count[root + 1]
+        })
+        .collect();
+    let basins: Vec<Vec<u32>> = roots
+        .par_iter()
+        .map(|&root| {
+            let root = root as usize;
+            let mut basin: Vec<u32> = Vec::new();
+            if kind[root] == SINK {
+                basin.push(root as u32);
+            }
+            let mut todo: Vec<u32> =
+                donors[count[root] as usize..count[root + 1] as usize].to_vec();
+            while let Some(c) = todo.pop() {
+                basin.push(c);
+                let c = c as usize;
+                todo.extend_from_slice(&donors[count[c] as usize..count[c + 1] as usize]);
+            }
+            basin
+        })
+        .collect();
+    r.basins.clear();
+    let mut start = 0u32;
+    r.basins.extend(roots.iter().zip(&basins).map(|(&root, b)| {
+        let end = start + b.len() as u32;
+        let basin = (root, start, end);
+        start = end;
+        basin
+    }));
+    r.stack.clear();
+    r.stack
+        .par_extend(basins.par_iter().flat_map_iter(|b| b.iter().copied()));
+    drop(basins);
+    debug_assert!(kind.iter().all(|&k| k == BASE || k == LAND || k == SINK));
+    r.forest
+        .build(&r.rcv, &r.stack, kind, &count, &donors, &r.basins);
+}
+
+/// Each cell's donors (the cells that drain to it), ascending by cell index, as offsets (`count`,
+/// n + 1) and the list: a counting sort over the cells in order.
+fn donors_in_order(n: usize, rcv: &[u32]) -> (Vec<u32>, Vec<u32>) {
     let mut count = vec![0u32; n + 1];
-    for c in 0..n {
-        let rc = r.rcv[c] as usize;
+    for (c, &rc) in rcv.iter().enumerate() {
+        let rc = rc as usize;
         if rc != c {
             count[rc + 1] += 1;
         }
@@ -101,36 +150,72 @@ pub fn stack<G: SurfaceGrid>(d: &G, kind: &[u8], r: &mut Routing) {
     }
     let mut donors = vec![0u32; count[n] as usize];
     let mut fill = count.clone();
-    for c in 0..n {
-        let rc = r.rcv[c] as usize;
+    for (c, &rc) in rcv.iter().enumerate() {
+        let rc = rc as usize;
         if rc != c {
             donors[fill[rc] as usize] = c as u32;
             fill[rc] += 1;
         }
     }
-    r.stack.clear();
-    r.basins.clear();
-    let mut todo: Vec<u32> = Vec::new();
-    for root in 0..n {
-        if kind[root] == LAND || count[root] == count[root + 1] {
-            continue;
+    (count, donors)
+}
+
+/// [`donors_in_order`]'s lists, found in parallel among each cell's neighbours (a cell drains to
+/// a neighbour); `None` when some cell drains to a cell that is not its neighbour.
+fn donors_by_neighbours<G: SurfaceGrid>(d: &G, rcv: &[u32]) -> Option<(Vec<u32>, Vec<u32>)> {
+    let n = rcv.len();
+    let of = |rc: usize| -> ([u32; 8], usize) {
+        let mut l = [0u32; 8];
+        let mut k = 0;
+        for (m, _) in d.neighbours(rc) {
+            if m != rc && rcv[m] as usize == rc && !l[..k].contains(&(m as u32)) {
+                l[k] = m as u32;
+                k += 1;
+            }
         }
-        let start = r.stack.len() as u32;
-        if kind[root] == SINK {
-            r.stack.push(root as u32);
-        }
-        todo.clear();
-        todo.extend_from_slice(&donors[count[root] as usize..count[root + 1] as usize]);
-        while let Some(c) = todo.pop() {
-            r.stack.push(c);
-            let c = c as usize;
-            todo.extend_from_slice(&donors[count[c] as usize..count[c + 1] as usize]);
-        }
-        r.basins.push((root as u32, start, r.stack.len() as u32));
+        l[..k].sort_unstable();
+        (l, k)
+    };
+    let k: Vec<u8> = (0..n).into_par_iter().map(|rc| of(rc).1 as u8).collect();
+    let movers = rcv
+        .par_iter()
+        .enumerate()
+        .filter(|&(c, &rc)| rc as usize != c)
+        .count();
+    // Offsets: chunk totals in parallel, the chunks' starts in order, then each chunk's own.
+    const CHUNK: usize = 1 << 16;
+    let totals: Vec<u32> = k
+        .par_chunks(CHUNK)
+        .map(|ch| ch.iter().map(|&x| u32::from(x)).sum())
+        .collect();
+    let mut starts = Vec::with_capacity(totals.len());
+    let mut at = 0u32;
+    for t in &totals {
+        starts.push(at);
+        at += t;
     }
-    debug_assert!(kind.iter().all(|&k| k == BASE || k == LAND || k == SINK));
-    r.forest
-        .build(&r.rcv, &r.stack, kind, &count, &donors, &r.basins);
+    if at as usize != movers {
+        return None;
+    }
+    let mut count = vec![0u32; n + 1];
+    count[1..]
+        .par_chunks_mut(CHUNK)
+        .zip(k.par_chunks(CHUNK))
+        .zip(starts.par_iter())
+        .for_each(|((out, ch), &s0)| {
+            let mut s = s0;
+            for (o, &x) in out.iter_mut().zip(ch) {
+                s += u32::from(x);
+                *o = s;
+            }
+        });
+    drop(k);
+    let mut donors = Vec::with_capacity(movers);
+    donors.par_extend((0..n).into_par_iter().flat_map_iter(|rc| {
+        let (l, k) = of(rc);
+        l.into_iter().take(k)
+    }));
+    Some((count, donors))
 }
 
 /// Drainage area of every cell, weighted by `weight` (runoff relative to the reference, so the

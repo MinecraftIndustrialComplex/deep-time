@@ -148,27 +148,35 @@ impl Forest {
         for (i, &c) in stack.iter().enumerate() {
             self.pos[c as usize] = i as u32;
         }
+        // The receivers' and donors' positions in parallel, in stack order (the speed work of
+        // 2026-10-28; one thread before).
         let pos = &self.pos;
         self.rpos.clear();
-        self.rpos.extend(stack.iter().map(|&c| {
+        self.rpos.par_extend(stack.par_iter().map(|&c| {
             let rc = rcv[c as usize];
             if rc == c { NONE } else { pos[rc as usize] }
         }));
         self.dptr.clear();
         self.dptr.reserve(l + 1);
         self.dptr.push(0);
+        let mut end = 0u32;
+        self.dptr.extend(stack.iter().map(|&c| {
+            end += cptr[c as usize + 1] - cptr[c as usize];
+            end
+        }));
         self.dpos.clear();
-        for &c in stack {
+        self.dpos.par_extend(stack.par_iter().flat_map_iter(|&c| {
             let c = c as usize;
-            for &d in &cdon[cptr[c] as usize..cptr[c + 1] as usize] {
-                debug_assert_ne!(
-                    pos[d as usize], NONE,
-                    "a donor of a stack cell is in the stack"
-                );
-                self.dpos.push(pos[d as usize]);
-            }
-            self.dptr.push(self.dpos.len() as u32);
-        }
+            cdon[cptr[c] as usize..cptr[c + 1] as usize]
+                .iter()
+                .map(|&d| {
+                    debug_assert_ne!(
+                        pos[d as usize], NONE,
+                        "a donor of a stack cell is in the stack"
+                    );
+                    pos[d as usize]
+                })
+        }));
         self.size.clear();
         self.size.resize(l, 1);
         for i in (0..l).rev() {
@@ -179,14 +187,17 @@ impl Forest {
         }
         self.tops.clear();
         self.leaves.clear();
-        for i in 0..l {
-            if self.rpos[i] == NONE {
-                self.tops.push(i as u32);
-            }
-            if self.dptr[i] == self.dptr[i + 1] {
-                self.leaves.push(i as u32);
-            }
-        }
+        let (rpos, dptr) = (&self.rpos, &self.dptr);
+        self.tops.par_extend(
+            (0..l as u32)
+                .into_par_iter()
+                .filter(|&i| rpos[i as usize] == NONE),
+        );
+        self.leaves.par_extend(
+            (0..l as u32)
+                .into_par_iter()
+                .filter(|&i| dptr[i as usize] == dptr[i as usize + 1]),
+        );
         self.outlets.clear();
         self.optr.clear();
         self.optr.push(0);
@@ -204,8 +215,11 @@ impl Forest {
         }
         self.pend.clear();
         let dptr = &self.dptr;
-        self.pend
-            .extend((0..l).map(|i| AtomicU32::new(dptr[i + 1] - dptr[i])));
+        self.pend.par_extend(
+            (0..l)
+                .into_par_iter()
+                .map(|i| AtomicU32::new(dptr[i + 1] - dptr[i])),
+        );
     }
 
     /// Runs `f(i)` once for every position `i`, each after its receiver's `f`. `grain` is the

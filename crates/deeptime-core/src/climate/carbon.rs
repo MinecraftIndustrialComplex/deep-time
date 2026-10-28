@@ -74,6 +74,8 @@
 //! **The star.** L(t) = L₀ / (1 + 0.4·(1 − t/t₀)) (Gough 1981, "Solar interior structure and
 //! luminosity variations", Solar Phys. 74: 21–34), t the star's age, t₀ `present_age_gyr`.
 
+use rayon::prelude::*;
+
 /// CO₂ at which the EBM's longwave A is North et al.'s, ppm (pre-industrial).
 pub const CO2_REF_PPM: f64 = 280.0;
 /// COPSE's present atmosphere–ocean reservoir, mol C.
@@ -493,10 +495,16 @@ pub fn place_dissolved(
             c.kin.max(0.0)
         }
     };
+    // Each cell's weight in parallel (the speed work of 2026-10-28); the sums take them in cell
+    // order.
+    let ws: Vec<f64> = cells.par_iter().map(weight).collect();
     // Per band: the free cells' weights, all the land's weights, the land's area.
     let mut sums = vec![[0.0f64; 3]; bands];
-    for c in cells.iter().filter(|c| c.area_km2 > 0.0 && c.band < bands) {
-        let w = weight(c);
+    for (c, &w) in cells
+        .iter()
+        .zip(&ws)
+        .filter(|(c, _)| c.area_km2 > 0.0 && c.band < bands)
+    {
         let s = &mut sums[c.band];
         if !c.iced {
             s[0] += w;
@@ -518,20 +526,23 @@ pub fn place_dissolved(
             out.unplaced_mol += m;
         }
     }
-    for (c, t) in cells.iter().zip(out.thickness_m.iter_mut()) {
-        if c.area_km2 <= 0.0 || c.band >= bands || mol_by_band[c.band] <= 0.0 {
-            continue;
-        }
-        let [free, all, area] = sums[c.band];
-        let share = if free > 0.0 {
-            if c.iced { 0.0 } else { weight(c) / free }
-        } else if all > 0.0 {
-            weight(c) / all
-        } else {
-            c.area_km2 / area
-        };
-        *t = mol_by_band[c.band] * share * kg_per_mol / (ROCK_KG_M3 * c.area_km2 * 1.0e6);
-    }
+    out.thickness_m
+        .par_iter_mut()
+        .zip(cells.par_iter().zip(&ws))
+        .for_each(|(t, (c, &w))| {
+            if c.area_km2 <= 0.0 || c.band >= bands || mol_by_band[c.band] <= 0.0 {
+                return;
+            }
+            let [free, all, area] = sums[c.band];
+            let share = if free > 0.0 {
+                if c.iced { 0.0 } else { w / free }
+            } else if all > 0.0 {
+                w / all
+            } else {
+                c.area_km2 / area
+            };
+            *t = mol_by_band[c.band] * share * kg_per_mol / (ROCK_KG_M3 * c.area_km2 * 1.0e6);
+        });
     out
 }
 

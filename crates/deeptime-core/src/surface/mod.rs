@@ -1072,7 +1072,7 @@ impl SurfaceStage {
             .fields
             .get(crate::climate::field::DISSOLVED)
             .filter(|f| f.data.len() == n)
-            .map(|f| f.data.iter().map(|&x| f64::from(x).max(0.0)).collect());
+            .map(|f| f.data.par_iter().map(|&x| f64::from(x).max(0.0)).collect());
         // The pelagic rain's share of it (`pelagic.rs`): its mass per mol of Ca + Mg (ERO-206),
         // and the part of its Ca + Mg the climate's drawdown already laid as cap carbonate.
         let kg_per_mol = self

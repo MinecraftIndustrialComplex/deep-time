@@ -29,6 +29,8 @@
 //! spills over the one its last exit drains to; the levels are those of the step's last flood, on
 //! the elevation it flooded.
 
+use rayon::prelude::*;
+
 use super::grid::SurfaceGrid;
 use super::pflood::{BASE, LAKE_TOL_M, LAND};
 use super::routing::Routing;
@@ -99,44 +101,21 @@ pub fn water_levels<G: SurfaceGrid>(
     water: &(dyn Fn(usize) -> CellWater + Sync),
 ) -> Levels {
     let n = d.cells();
-    const NONE: u32 = u32::MAX;
+    const NONE: u32 = NO_LAKE;
     let is_lake = |c: usize| kind[c] == LAND && filled[c] - h[c] > LAKE_TOL_M;
     // 1. The lakes: lake cells connected at one level.
-    let mut id = vec![NONE; n];
-    let mut lakes: Vec<Lake> = Vec::new();
-    let mut todo: Vec<u32> = Vec::new();
-    for s in 0..n {
-        if id[s] != NONE || !is_lake(s) {
-            continue;
-        }
-        let k = lakes.len() as u32;
-        let mut lake = Lake {
-            cells: Vec::new(),
-            level: f64::INFINITY,
-            exits_left: 0,
-            supply: 0.0,
-        };
-        id[s] = k;
-        todo.push(s as u32);
-        while let Some(c) = todo.pop() {
-            let c = c as usize;
-            lake.cells.push(c as u32);
-            lake.level = lake.level.min(filled[c]);
-            for (m, _) in d.neighbours(c) {
-                if id[m] == NONE && is_lake(m) && (filled[m] - filled[c]).abs() <= LAKE_TOL_M {
-                    id[m] = k;
-                    todo.push(m as u32);
-                }
-            }
-        }
-        lakes.push(lake);
-    }
+    let (id, mut lakes) = label_lakes_parallel(d, &is_lake, filled)
+        .unwrap_or_else(|| label_lakes(d, &is_lake, filled));
     let rcv = |c: usize| r.rcv.get(c).map_or(c, |&x| x as usize);
     let exits = |c: usize| id[c] != NONE && (rcv(c) == c || id[rcv(c)] != id[c]);
-    for c in 0..n {
-        if exits(c) {
-            lakes[id[c] as usize].exits_left += 1;
-        }
+    // (counts: in parallel, the same integers)
+    let exit_lakes: Vec<u32> = (0..n)
+        .into_par_iter()
+        .filter(|&c| exits(c))
+        .map(|c| id[c])
+        .collect();
+    for k in exit_lakes {
+        lakes[k as usize].exits_left += 1;
     }
 
     // 2. The balance, upstream first: every cell after its donors.
@@ -224,6 +203,7 @@ pub fn water_levels<G: SurfaceGrid>(
         ..Levels::default()
     };
     out.water_z = (0..n)
+        .into_par_iter()
         .map(|c| {
             if kind[c] == BASE {
                 sea
@@ -234,15 +214,122 @@ pub fn water_levels<G: SurfaceGrid>(
             }
         })
         .collect();
-    for (&hc, &z) in h.iter().zip(&out.water_z) {
-        if hc <= sea && hc > z {
-            out.dry_below_sea += 1;
-        }
-        if hc > sea && hc < z {
-            out.wet_above_sea += 1;
-        }
-    }
+    (out.dry_below_sea, out.wet_above_sea) = h
+        .par_iter()
+        .zip(&out.water_z)
+        .map(|(&hc, &z)| {
+            (
+                usize::from(hc <= sea && hc > z),
+                usize::from(hc > sea && hc < z),
+            )
+        })
+        .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
     out
+}
+
+/// Off every lake ([`label_lakes`]).
+const NO_LAKE: u32 = u32::MAX;
+
+/// The lakes, numbered in the order of their first cell, and each cell's lake ([`NO_LAKE`] off
+/// them): from each first cell, the lake cells joined to it through neighbours whose fills are
+/// within [`LAKE_TOL_M`], taken in a depth-first walk (a lake's cells in that walk's order).
+fn label_lakes<G: SurfaceGrid>(
+    d: &G,
+    is_lake: &(impl Fn(usize) -> bool + Sync),
+    filled: &[f64],
+) -> (Vec<u32>, Vec<Lake>) {
+    let n = d.cells();
+    let mut id = vec![NO_LAKE; n];
+    let mut lakes: Vec<Lake> = Vec::new();
+    let mut todo: Vec<u32> = Vec::new();
+    for s in 0..n {
+        if id[s] != NO_LAKE || !is_lake(s) {
+            continue;
+        }
+        let k = lakes.len() as u32;
+        let mut lake = Lake {
+            cells: Vec::new(),
+            level: f64::INFINITY,
+            exits_left: 0,
+            supply: 0.0,
+        };
+        id[s] = k;
+        todo.push(s as u32);
+        while let Some(c) = todo.pop() {
+            let c = c as usize;
+            lake.cells.push(c as u32);
+            lake.level = lake.level.min(filled[c]);
+            for (m, _) in d.neighbours(c) {
+                if id[m] == NO_LAKE && is_lake(m) && (filled[m] - filled[c]).abs() <= LAKE_TOL_M {
+                    id[m] = k;
+                    todo.push(m as u32);
+                }
+            }
+        }
+        lakes.push(lake);
+    }
+    (id, lakes)
+}
+
+/// [`label_lakes`] in parallel (the speed work of 2026-10-28): the lakes' cells joined by a
+/// union-find whose roots are each lake's least cell (the cell the serial scan starts it from;
+/// [`crate::hydro::joined`]), numbered in that order, then each lake's own depth-first walk from
+/// it, the lakes side by side. A walk claims only cells of its own lake, and must reach every one
+/// of them; on a grid whose neighbours are not each other's (where the walks and the joins part)
+/// it gives None and the serial labelling runs.
+fn label_lakes_parallel<G: SurfaceGrid>(
+    d: &G,
+    is_lake: &(impl Fn(usize) -> bool + Sync),
+    filled: &[f64],
+) -> Option<(Vec<u32>, Vec<Lake>)> {
+    use std::sync::atomic::{AtomicU32, Ordering::Relaxed};
+    let n = d.cells();
+    if n >= NO_LAKE as usize {
+        return None;
+    }
+    let joins = |c: usize, m: usize| (filled[m] - filled[c]).abs() <= LAKE_TOL_M;
+    let (root, size) = crate::hydro::joined(n, is_lake, |c| {
+        d.neighbours(c)
+            .map(|(m, _)| m)
+            .filter(move |&m| joins(c, m))
+    });
+    let seeds: Vec<u32> = (0..n as u32)
+        .into_par_iter()
+        .filter(|&c| root[c as usize] == c)
+        .collect();
+    let id: Vec<AtomicU32> = (0..n)
+        .into_par_iter()
+        .map(|_| AtomicU32::new(NO_LAKE))
+        .collect();
+    let lakes: Vec<Option<Lake>> = seeds
+        .par_iter()
+        .enumerate()
+        .map(|(k, &s)| {
+            let k = k as u32;
+            let mut lake = Lake {
+                cells: Vec::new(),
+                level: f64::INFINITY,
+                exits_left: 0,
+                supply: 0.0,
+            };
+            let mut todo = vec![s];
+            id[s as usize].store(k, Relaxed);
+            while let Some(c) = todo.pop() {
+                let c = c as usize;
+                lake.cells.push(c as u32);
+                lake.level = lake.level.min(filled[c]);
+                for (m, _) in d.neighbours(c) {
+                    if root[m] == s && id[m].load(Relaxed) == NO_LAKE && is_lake(m) && joins(c, m) {
+                        id[m].store(k, Relaxed);
+                        todo.push(m as u32);
+                    }
+                }
+            }
+            (lake.cells.len() == size[s as usize] as usize).then_some(lake)
+        })
+        .collect();
+    let lakes: Vec<Lake> = lakes.into_iter().collect::<Option<_>>()?;
+    Some((id.into_iter().map(AtomicU32::into_inner).collect(), lakes))
 }
 
 // ledger: ISO-126
@@ -259,8 +346,11 @@ pub fn at_step_end<G: SurfaceGrid>(
 ) -> Levels {
     let n = d.cells();
     let mut open = vec![LAND; n];
-    super::pflood::open_sea(d, h, sea, min_cells, &mut open);
+    // By strips in parallel: the serial labelling's cells, cell for cell (the speed work of
+    // 2026-10-28; it ran on one thread every surface step).
+    super::pflood::parallel::open_sea(d, h, sea, min_cells, &mut open);
     let water_z: Vec<f64> = (0..n)
+        .into_par_iter()
         .map(|c| {
             if open[c] == BASE {
                 sea
@@ -269,15 +359,15 @@ pub fn at_step_end<G: SurfaceGrid>(
             }
         })
         .collect();
-    let (mut dry_below_sea, mut wet_above_sea) = (0, 0);
-    for c in 0..n {
-        if h[c] <= sea && h[c] > water_z[c] {
-            dry_below_sea += 1;
-        }
-        if h[c] > sea && h[c] < water_z[c] {
-            wet_above_sea += 1;
-        }
-    }
+    let (dry_below_sea, wet_above_sea) = (0..n)
+        .into_par_iter()
+        .map(|c| {
+            (
+                usize::from(h[c] <= sea && h[c] > water_z[c]),
+                usize::from(h[c] > sea && h[c] < water_z[c]),
+            )
+        })
+        .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
     Levels {
         water_z,
         lakes: flood.lakes,
@@ -332,6 +422,56 @@ mod tests {
             })
             .collect();
         (d, z)
+    }
+
+    /// The lakes labelled in parallel are the serial labelling's: each cell's lake, each lake's
+    /// cells in the walk's order and its level, bit for bit, on pools of 1, 3 and 8 threads, with
+    /// many lakes of every size on a wrapping grid (lakes across the seam) and flats within
+    /// `LAKE_TOL_M` that join and part them.
+    #[test]
+    fn the_lakes_labelled_in_parallel_are_the_serial_ones() {
+        let (w, rows) = (83, 47);
+        let d = Dims::new(w, rows, 1000.0, true);
+        let n = w * rows;
+        let mut rng = crate::sphere::SplitMix64::new(9);
+        // Fills on plateaus 5 m apart, each cell 0 to 12 mm above its plateau (neighbours 8 mm
+        // apart join, 12 mm part), the ground 0 to 3 m under them or 5 mm (not a lake).
+        let filled: Vec<f64> = (0..n)
+            .map(|c| {
+                let (i, j) = ((c % w) as f64, (c / w) as f64);
+                let z = 200.0 + 40.0 * (i * 0.17).sin() * (j * 0.13).cos();
+                5.0 * (z / 5.0).floor() + 0.004 * (rng.next_f64() * 4.0).floor()
+            })
+            .collect();
+        let h: Vec<f64> = filled
+            .iter()
+            .map(|&f| {
+                f - if rng.next_f64() < 0.15 {
+                    0.005
+                } else {
+                    3.0 * rng.next_f64()
+                }
+            })
+            .collect();
+        let kind = vec![LAND; n];
+        let is_lake = |c: usize| kind[c] == LAND && filled[c] - h[c] > LAKE_TOL_M;
+        let (want_id, want) = label_lakes(&d, &is_lake, &filled);
+        assert!(want.len() > 20 && want.iter().any(|l| l.cells.len() > 20));
+        for t in [1, 3, 8] {
+            let pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(t)
+                .build()
+                .unwrap();
+            let (id, got) = pool
+                .install(|| label_lakes_parallel(&d, &is_lake, &filled))
+                .expect("a grid whose neighbours are each other's");
+            assert_eq!(id, want_id, "{t} threads");
+            assert_eq!(got.len(), want.len());
+            for (g, w) in got.iter().zip(&want) {
+                assert_eq!(g.cells, w.cells, "{t} threads");
+                assert_eq!(g.level.to_bits(), w.level.to_bits());
+            }
+        }
     }
 
     /// The open sea stands at the sea level and dry land carries nothing.

@@ -10,6 +10,8 @@
 
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
+use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
+use std::sync::{Arc, Mutex};
 
 use glam::{DQuat, DVec3};
 use rayon::prelude::*;
@@ -167,9 +169,39 @@ pub fn cover(
 /// A k-d tree over the given positions (all samples, or only those `keep` selects; the items of
 /// the tree then index `index`).
 pub struct Tree {
-    pub tree: SampleTree,
+    pub tree: Arc<SampleTree>,
     /// Tree item → sample index.
-    pub index: Vec<u32>,
+    pub index: Arc<Vec<u32>>,
+}
+
+/// A tree [`Tree::over`] keeps for a build over the same points.
+struct Kept {
+    pts: Arc<Vec<DVec3>>,
+    index: Arc<Vec<u32>>,
+    tree: Arc<SampleTree>,
+}
+
+/// The trees kept (the speed work of 2026-10-28): the parts of a plate step build the tree of all
+/// the samples, or of the visible ones, again and again while the samples stand still. Built
+/// from the same points a tree is the same tree, so a build whose items and points equal a kept
+/// tree's, bit for bit, takes that tree. Only trees over at least half the samples are kept (the
+/// per-plate trees would push them out), at most [`KEEP`], and [`forget_trees`] lets them go
+/// at the end of every plate step.
+static KEPT: Mutex<Vec<Kept>> = Mutex::new(Vec::new());
+const KEEP: usize = 3;
+
+/// Counters since the process started (diagnostics printed by `deeptime bench`; not part of any
+/// world): trees built over half the samples or more, and trees taken from those kept.
+static TREE_COUNTS: [AtomicU64; 2] = [AtomicU64::new(0), AtomicU64::new(0)];
+
+/// [`Tree::over`]'s counters: (trees built that could be kept, trees taken from the kept).
+pub fn tree_counts() -> [u64; 2] {
+    std::array::from_fn(|k| TREE_COUNTS[k].load(Relaxed))
+}
+
+/// Lets the kept trees go (the end of a plate step).
+pub fn forget_trees() {
+    KEPT.lock().unwrap_or_else(|e| e.into_inner()).clear();
 }
 
 impl Tree {
@@ -179,10 +211,42 @@ impl Tree {
             .filter(|&i| keep(i as usize))
             .collect();
         let pts: Vec<DVec3> = index.par_iter().map(|&i| pos[i as usize]).collect();
-        Tree {
-            tree: SampleTree::new(&pts),
-            index,
+        if 2 * index.len() < pos.len() {
+            return Tree {
+                tree: Arc::new(SampleTree::new(&pts)),
+                index: Arc::new(index),
+            };
         }
+        // The candidates out of the lock, then compared bit for bit.
+        let kept: Vec<_> = KEPT
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .iter()
+            .map(|k| (k.pts.clone(), k.index.clone(), k.tree.clone()))
+            .collect();
+        let bits = |p: &DVec3| [p.x.to_bits(), p.y.to_bits(), p.z.to_bits()];
+        for (kp, ki, kt) in kept {
+            if *ki == index && kp.par_iter().zip(&pts).all(|(a, b)| bits(a) == bits(b)) {
+                TREE_COUNTS[1].fetch_add(1, Relaxed);
+                return Tree {
+                    tree: kt,
+                    index: ki,
+                };
+            }
+        }
+        TREE_COUNTS[0].fetch_add(1, Relaxed);
+        let tree = Arc::new(SampleTree::new(&pts));
+        let index = Arc::new(index);
+        let mut kept = KEPT.lock().unwrap_or_else(|e| e.into_inner());
+        if kept.len() >= KEEP {
+            kept.remove(0);
+        }
+        kept.push(Kept {
+            pts: Arc::new(pts),
+            index: index.clone(),
+            tree: tree.clone(),
+        });
+        Tree { tree, index }
     }
 
     /// The nearest sample and its squared chord distance.
@@ -334,6 +398,49 @@ pub fn dijkstra_sparse(
     allow: impl Fn(u32, u32) -> bool,
     max_rad: f64,
 ) -> Vec<(u32, f64, u32)> {
+    sparse_search(
+        geo,
+        sources,
+        allow,
+        max_rad,
+        |_, _| true,
+        |reached, dist, label| {
+            reached
+                .iter()
+                .map(|&v| (v, dist[v as usize], label[v as usize]))
+                .collect()
+        },
+    )
+}
+
+/// [`dijkstra_sparse`] of sources of one label, its vertices handed to `visit(vertex, distance)`
+/// as the search settles them, until `visit` returns false (the speed work of 2026-10-28: a caller
+/// that takes only the nearest few stops there). They come nearest first, ties by vertex (the
+/// heap's order): the order of the finished search's list sorted by distance, then vertex, with
+/// the same distances, since every edge is longer than 0 (a vertex at a distance is pushed before
+/// any vertex of that distance is taken).
+pub fn dijkstra_settled(
+    geo: &Geo,
+    sources: &[(u32, f64, u32)],
+    allow: impl Fn(u32, u32) -> bool,
+    max_rad: f64,
+    visit: impl FnMut(u32, f64) -> bool,
+) {
+    sparse_search(geo, sources, allow, max_rad, visit, |_, _, _| ());
+}
+
+/// The search of [`dijkstra_sparse`] and [`dijkstra_settled`] in the per-thread scratch: `visit`
+/// sees each vertex as it settles and stops the search by returning false, then `finish` reads the
+/// vertices reached (in the order first reached) with the scratch's distances and labels, before
+/// the scratch is put back.
+fn sparse_search<R>(
+    geo: &Geo,
+    sources: &[(u32, f64, u32)],
+    allow: impl Fn(u32, u32) -> bool,
+    max_rad: f64,
+    mut visit: impl FnMut(u32, f64) -> bool,
+    finish: impl FnOnce(&[u32], &[f64], &[u32]) -> R,
+) -> R {
     let n = geo.points().len();
     SPARSE.with(|cell| {
         let mut scratch = cell.borrow_mut();
@@ -358,6 +465,9 @@ pub fn dijkstra_sparse(
             if d > dist[v as usize] || label[v as usize] != l {
                 continue;
             }
+            if !visit(v, d) {
+                break;
+            }
             for (u, len) in geo.edges(v) {
                 let nd = d + f64::from(len);
                 if nd <= max_rad && nd < dist[u as usize] && allow(v, u) {
@@ -374,10 +484,7 @@ pub fn dijkstra_sparse(
                 }
             }
         }
-        let out = reached
-            .iter()
-            .map(|&v| (v, dist[v as usize], label[v as usize]))
-            .collect();
+        let out = finish(&reached, dist, label);
         for &v in &reached {
             dist[v as usize] = f64::INFINITY;
             label[v as usize] = u32::MAX;
@@ -635,6 +742,33 @@ pub fn coast_split(
 mod tests {
     use super::*;
 
+    /// A tree over the same points is the kept tree (the queries the same as a fresh build's);
+    /// one point moved by an ulp, or another set of samples, builds its own. The test's points
+    /// are its own, so other tests' trees never match them; a plate step of a test running beside
+    /// may let the kept trees go between two builds, so the second build is tried a few times.
+    #[test]
+    fn a_tree_over_the_same_points_is_the_kept_one() {
+        let mut pos = fibonacci_sphere(4001);
+        pos[17] = (pos[17] + DVec3::new(0.0, 0.0, 1.0e-3)).normalize();
+        let a = Tree::over(&pos, |_| true);
+        let b = (0..50)
+            .map(|_| (Tree::over(&pos, |_| true), Tree::over(&pos, |_| true)))
+            .find(|(x, y)| Arc::ptr_eq(&x.tree, &y.tree) && Arc::ptr_eq(&x.index, &y.index))
+            .expect("the second build took the first one's tree")
+            .1;
+        let fresh = SampleTree::new(&pos);
+        for q in fibonacci_sphere(500) {
+            assert_eq!(b.tree.nearest_n(q, 3), fresh.nearest_n(q, 3));
+        }
+        let mut moved = pos.clone();
+        moved[1000].x = f64::from_bits(moved[1000].x.to_bits() + 1);
+        let c = Tree::over(&moved, |_| true);
+        assert!(!Arc::ptr_eq(&a.tree, &c.tree));
+        let d = Tree::over(&pos, |i| i != 3);
+        assert!(!Arc::ptr_eq(&a.tree, &d.tree));
+        assert_eq!(d.index.len(), pos.len() - 1);
+    }
+
     /// A lattice's geometry is the same built or turned from another lattice's (P1-19: a resumed
     /// run builds the lattice a resampling turned).
     #[test]
@@ -668,6 +802,77 @@ mod tests {
                 .collect();
             assert!(dense.len() > 100 && dense.len() < 3000);
             assert_eq!(sparse, dense);
+        }
+    }
+
+    /// `dijkstra_settled` hands the vertices over in the order of the finished search's list
+    /// sorted by distance, then vertex, with its distances; taking the nearest room until a
+    /// budget is placed (as the plates' spread does) gives the same handouts, bit for bit, when
+    /// the search stops early as when it ran over the whole reach.
+    #[test]
+    fn the_settled_search_takes_the_room_the_sorted_search_does() {
+        let geo = Geo::build(3000, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let mut rng = crate::sphere::SplitMix64::new(5);
+        let room: Vec<Option<f64>> = (0..3000)
+            .map(|_| (rng.below(3) == 0).then(|| rng.next_f64() * 900.0))
+            .collect();
+        let allow = |a: u32, b: u32| !(a + b).is_multiple_of(7);
+        let src = [(5, 0.0, 0), (1400, 0.0, 0), (2900, 0.0, 0)];
+        let all = dijkstra_sparse(&geo, &src, allow, 0.6);
+        let mut order: Vec<(f64, u32)> = all.iter().map(|&(v, d, _)| (d, v)).collect();
+        order.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+        let mut settled = Vec::new();
+        dijkstra_settled(&geo, &src, allow, 0.6, |v, d| {
+            settled.push((d, v));
+            true
+        });
+        assert_eq!(
+            settled
+                .iter()
+                .map(|&(d, v)| (d.to_bits(), v))
+                .collect::<Vec<_>>(),
+            order
+                .iter()
+                .map(|&(d, v)| (d.to_bits(), v))
+                .collect::<Vec<_>>()
+        );
+        let total: f64 = order.iter().filter_map(|&(_, v)| room[v as usize]).sum();
+        for budget in [1.0, 50.0, 2_000.0, 0.5 * total, 2.0 * total] {
+            let take = |list: &mut dyn Iterator<Item = u32>| {
+                let mut left = budget;
+                let mut given = Vec::new();
+                for v in list {
+                    if left <= 0.0 {
+                        break;
+                    }
+                    if let Some(r) = room[v as usize] {
+                        let g = r.min(left);
+                        given.push((v, g.to_bits()));
+                        left -= g;
+                    }
+                }
+                (left.to_bits(), given)
+            };
+            let sorted = take(&mut order.iter().map(|&(_, v)| v));
+            let mut left = budget;
+            let mut given = Vec::new();
+            let mut visited = 0;
+            dijkstra_settled(&geo, &src, allow, 0.6, |v, _| {
+                if left <= 0.0 {
+                    return false;
+                }
+                visited += 1;
+                if let Some(r) = room[v as usize] {
+                    let g = r.min(left);
+                    given.push((v, g.to_bits()));
+                    left -= g;
+                }
+                true
+            });
+            assert_eq!((left.to_bits(), given), sorted, "budget {budget}");
+            if budget < 100.0 {
+                assert!(visited < order.len() / 4, "stops early: {visited}");
+            }
         }
     }
 

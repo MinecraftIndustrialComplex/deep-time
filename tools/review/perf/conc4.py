@@ -45,7 +45,7 @@ def done(c):
 for line in gzip.open(sys.argv[1], "rt", errors="replace"):
     if not line.strip():
         done(cur); cur = None; continue
-    if not line[0].isspace():
+    if not line.startswith("\t"):
         m = re.match(r"\s*\S*?\s*(\d+)\s+([\d.]+):", line)
         if m: cur = (float(m.group(2)), int(m.group(1)), [])
         continue

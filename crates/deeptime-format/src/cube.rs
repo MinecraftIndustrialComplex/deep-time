@@ -593,7 +593,27 @@ impl Cube {
     /// The net of face side `s`, made once per process and shared: a world's readers (rasters,
     /// [`crate::projection::WorldProjection`]) fold through it without building the edge list
     /// each time. A process meets a handful of sides, so the nets are kept for its life.
+    ///
+    /// Each thread keeps the net it asked for last and takes it without the lock (the speed work
+    /// of 2026-10-28): a reader asks for its grid's net at every point it folds, and on the bake's
+    /// eight threads the lock was 30 of the biome layers' 47 CPU-s.
     pub fn shared(s: u32) -> &'static Cube {
+        use std::cell::Cell;
+        thread_local! {
+            static LAST: Cell<Option<&'static Cube>> = const { Cell::new(None) };
+        }
+        if let Some(c) = LAST.with(Cell::get)
+            && c.s == i64::from(s)
+        {
+            return c;
+        }
+        let c = Cube::shared_locked(s);
+        LAST.with(|last| last.set(Some(c)));
+        c
+    }
+
+    /// [`Cube::shared`] through the process's list of nets.
+    fn shared_locked(s: u32) -> &'static Cube {
         use std::sync::{Mutex, OnceLock};
         static NETS: OnceLock<Mutex<Vec<&'static Cube>>> = OnceLock::new();
         let mut nets = NETS
@@ -1175,6 +1195,26 @@ fn net_edges(s: i64) -> Vec<NetEdge> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A side's shared net is one net, asked for again on the same thread or on others, after
+    /// another side's (each thread keeps only its last).
+    #[test]
+    fn a_sides_shared_net_is_one_net_on_every_thread() {
+        let a = Cube::shared(1024) as *const Cube;
+        let b = Cube::shared(2048) as *const Cube;
+        assert_ne!(a, b);
+        assert_eq!(Cube::shared(1024) as *const Cube, a);
+        assert_eq!(Cube::shared(1024).side(), 1024);
+        let other = std::thread::spawn(|| {
+            (
+                Cube::shared(2048) as *const Cube as usize,
+                Cube::shared(1024) as *const Cube as usize,
+            )
+        })
+        .join()
+        .unwrap();
+        assert_eq!(other, (b as usize, a as usize));
+    }
 
     const SIDES: [u32; 3] = [1_024, 3_840, 64];
 

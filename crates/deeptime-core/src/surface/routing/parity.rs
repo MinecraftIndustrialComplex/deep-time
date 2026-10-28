@@ -8,7 +8,7 @@
 use super::super::grid::Dims;
 use super::super::pflood::{self, BASE, LAND, SINK};
 use super::super::spl::{self, FAMILIES, LAKE_TOL_M, SplInput, SplParams, SplReport, incise};
-use super::{Routing, accumulate, receivers, stack};
+use super::{Routing, accumulate, donors_by_neighbours, donors_in_order, receivers, stack};
 use crate::sphere::SplitMix64;
 
 /// The serial `accumulate` of P1-04.
@@ -668,5 +668,131 @@ fn surface_timing() {
                 "receivers {rcv:.2}, stack {stk:.2}, accumulate {acc:.2}, solve {sol:.2}, families {fm:.2}"
             );
         });
+    }
+}
+
+/// The stack, its basins and its forest's arrays as one thread built them before the speed work
+/// of 2026-10-28: the donors by a counting sort over the cells, the basins one walk after another,
+/// the forest's arrays one loop each.
+#[allow(clippy::type_complexity)]
+fn stack_serial(kind: &[u8], rcv: &[u32]) -> (Vec<u32>, Vec<(u32, u32, u32)>, Vec<Vec<u32>>) {
+    let n = rcv.len();
+    let (count, donors) = donors_in_order(n, rcv);
+    let (mut stack, mut basins) = (Vec::new(), Vec::new());
+    let mut todo: Vec<u32> = Vec::new();
+    for root in 0..n {
+        if kind[root] == LAND || count[root] == count[root + 1] {
+            continue;
+        }
+        let start = stack.len() as u32;
+        if kind[root] == SINK {
+            stack.push(root as u32);
+        }
+        todo.clear();
+        todo.extend_from_slice(&donors[count[root] as usize..count[root + 1] as usize]);
+        while let Some(c) = todo.pop() {
+            stack.push(c);
+            let c = c as usize;
+            todo.extend_from_slice(&donors[count[c] as usize..count[c + 1] as usize]);
+        }
+        basins.push((root as u32, start, stack.len() as u32));
+    }
+    const NONE: u32 = u32::MAX;
+    let l = stack.len();
+    let mut pos = vec![NONE; n];
+    for (i, &c) in stack.iter().enumerate() {
+        pos[c as usize] = i as u32;
+    }
+    let rpos: Vec<u32> = stack
+        .iter()
+        .map(|&c| {
+            let rc = rcv[c as usize];
+            if rc == c { NONE } else { pos[rc as usize] }
+        })
+        .collect();
+    let (mut dptr, mut dpos) = (vec![0u32], Vec::new());
+    for &c in &stack {
+        let c = c as usize;
+        for &d in &donors[count[c] as usize..count[c + 1] as usize] {
+            dpos.push(pos[d as usize]);
+        }
+        dptr.push(dpos.len() as u32);
+    }
+    let mut size = vec![1u32; l];
+    for i in (0..l).rev() {
+        if rpos[i] != NONE {
+            size[rpos[i] as usize] += size[i];
+        }
+    }
+    let (mut tops, mut leaves) = (Vec::new(), Vec::new());
+    for i in 0..l {
+        if rpos[i] == NONE {
+            tops.push(i as u32);
+        }
+        if dptr[i] == dptr[i + 1] {
+            leaves.push(i as u32);
+        }
+    }
+    let (mut outlets, mut optr, mut opos) = (Vec::new(), vec![0u32], Vec::new());
+    for &(root, _, _) in &basins {
+        let c = root as usize;
+        if kind[c] != BASE {
+            continue;
+        }
+        outlets.push(root);
+        for &d in &donors[count[c] as usize..count[c + 1] as usize] {
+            opos.push(pos[d as usize]);
+        }
+        optr.push(opos.len() as u32);
+    }
+    let forest = vec![
+        pos, rpos, dptr, dpos, size, tops, leaves, outlets, optr, opos,
+    ];
+    (stack, basins, forest)
+}
+
+/// The stack built in parallel (the donors among each cell's neighbours, the basins side by side,
+/// the forest's arrays in parallel) is the serial one, array for array, on pools of 1, 3 and 8
+/// threads; a receiver that is not a neighbour sends the donors back to the counting sort.
+#[test]
+fn the_parallel_stack_is_the_serial_stack() {
+    for (seed, wrap, sea, coarse) in [
+        (3, true, true, false),
+        (8, false, true, true),
+        (11, true, false, false),
+    ] {
+        let c = case(150, 90, seed, wrap, sea, coarse);
+        for threads in [1, 3, 8] {
+            in_pool(threads, || {
+                let n = c.d.cells();
+                let mut kind = c.kind.clone();
+                let mut filled = vec![0.0; n];
+                pflood::flood(&c.d, &c.h, &c.base_z, &mut kind, &mut filled);
+                let mut r = Routing::default();
+                receivers(&c.d, &filled, &kind, &mut r);
+                assert_eq!(
+                    donors_by_neighbours(&c.d, &r.rcv),
+                    Some(donors_in_order(n, &r.rcv))
+                );
+                stack(&c.d, &kind, &mut r);
+                let (st, basins, forest) = stack_serial(&kind, &r.rcv);
+                assert_eq!(r.stack, st, "stack, seed {seed}, {threads} threads");
+                assert_eq!(r.basins, basins, "basins, seed {seed}");
+                let f = &r.forest;
+                let got = [
+                    &f.pos, &f.rpos, &f.dptr, &f.dpos, &f.size, &f.tops, &f.leaves, &f.outlets,
+                    &f.optr, &f.opos,
+                ];
+                for (k, (a, b)) in got.iter().zip(&forest).enumerate() {
+                    assert_eq!(*a, b, "forest array {k}, seed {seed}, {threads} threads");
+                }
+                let mut far = r.rcv.clone();
+                let land = (0..n)
+                    .find(|&m| kind[m] == LAND && far[m] as usize != m)
+                    .unwrap();
+                far[land] = ((land + n / 2) % n) as u32;
+                assert_eq!(donors_by_neighbours(&c.d, &far), None);
+            });
+        }
     }
 }
