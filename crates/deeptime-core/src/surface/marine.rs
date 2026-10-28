@@ -89,103 +89,29 @@ impl PartialOrd for Item {
 }
 
 /// Counters of the mouth fills since the process started (P1-17 diagnostics, printed by
-/// `deeptime bench`; not part of any world): fills planned (a mouth planned again counts twice),
-/// cells popped, cells raised, the most cells one fill popped, and the fills [`fill_all`] planned
-/// again in turn.
-static FILL_COUNTS: [std::sync::atomic::AtomicU64; 5] = [
-    std::sync::atomic::AtomicU64::new(0),
+/// `deeptime bench`; not part of any world): fills, cells popped, cells raised, the most cells one
+/// fill popped.
+static FILL_COUNTS: [std::sync::atomic::AtomicU64; 4] = [
     std::sync::atomic::AtomicU64::new(0),
     std::sync::atomic::AtomicU64::new(0),
     std::sync::atomic::AtomicU64::new(0),
     std::sync::atomic::AtomicU64::new(0),
 ];
 
-/// The mouth fills' counters: (fills, cells popped, cells raised, the most cells one fill popped,
-/// fills planned again in turn).
-pub fn fill_counts() -> [u64; 5] {
+/// The mouth fills' counters: (fills, cells popped, cells raised, the most cells one fill popped).
+pub fn fill_counts() -> [u64; 4] {
     std::array::from_fn(|k| FILL_COUNTS[k].load(std::sync::atomic::Ordering::Relaxed))
 }
 
-/// The cells a fill has put on its heap: an open-addressing set as small as the fill, emptied
-/// through the slots it filled (a grid-sized stamp array for each of the pool's threads would cost
-/// tens of megabytes apiece).
-#[derive(Default)]
-struct Seen {
-    slots: Vec<u32>,
-    filled: Vec<u32>,
-    shift: u32,
-}
-
-impl Seen {
-    const EMPTY: u32 = u32::MAX;
-
-    fn clear(&mut self) {
-        for &k in &self.filled {
-            self.slots[k as usize] = Self::EMPTY;
-        }
-        self.filled.clear();
-    }
-
-    /// Adds `c`; false when it was there.
-    fn insert(&mut self, c: u32) -> bool {
-        if 2 * (self.filled.len() + 1) > self.slots.len() {
-            self.grow();
-        }
-        let mask = self.slots.len() - 1;
-        let mut k = (u64::from(c).wrapping_mul(0x9E37_79B9_7F4A_7C15) >> self.shift) as usize;
-        loop {
-            match self.slots[k] {
-                Self::EMPTY => {
-                    self.slots[k] = c;
-                    self.filled.push(k as u32);
-                    return true;
-                }
-                x if x == c => return false,
-                _ => k = (k + 1) & mask,
-            }
-        }
-    }
-
-    fn grow(&mut self) {
-        let held: Vec<u32> = self
-            .filled
-            .iter()
-            .map(|&k| self.slots[k as usize])
-            .collect();
-        let size = (self.slots.len() * 2).max(256);
-        self.slots = vec![Self::EMPTY; size];
-        self.shift = 64 - size.trailing_zeros();
-        self.filled.clear();
-        for c in held {
-            self.insert(c);
-        }
-    }
-}
-
-/// One fill's scratch and its plan: the raises it makes, (cell, metres) in order, and the cells it
-/// popped (whose heights it read before raising any).
-#[derive(Default)]
-struct Planner {
-    seen: Seen,
-    heap: BinaryHeap<Item>,
-    visited: Vec<u32>,
-    writes: Vec<(u32, f64)>,
-}
-
-thread_local! {
-    /// [`fill_all`]'s planner on each thread of the pool.
-    static PLANNER: std::cell::RefCell<Planner> = std::cell::RefCell::new(Planner::default());
-}
-
-/// Scratch for [`fill`] and [`fill_all`], reused between mouths and steps.
+/// Scratch for [`fill`], reused between mouths and steps.
 #[derive(Default)]
 pub struct FillScratch {
-    planner: Planner,
-    /// The cells the last [`fill`] raised (a cell twice when the rest was spread over it).
+    stamp: Vec<u32>,
+    generation: u32,
+    heap: BinaryHeap<Item>,
+    /// The cells the last [`fill`] raised.
     pub touched: Vec<u32>,
-    /// [`fill_all`]'s cells raised since its batch's plans read the heights (`== written_gen`).
-    written: Vec<u32>,
-    written_gen: u32,
+    visited: Vec<u32>,
 }
 
 /// Parameters of the mouth fill.
@@ -211,54 +137,52 @@ pub fn fill<G: SurfaceGrid>(
     dep: &mut [f32],
     s: &mut FillScratch,
 ) -> usize {
-    plan(d, sea, mouth, volume, p, h, &mut s.planner);
-    apply(&s.planner.writes, h, dep, &mut s.touched);
-    s.touched.len()
-}
-
-/// [`fill`]'s raises on the heights `h` as they stand, into `w.writes`, without making them: a
-/// cell's height is read when it goes on the heap and when it is popped, and a cell is raised only
-/// when it is popped, after both reads, so the plan raises what the fill would.
-fn plan<G: SurfaceGrid>(
-    d: &G,
-    sea: &[bool],
-    mouth: usize,
-    volume: f64,
-    p: &FillParams,
-    h: &[f64],
-    w: &mut Planner,
-) {
-    w.seen.clear();
-    w.heap.clear();
-    w.visited.clear();
-    w.writes.clear();
-    w.heap.push(Item {
+    if s.stamp.len() != d.cells() {
+        s.stamp = vec![0; d.cells()];
+        s.generation = 0;
+    }
+    s.generation = s.generation.wrapping_add(1);
+    if s.generation == 0 {
+        s.stamp.iter_mut().for_each(|x| *x = 0);
+        s.generation = 1;
+    }
+    let stamp_id = s.generation;
+    s.heap.clear();
+    s.touched.clear();
+    s.visited.clear();
+    s.heap.push(Item {
         spill: h[mouth],
         dist: 0.0,
         z: h[mouth],
         c: mouth as u32,
     });
-    w.seen.insert(mouth as u32);
+    s.stamp[mouth] = stamp_id;
     let mut left = volume;
-    let mut raised = 0;
+    let mut touched = 0;
+    let mut visited = 0;
     while left > 0.0 {
-        let Some(it) = w.heap.pop() else { break };
+        let Some(it) = s.heap.pop() else { break };
         let c = it.c as usize;
-        w.visited.push(c as u32);
+        visited += 1;
+        s.visited.push(c as u32);
         let level = p.sea_level - p.fill_depth_m - p.shelf_slope * f64::from(it.dist);
         if h[c] < level {
             let a = d.area(c);
             let take = ((level - h[c]) * a).min(left);
-            w.writes.push((c as u32, take / a));
+            let dz = take / a;
+            h[c] += dz;
+            dep[c] += dz as f32;
             left -= take;
-            raised += 1;
+            touched += 1;
+            s.touched.push(c as u32);
         }
-        if left <= 0.0 || w.visited.len() >= p.max_cells {
+        if left <= 0.0 || visited >= p.max_cells {
             break;
         }
         for (m, dl) in d.neighbours(c) {
-            if sea[m] && w.seen.insert(m as u32) {
-                w.heap.push(Item {
+            if sea[m] && s.stamp[m] != stamp_id {
+                s.stamp[m] = stamp_id;
+                s.heap.push(Item {
                     spill: h[m].max(it.spill),
                     dist: it.dist + dl as f32,
                     z: h[m],
@@ -269,110 +193,35 @@ fn plan<G: SurfaceGrid>(
     }
     {
         use std::sync::atomic::Ordering::Relaxed;
-        let popped = w.visited.len() as u64;
         FILL_COUNTS[0].fetch_add(1, Relaxed);
-        FILL_COUNTS[1].fetch_add(popped, Relaxed);
-        FILL_COUNTS[2].fetch_add(raised, Relaxed);
-        FILL_COUNTS[3].fetch_max(popped, Relaxed);
+        FILL_COUNTS[1].fetch_add(visited as u64, Relaxed);
+        FILL_COUNTS[2].fetch_add(touched as u64, Relaxed);
+        FILL_COUNTS[3].fetch_max(visited as u64, Relaxed);
     }
     if left > 0.0 {
         // A closed sea is full (or the mouth ran out of cells): the rest spreads evenly over
         // what it reached, so a load never makes a tower.
         let dz = match d.uniform_area() {
             Some(a) => {
-                let cells = w.visited.len().max(1) as f64;
+                let cells = s.visited.len().max(1) as f64;
                 left / (cells * a)
             }
             None => {
                 // ledger: SCL-151 (game-choice: the rest over the visited area)
-                let area: f64 = w.visited.iter().map(|&c| d.area(c as usize)).sum();
+                let area: f64 = s.visited.iter().map(|&c| d.area(c as usize)).sum();
                 left / area.max(f64::MIN_POSITIVE)
             }
         };
-        w.writes.extend(w.visited.iter().map(|&c| (c, dz)));
-    }
-}
-
-/// Raises `h` and `dep` by a plan's `writes` in their order, and lists the cells in `touched`.
-fn apply(writes: &[(u32, f64)], h: &mut [f64], dep: &mut [f32], touched: &mut Vec<u32>) {
-    touched.clear();
-    for &(c, dz) in writes {
-        let cu = c as usize;
-        h[cu] += dz;
-        dep[cu] += dz as f32;
-        touched.push(c);
-    }
-}
-
-/// The fills of `mouths`, (cell, m³), one after another as [`fill`] makes them, bit for bit;
-/// `after(k, touched)` runs after mouth `k`'s with the cells it raised (the speed work of
-/// 2026-10-28, for the shallow-first fill's longer walks).
-///
-/// A batch of mouths is planned in parallel on the heights as they stand, and the plans are
-/// applied in order. A plan holds if no earlier mouth of its batch raised a cell it popped: the
-/// cells it only put on its heap do not matter, since raising a cell only puts it later in the
-/// heap's order (a higher spill, or the same spill and a higher bed), so a cell that was not
-/// popped is still not popped. A plan that does not hold is made again on the heights as they are
-/// then. Returns how many mouths were planned again.
-#[allow(clippy::too_many_arguments)]
-pub fn fill_all<G: SurfaceGrid>(
-    d: &G,
-    sea: &[bool],
-    mouths: &[(usize, f64)],
-    p: &FillParams,
-    h: &mut [f64],
-    dep: &mut [f32],
-    s: &mut FillScratch,
-    mut after: impl FnMut(usize, &[u32]),
-) -> u64 {
-    use rayon::prelude::*;
-    let n = d.cells();
-    if s.written.len() != n {
-        s.written = vec![0; n];
-        s.written_gen = 0;
-    }
-    // Enough mouths to keep the pool busy, few enough that a plan seldom meets a raise.
-    let batch_size = 32 * rayon::current_num_threads().max(1);
-    let mut again = 0u64;
-    for (b, batch) in mouths.chunks(batch_size).enumerate() {
-        let plans: Vec<_> = {
-            let heights = &*h;
-            batch
-                .par_iter()
-                .map(|&(m, vol)| {
-                    PLANNER.with(|w| {
-                        let mut w = w.borrow_mut();
-                        plan(d, sea, m, vol, p, heights, &mut w);
-                        (w.visited.clone(), w.writes.clone())
-                    })
-                })
-                .collect()
-        };
-        s.written_gen = s.written_gen.wrapping_add(1);
-        if s.written_gen == 0 {
-            s.written.iter_mut().for_each(|x| *x = 0);
-            s.written_gen = 1;
+        for &c in &s.visited {
+            let c = c as usize;
+            h[c] += dz;
+            dep[c] += dz as f32;
         }
-        let mark = s.written_gen;
-        for (k, (visited, writes)) in plans.into_iter().enumerate() {
-            let holds = visited.iter().all(|&c| s.written[c as usize] != mark);
-            let writes = if holds {
-                writes
-            } else {
-                again += 1;
-                let (m, vol) = batch[k];
-                plan(d, sea, m, vol, p, h, &mut s.planner);
-                std::mem::take(&mut s.planner.writes)
-            };
-            apply(&writes, h, dep, &mut s.touched);
-            for &(c, _) in &writes {
-                s.written[c as usize] = mark;
-            }
-            after(b * batch_size + k, &s.touched);
-        }
+        // (A cell may now appear twice in `touched`; its users are idempotent.)
+        touched += s.visited.len();
+        s.touched.extend_from_slice(&s.visited);
     }
-    FILL_COUNTS[4].fetch_add(again, std::sync::atomic::Ordering::Relaxed);
-    again
+    touched
 }
 
 /// Share of a pair's excess the slope failure moves per iteration, and its iterations per LEM
@@ -1018,174 +867,6 @@ mod tests {
             (after - before) * 1e6
         );
         assert!(h[210] <= -20.0 + 1e-9);
-    }
-
-    /// The fill as it was written before the plans (2026-10-28): one heap walk that raises as it
-    /// goes, a grid-sized stamp for the cells it has seen. The reference for [`fill`] and
-    /// [`fill_all`].
-    #[allow(clippy::too_many_arguments)]
-    fn fill_reference(
-        d: &Dims,
-        sea: &[bool],
-        mouth: usize,
-        volume: f64,
-        p: &FillParams,
-        h: &mut [f64],
-        dep: &mut [f32],
-        touched: &mut Vec<u32>,
-    ) {
-        let mut seen = vec![false; d.cells()];
-        let mut heap = BinaryHeap::new();
-        let mut visited = Vec::new();
-        touched.clear();
-        heap.push(Item {
-            spill: h[mouth],
-            dist: 0.0,
-            z: h[mouth],
-            c: mouth as u32,
-        });
-        seen[mouth] = true;
-        let mut left = volume;
-        while left > 0.0 {
-            let Some(it) = heap.pop() else { break };
-            let c = it.c as usize;
-            visited.push(c as u32);
-            let level = p.sea_level - p.fill_depth_m - p.shelf_slope * f64::from(it.dist);
-            if h[c] < level {
-                let a = d.area(c);
-                let take = ((level - h[c]) * a).min(left);
-                let dz = take / a;
-                h[c] += dz;
-                dep[c] += dz as f32;
-                left -= take;
-                touched.push(c as u32);
-            }
-            if left <= 0.0 || visited.len() >= p.max_cells {
-                break;
-            }
-            for (m, dl) in d.neighbours(c) {
-                if sea[m] && !seen[m] {
-                    seen[m] = true;
-                    heap.push(Item {
-                        spill: h[m].max(it.spill),
-                        dist: it.dist + dl as f32,
-                        z: h[m],
-                        c: m as u32,
-                    });
-                }
-            }
-        }
-        if left > 0.0 {
-            let dz = left / (visited.len().max(1) as f64 * d.cell_area());
-            for &c in &visited {
-                h[c as usize] += dz;
-                dep[c as usize] += dz as f32;
-            }
-            touched.extend_from_slice(&visited);
-        }
-    }
-
-    /// The mouths' fills planned in parallel give the fills in turn bit for bit (heights, deposit,
-    /// and each mouth's raised cells for the provenance), on pools of 1, 3 and 8 threads: mouths
-    /// along a crowded coast whose plans overlap, loads from a sliver of a cell to dozens of cells,
-    /// a closed sea that fills up and a mouth that runs out of cells. [`fill`] alone gives them too.
-    #[test]
-    fn the_mouths_planned_in_parallel_fill_as_they_did_in_turn() {
-        let (w, rows) = (96, 64);
-        let d = Dims::new(w, rows, 1000.0, true);
-        let n = d.cells();
-        let mut rng = crate::sphere::SplitMix64::new(28);
-        let mut uni = || (rng.next_u64() >> 11) as f64 / (1u64 << 53) as f64;
-        // Land in the middle columns, a closed sea 3 x 3 inside it, the ocean either side.
-        let closed = |c: usize| (20..23).contains(&(c / w)) && (50..53).contains(&(c % w));
-        let h0: Vec<f64> = (0..n)
-            .map(|c| {
-                let (i, j) = (c % w, c / w);
-                let coast = 40.0 + 6.0 * (j as f64 * 0.3).sin();
-                let x = i as f64 - coast;
-                if closed(c) {
-                    -300.0 - uni() * 50.0
-                } else if (0.0..24.0).contains(&x) {
-                    100.0 + uni() * 50.0
-                } else {
-                    -40.0 * x.abs().min((x - 24.0).abs()) - uni() * 200.0
-                }
-            })
-            .collect();
-        let sea: Vec<bool> = h0.iter().map(|&z| z < 0.0).collect();
-        let mouths: Vec<(usize, f64)> = (0..n)
-            .filter(|&c| sea[c] && d.neighbours(c).any(|(m, _)| !sea[m]))
-            .map(|c| {
-                let v = 10f64.powf(5.0 + 6.5 * uni());
-                (c, if closed(c) { 1.0e10 } else { v })
-            })
-            .collect();
-        assert!(mouths.len() > 150, "{} mouths", mouths.len());
-        let p = FillParams {
-            sea_level: 0.0,
-            fill_depth_m: 5.0,
-            shelf_slope: 0.0005,
-            max_cells: 400,
-        };
-        let (mut h_want, mut dep_want) = (h0.clone(), vec![0.0f32; n]);
-        let mut touched_want = Vec::new();
-        let mut t = Vec::new();
-        for &(m, vol) in &mouths {
-            fill_reference(&d, &sea, m, vol, &p, &mut h_want, &mut dep_want, &mut t);
-            touched_want.push(t.clone());
-        }
-        let bits = |v: &[f64]| v.iter().map(|x| x.to_bits()).collect::<Vec<_>>();
-        let fbits = |v: &[f32]| v.iter().map(|x| x.to_bits()).collect::<Vec<_>>();
-        // One fill after another.
-        let (mut h, mut dep) = (h0.clone(), vec![0.0f32; n]);
-        let mut s = FillScratch::default();
-        for &(m, vol) in &mouths {
-            fill(&d, &sea, m, vol, &p, &mut h, &mut dep, &mut s);
-        }
-        assert!(
-            bits(&h) == bits(&h_want) && fbits(&dep) == fbits(&dep_want),
-            "fill"
-        );
-        for threads in [1, 3, 8] {
-            let pool = rayon::ThreadPoolBuilder::new()
-                .num_threads(threads)
-                .build()
-                .unwrap();
-            let (mut h, mut dep) = (h0.clone(), vec![0.0f32; n]);
-            let mut touched = vec![Vec::new(); mouths.len()];
-            let mut s = FillScratch::default();
-            let again = pool.install(|| {
-                fill_all(&d, &sea, &mouths, &p, &mut h, &mut dep, &mut s, |k, t| {
-                    touched[k] = t.to_vec();
-                })
-            });
-            assert!(bits(&h) == bits(&h_want), "heights, {threads} threads");
-            assert!(
-                fbits(&dep) == fbits(&dep_want),
-                "deposit, {threads} threads"
-            );
-            assert_eq!(touched, touched_want, "raised cells, {threads} threads");
-            assert!(again > 0, "no plan popped ground an earlier mouth raised");
-            // The closed sea filled up: the rest spread over what it reached.
-            assert!(h[21 * w + 51] > p.sea_level - p.fill_depth_m);
-        }
-    }
-
-    /// The fill's set of seen cells holds what went in, through growth and clearing.
-    #[test]
-    fn the_seen_set_keeps_its_cells() {
-        let mut s = Seen::default();
-        for round in 0..3u32 {
-            let cells: Vec<u32> = (0..5000u32).map(|k| k * 7 + round).collect();
-            for &c in &cells {
-                assert!(s.insert(c));
-            }
-            for &c in &cells {
-                assert!(!s.insert(c));
-            }
-            s.clear();
-            assert!(s.slots.iter().all(|&x| x == Seen::EMPTY));
-        }
     }
 
     /// A mouth's load fills the room beside the mouth before the deeper floor farther out
