@@ -856,8 +856,11 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // 11 and 17; 9 of seeds 1 to 24 with incipient subduction on by default, PLT-610, 2026-10-25,
     // the sweep `weld_seed_sweep`: 2, 10, 14 to 19 and 21, seeds 2 and 10 twice, seeds 1, 4, 7,
     // 8, 11 and 23 no more, so seed 2; from the supercontinent 5, 6, 7, 13, 15, 16, 18 and 23,
-    // seed 23 twice).
-    let mut p = preset(8000, 300.0, "scattered_continents", 2);
+    // seed 23 twice; 9 of seeds 1 to 24 with the weld on the plates' relative speed at 2 mm/yr,
+    // PLT-246 and PLT-721, 2026-10-27, the sweep `weld_seed_sweep`: 4, 10, 12, 15, 17, 18, 20, 21
+    // and 24, seed 2 no more, so seed 4; from the supercontinent 5, 7 to 9, 11, 12, 14, 15, 21
+    // and 22).
+    let mut p = preset(8000, 300.0, "scattered_continents", 4);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: under Forsyth & Uyeda's
     // balance on this small planet, whose ridge push is several times Earth's
     // (`plates_quick_16k`, ridge -1,000 m, floor -10,000 m), the speed guard bound on every
@@ -1040,8 +1043,10 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // seed 2 no longer welds: seed 4 is the first welding seed after seed 1, which the weld test
     // above takes; seed 2 again since the critical-taper belt went on by default with them,
     // PLT-600, the same day, when seed 4 no longer welds: the sweep's welding seeds 1, 2, 6, 7,
-    // 11, 14, 15, 16, 22 and 24, seed 2 again the first after seed 1).
-    let mut p = preset(8000, 300.0, "scattered_continents", 2);
+    // 11, 14, 15, 16, 22 and 24, seed 2 again the first after seed 1; seed 4 since the weld on
+    // the plates' relative speed at 2 mm/yr, PLT-246 and PLT-721, 2026-10-27, when seed 2 no
+    // longer welds: the sweep's welding seeds 4, 10, 12, 15, 17, 18, 20, 21 and 24).
+    let mut p = preset(8000, 300.0, "scattered_continents", 4);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: the guard asserted below
     // bound under Forsyth & Uyeda's balance on every welding seed of 1 to 24 of this small planet
     // but supercontinent 11, whose ridge push is several times Earth's (`plates_quick_16k`, ridge
