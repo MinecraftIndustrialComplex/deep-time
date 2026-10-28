@@ -851,13 +851,13 @@ pub fn belt_reach(
     reach: usize,
 ) -> Vec<(usize, f32, f32)> {
     let n = w * h;
-    let mut sources = Vec::new();
-    for c in 0..n.min(plate.len()).min(carrier.len()) {
-        let k = carrier[c];
-        if k.is_finite() && plate[c] != k {
-            sources.push((c, (k, plate[c])));
-        }
-    }
+    let sources: Vec<(usize, (f32, f32))> = (0..n.min(plate.len()).min(carrier.len()))
+        .into_par_iter()
+        .filter_map(|c| {
+            let k = carrier[c];
+            (k.is_finite() && plate[c] != k).then_some((c, (k, plate[c])))
+        })
+        .collect();
     if sources.is_empty() {
         return Vec::new();
     }
@@ -892,9 +892,11 @@ pub fn belt_reach(
         }
         (dist, label)
     };
-    let (dist, label) = spread(false);
-    let (_, nearest) = spread(true);
+    // The two searches side by side, the cells in parallel (the speed work of 2026-10-28: one
+    // after the other on one thread before); each search is the same one.
+    let ((dist, label), (_, nearest)) = rayon::join(|| spread(false), || spread(true));
     (0..n)
+        .into_par_iter()
         .filter(|&c| {
             dist[c] != u32::MAX
                 && dist[c] > 0
