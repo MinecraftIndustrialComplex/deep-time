@@ -9974,6 +9974,25 @@ and base27's welds taking 0.94 of the planet's area of ocean floor into other pl
   5,357 to 5,999 m (p 0.009); the guard's worst 10,328 to 10,491 m from the sea, no step beyond 2 Earth reliefs. On by
   default (the coordinator's call, decisions log 2026-10-27): the corrected law is the rule's own definition and its
   speed is sourced; the margins' active share and the speed guard are the next things to read on base28.
+- **base28**: master b71c1e51 (key 4107efe05418), 24 runs, against base27's 24. Read with `pool.sh table` (v1census, guard, and the boundary registry `measures_boundary.json`) and the plate check's measures in each run's `plate.json`.
+  - **Old floor.**
+    - Older than 250 Myr: 5.86 % to 3.69 % (median). 20 of 24 runs are still over the check's line, against 23 on base27.
+    - Older than 180 Myr: 13.2 % to 9.7 %. Failing runs: 21 to 10.
+    - Median age: 68.9 to 61.9 Myr.
+    - Collisions: 4.90 to 2.80 per 100 Myr (p < 0.001).
+  - **The cost**, as on the arm:
+    - The active share of the continental margin rises from 0.390 to 0.447 (p < 0.001). Runs within 0.25 to 0.4 drop from 14 to 0.
+    - Both parts rose: the coast at a subduction front from 0.177 to 0.196, and the coast in a collision belt from 0.230 to 0.254.
+    - The front in collision rises from 10,387 to 13,738 km (p < 0.001), against Stern & Scholl 2010's 6,000 to 12,000.
+    - Plates alive: 19 to 24. Polarity reversals: 7.2 to 10.0 per 100 Myr.
+    - The collisions' 90th-percentile length: 61 to 80 Myr.
+  - **V1:**
+    - coast with high ground 0.131 to 0.167 (p 0.19);
+    - largest landmass 0.189 to 0.146 (p 0.068);
+    - land above 2 km 0.039 to 0.054 (p 0.31);
+    - the highest plate elevation 5,357 to 5,729 m (p 0.078);
+    - the guard's worst 10,328 to 10,568 m, with no step beyond 2 Earth reliefs.
+  - **Next:** the collision fronts that no longer weld keep converging faster than 2 mm/yr, so the question is the collision's resistance in the force balance. Not a knob on the weld.
 
 ## Plate speed (2026-10-25)
 
