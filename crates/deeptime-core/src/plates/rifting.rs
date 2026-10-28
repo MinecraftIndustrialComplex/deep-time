@@ -523,11 +523,17 @@ pub fn maybe_initiate_subduction(
             s.age_myr(t) > k.subduction_initiation_age_myr && to_trench(i) > clearance
         }
     };
+    // Which samples qualify, in parallel (a trench query each; the speed work of 2026-10-28),
+    // then gathered per plate in sample order.
+    let ok: Vec<bool> = state
+        .samples
+        .par_iter()
+        .enumerate()
+        .map(|(i, s)| !s.is_hidden() && s.kind != CONTINENTAL && qualifies(i, s))
+        .collect();
     let mut old: Vec<Vec<u32>> = vec![Vec::new(); state.plates.len()];
-    for (i, s) in state.samples.iter().enumerate() {
-        if !s.is_hidden() && s.kind != CONTINENTAL && qualifies(i, s) {
-            old[state.plate_of(i) as usize].push(i as u32);
-        }
+    for (i, _) in ok.iter().enumerate().filter(|(_, q)| **q) {
+        old[state.plate_of(i) as usize].push(i as u32);
     }
     let ids: Vec<u32> = state.alive().map(|p| p.id).collect();
     // The hazard per qualifying sample and step. Fix C: the planet's expected initiations, rate ×
