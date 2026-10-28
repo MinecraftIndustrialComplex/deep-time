@@ -208,6 +208,72 @@ of non-native content, plus the eight baseline libraries scaled by the release-t
 the deflated linux-gnu library, 1.093). So the jar grows by about 17 MB (1.42×). The v3 builds
 add 19.4 MB, and the ship profile saves about 3.3 MB.
 
+## The gate on master b71c1e51, and where the cores sit idle (2026-10-28)
+
+The procedure above on master b71c1e51 (PRs #16 and #17 in; `gate-bins.sh` into
+`/data/ban/deeptime-runs/gate1027/bins-b71c`), `earthlike_full_16k`, scattered continents,
+1000 Myr, 8 threads. The VM was otherwise quiet: other jobs held 5 CPUs on average, which was the
+other build's run, and the runs' cores' SMT siblings were 0 % busy.
+
+| build | set | total s | plates | climate | surface | finalize | user CPU s |
+|---|---|--:|--:|--:|--:|--:|--:|
+| x86-64-v3 | A | 1,038.5 | 316.2 | 138.8 | 435.2 | 39.7 | 5,168 |
+| baseline | B | 1,082.0 | 327.1 | 149.9 | 454.2 | 38.0 | 5,430 |
+
+The run kept 5.15 of its 8 cores busy on average, and its CPU work alone would fit in about
+670 s. So the gap to 900 s is idle cores, not work.
+
+**Profile.** The frame-pointer `perf` profile of 2026-10-27 (300 Myr; `perf script` kept in
+`/data/ban/deeptime-runs/perffp/script.txt.gz`) has to be read with care:
+- Counting threads on a CPU per 25 ms window (`conc.py`) makes the run look parallel (369 of
+  505 s with 8 threads on a CPU). A thread busy 5 ms of a window counts as busy for all of it.
+- Counting rayon's wait frames as idle (`conc2.py`) went wrong the other way. A worker running
+  a closure that rayon inlined has no deeptime frame between its leaf and `wait_until_cold`, so
+  57 % of samples looked like spinning.
+- What holds up is `conc4.py`: each sample's concurrency is the sample density within ±10 ms,
+  rayon's idle frames count only when they come before any frame naming a deeptime function, and
+  each sample takes (8 − c) / (8 c · 199 Hz) of idle wall time. That gives 4.84 busy threads on
+  average and 199 s of idle cores in the 505 s run, by stage: surface 56, plates 48, climate 32,
+  bake 28, amplify 15, deposits 10, structure 8.
+
+**Per-part CPU (`DEEPTIME_LAP_CPU`).** With this variable set, each timed part of the plate,
+climate and surface steps also sums the process's CPU (`CLOCK_PROCESS_CPUTIME_ID`) since the
+part before it in that stage. `deeptime bench` prints the sums as `cpu[stage:part=…]`, so a
+part's CPU over its wall time is the cores it kept busy. Run it with
+`DEEPTIME_BENCH_NO_OVERLAP=1`, so the structure stage does not step beside the plates. The run
+measured here was 300 Myr on set A (`/data/ban/deeptime-runs/serial/diag`):
+- plates kept 4.75 of 8 cores busy, climate 4.3, surface 6.3.
+- The least busy parts were all under 3 cores: plates `feedback`, `motion`, `motion_rifting`,
+  `forces`, `transition` and `rate`; the climate's orbital clock span (with `present` inside
+  it) at 3.6 cores; its two `ice` spans at 3.4; surface `lakes` and `marine_fill` at about 1.
+- Parts timed inside another part (`present` in `clock`, `glacial_sea` in `glacial`,
+  `slope_failure` and `diffusion_solve` in `diffusion`), or running beside one (`advect`'s
+  carry beside the flood), have to be read together.
+
+Two serial loops stand out:
+- The climate clock's 1-D energy balance model (`EbmParams::run`): about 10 CPU-s a 300 Myr run,
+  one orbital step after another.
+- `subduction::resolve`: 11.2 CPU-s on one thread, most of it the arc-crust search per overlap
+  sample.
+
+**Speed-ups with identical worlds (branch `speed-serial`).**
+- `resolve` runs its arc-crust searches in parallel before the tally.
+- The ice's distance transform (`climate::ice::distance_to_margin`) changes three ways:
+  - It transforms only rows with ice. Each such row is read once round from an ice-free cell,
+    not as three copies.
+  - It skips columns without ice, which only ice-free cells read.
+  - It reuses its scratch vectors.
+  A test against the old transform checks every ice cell bit for bit.
+- The clock keeps its equilibrium glaciers when a refresh finds the same ice mask.
+- Subduction initiation scans its candidates in parallel.
+
+Pair (`p1-19-pair.sh`, ab, 1000 Myr, the branch's v3 build on set A, master's on set B):
+- the branch 1,018.1 s against master's 1,039.3 s;
+- plates 296.1 against 319.1 s, climate 132.7 against 139.9 s;
+- `p1-17-cmp.py`: 91 files, 0 differ.
+
+That leaves 118 s to the gate.
+
 ## P1-19 exit item 1: full 16k on eight pinned cores (2026-10-18)
 
 Plan §10 P1-19's first exit item is this page's full 16k gate: 900 s at 8 threads, scattered
