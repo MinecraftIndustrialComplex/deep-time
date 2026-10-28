@@ -799,15 +799,18 @@ pub(crate) fn settle_biome_layers(
         crate::bake::project_cube::CubeSettle::new(&wg, view, rs / blocks_per_cell)
     });
     let settle = |cells: &mut biomes::BiomeCells, sea: &[bool]| match &cube {
-        Some(cs) => biomes::settle_to_ground_by(
-            cells,
-            sea,
-            &depth_m,
-            blocks_per_cell,
-            params,
-            &|v, src| cs.fill(v, src),
-            &|land, to_sea| cs.dist(land, to_sea),
-        ),
+        Some(cs) => {
+            cs.prime(&biomes::settle_sources(cells, sea));
+            biomes::settle_to_ground_by(
+                cells,
+                sea,
+                &depth_m,
+                blocks_per_cell,
+                params,
+                &|v, src| cs.fill(v, src),
+                &|land, to_sea| cs.dist(land, to_sea),
+            )
+        }
         None => biomes::settle_to_ground(cells, w, h, sea, &depth_m, blocks_per_cell, params),
     };
     let settled = settle(&mut cells, &sea);

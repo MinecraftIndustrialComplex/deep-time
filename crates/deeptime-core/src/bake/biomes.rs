@@ -1258,6 +1258,23 @@ pub fn settle_to_ground(
     )
 }
 
+/// The source sets [`settle_to_ground_by`] searches on `sea`: its two donor sets (the land and
+/// the sea that already agree) and the sea, for the cube to search side by side first
+/// (`CubeSettle::prime`); none when the land call changes no node.
+pub fn settle_sources(c: &BiomeCells, sea: &[bool]) -> Vec<Vec<bool>> {
+    let now_land: Vec<bool> = c
+        .continents
+        .par_iter()
+        .map(|&v| is_land_continentalness(f64::from(v)))
+        .collect();
+    if !sea.par_iter().zip(&now_land).any(|(&s, &l)| s == l) {
+        return Vec::new();
+    }
+    let stable_land = sea.par_iter().zip(&now_land).map(|(&s, &l)| !s && l).collect();
+    let stable_sea = sea.par_iter().zip(&now_land).map(|(&s, &l)| s && !l).collect();
+    vec![stable_land, stable_sea, sea.to_vec()]
+}
+
 /// [`settle_to_ground`] on any grid: `fill` is [`fill_nearest`] on it and `dist` is
 /// [`distance_cells`] (in cells of `blocks_per_cell` bake blocks). A cube world's grid passes its
 /// own, which run across the seams (SCL-122).
