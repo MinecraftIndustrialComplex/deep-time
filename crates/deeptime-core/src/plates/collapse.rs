@@ -146,7 +146,7 @@ use rayon::prelude::*;
 
 use super::Env;
 use super::forces::{LITHOSPHERE_KM, YEAR_S, column_energy};
-use super::geometry::{Geo, dijkstra_sparse};
+use super::geometry::{Geo, dijkstra_settled, dijkstra_sparse};
 use super::pools::{
     COLUMN_ISOSTATIC_FACTOR, continental_column, eclogite_m, isostatic_change_m, root_drop_m,
 };
@@ -607,48 +607,69 @@ pub(super) fn spread(
                 let s = &samples[v as usize];
                 groups[s.group as usize].plate == p && !s.is_hidden()
             };
-            let reached = dijkstra_sparse(geo, &src, |_, b| on_plate(b), reach);
-            // The room, nearest first, not at a trench: continental crust thinner than
-            // `continental_to_m`, ocean floor up to `ocean_to_m`, neither above its ceiling.
-            let mut room: Vec<(f64, usize, f64)> = reached
-                .iter()
-                .filter(|&&(j, _, _)| on_plate(j))
-                .filter_map(|&(j, d, _)| {
-                    let j = j as usize;
-                    let s = &samples[j];
-                    let to = if s.kind == CONTINENTAL {
-                        continental_to_m
-                    } else {
-                        ocean_to_m
-                    };
-                    let cap = ceiling
-                        .and_then(|c| c.get(j))
-                        .map_or(f64::INFINITY, |&c| f64::from(c));
-                    let r = to.min(cap) - f64::from(s.thickness_m);
-                    (r > 0.0 && s.flags & TRENCH == 0).then_some((d, j, r))
-                })
-                .collect();
-            // Continental room before ocean floor when the crust spreads within its continent
-            // first (ledger: PLT-391), else the nearest first.
+            // The room at a sample: continental crust thinner than `continental_to_m`, ocean
+            // floor up to `ocean_to_m`, neither above its ceiling, not at a trench.
+            let room_at = |j: usize| -> Option<f64> {
+                let s = &samples[j];
+                let to = if s.kind == CONTINENTAL {
+                    continental_to_m
+                } else {
+                    ocean_to_m
+                };
+                let cap = ceiling
+                    .and_then(|c| c.get(j))
+                    .map_or(f64::INFINITY, |&c| f64::from(c));
+                let r = to.min(cap) - f64::from(s.thickness_m);
+                (r > 0.0 && s.flags & TRENCH == 0).then_some(r)
+            };
+            let mut left = budget;
+            let mut given: Vec<(usize, f64)> = Vec::new();
             if k.collapse_continent_first {
+                // Continental room before ocean floor when the crust spreads within its continent
+                // first (ledger: PLT-391): all the room in reach, sorted.
+                let reached = dijkstra_sparse(geo, &src, |_, b| on_plate(b), reach);
+                let mut room: Vec<(f64, usize, f64)> = reached
+                    .iter()
+                    .filter(|&&(j, _, _)| on_plate(j))
+                    .filter_map(|&(j, d, _)| room_at(j as usize).map(|r| (d, j as usize, r)))
+                    .collect();
                 room.sort_by(|a, b| {
                     (samples[a.1].kind != CONTINENTAL)
                         .cmp(&(samples[b.1].kind != CONTINENTAL))
                         .then(a.0.total_cmp(&b.0))
                         .then(a.1.cmp(&b.1))
                 });
-            } else {
-                room.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
-            }
-            let mut left = budget;
-            let mut given: Vec<(usize, f64)> = Vec::new();
-            for (_, j, r) in room {
-                if left <= 0.0 {
-                    break;
+                for (_, j, r) in room {
+                    if left <= 0.0 {
+                        break;
+                    }
+                    let g = r.min(left);
+                    given.push((j, g));
+                    left -= g;
                 }
-                let g = r.min(left);
-                given.push((j, g));
-                left -= g;
+            } else {
+                // The nearest room first, in the order the search settles the samples (distance,
+                // then sample), so it stops once the release is placed (the speed work of
+                // 2026-10-28; the search went on over the whole reach, 5,000 km, before).
+                dijkstra_settled(
+                    geo,
+                    &src,
+                    |_, b| on_plate(b),
+                    reach,
+                    |j, _| {
+                        if left <= 0.0 {
+                            return false;
+                        }
+                        if on_plate(j)
+                            && let Some(r) = room_at(j as usize)
+                        {
+                            let g = r.min(left);
+                            given.push((j as usize, g));
+                            left -= g;
+                        }
+                        true
+                    },
+                );
             }
             Some((budget, left, given))
         })
