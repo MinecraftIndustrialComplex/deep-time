@@ -333,6 +333,9 @@ struct IceRun {
     /// The equilibrium glaciers of the fine ground and the kyr since they were computed.
     heq: Vec<f32>,
     since_eq: f64,
+    /// The ice mask `heq` was computed from: the same mask gives the same glaciers, so a refresh
+    /// under an unchanged mask keeps them (the speed work of 2026-10-28).
+    heq_mask: Vec<bool>,
     sheet: sheet::State,
     /// (land ice share, volume) of every window step.
     rows: Vec<(f64, f64)>,
@@ -1491,6 +1494,7 @@ impl ClimateStage {
             share_acc: vec![0.0f32; n],
             heq: vec![0.0; n],
             since_eq: f64::MAX,
+            heq_mask: Vec::new(),
             sheet: std::mem::take(&mut self.s.sheet),
             rows: Vec::new(),
             in_window: false,
@@ -1537,7 +1541,10 @@ impl ClimateStage {
                             mu0[c].is_finite() && f64::from(mu0[c]) > s.delta[geo.cell_band(c)]
                         })
                         .collect();
-                    ir.heq = ice::thickness(w, hgt, &mask, &geo.sx, &geo.sy, tau, cap, grav);
+                    if mask != ir.heq_mask {
+                        ir.heq = ice::thickness(w, hgt, &mask, &geo.sx, &geo.sy, tau, cap, grav);
+                        ir.heq_mask = mask;
+                    }
                     ir.since_eq = 0.0;
                 }
                 let dtk = s.dt_kyr as f32;

@@ -379,7 +379,22 @@ pub fn resolve(
         .collect();
     let mut aggs: BTreeMap<(u32, u32), Agg> = BTreeMap::new();
     let arc_steps = (env.k.arc_distance_km / env.norm.km(env.norm.spacing_rad())).floor() as u32;
-    for o in overlaps {
+    // Whether each overlap's two samples (its own, its cover's) would hold an arc on continental
+    // crust: a search per sample that reads the state only, so all of them in parallel before the
+    // tally (it took most of this function's time on one thread; the speed work of 2026-10-28).
+    let near: Vec<[bool; 2]> = if by_arc {
+        let st: &PlateState = state;
+        overlaps
+            .par_iter()
+            .map(|o| {
+                [o.i, o.cover.major()]
+                    .map(|idx| continent_within(st, geo, idx, arc_steps, |v| hidden_before[v]))
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+    for (k, o) in overlaps.iter().enumerate() {
         let a = state.plate_of(o.i as usize);
         let b = state.groups[o.group as usize].plate;
         let key = (a.min(b), a.max(b));
@@ -388,10 +403,10 @@ pub fn resolve(
         let e = aggs.entry(key).or_default();
         e.count += 1;
         e.sum += pos[o.i as usize];
-        for (side, idx) in [(sa, o.i), (sb, o.cover.major())] {
+        for (t, (side, idx)) in [(sa, o.i), (sb, o.cover.major())].into_iter().enumerate() {
             let s = &state.samples[idx as usize];
             e.seen[side] += 1;
-            if by_arc && continent_within(state, geo, idx, arc_steps, |v| hidden_before[v]) {
+            if by_arc && near[k][t] {
                 e.near[side] += 1;
             }
             if s.kind == CONTINENTAL {
