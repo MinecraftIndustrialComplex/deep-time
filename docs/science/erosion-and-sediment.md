@@ -1211,3 +1211,47 @@ GlobSed is Straume et al. 2019 in place, as in the sediment diagnosis (plates.md
   0.334 (p 0.19), coast with high ground 0.103 to 0.096 (p 0.96), criteria met 6 to 6.5 of 7 (p
   0.47). The guard is clean: worst 10,046 to 9,962 m from the sea (p 0.72), no step beyond two
   Earth reliefs, the plates' largest excess over Airy 2,408 to 2,591 m (p 0.10).
+
+## The mouth fill's order (mouth-fill lane, 2026-10-28)
+
+**What was wrong.** The mouth fill (`marine::fill`, ERO-050) was written in P1-04 to raise the sea
+cells round a river mouth to the clinoform level "shallowest first", so that a delta and its shelf
+build out from the mouth. Its heap item was ordered the way the Priority-Flood's is (`pflood.rs`,
+the lowest bed popped first), so the fill took the deepest cell it had reached first. A mouth's
+load ran down the slope and filled the deepest room within reach, up to a level only 0.5 m per km
+below the sea, before it touched the shallow room beside the mouth. Found on the way, in the
+speed work of 2026-10-28 (docs/design/p1-17-benchmark-gate.md, "Not speed: the mouth fill's
+order").
+
+**What the sources do.** No published scheme read fills the deepest room first:
+- goSPL (v2021.08.03, read): the marine cells are taken highest bed first
+  (`np.argsort(smthZ)[::-1]`), each filled to its room below the clinoform height, the rest
+  passed to its downslope receivers (`distocean`). The current goSPL routes the load downstream
+  the same way, cell by cell, filling each to its room before it passes the rest on.
+- FastScape's marine scheme (fastscapelib-fortran `Marine.f90`, read; Yuan et al. 2019, EPSL,
+  abstract only): the shelf surface is set from the shore down the flow paths at a slope of 1e-4,
+  and the river flux less each cell's room is passed downstream, donors first.
+- Badlands' `marine_distribution` (read by the research pass, not here) starts at the mouth and
+  passes what a cell cannot take to its lowest neighbour.
+- Clinoforms: Pirmez, Pratson & Steckler (1998, abstract) find the greatest accumulation on the
+  upper foreset and little on the topset and bottomset; the deep bottomset takes least.
+
+Each sends the load down from the mouth and fills the room nearest the mouth before it sends the
+rest on; a closed hollow is filled from its floor (goSPL's pits, to their spill level). The
+spreading along the shelf comes from the diffusion after the fill in all of them, as here.
+
+**What the code does now.** The load goes down from the mouth, nearest room first, and climbs
+over a rise only when there is no room left below it. Each cell the fill reaches is keyed by the
+highest bed on the fill's way to it (its spill, as in the Priority-Flood), lowest first; among
+equal spills, which is all the ground the load reaches going down, the nearest first, then the
+deeper (`Item::cmp`). So a delta builds out from its mouth, the room beside the mouth before the
+deep floor beyond it, and a hollow the mouth lies in fills from its floor. A plain "shallowest
+first" was tried first and dropped: from a mouth at the floor of a hollow it climbs the hollow's
+side along whichever way the grid's rounding favours, and on the cube the area it covered then
+depended on how the planet was turned (`stream_power_and_mouth_fill_are_the_same_turned`); the
+sources' loads only go down. The level (ERO-050), the fill depth (ERO-051) and the shelf slope
+(ERO-052) are unchanged. Our shelf slope, 5e-4, is five times FastScape's 1e-4; that is a separate
+question and is left as it is. The tests `a_mouth_fills_the_near_room_before_the_deep_floor_beyond`
+and `a_mouth_in_a_hollow_fills_it_from_its_floor` pin the order.
+
+**On the planet.** MOUTH_RESULT
