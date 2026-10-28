@@ -446,10 +446,18 @@ mod tests {
 
     /// The transform as it was before 2026-10-28: every row as three copies (across the seam),
     /// every column, one vector per column.
-    fn distance_to_margin_reference(w: usize, h: usize, ice: &[bool], sx: &[f64], sy: &[f64]) -> Vec<f64> {
+    fn distance_to_margin_reference(
+        w: usize,
+        h: usize,
+        ice: &[bool],
+        sx: &[f64],
+        sy: &[f64],
+    ) -> Vec<f64> {
         let mut rows = vec![0.0; w * h];
         for j in 0..h {
-            let f: Vec<f64> = (0..3 * w).map(|k| if ice[j * w + k % w] { INF } else { 0.0 }).collect();
+            let f: Vec<f64> = (0..3 * w)
+                .map(|k| if ice[j * w + k % w] { INF } else { 0.0 })
+                .collect();
             let mut d = vec![0.0; 3 * w];
             let (mut v, mut z) = (Vec::new(), Vec::new());
             dt_1d(&f, sx[j].max(1e-6), &mut d, &mut v, &mut z);
@@ -477,7 +485,9 @@ mod tests {
         // Random caps, glaciers and whole ice rows on a grid with uneven rows and rows past the
         // poles (1 µm apart): every ice cell bit for bit, every ice-free cell 0 in the new one.
         let (w, h) = (97, 61);
-        let sx: Vec<f64> = (0..h).map(|j| 1.0e4 * (0.05 + (j as f64 / h as f64 * 3.1).sin().abs())).collect();
+        let sx: Vec<f64> = (0..h)
+            .map(|j| 1.0e4 * (0.05 + (j as f64 / h as f64 * 3.1).sin().abs()))
+            .collect();
         let mut sy: Vec<f64> = (0..h).map(|j| 9.0e3 + 50.0 * j as f64).collect();
         sy[0] = 0.0;
         sy[h - 1] = 0.0;
@@ -503,7 +513,13 @@ mod tests {
             let old = distance_to_margin_reference(w, h, &ice, &sx, &sy);
             for c in 0..w * h {
                 if ice[c] {
-                    assert_eq!(new[c].to_bits(), old[c].to_bits(), "case {case} cell {c}: {} vs {}", new[c], old[c]);
+                    assert_eq!(
+                        new[c].to_bits(),
+                        old[c].to_bits(),
+                        "case {case} cell {c}: {} vs {}",
+                        new[c],
+                        old[c]
+                    );
                 } else {
                     assert_eq!(new[c], 0.0, "case {case} ice-free cell {c}");
                 }
@@ -518,7 +534,13 @@ mod tests {
                     nye((old[c] - half).max(half), 5.0e4, 4000.0, G) as f32
                 })
                 .collect();
-            assert!(t_new.iter().zip(&t_old).all(|(a, b)| a.to_bits() == b.to_bits()), "case {case}: thickness differs");
+            assert!(
+                t_new
+                    .iter()
+                    .zip(&t_old)
+                    .all(|(a, b)| a.to_bits() == b.to_bits()),
+                "case {case}: thickness differs"
+            );
         }
     }
 
