@@ -34,6 +34,7 @@
 use std::collections::BinaryHeap;
 
 use super::grid::{Dims, SurfaceGrid};
+use super::radix::{ordered, unordered};
 
 #[cfg(feature = "gpu")]
 mod gpu;
@@ -65,19 +66,6 @@ pub fn submarine_kd(z: f64, d0: f64, wave_base: f64, tidal_range: f64, land: f64
 /// 4 km); a tie there goes to the next field.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 struct Item(u128);
-
-/// `f32` bits whose unsigned order is the number's order.
-#[inline]
-fn ordered(x: f32) -> u32 {
-    let b = x.to_bits();
-    if b >> 31 == 1 { !b } else { b | 0x8000_0000 }
-}
-
-/// [`ordered`] undone.
-#[inline]
-fn unordered(o: u32) -> f32 {
-    f32::from_bits(if o >> 31 == 1 { o & 0x7fff_ffff } else { !o })
-}
 
 impl Item {
     #[inline]
