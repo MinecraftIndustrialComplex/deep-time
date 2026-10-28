@@ -267,7 +267,8 @@ Two serial loops stand out:
 - The clock keeps its equilibrium glaciers when a refresh finds the same ice mask.
 - Subduction initiation scans its candidates in parallel.
 
-Pair (`p1-19-pair.sh`, ab, 1000 Myr, the branch's v3 build on set A, master's on set B):
+Pair (`p1-19-pair.sh`, ab, 1000 Myr, the branch's v3 build on set A, master's on set B; the build
+predates the initiation scan, which the tests cover):
 - the branch 1,018.1 s against master's 1,039.3 s;
 - plates 296.1 against 319.1 s, climate 132.7 against 139.9 s;
 - `p1-17-cmp.py`: 91 files, 0 differ.
