@@ -1270,8 +1270,16 @@ pub fn settle_sources(c: &BiomeCells, sea: &[bool]) -> Vec<Vec<bool>> {
     if !sea.par_iter().zip(&now_land).any(|(&s, &l)| s == l) {
         return Vec::new();
     }
-    let stable_land = sea.par_iter().zip(&now_land).map(|(&s, &l)| !s && l).collect();
-    let stable_sea = sea.par_iter().zip(&now_land).map(|(&s, &l)| s && !l).collect();
+    let stable_land = sea
+        .par_iter()
+        .zip(&now_land)
+        .map(|(&s, &l)| !s && l)
+        .collect();
+    let stable_sea = sea
+        .par_iter()
+        .zip(&now_land)
+        .map(|(&s, &l)| s && !l)
+        .collect();
     vec![stable_land, stable_sea, sea.to_vec()]
 }
 
