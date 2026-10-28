@@ -252,6 +252,15 @@ def step_bench(a):
     return [Row("bench", 1, "Bench gate: quick 16k in 5 min and full 16k in 15 min at 8 threads, peak memory within the estimate", status_of(kids), [], kids, time.time() - t0)]
 
 
+SMOKE_CATS = (
+    ("first start from an empty world", re.compile(r"first start generated|progress lines at most|generation finished before")),
+    ("boot", re.compile(r"server reaches Done")),
+    ("every mixin applied (Deep Time, Toroidal World, COE and CDG hooks)", re.compile(r"every declared mixin applied")),
+    ("probes answer and the rock classes resolve", re.compile(r"probe .* answers|every rock class resolves|no C2ME")),
+    ("restart does not regenerate", re.compile(r"restart|world data not regenerated")),
+)
+
+
 def step_smoke_mic(a):
     # A failed install or a run that never reached its verdict prints the tail of its output (a filtered failure hides why).
     cmd = (f"mkdir -p /tmp/p1-smoke && tools/smoke/install.sh mic --preset earthlike_quick_16k --start {START} --length-myr {a.quick_myr} >/tmp/p1-smoke/install.txt 2>&1 "
