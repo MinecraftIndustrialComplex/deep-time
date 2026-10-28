@@ -31,7 +31,6 @@
 //! cell it had reached first, against the "shallowest first" this note gave: a mouth's load ran
 //! down the slope and filled the deepest room within reach before the room beside the mouth.
 
-use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 
 use super::grid::{Dims, SurfaceGrid};
@@ -58,33 +57,51 @@ pub fn submarine_kd(z: f64, d0: f64, wave_base: f64, tidal_range: f64, land: f64
     d0 * f1 * f2 + land * (1.0 - f1)
 }
 
-/// A sea cell the fill has reached: `spill` is the highest bed on the fill's way to it from the
-/// mouth (the cell's own bed or the way's), `z` its own bed, `dist` the way's length.
-#[derive(Clone, Copy, PartialEq)]
-struct Item {
-    spill: f64,
-    dist: f32,
-    z: f64,
-    c: u32,
+/// A sea cell the fill has reached, packed into one integer the heap compares at once (16 bytes;
+/// the speed work of 2026-10-28): from the top, the spill (the highest bed on the fill's way to it
+/// from the mouth), the way's length, the cell's own bed and the cell, each inverted, so the
+/// heap's greatest is the lowest spill, then the nearest, then the deepest bed, then the lower
+/// cell (ERO-050). The spill and the bed are compared as `f32` (a quarter of a millimetre at
+/// 4 km); a tie there goes to the next field.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+struct Item(u128);
+
+/// `f32` bits whose unsigned order is the number's order.
+#[inline]
+fn ordered(x: f32) -> u32 {
+    let b = x.to_bits();
+    if b >> 31 == 1 { !b } else { b | 0x8000_0000 }
 }
 
-impl Eq for Item {}
+/// [`ordered`] undone.
+#[inline]
+fn unordered(o: u32) -> f32 {
+    f32::from_bits(if o >> 31 == 1 { o & 0x7fff_ffff } else { !o })
+}
 
-impl Ord for Item {
-    /// The heap pops its greatest: the lowest spill, then the nearest, then the deepest bed, then
-    /// the lower cell (ERO-050).
-    fn cmp(&self, o: &Self) -> Ordering {
-        o.spill
-            .total_cmp(&self.spill)
-            .then_with(|| o.dist.total_cmp(&self.dist))
-            .then_with(|| o.z.total_cmp(&self.z))
-            .then_with(|| o.c.cmp(&self.c))
+impl Item {
+    #[inline]
+    fn new(spill: f32, dist: f32, z: f64, c: u32) -> Item {
+        let k = (u128::from(ordered(spill)) << 96)
+            | (u128::from(ordered(dist)) << 64)
+            | (u128::from(ordered(z as f32)) << 32)
+            | u128::from(c);
+        Item(!k)
     }
-}
 
-impl PartialOrd for Item {
-    fn partial_cmp(&self, o: &Self) -> Option<Ordering> {
-        Some(self.cmp(o))
+    #[inline]
+    fn spill(self) -> f32 {
+        unordered(!(self.0 >> 96) as u32)
+    }
+
+    #[inline]
+    fn dist(self) -> f32 {
+        unordered(!(self.0 >> 64) as u32)
+    }
+
+    #[inline]
+    fn cell(self) -> usize {
+        !(self.0 as u32) as usize
     }
 }
 
@@ -150,22 +167,18 @@ pub fn fill<G: SurfaceGrid>(
     s.heap.clear();
     s.touched.clear();
     s.visited.clear();
-    s.heap.push(Item {
-        spill: h[mouth],
-        dist: 0.0,
-        z: h[mouth],
-        c: mouth as u32,
-    });
+    s.heap
+        .push(Item::new(h[mouth] as f32, 0.0, h[mouth], mouth as u32));
     s.stamp[mouth] = stamp_id;
     let mut left = volume;
     let mut touched = 0;
     let mut visited = 0;
     while left > 0.0 {
         let Some(it) = s.heap.pop() else { break };
-        let c = it.c as usize;
+        let (c, spill, dist) = (it.cell(), it.spill(), it.dist());
         visited += 1;
         s.visited.push(c as u32);
-        let level = p.sea_level - p.fill_depth_m - p.shelf_slope * f64::from(it.dist);
+        let level = p.sea_level - p.fill_depth_m - p.shelf_slope * f64::from(dist);
         if h[c] < level {
             let a = d.area(c);
             let take = ((level - h[c]) * a).min(left);
@@ -182,12 +195,12 @@ pub fn fill<G: SurfaceGrid>(
         for (m, dl) in d.neighbours(c) {
             if sea[m] && s.stamp[m] != stamp_id {
                 s.stamp[m] = stamp_id;
-                s.heap.push(Item {
-                    spill: h[m].max(it.spill),
-                    dist: it.dist + dl as f32,
-                    z: h[m],
-                    c: m as u32,
-                });
+                s.heap.push(Item::new(
+                    (h[m] as f32).max(spill),
+                    dist + dl as f32,
+                    h[m],
+                    m as u32,
+                ));
             }
         }
     }
@@ -867,6 +880,38 @@ mod tests {
             (after - before) * 1e6
         );
         assert!(h[210] <= -20.0 + 1e-9);
+    }
+
+    /// The packed heap item orders as its fields do: the lowest spill first, then the nearest,
+    /// then the deepest bed, then the lower cell; and gives back its spill, length and cell.
+    #[test]
+    fn the_packed_item_orders_as_its_fields() {
+        let mut rng = crate::sphere::SplitMix64::new(7);
+        let mut uni = || (rng.next_u64() >> 11) as f64 / (1u64 << 53) as f64;
+        let pick = |u: f64, vals: &[f64]| vals[(u * vals.len() as f64) as usize % vals.len()];
+        let items: Vec<(f32, f32, f64, u32)> = (0..400)
+            .map(|_| {
+                let spill = pick(uni(), &[-4000.0, -20.5, -0.0, 0.0, 3.25, -1.0e-7]) as f32;
+                let dist = pick(uni(), &[0.0, 1000.0, 1414.2135, 2000.0]) as f32;
+                let z = pick(uni(), &[-4000.0, -20.5, -1.0, 12.0]);
+                (spill, dist, z, (uni() * 50.0) as u32)
+            })
+            .collect();
+        for a in &items {
+            let ia = Item::new(a.0, a.1, a.2, a.3);
+            assert_eq!(ia.spill().to_bits(), a.0.to_bits());
+            assert_eq!(ia.dist().to_bits(), a.1.to_bits());
+            assert_eq!(ia.cell(), a.3 as usize);
+            for b in &items {
+                let ib = Item::new(b.0, b.1, b.2, b.3);
+                let want =
+                    b.0.total_cmp(&a.0)
+                        .then(b.1.total_cmp(&a.1))
+                        .then((b.2 as f32).total_cmp(&(a.2 as f32)))
+                        .then(b.3.cmp(&a.3));
+                assert_eq!(ia.cmp(&ib), want, "{a:?} {b:?}");
+            }
+        }
     }
 
     /// A mouth's load fills the room beside the mouth before the deeper floor farther out
