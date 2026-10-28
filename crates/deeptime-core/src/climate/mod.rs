@@ -1020,6 +1020,7 @@ impl ClimateStage {
 
     fn time(&mut self, what: &'static str, since: Instant) {
         *self.timings.entry(what).or_insert(0.0) += since.elapsed().as_secs_f64() * 1000.0;
+        crate::compute::cpu_part(STAGE_NAME, what);
     }
 
     /// The end-weighted nudges, when the preset has them on (`steering`).
@@ -1139,6 +1140,7 @@ impl ClimateStage {
     }
 
     fn advance(&mut self, world: &mut WorldState, ctx: &StageContext<'_>) -> Result<(), CoreError> {
+        crate::compute::cpu_mark(STAGE_NAME);
         let grid = GridDesc::for_planet(
             "L1",
             self.preset.scale.circumference_blocks,
