@@ -19,7 +19,7 @@ def done(fr):
 for line in gzip.open(sys.argv[1], "rt", errors="replace"):
     if not line.strip():
         done(cur); cur = []; continue
-    if not line[0].isspace(): continue
+    if not line.startswith("\t"): continue
     m = re.match(r"^[0-9a-f]+ (.*)$", line.strip())
     if m: cur.append(m.group(1).rsplit(" (", 1)[0])
 done(cur)

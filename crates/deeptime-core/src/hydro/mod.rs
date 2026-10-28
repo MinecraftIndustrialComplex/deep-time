@@ -79,6 +79,7 @@ mod meander_tests;
 mod tests;
 
 use deeptime_format::GridDesc;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::error::CoreError;
@@ -115,48 +116,155 @@ fn neighbour8(w: usize, h: usize, c: usize, k: usize) -> Option<usize> {
 pub fn open_sea_mask(
     w: usize,
     h: usize,
-    deep: impl Fn(usize) -> bool,
+    deep: impl Fn(usize) -> bool + Sync,
     min_cells: usize,
 ) -> Vec<bool> {
-    let n = w * h;
-    let mut done = vec![false; n];
-    let mut open = vec![false; n];
-    let mut members: Vec<usize> = Vec::new();
-    let mut stack: Vec<usize> = Vec::new();
-    for c0 in 0..n {
-        if done[c0] || !deep(c0) {
-            continue;
-        }
-        members.clear();
-        stack.push(c0);
-        done[c0] = true;
-        while let Some(c) = stack.pop() {
-            members.push(c);
-            for k in 0..8 {
-                if let Some(nb) = neighbour8(w, h, c, k)
-                    && !done[nb]
-                    && deep(nb)
-                {
-                    done[nb] = true;
-                    stack.push(nb);
-                }
-            }
-        }
-        if members.len() >= min_cells {
-            for &c in &members {
-                open[c] = true;
-            }
-        }
-    }
-    open
+    let (root, size) = bodies(w * h, |c, k| neighbour8(w, h, c, k), &deep);
+    (0..w * h)
+        .into_par_iter()
+        .map(|c| root[c] != NO_BODY && size[root[c] as usize] as usize >= min_cells)
+        .collect()
 }
 
 /// The ground the open sea reaches at its own level (ledger: HYD-100): the `open` cells and every
 /// cell joined to them, 8-connected (x wraps), through cells where `low` holds (ground at or below
 /// sea level). It is the ground whose spill level towards the sea is at most sea level; a closed
 /// basin's floor below sea level, behind a rim above it, is not reached, and no sea stands there.
-pub fn sea_reached(w: usize, h: usize, open: &[bool], low: impl Fn(usize) -> bool) -> Vec<bool> {
-    sea_reached_by(w * h, |c, k| neighbour8(w, h, c, k), open, low)
+///
+/// In parallel (the speed work of 2026-10-28; [`sea_reached_by`]'s floods on one thread before):
+/// the low ground's bodies, and each body that holds an open cell or borders one is reached
+/// whole, the same cells as the floods.
+pub fn sea_reached(
+    w: usize,
+    h: usize,
+    open: &[bool],
+    low: impl Fn(usize) -> bool + Sync,
+) -> Vec<bool> {
+    use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
+    let n = w * h;
+    let (root, _) = bodies(n, |c, k| neighbour8(w, h, c, k), &low);
+    let touched: Vec<AtomicBool> = (0..n)
+        .into_par_iter()
+        .map(|_| AtomicBool::new(false))
+        .collect();
+    (0..n).into_par_iter().filter(|&c| open[c]).for_each(|c| {
+        if root[c] != NO_BODY {
+            touched[root[c] as usize].store(true, Relaxed);
+        }
+        for k in 0..8 {
+            if let Some(m) = neighbour8(w, h, c, k)
+                && root[m] != NO_BODY
+            {
+                touched[root[m] as usize].store(true, Relaxed);
+            }
+        }
+    });
+    (0..n)
+        .into_par_iter()
+        .map(|c| open[c] || (root[c] != NO_BODY && touched[root[c] as usize].load(Relaxed)))
+        .collect()
+}
+
+/// Off every body ([`bodies`]).
+pub(crate) const NO_BODY: u32 = u32::MAX;
+
+/// The 8-connected bodies of the cells `member` picks, on a grid of `n` cells whose neighbour `k`
+/// (0..8) of cell `c` is `nb(c, k)` (a symmetric relation): [`joined`] over the neighbours' pairs,
+/// each pair joined once from its lower cell. The bodies the serial floods find.
+pub(crate) fn bodies(
+    n: usize,
+    nb: impl Fn(usize, usize) -> Option<usize> + Sync,
+    member: &(impl Fn(usize) -> bool + Sync),
+) -> (Vec<u32>, Vec<u32>) {
+    let nb = &nb;
+    joined(n, member, move |c| {
+        (0..8).filter_map(move |k| nb(c, k).filter(|&m| m > c))
+    })
+}
+
+/// The bodies of the cells `member` picks, each member joined to the members `links(c)` names, in
+/// parallel (the speed work of 2026-10-28): each cell's body as its least cell ([`NO_BODY`] off
+/// the bodies), and each body's cell count at that least cell. A union-find, the larger root
+/// always linked under the smaller, so every body's root is its least cell whatever the threads'
+/// order. A link named from either end joins the pair.
+pub(crate) fn joined<I: IntoIterator<Item = usize>>(
+    n: usize,
+    member: &(impl Fn(usize) -> bool + Sync),
+    links: impl Fn(usize) -> I + Sync,
+) -> (Vec<u32>, Vec<u32>) {
+    use std::sync::atomic::{AtomicU32, Ordering::AcqRel, Ordering::Acquire, Ordering::Relaxed};
+    assert!(n < NO_BODY as usize, "cell indices fit in u32");
+    let parent: Vec<AtomicU32> = (0..n as u32)
+        .into_par_iter()
+        .map(|c| AtomicU32::new(if member(c as usize) { c } else { NO_BODY }))
+        .collect();
+    let find = |mut x: u32| -> u32 {
+        loop {
+            let p = parent[x as usize].load(Acquire);
+            if p == x {
+                return x;
+            }
+            let g = parent[p as usize].load(Acquire);
+            if g != p {
+                // Path halving: `g` is an ancestor of `x` too.
+                let _ = parent[x as usize].compare_exchange_weak(p, g, AcqRel, Relaxed);
+            }
+            x = p;
+        }
+    };
+    (0..n).into_par_iter().for_each(|c| {
+        if parent[c].load(Relaxed) == NO_BODY {
+            return;
+        }
+        for m in links(c) {
+            if parent[m].load(Relaxed) == NO_BODY {
+                continue;
+            }
+            loop {
+                let (a, b) = (find(c as u32), find(m as u32));
+                if a == b {
+                    break;
+                }
+                let (hi, lo) = if a > b { (a, b) } else { (b, a) };
+                if parent[hi as usize]
+                    .compare_exchange(hi, lo, AcqRel, Relaxed)
+                    .is_ok()
+                {
+                    break;
+                }
+            }
+        }
+    });
+    let root: Vec<u32> = (0..n)
+        .into_par_iter()
+        .map(|c| {
+            if parent[c].load(Relaxed) == NO_BODY {
+                NO_BODY
+            } else {
+                find(c as u32)
+            }
+        })
+        .collect();
+    drop(parent);
+    // The counts: runs of one root in a chunk added at once (an ocean is one root).
+    let size: Vec<AtomicU32> = (0..n).into_par_iter().map(|_| AtomicU32::new(0)).collect();
+    root.par_chunks(1 << 14).for_each(|ch| {
+        let (mut last, mut run) = (NO_BODY, 0u32);
+        for &r in ch {
+            if r != last {
+                if last != NO_BODY {
+                    size[last as usize].fetch_add(run, Relaxed);
+                }
+                (last, run) = (r, 0);
+            }
+            run += 1;
+        }
+        if last != NO_BODY {
+            size[last as usize].fetch_add(run, Relaxed);
+        }
+    });
+    let size = size.into_iter().map(AtomicU32::into_inner).collect();
+    (root, size)
 }
 
 /// [`sea_reached`] on any grid of `n` cells whose neighbour `k` (0..8) of cell `c` is `nb(c, k)`

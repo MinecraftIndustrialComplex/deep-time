@@ -20,6 +20,18 @@ pub const YEAR_START_RAD: f64 = 280.0 * PI / 180.0;
 
 /// Daily-mean insolation, W/m², at latitude `lat` (rad) and solar longitude `lambda` (rad).
 pub fn daily(s0: f64, lat: f64, lambda: f64, obliquity: f64) -> f64 {
+    from_shape(s0, daily_shape(lat, lambda, obliquity))
+}
+
+/// [`daily`] from its shape ([`daily_shape`]): the same bits.
+#[inline]
+pub fn from_shape(s0: f64, shape: f64) -> f64 {
+    (s0 / PI * shape).max(0.0)
+}
+
+/// What [`daily`] multiplies by s₀/π: h₀ sin φ sin δ + cos φ cos δ sin h₀ (the speed work of
+/// 2026-10-28: the EBM keeps it from call to call while the orbit stays the same).
+pub fn daily_shape(lat: f64, lambda: f64, obliquity: f64) -> f64 {
     let sin_d = obliquity.sin() * lambda.sin();
     let d = sin_d.clamp(-1.0, 1.0).asin();
     let (sp, cp) = lat.sin_cos();
@@ -36,7 +48,7 @@ pub fn daily(s0: f64, lat: f64, lambda: f64, obliquity: f64) -> f64 {
             c.acos()
         }
     };
-    (s0 / PI * (h0 * sp * sin_d + cp * d.cos() * h0.sin())).max(0.0)
+    h0 * sp * sin_d + cp * d.cos() * h0.sin()
 }
 
 /// Solar longitude at year fraction `f` (0 = the start of month 0).
