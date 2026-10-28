@@ -634,7 +634,12 @@ mod tests {
             let mut st = p.initial_state();
             let r = p.run(&mut st, &land, &[], 3);
             let bits = |v: &[f64]| v.iter().map(|x| x.to_bits()).collect::<Vec<_>>();
-            (r.t_global.to_bits(), r.asr.to_bits(), bits(&st.t_ocean), bits(&st.t_land))
+            (
+                r.t_global.to_bits(),
+                r.asr.to_bits(),
+                bits(&st.t_ocean),
+                bits(&st.t_land),
+            )
         };
         let cold = |p: &EbmParams| std::thread::scope(|sc| sc.spawn(|| run(p)).join().unwrap());
         let (base0, brighter0) = (cold(&base), cold(&brighter));
@@ -642,7 +647,11 @@ mod tests {
             sc.spawn(|| {
                 run(&other);
                 assert_eq!(run(&base), base0, "after another orbit");
-                assert_eq!(run(&brighter), brighter0, "the kept shapes under another s0");
+                assert_eq!(
+                    run(&brighter),
+                    brighter0,
+                    "the kept shapes under another s0"
+                );
                 assert_eq!(run(&base), base0, "again");
             })
             .join()
