@@ -99,13 +99,7 @@ fn fill_level_with<G: SurfaceGrid, A: Fn(usize) -> f64 + Sync>(
     let water = layer_m.max(0.0) * total;
     // 1. The plain hypsometric level.
     let mut order = ascending(n, |c| h[c]);
-    let s0 = walk(
-        order
-            .iter()
-            .map(|&c| (h[c as usize], h[c as usize], a(c as usize))),
-        water,
-    )
-    .unwrap_or(h[order[0] as usize]);
+    let s0 = walk(gathered(&order, |c| (h[c], h[c], a(c))), water).unwrap_or(h[order[0] as usize]);
     // 2. The open sea at S₀ and every other cell's spill height.
     let mut kind = vec![pflood::LAND; n];
     pflood::open_sea_with(method, d, h, s0, min_cells, &mut kind);
@@ -117,10 +111,7 @@ fn fill_level_with<G: SurfaceGrid, A: Fn(usize) -> f64 + Sync>(
     // 3. The walk up the spill heights.
     order = ascending(n, |c| spill[c]);
     let s1 = walk(
-        order.iter().map(|&c| {
-            let c = c as usize;
-            (spill[c].max(h[c]), h[c], a(c))
-        }),
+        gathered(&order, |c| (spill[c].max(h[c]), h[c], a(c))),
         water,
     )
     .unwrap_or(s0);
@@ -132,7 +123,9 @@ fn fill_level_with<G: SurfaceGrid, A: Fn(usize) -> f64 + Sync>(
     // sea makes V jump past the water, the level stays at that turn, as at a pass.
     let mut at = vec![pflood::LAND; n];
     pflood::open_sea_with(method, d, h, s1, min_cells, &mut at);
-    let missed = (0..n).any(|c| at[c] == pflood::BASE && spill[c].max(h[c]) > s1);
+    let missed = (0..n)
+        .into_par_iter()
+        .any(|c| at[c] == pflood::BASE && spill[c].max(h[c]) > s1);
     if !missed {
         return s1;
     }
@@ -171,6 +164,22 @@ fn ascending(n: usize, key: impl Fn(usize) -> f64 + Sync) -> Vec<u32> {
         .collect();
     packed.par_sort_unstable();
     packed.into_par_iter().map(|x| x as u32).collect()
+}
+
+/// The walk's cells `(reached at, ground, area)` in `order`, read a block at a time in parallel (the
+/// speed work of 2026-10-28: the walk read each cell's values out of order, one cache miss after
+/// another): the same values in the same order, and no more blocks than the walk reaches.
+fn gathered<'a>(
+    order: &'a [u32],
+    cell: impl Fn(usize) -> (f64, f64, f64) + Sync + 'a,
+) -> impl Iterator<Item = (f64, f64, f64)> + 'a {
+    const BLOCK: usize = 1 << 15;
+    order.chunks(BLOCK).flat_map(move |block| {
+        block
+            .par_iter()
+            .map(|&c| cell(c as usize))
+            .collect::<Vec<_>>()
+    })
 }
 
 /// An unsigned integer whose order is `f64::total_cmp`'s (IEEE 754 totalOrder): negative values
