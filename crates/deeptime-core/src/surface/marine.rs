@@ -10,14 +10,26 @@
 //! hillslope diffusivity instead of Landlab's tiny value, since `diffusion.rs` solves land and sea
 //! together. Landlab's defaults are D₀ = 100 m²/yr, wave base 60 m, tidal range 2 m.
 //!
-//! # Delivery at the mouths (Deep Time's rule)
+//! # Delivery at the mouths (ledger: ERO-050)
 //! Rivers deliver their load (`spl.rs`) to the sea cell they drain into. Dumping it there would
 //! make towers on steep (active) margins, where the diffusivity below the wave base is nil, so each
-//! mouth first **fills accommodation** outwards: a priority queue over sea cells from the mouth,
-//! shallowest first, raises each cell to a clinoform fill level — `fill_depth_m` below sea level
-//! at the mouth, deepening by `shelf_slope` with distance — until the load is spent. Deltas and
-//! shelves prograde from the mouths this way; the diffusion then smooths them. Mass is exact: a
-//! load that finds no more room (a full closed sea) spreads evenly over the cells it reached.
+//! mouth first **fills accommodation** outwards: a priority queue over sea cells from the mouth
+//! raises each cell to a clinoform fill level — `fill_depth_m` below sea level at the mouth,
+//! deepening by `shelf_slope` with distance — until the load is spent. Mass is exact: a load that
+//! finds no more room (a full closed sea) spreads evenly over the cells it reached.
+//!
+//! The queue's order: the load goes down from the mouth, nearest room first, and climbs over a
+//! rise only when there is no more room below it. Each cell's key is the highest bed on the fill's
+//! way to it (its spill, as in the Priority-Flood), lowest first; among equal spills, so all the
+//! ground the load reaches going down, the nearest first, then the deepest. So a delta and its
+//! shelf build out from the mouth (the foreset beside the mouth before the deep floor beyond it),
+//! a hollow the mouth sits in fills from its floor, and the diffusion then smooths them. This is
+//! the order of goSPL's marine deposition (its cells highest bed first, each filled to the
+//! clinoform height and the rest passed to its lower receivers) and of FastScape's marine scheme
+//! (the shelf filled from the shore downstream, the overflow passed on along the flow); the rule
+//! is cited, no code of theirs is ported (both GPL). Until 2026-10-28 the queue popped the deepest
+//! cell it had reached first, against the "shallowest first" this note gave: a mouth's load ran
+//! down the slope and filled the deepest room within reach before the room beside the mouth.
 
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
@@ -46,18 +58,27 @@ pub fn submarine_kd(z: f64, d0: f64, wave_base: f64, tidal_range: f64, land: f64
     d0 * f1 * f2 + land * (1.0 - f1)
 }
 
+/// A sea cell the fill has reached: `spill` is the highest bed on the fill's way to it from the
+/// mouth (the cell's own bed or the way's), `z` its own bed, `dist` the way's length.
 #[derive(Clone, Copy, PartialEq)]
 struct Item {
+    spill: f64,
+    dist: f32,
     z: f64,
     c: u32,
-    dist: f32,
 }
 
 impl Eq for Item {}
 
 impl Ord for Item {
+    /// The heap pops its greatest: the lowest spill, then the nearest, then the deepest bed, then
+    /// the lower cell (ERO-050).
     fn cmp(&self, o: &Self) -> Ordering {
-        o.z.total_cmp(&self.z).then_with(|| o.c.cmp(&self.c))
+        o.spill
+            .total_cmp(&self.spill)
+            .then_with(|| o.dist.total_cmp(&self.dist))
+            .then_with(|| o.z.total_cmp(&self.z))
+            .then_with(|| o.c.cmp(&self.c))
     }
 }
 
@@ -115,9 +136,10 @@ pub fn fill<G: SurfaceGrid>(
     s.touched.clear();
     s.visited.clear();
     s.heap.push(Item {
+        spill: h[mouth],
+        dist: 0.0,
         z: h[mouth],
         c: mouth as u32,
-        dist: 0.0,
     });
     s.stamp[mouth] = stamp_id;
     let mut left = volume;
@@ -146,9 +168,10 @@ pub fn fill<G: SurfaceGrid>(
             if sea[m] && s.stamp[m] != stamp_id {
                 s.stamp[m] = stamp_id;
                 s.heap.push(Item {
+                    spill: h[m].max(it.spill),
+                    dist: it.dist + dl as f32,
                     z: h[m],
                     c: m as u32,
-                    dist: it.dist + dl as f32,
                 });
             }
         }
@@ -822,6 +845,95 @@ mod tests {
             (after - before) * 1e6
         );
         assert!(h[210] <= -20.0 + 1e-9);
+    }
+
+    /// A mouth's load fills the room beside the mouth before the deeper floor farther out
+    /// (ERO-050): the shelf at one cell before the trough at two, though the trough is deeper and
+    /// the deepest-first order took it first; then outward, nearest first.
+    #[test]
+    fn a_mouth_fills_the_near_room_before_the_deep_floor_beyond() {
+        // One row: a shelf at 0..10, the mouth at 10, one shelf cell at 11, a trough at 12..21.
+        let d = Dims::new(21, 1, 1000.0, false);
+        let bed = |i: usize| match i {
+            0..10 => -20.0,
+            10 => -1.0,
+            11 => -30.0,
+            _ => -2000.0,
+        };
+        let mut h: Vec<f64> = (0..21).map(bed).collect();
+        let sea = vec![true; 21];
+        let mut dep = vec![0.0f32; 21];
+        let p = FillParams {
+            sea_level: 0.0,
+            fill_depth_m: 0.0,
+            shelf_slope: 0.0005,
+            max_cells: 10_000,
+        };
+        let room = |i: usize, cells: f64| {
+            let level = -p.shelf_slope * d.dx * cells;
+            (level - bed(i)).max(0.0) * d.cell_area()
+        };
+        // The mouth's room and its two neighbours', one cell away.
+        // (A hair less, so the sums' rounding cannot leave a crumb for the next cell.)
+        let near = (room(10, 0.0) + room(9, 1.0) + room(11, 1.0)) * (1.0 - 1e-9);
+        let mut s = FillScratch::default();
+        fill(&d, &sea, 10, near, &p, &mut h, &mut dep, &mut s);
+        let level1 = -p.shelf_slope * d.dx;
+        assert!(
+            (h[9] - level1).abs() < 1e-6 && (h[11] - level1).abs() < 1e-6,
+            "{h:?}"
+        );
+        assert!(
+            dep[..9].iter().chain(&dep[12..]).all(|&x| x == 0.0),
+            "{dep:?}"
+        );
+        // The next load goes on to the cells two away, the trough's first before the shelf's.
+        fill(
+            &d,
+            &sea,
+            10,
+            room(12, 2.0) + 0.5 * room(8, 2.0),
+            &p,
+            &mut h,
+            &mut dep,
+            &mut s,
+        );
+        assert!((h[12] - 2.0 * level1).abs() < 1e-6, "{h:?}");
+        assert!(dep[8] > 0.0 && h[8] < 2.0 * level1, "{h:?}");
+        assert!(
+            dep[..8].iter().chain(&dep[13..]).all(|&x| x == 0.0),
+            "{dep:?}"
+        );
+    }
+
+    /// A mouth at the floor of a hollow fills the hollow from its floor: the load does not climb
+    /// the hollow's side while there is room below it.
+    #[test]
+    fn a_mouth_in_a_hollow_fills_it_from_its_floor() {
+        // A V-shaped hollow, 1,000 m deep at the mouth (10), rising 100 m a cell to -100 m.
+        let d = Dims::new(21, 1, 1000.0, false);
+        let bed = |i: usize| -1000.0 + 100.0 * (i as f64 - 10.0).abs();
+        let mut h: Vec<f64> = (0..21).map(bed).collect();
+        let sea = vec![true; 21];
+        let mut dep = vec![0.0f32; 21];
+        let p = FillParams {
+            sea_level: 0.0,
+            fill_depth_m: 0.0,
+            shelf_slope: 0.0005,
+            max_cells: 10_000,
+        };
+        let mut s = FillScratch::default();
+        // Less than the mouth cell's room: it all stays at the floor.
+        fill(&d, &sea, 10, 0.5e9, &p, &mut h, &mut dep, &mut s);
+        assert!(dep[10] > 0.0 && dep.iter().enumerate().all(|(i, &x)| i == 10 || x == 0.0));
+        // More: the mouth's cell to the level, then the cells next up the sides, not those above.
+        fill(&d, &sea, 10, 1.5e9, &p, &mut h, &mut dep, &mut s);
+        assert!(h[10].abs() < 1e-6, "{h:?}");
+        assert!(dep[9] > 0.0 && dep[11] > 0.0, "{dep:?}");
+        assert!(
+            dep[..9].iter().chain(&dep[12..]).all(|&x| x == 0.0),
+            "{dep:?}"
+        );
     }
 
     /// The device's slope failure against the CPU's on the worlds of the bit-for-bit test above
