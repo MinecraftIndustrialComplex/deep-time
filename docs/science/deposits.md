@@ -226,6 +226,30 @@ Two rules are the project's, not the sources' (coordinator's calls, decisions lo
   rule that needs no block read. In the test world the model agreed with the generated ground to
   within three blocks in all 1,631 capped columns, so the hold never acted.
 
+### The profile under the world's ground (ORE-285, 2026-10-28)
+
+The gossan and the blanket are made by today's weathering: the cap at the outcrop, the blanket at
+the top of the water table (SIR 2010-5070-B p. 120). The deposit stage places them against its
+own ground, the history's L1 surface, and the young landscape and the amplifier run after it and
+cut the world's ground lower over many sites. On the Phase 1 check's planet (master a2ec6072,
+2026-10-28) the porphyry it picked had its gossan at y 137 to 140 and its blanket at 136 to 139
+over ground at 127 to 135 (top rock block 123): the whole profile in the air, the blanket's copper
+with it, so the check found 22 copper ore blocks in the ore body's footprint against 13 in a box
+beside it. Leaching keeps pace with the surface only where the water table's drawdown outruns
+erosion (pp. 120 to 121), and the blanket then follows it down; the model has no clock for that
+race at the amplifier's scale, so it takes the profile as formed at the world's own surface.
+
+The pass after the projection (`deposits::anchor::settle_weathering`) moves each natural site's
+weathering profile, its gossans with its supergene children's blankets, down by whole blocks so
+the gossan's clip (the stage's ground) lies at the top rock block over the gossan's centre (the
+ground less 4 blocks of soil on dry land, the bed under water; ORE-280). A supergene site with no
+gossan in its family goes by its own clip. The hypogene bodies (the stockwork shell, the
+lithocap) stay where the history put them: the lower ground has eroded through them, as erosion
+truncates an exposed porphyry. A profile never moves up: where the world's ground stands above the
+stage's, the bake lifted it with the strata (STR-056), and a buried blanket is a real thing.
+Guaranteed sites, and the families of guaranteed parents, stay with the guaranteed anchor
+(DEP-221). The pass's counts are in the manifest's `notes.bake.guaranteed.weathering`.
+
 ## Equations and constants
 
 The main constants by family; the ledgers hold every row.
