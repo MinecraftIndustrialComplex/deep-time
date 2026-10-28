@@ -9,7 +9,7 @@ Steps (ids), in the order they run; each item of the plan is one or more rows:
 
   phase0          Phase 0's suite re-run (tools/review/phase0.py --no-publish): 11 checks
   build           (no row) cargo build --release of deeptime and deeptime-inspect on the VM
-  bench           item 1: `deeptime bench` quick 16k <= 300 s, full 16k <= 900 s at 8 threads, peak memory <= the estimate
+  bench           item 1: the shipped builds (gate-bins.sh), x86-64-v3 and baseline side by side under bench-quiet.py, each on 8 physical cores: v3 quick 16k <= 300 s, full 16k <= 900 s, peak memory <= the estimate; the baseline reported
   smoke-mic       item 2: MIC smoke from an empty world with earthlike_quick_16k: first start, boot, every mixin, probes
   geology         items 3 and 4: porphyry (the essentials-reach clause is gone with the essentials-based spawn), `probe site`, copper ore, gossan, a placer whose
                   why-chain ends in an eroded porphyry (Ben, 2026-10-05),
@@ -40,6 +40,7 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import time
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -73,15 +74,15 @@ class Row:
         return r
 
 
-KINDS = {"build": "cargo:build", "bench": "sim:earthlike_quick_16k:8t"}
+KINDS = {"build": "cargo:build", "gatebins": "cargo:build", "bench": "sim:earthlike_quick_16k:8t"}
 
 
-def vm(sid, cmd, flags=(), pulls=()):
+def vm(sid, cmd, flags=(), pulls=(), kind=None):
     """Runs `cmd` on the VM detached (tools/review/phase1_detach.py: a dropped ssh session does not lose the job),
     admitted by the VM's admission tool; returns (output without noise, exit code, seconds). Kept in logs/<sid>.log."""
     import phase1_detach
     os.makedirs(LOGS, exist_ok=True)
-    out, rc, secs = phase1_detach.run(sid, cmd, flags=flags, pulls=pulls, kind=KINDS.get(sid, "auto"))
+    out, rc, secs = phase1_detach.run(sid, cmd, flags=flags, pulls=pulls, kind=kind or KINDS.get(sid, "auto"))
     out = "\n".join(l for l in out.splitlines() if not NOISE.match(l))
     with open(os.path.join(LOGS, f"{sid}.log"), "a") as f:
         f.write(f"$ {cmd}\n{out}\n[exit {rc}, {secs:.0f} s]\n\n")
@@ -183,53 +184,72 @@ def stage_lines(stages, n=6):
     return ", ".join(f"{s['name']} {s.get('millis', 0) / 1000:.0f} s" for s in top)
 
 
+# The gate's procedure (docs/design/p1-17-benchmark-gate.md, "Running the gate"; decisions log 2026-10-18 and 2026-10-19): the
+# shipped builds (tools/natives/gate-bins.sh: the `ship` profile for x86-64-v3 and for the baseline), side by side under
+# tools/review/bench-quiet.py, each held to 8 separate physical cores, v3 on set A and the baseline on set B.
+GATE_BINS = "target/gate-bins"
+GATE_SETS = (("v3", "deeptime-x86-64-v3", "0,16,2,18,4,20,6,22"), ("baseline", "deeptime-baseline", "8,24,10,26,12,28,14,30"))
+
+
 def step_bench(a):
     kids = []
     t0 = time.time()
+    out, rc, _ = vm("gatebins", f"tools/natives/gate-bins.sh {GATE_BINS}")
+    if rc:
+        kids.append(kid(False, "bench: the shipped builds (tools/natives/gate-bins.sh)", f"exit {rc}: {out.strip()[-300:]}"))
+        return [Row("bench", 1, "Bench gate: quick 16k in 5 min and full 16k in 15 min at 8 threads, peak memory within the estimate", status_of(kids), [], kids, time.time() - t0)]
     # The 1/2/4-thread scaling run of a missed gate: the quick preset by default (about 40 minutes); the full one takes hours at 1 thread
     # (8,312 s on 2026-10-05), so it is opt-in: PHASE1_BENCH_SCALING=quick16k,full16k.
     scaling_keys = set(os.environ.get("PHASE1_BENCH_SCALING", "quick16k").split(","))
     for key, preset, myr, gate in (("quick16k", "earthlike_quick_16k", a.quick_myr, QUICK_GATE_S), ("full16k", "earthlike_full_16k", a.full_myr, FULL_GATE_S)):
         d = f"review/out/phase1/bench/{key}"
-        cmd = (f"mkdir -p review/out/phase1/bench && echo load-start $(cut -d' ' -f1 /proc/loadavg) && target/release/deeptime bench --preset {preset} "
-               f"--start {START} --length-myr {myr} --threads 8 --out {d}.json --viewer {d} 2>&1 | grep -E 'bench: threads=8 (timings|total_ms)|bench: .* runs'; "
-               "echo load-end $(cut -d' ' -f1,2 /proc/loadavg)")
-        out, rc, secs = vm("bench", cmd, pulls=[f"{d}.json", d])
-        res = bench_json(os.path.join(REPO, d + ".json"))
-        if res is None:
-            kids.append(kid(False, f"bench {preset}: within {gate:.0f} s at 8 threads", f"no 8-thread run in {d}.json (exit {rc}): {out.strip()[-200:]}"))
+
+        def one(label, binary, cpus, res):
+            res[label] = vm(f"bench-{label}", f"tools/review/bench-quiet.py --cpus {cpus} --out {d}/{label} {GATE_BINS}/{binary} {preset} {START} {myr} 8",
+                            pulls=[f"{d}/{label}/bench.json", f"{d}/{label}/summary.txt", f"{d}/{label}/load.tsv"], kind=f"sim:{preset}:8t")
+        res = {}
+        shutil.rmtree(os.path.join(REPO, d), ignore_errors=True)   # no stale bench.json from an earlier run
+        pair = [threading.Thread(target=one, args=(*g, res)) for g in GATE_SETS]
+        for i, t in enumerate(pair):
+            if i:
+                time.sleep(60)   # spaced so the two starts' syncs of the checkout do not collide
+            t.start()
+        for t in pair:
+            t.join()
+        got = {label: bench_json(os.path.join(REPO, d, label, "bench.json")) for label, _, _ in GATE_SETS}
+        if got["v3"] is None:
+            o, r, _ = res.get("v3", ("", -1, 0))
+            kids.append(kid(False, f"bench {preset}: within {gate:.0f} s at 8 threads (x86-64-v3)", f"no 8-thread run in {d}/v3/bench.json (exit {r}): {o.strip()[-200:]}"))
             kids.append(kid(False, f"bench {preset}: peak memory within the estimate", "no bench.json"))
             continue
-        s, peak, est, stages, doc = res
-        load = " / ".join(re.findall(r"^load-(?:start|end) (.*)$", out, re.M))
-        ev = [f"{d}.json", f"{d}/index.html", f"VM load average (1 min at start / 1 and 5 min at end; the bench shares the box with other agents' jobs, so a miss under load is a reason to re-run): {load}",
-              f"{preset} {myr} Myr from {START}, 8 threads on {doc.get('host')}: {s:.0f} s (gate {gate:.0f} s)",
-              "stages: " + stage_lines(stages)]
+        s, peak, est, stages, doc = got["v3"]
+        ev = [f"{d}/v3/bench.json", f"{d}/v3/summary.txt",
+              f"{preset} {myr} Myr from {START}, 8 threads held to 8 physical cores on {doc.get('host')}: x86-64-v3 {s:.0f} s (gate {gate:.0f} s)"]
+        if got["baseline"]:
+            ev.append(f"the baseline build beside it (the floor for CPUs older than x86-64-v3; reported, the gate is the v3 build a mid-range gaming PC loads, "
+                      f"decisions log 2026-10-19): {got['baseline'][0]:.0f} s, {d}/baseline/summary.txt")
+        else:
+            ev.append(f"the baseline build: no 8-thread run in {d}/baseline/bench.json (exit {res.get('baseline', ('', -1))[1]})")
+        others = re.search(r"^others' busy CPUs: .*$", res.get("v3", ("",))[0], re.M)
+        ev.append("the VM's load from other jobs during the v3 run (the bench shares the box; a miss under load is a reason to re-run): "
+                  + (others.group(0) if others else "not recorded"))
+        ev.append("stages: " + stage_lines(stages))
         if s > gate and key not in scaling_keys:
             ev.append("scaling over 1/2/4 threads: not re-measured in this run (PHASE1_BENCH_SCALING=" + ",".join(sorted(scaling_keys)) + "); the full-length one takes hours at 1 thread")
         if s > gate and key in scaling_keys:
             # The plan's alternative: "a per-stage report for Ben's decision" with the scaling across thread counts.
             sd = f"review/out/phase1/bench/{key}-scaling"
-            out2, rc2, _ = vm("bench", f"target/release/deeptime bench --preset {preset} --start {START} --length-myr {myr} --threads 1,2,4 "
+            out2, rc2, _ = vm("bench", f"{GATE_BINS}/deeptime-x86-64-v3 bench --preset {preset} --start {START} --length-myr {myr} --threads 1,2,4 "
                               f"--out {sd}.json 2>&1 | grep -E 'bench: threads=[0-9]+ total_ms'", pulls=[f"{sd}.json"])
             ev.append("scaling (the gate is missed, so the thread counts too): " + " | ".join(re.findall(r"threads=(\d+) total_ms=([\d.]+)", out2) and
                       [f"{t} threads {float(ms) / 1000:.0f} s" for t, ms in re.findall(r"threads=(\d+) total_ms=([\d.]+)", out2)] or ["not measured"]))
-        kids.append(kid(s <= gate, f"bench {preset}: within {gate:.0f} s at 8 threads", *ev))
+        kids.append(kid(s <= gate, f"bench {preset}: within {gate:.0f} s at 8 threads (x86-64-v3)", *ev))
         if est is None:
             kids.append(kid(False, f"bench {preset}: peak memory within the estimate",
                             f"peak {peak / 2**20:.0f} MiB measured; bench.json carries no estimate (`deeptime bench` writes `estimate.shown_peak_bytes`)"))
         else:
             kids.append(kid(peak <= est, f"bench {preset}: peak memory within the estimate", f"peak {peak / 2**20:.0f} MiB against an estimate of {est / 2**20:.0f} MiB"))
     return [Row("bench", 1, "Bench gate: quick 16k in 5 min and full 16k in 15 min at 8 threads, peak memory within the estimate", status_of(kids), [], kids, time.time() - t0)]
-
-
-SMOKE_CATS = (
-    ("first start from an empty world", re.compile(r"first start generated|progress lines at most|generation finished before")),
-    ("boot", re.compile(r"server reaches Done")),
-    ("every mixin applied (Deep Time, Toroidal World, COE and CDG hooks)", re.compile(r"every declared mixin applied")),
-    ("probes answer and the rock classes resolve", re.compile(r"probe .* answers|every rock class resolves|no C2ME")),
-    ("restart does not regenerate", re.compile(r"restart|world data not regenerated")),
-)
 
 
 def step_smoke_mic(a):
