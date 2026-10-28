@@ -29,6 +29,7 @@
 //! land's mean `R_z`. Inside one steadily eroding range every cell wears at the uplift rate,
 //! ridge and valley alike, so classing cells one by one flattens the curve; the windows do not.
 
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -150,18 +151,32 @@ impl ErosionBands {
         let a_km2 = d.cell_area() / 1.0e6;
         let km3 = d.cell_area() / 1.0e9;
         let class = |rz: f64| RELIEF_FROM_M.iter().filter(|&&lo| rz >= lo).count();
-        let h1: Vec<f64> = s.h0.iter().zip(s.net).map(|(a, b)| a + b).collect();
+        let h1: Vec<f64> = s.h0.par_iter().zip(s.net).map(|(a, b)| a + b).collect();
+        // Each land cell's height band, relief and high ground (flat or not), read in parallel
+        // (the speed work of 2026-10-28; on one thread every step before); the sums below take
+        // them in cell order, as before, so they keep their bits.
+        let reads: Vec<Option<(usize, f64, Option<bool>)>> = (0..d.cells())
+            .into_par_iter()
+            .map(|c| {
+                let z = s.h0[c] - s.sea_m;
+                if z <= 0.0 {
+                    return None;
+                }
+                let band = ((z / BAND_M) as usize).min(BANDS - 1);
+                let rz = relief5(d, &h1, s.sea_m, c);
+                let high = (z >= HIGH_M).then(|| relief3(d, s.h0, c) < FLAT_RELIEF_M);
+                Some((band, rz, high))
+            })
+            .collect();
         let (ww, wh) = (d.w.div_ceil(WINDOW_CELLS), d.h.div_ceil(WINDOW_CELLS));
         // Per window: cells, land cells, the land's summed relief and process sums.
         let mut win = vec![(0usize, 0usize, 0.0f64, ProcessSums::default()); ww * wh];
-        for c in 0..d.cells() {
+        for (c, read) in reads.iter().enumerate() {
             let wi = (c / d.w) / WINDOW_CELLS * ww + (c % d.w) / WINDOW_CELLS;
             win[wi].0 += 1;
-            let z = s.h0[c] - s.sea_m;
-            if z <= 0.0 {
+            let Some((band, rz, high)) = *read else {
                 continue;
-            }
-            let band = ((z / BAND_M) as usize).min(BANDS - 1);
+            };
             let add = |p: &mut ProcessSums| {
                 p.area_km2_myr += a_km2 * s.dt_myr;
                 p.spl_km3 += f64::from(s.spl[c]) * km3;
@@ -171,17 +186,14 @@ impl ErosionBands {
                 p.net_km3 += -s.net[c] * km3;
             };
             add(&mut self.bands[band]);
-            let rz = relief5(d, &h1, s.sea_m, c);
             add(&mut self.by_relief[class(rz)]);
             win[wi].1 += 1;
             win[wi].2 += rz;
             add(&mut win[wi].3);
-            if z >= HIGH_M {
-                if relief3(d, s.h0, c) < FLAT_RELIEF_M {
-                    add(&mut self.high_flat);
-                } else {
-                    add(&mut self.high_steep);
-                }
+            match high {
+                Some(true) => add(&mut self.high_flat),
+                Some(false) => add(&mut self.high_steep),
+                None => {}
             }
         }
         for (cells, land, rz_sum, sums) in &win {
