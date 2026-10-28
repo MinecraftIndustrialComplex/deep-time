@@ -142,7 +142,7 @@ mod tests {
         for _ in 0..2_000 {
             push(&mut radix, &mut binary, next(&mut s) >> 30);
         }
-        let mut last = 0u64;
+        let mut last: u64;
         let mut popped = 0;
         while let Some(Reverse(want)) = binary.pop() {
             assert_eq!(radix.pop(), Some(want));
