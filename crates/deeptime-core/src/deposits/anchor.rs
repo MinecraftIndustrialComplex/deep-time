@@ -402,18 +402,15 @@ pub fn anchor_sites(
                 out.moved_down += usize::from(dy < 0);
                 out.largest_move = out.largest_move.max(dy.abs());
                 // The site's centre is its ore's (the first body's) centre block; its box its
-                // bodies'.
-                if let Some(first) = s.body.and_then(|id| bodies.iter().find(|b| b.id == id)) {
-                    s.center[1] = first.center[1].floor() as i32;
-                } else {
+                // bodies'; by the move where it has neither.
+                let own: Vec<&Body> = idx.iter().map(|&i| &bodies[i]).collect();
+                let (centred, boxed) = refit_site_y(s, &own);
+                if !centred {
                     s.center[1] += dy;
                 }
-                if idx.is_empty() {
+                if !boxed {
                     s.aabb[0][1] += dy;
                     s.aabb[1][1] += dy;
-                } else {
-                    s.aabb[0][1] = idx.iter().map(|&i| bodies[i].aabb[0][1]).min().unwrap_or(0);
-                    s.aabb[1][1] = idx.iter().map(|&i| bodies[i].aabb[1][1]).max().unwrap_or(0);
                 }
             }
         }
@@ -503,22 +500,31 @@ pub fn settle_weathering(
         out.bodies_moved += idx.len();
         out.largest_move = out.largest_move.max(-dy);
     }
-    // Each site a profile moved: its centre is its first body's centre block, its box its bodies'
-    // (as `anchor_sites` keeps them).
     for s in sites.iter_mut().filter(|s| touched.contains(&s.id)) {
         let own: Vec<&Body> = bodies.iter().filter(|b| b.site == Some(s.id)).collect();
-        if let Some(first) = s.body.and_then(|id| own.iter().find(|b| b.id == id)) {
-            s.center[1] = first.center[1].floor() as i32;
-        }
-        if let (Some(lo), Some(hi)) = (
-            own.iter().map(|b| b.aabb[0][1]).min(),
-            own.iter().map(|b| b.aabb[1][1]).max(),
-        ) {
-            s.aabb[0][1] = lo;
-            s.aabb[1][1] = hi;
-        }
+        refit_site_y(s, &own);
     }
     out
+}
+
+/// A site's centre and box in y from its bodies `own` after they moved: the centre its first
+/// body's centre block, the box their span. Returns whether it found the first body and whether
+/// it had any body; what it did not find it leaves as it was.
+fn refit_site_y(s: &mut Site, own: &[&Body]) -> (bool, bool) {
+    let first = s.body.and_then(|id| own.iter().find(|b| b.id == id));
+    if let Some(first) = first {
+        s.center[1] = first.center[1].floor() as i32;
+    }
+    let span = own
+        .iter()
+        .map(|b| b.aabb[0][1])
+        .min()
+        .zip(own.iter().map(|b| b.aabb[1][1]).max());
+    if let Some((lo, hi)) = span {
+        s.aabb[0][1] = lo;
+        s.aabb[1][1] = hi;
+    }
+    (first.is_some(), span.is_some())
 }
 
 /// The world as the top-up reads it: which columns are dry land, their top rock block and rock.
