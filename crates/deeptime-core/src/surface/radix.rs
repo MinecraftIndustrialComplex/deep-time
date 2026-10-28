@@ -152,7 +152,7 @@ mod tests {
                 for _ in 0..(next(&mut s) % 3) {
                     let step = next(&mut s) >> 44;
                     // Now and then a key below the last pop.
-                    let k = if next(&mut s) % 97 == 0 {
+                    let k = if next(&mut s).is_multiple_of(97) {
                         (last >> 20) / 2
                     } else {
                         (last >> 20) + step
