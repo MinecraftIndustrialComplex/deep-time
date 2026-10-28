@@ -177,44 +177,34 @@ impl CubeSettle {
         {
             return Some(r.clone());
         }
-        let n = src.len();
-        let mut from = vec![u32::MAX; n];
-        let mut key = vec![f64::INFINITY; n];
-        let mut heap = BinaryHeap::new();
-        for (c, _) in src.iter().enumerate().filter(|(_, s)| **s) {
-            from[c] = c as u32;
-            key[c] = 0.0;
-            heap.push(Reverse((0u64, c as u32)));
-        }
-        let nb = hydro::cube_neighbour8(&self.grid);
-        while let Some(Reverse((kb, c))) = heap.pop() {
-            let c = c as usize;
-            // Keys are non-negative, so their bits order as the numbers do.
-            if f64::from_bits(kb) > key[c] {
-                continue;
-            }
-            let s = self.units[from[c] as usize];
-            for k in 0..8 {
-                let Some(m) = nb(c, k) else {
-                    continue;
-                };
-                let um = self.units[m];
-                let d = [um[0] - s[0], um[1] - s[1], um[2] - s[2]];
-                let d2 = dot(d, d);
-                if d2 < key[m] {
-                    key[m] = d2;
-                    from[m] = from[c];
-                    heap.push(Reverse((d2.to_bits(), m as u32)));
-                }
-            }
-        }
-        let r: Nearest = Arc::new((from, key));
+        let r = search(&self.grid, &self.units, src);
+        self.keep(src.to_vec(), r.clone());
+        Some(r)
+    }
+
+    fn keep(&self, src: Vec<bool>, r: Nearest) {
         let mut cache = self.cache.borrow_mut();
-        if cache.len() >= 2 {
+        if cache.len() >= KEPT {
             cache.remove(0);
         }
-        cache.push((src.to_vec(), r.clone()));
-        Some(r)
+        cache.push((src, r));
+    }
+
+    /// The searches of the source sets the land call will ask for, side by side (each one search
+    /// on one thread, as `nearest` would run it: the same answers), kept for it (the speed work of
+    /// 2026-10-28; one after another before).
+    pub(crate) fn prime(&self, sets: &[Vec<bool>]) {
+        let sets: Vec<&Vec<bool>> = sets
+            .iter()
+            .filter(|s| s.iter().any(|&x| x))
+            .filter(|s| self.cache.borrow().iter().all(|(k, _)| k != *s))
+            .take(KEPT)
+            .collect();
+        let (grid, units) = (&self.grid, &self.units);
+        let found: Vec<Nearest> = sets.par_iter().map(|s| search(grid, units, s)).collect();
+        for (s, r) in sets.into_iter().zip(found) {
+            self.keep(s.clone(), r);
+        }
     }
 
     /// Every cell takes the value of its nearest source (`src`); false with no source.
@@ -248,6 +238,46 @@ impl CubeSettle {
             })
             .collect()
     }
+}
+
+/// Source sets [`CubeSettle`] keeps (the land call's two donor sets and the sea).
+const KEPT: usize = 3;
+
+/// Each cell's nearest source by great-circle distance on a cube grid ([`CubeSettle`]): the
+/// multi-source Dijkstra over the grid's 8 neighbours, on one thread.
+fn search(grid: &GridDesc, units: &[[f64; 3]], src: &[bool]) -> Nearest {
+    let n = src.len();
+    let mut from = vec![u32::MAX; n];
+    let mut key = vec![f64::INFINITY; n];
+    let mut heap = BinaryHeap::new();
+    for (c, _) in src.iter().enumerate().filter(|(_, s)| **s) {
+        from[c] = c as u32;
+        key[c] = 0.0;
+        heap.push(Reverse((0u64, c as u32)));
+    }
+    let nb = hydro::cube_neighbour8(grid);
+    while let Some(Reverse((kb, c))) = heap.pop() {
+        let c = c as usize;
+        // Keys are non-negative, so their bits order as the numbers do.
+        if f64::from_bits(kb) > key[c] {
+            continue;
+        }
+        let s = units[from[c] as usize];
+        for k in 0..8 {
+            let Some(m) = nb(c, k) else {
+                continue;
+            };
+            let um = units[m];
+            let d = [um[0] - s[0], um[1] - s[1], um[2] - s[2]];
+            let d2 = dot(d, d);
+            if d2 < key[m] {
+                key[m] = d2;
+                from[m] = from[c];
+                heap.push(Reverse((d2.to_bits(), m as u32)));
+            }
+        }
+    }
+    Arc::new((from, key))
 }
 
 // --- the mapping -------------------------------------------------------------------------------------
