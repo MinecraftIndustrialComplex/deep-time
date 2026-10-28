@@ -27,6 +27,26 @@ const EXPORT_MIN_FLUX_M: f64 = 1.0e-3; // ledger: ERO-195
 /// another length scales it, so the cut-off is a rate and the step size does not move it.
 const EXPORT_REF_YEARS: f64 = 2.0e6; // ledger: ERO-195
 
+#[derive(Clone, Copy, PartialEq)]
+struct Higher {
+    h: f64,
+    c: u32,
+}
+
+impl Eq for Higher {}
+
+impl PartialOrd for Higher {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Higher {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.h.total_cmp(&other.h).then(other.c.cmp(&self.c))
+    }
+}
+
 /// **Periplatform carbonate** (ledger ERO-195): the carbonate in what the marine diffusion laid in
 /// each sea cell over a substep, m, as (cell, metres) for the cells that got any.
 ///
@@ -61,7 +81,7 @@ pub fn exported(
     loss_carb: &[f64],
     gain: impl Fn(usize) -> f64,
 ) -> Vec<(u32, f64)> {
-    use super::queue::MinQueue;
+    use std::collections::BinaryHeap;
     let (w, rows) = (d.w, d.h);
     let n = w * rows;
     if n == 0 || d.dx <= 0.0 {
@@ -96,18 +116,19 @@ pub fn exported(
     // 0: untouched, 1: queued, 2: done.
     let mut state = vec![0u8; n];
     let mut share = vec![0.0f32; n];
-    // Highest first, ties by the lower cell (the speed work of 2026-10-28: `super::queue`, the
-    // pops of the `BinaryHeap` it replaced).
-    let mut heap = MinQueue::default();
+    let mut heap = BinaryHeap::new();
     for c in 0..n {
         if sea[c] && loss_carb[c] > 0.0 {
             state[c] = 1;
-            heap.push(MinQueue::high_first(h[c], c as u32));
+            heap.push(Higher {
+                h: h[c],
+                c: c as u32,
+            });
         }
     }
     let mut out = Vec::new();
-    while let Some(key) = heap.pop() {
-        let (c, _) = MinQueue::cell_extra(key);
+    while let Some(Higher { c, .. }) = heap.pop() {
+        let c = c as usize;
         let near = faces(c);
         let (mut inflow, mut inflow_carb) = (0.0f64, 0.0f64);
         for m in near.into_iter().flatten() {
@@ -141,7 +162,10 @@ pub fn exported(
                 && 0.5 * (kd[m] + kd[c]) * k * (h[c] - h[m]) > min_flux
             {
                 state[m] = 1;
-                heap.push(MinQueue::high_first(h[m], m as u32));
+                heap.push(Higher {
+                    h: h[m],
+                    c: m as u32,
+                });
             }
         }
     }
