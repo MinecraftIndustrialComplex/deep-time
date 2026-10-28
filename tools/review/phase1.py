@@ -205,7 +205,7 @@ def step_bench(a):
         d = f"review/out/phase1/bench/{key}"
 
         def one(label, binary, cpus, res):
-            res[label] = vm(f"bench-{label}", f"tools/review/bench-quiet.py --cpus {cpus} --out {d}/{label} {GATE_BINS}/{binary} {preset} {START} {myr} 8",
+            res[label] = vm(f"bench-{label}", f"rm -rf {d}/{label} && tools/review/bench-quiet.py --cpus {cpus} --out {d}/{label} {GATE_BINS}/{binary} {preset} {START} {myr} 8",
                             pulls=[f"{d}/{label}/bench.json", f"{d}/{label}/summary.txt", f"{d}/{label}/load.tsv"], kind=f"sim:{preset}:8t")
         res = {}
         shutil.rmtree(os.path.join(REPO, d), ignore_errors=True)   # no stale bench.json from an earlier run
@@ -216,7 +216,8 @@ def step_bench(a):
             t.start()
         for t in pair:
             t.join()
-        got = {label: bench_json(os.path.join(REPO, d, label, "bench.json")) for label, _, _ in GATE_SETS}
+        # A run counts only if its job exited 0 (bench-quiet.py exits with the bench's code): never a bench.json left by an earlier run.
+        got = {label: bench_json(os.path.join(REPO, d, label, "bench.json")) if res.get(label, ("", -1))[1] == 0 else None for label, _, _ in GATE_SETS}
         if got["v3"] is None:
             o, r, _ = res.get("v3", ("", -1, 0))
             kids.append(kid(False, f"bench {preset}: within {gate:.0f} s at 8 threads (x86-64-v3)", f"no 8-thread run in {d}/v3/bench.json (exit {r}): {o.strip()[-200:]}"))
