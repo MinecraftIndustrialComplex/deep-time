@@ -803,7 +803,9 @@ fn planet_share(layer: &LoadedLayer, map: &CubeMap, pred: impl Fn(f64) -> bool +
     let (w, h) = (g.w as usize, g.h as usize);
     let half = f64::from(g.face_blocks()) / 2.0;
     let r = f64::from(g.r);
-    let (num, den) = (0..h)
+    // Rows side by side, their sums added in row order: the same bits on any thread count (a
+    // `reduce` adds them in the order the threads split the rows, which differs from run to run).
+    let rows: Vec<(f64, f64)> = (0..h)
         .into_par_iter()
         .map(|j| {
             let (mut num, mut den) = (0.0, 0.0);
@@ -825,7 +827,8 @@ fn planet_share(layer: &LoadedLayer, map: &CubeMap, pred: impl Fn(f64) -> bool +
             }
             (num, den)
         })
-        .reduce(|| (0.0, 0.0), |a, b| (a.0 + b.0, a.1 + b.1));
+        .collect();
+    let (num, den) = rows.iter().fold((0.0, 0.0), |a, b| (a.0 + b.0, a.1 + b.1));
     if den > 0.0 { num / den } else { 0.0 }
 }
 
