@@ -10,6 +10,8 @@
 
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
+use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
+use std::sync::{Arc, Mutex};
 
 use glam::{DQuat, DVec3};
 use rayon::prelude::*;
@@ -167,9 +169,39 @@ pub fn cover(
 /// A k-d tree over the given positions (all samples, or only those `keep` selects; the items of
 /// the tree then index `index`).
 pub struct Tree {
-    pub tree: SampleTree,
+    pub tree: Arc<SampleTree>,
     /// Tree item → sample index.
-    pub index: Vec<u32>,
+    pub index: Arc<Vec<u32>>,
+}
+
+/// A tree [`Tree::over`] keeps for a build over the same points.
+struct Kept {
+    pts: Arc<Vec<DVec3>>,
+    index: Arc<Vec<u32>>,
+    tree: Arc<SampleTree>,
+}
+
+/// The trees kept (the speed work of 2026-10-28): the parts of a plate step build the tree of all
+/// the samples, or of the visible ones, again and again while the samples stand still. Built
+/// from the same points a tree is the same tree, so a build whose items and points equal a kept
+/// tree's, bit for bit, takes that tree. Only trees over at least half the samples are kept (the
+/// per-plate trees would push them out), at most [`KEEP`], and [`forget_trees`] lets them go
+/// at the end of every plate step.
+static KEPT: Mutex<Vec<Kept>> = Mutex::new(Vec::new());
+const KEEP: usize = 3;
+
+/// Counters since the process started (diagnostics printed by `deeptime bench`; not part of any
+/// world): trees built over half the samples or more, and trees taken from those kept.
+static TREE_COUNTS: [AtomicU64; 2] = [AtomicU64::new(0), AtomicU64::new(0)];
+
+/// [`Tree::over`]'s counters: (trees built that could be kept, trees taken from the kept).
+pub fn tree_counts() -> [u64; 2] {
+    std::array::from_fn(|k| TREE_COUNTS[k].load(Relaxed))
+}
+
+/// Lets the kept trees go (the end of a plate step).
+pub fn forget_trees() {
+    KEPT.lock().unwrap_or_else(|e| e.into_inner()).clear();
 }
 
 impl Tree {
@@ -179,10 +211,42 @@ impl Tree {
             .filter(|&i| keep(i as usize))
             .collect();
         let pts: Vec<DVec3> = index.par_iter().map(|&i| pos[i as usize]).collect();
-        Tree {
-            tree: SampleTree::new(&pts),
-            index,
+        if 2 * index.len() < pos.len() {
+            return Tree {
+                tree: Arc::new(SampleTree::new(&pts)),
+                index: Arc::new(index),
+            };
         }
+        // The candidates out of the lock, then compared bit for bit.
+        let kept: Vec<_> = KEPT
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .iter()
+            .map(|k| (k.pts.clone(), k.index.clone(), k.tree.clone()))
+            .collect();
+        let bits = |p: &DVec3| [p.x.to_bits(), p.y.to_bits(), p.z.to_bits()];
+        for (kp, ki, kt) in kept {
+            if *ki == index && kp.par_iter().zip(&pts).all(|(a, b)| bits(a) == bits(b)) {
+                TREE_COUNTS[1].fetch_add(1, Relaxed);
+                return Tree {
+                    tree: kt,
+                    index: ki,
+                };
+            }
+        }
+        TREE_COUNTS[0].fetch_add(1, Relaxed);
+        let tree = Arc::new(SampleTree::new(&pts));
+        let index = Arc::new(index);
+        let mut kept = KEPT.lock().unwrap_or_else(|e| e.into_inner());
+        if kept.len() >= KEEP {
+            kept.remove(0);
+        }
+        kept.push(Kept {
+            pts: Arc::new(pts),
+            index: index.clone(),
+            tree: tree.clone(),
+        });
+        Tree { tree, index }
     }
 
     /// The nearest sample and its squared chord distance.
@@ -697,6 +761,33 @@ pub fn coast_split(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A tree over the same points is the kept tree (the queries the same as a fresh build's);
+    /// one point moved by an ulp, or another set of samples, builds its own. The test's points
+    /// are its own, so other tests' trees never match them; a plate step of a test running beside
+    /// may let the kept trees go between two builds, so the second build is tried a few times.
+    #[test]
+    fn a_tree_over_the_same_points_is_the_kept_one() {
+        let mut pos = fibonacci_sphere(4001);
+        pos[17] = (pos[17] + DVec3::new(0.0, 0.0, 1.0e-3)).normalize();
+        let a = Tree::over(&pos, |_| true);
+        let b = (0..50)
+            .map(|_| (Tree::over(&pos, |_| true), Tree::over(&pos, |_| true)))
+            .find(|(x, y)| Arc::ptr_eq(&x.tree, &y.tree) && Arc::ptr_eq(&x.index, &y.index))
+            .expect("the second build took the first one's tree")
+            .1;
+        let fresh = SampleTree::new(&pos);
+        for q in fibonacci_sphere(500) {
+            assert_eq!(b.tree.nearest_n(q, 3), fresh.nearest_n(q, 3));
+        }
+        let mut moved = pos.clone();
+        moved[1000].x = f64::from_bits(moved[1000].x.to_bits() + 1);
+        let c = Tree::over(&moved, |_| true);
+        assert!(!Arc::ptr_eq(&a.tree, &c.tree));
+        let d = Tree::over(&pos, |i| i != 3);
+        assert!(!Arc::ptr_eq(&a.tree, &d.tree));
+        assert_eq!(d.index.len(), pos.len() - 1);
+    }
 
     /// A lattice's geometry is the same built or turned from another lattice's (P1-19: a resumed
     /// run builds the lattice a resampling turned).

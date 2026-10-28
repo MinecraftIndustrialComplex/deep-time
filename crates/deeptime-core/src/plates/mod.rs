@@ -1883,6 +1883,7 @@ impl Stage for PlatesStage {
                 st.gap_budget = Some(gap_budget::GapBudget::start(&st.samples, z_0, env.gravity));
             }
             let result = self.advance(&mut st, world);
+            geometry::forget_trees();
             world.plates = Some(st);
             result
         })
