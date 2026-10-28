@@ -224,7 +224,8 @@ The run kept 5.15 of its 8 cores busy on average, and its CPU work alone would f
 670 s. So the gap to 900 s is idle cores, not work.
 
 **Profile.** The frame-pointer `perf` profile of 2026-10-27 (300 Myr; `perf script` kept in
-`/data/ban/deeptime-runs/perffp/script.txt.gz`) has to be read with care:
+`/data/ban/deeptime-runs/perffp/script.txt.gz`; the readers are in `tools/review/perf/`) has to
+be read with care:
 - Counting threads on a CPU per 25 ms window (`conc.py`) makes the run look parallel (369 of
   505 s with 8 threads on a CPU). A thread busy 5 ms of a window counts as busy for all of it.
 - Counting rayon's wait frames as idle (`conc2.py`) went wrong the other way. A worker running
