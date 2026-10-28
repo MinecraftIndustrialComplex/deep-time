@@ -430,6 +430,9 @@ pub struct Weathered {
     pub largest_move: i32,
     /// Profiles already at or under it.
     pub kept: usize,
+    /// Profiles whose sulphide body the world's ground has come down below: left where the
+    /// history put them, above the world's ground, so neither the cap nor its body is placed.
+    pub gone: usize,
 }
 
 // ledger: ORE-285
@@ -444,9 +447,14 @@ pub struct Weathered {
 /// so the gossan's clip (the stage's ground) lies at the top rock block over the gossan's centre
 /// ([`rock_top`]); a supergene site with no gossan in its family goes by its own clip. The
 /// hypogene bodies stay where the history put them, truncated where the ground has come down
-/// through them, as erosion truncates them. A profile never moves up: where the world's ground
-/// stands higher the bake lifted it with the strata (STR-056) and it lies buried, as an old
-/// blanket can. Guaranteed sites, and the families of guaranteed parents, are [`anchor_sites`]'s.
+/// through them, as erosion truncates them. A cap needs its body: where no ore block of the
+/// site's hypogene bodies lies in the world's rock (the ground has come down below the whole
+/// body, as over the Phase 1 run's porphyry of 2026-10-28 on master 2f453594: its stockwork shell
+/// at y 116 to 133 over ground at 86 to 115), the erosion that took the body took its gossan and
+/// blanket too, and the profile is left above the ground, unplaced. A profile never moves up:
+/// where the world's ground stands higher the bake lifted it with the strata (STR-056) and it lies
+/// buried, as an old blanket can. Guaranteed sites, and the families of guaranteed parents, are
+/// [`anchor_sites`]'s.
 pub fn settle_weathering(
     world: &dyn Columns,
     sites: &mut [Site],
@@ -474,8 +482,9 @@ pub fn settle_weathering(
         profiles.entry(root.id).or_default().push(i);
     }
     drop(by_id);
+    let c = world.period() as u32;
     let mut touched: HashSet<u32> = HashSet::new();
-    for idx in profiles.values() {
+    for (&root, idx) in &profiles {
         // The gossan's clip and centre; else the first clipped body's.
         let lead = idx
             .iter()
@@ -492,6 +501,14 @@ pub fn settle_weathering(
             out.kept += 1;
             continue;
         }
+        let ore: Vec<&Body> = bodies
+            .iter()
+            .filter(|o| o.site == Some(root) && o.role != "gossan" && bears_ore(o))
+            .collect();
+        if !ore.is_empty() && !ore_in_rock(world, &ore, c) {
+            out.gone += 1;
+            continue;
+        }
         for &i in idx {
             shift_body(&mut bodies[i], dy);
             touched.extend(bodies[i].site);
@@ -505,6 +522,26 @@ pub fn settle_weathering(
         refit_site_y(s, &own);
     }
     out
+}
+
+/// Whether an ore block of `ore` lies in the world's rock: a column of their footprint, every
+/// second block each way, holds one at or under its top rock block ([`ore_in_column`]). A column
+/// whose top rock lies under the bodies costs nothing.
+fn ore_in_rock(world: &dyn Columns, ore: &[&Body], c: u32) -> bool {
+    let (x0, x1) = (
+        ore.iter().map(|b| b.aabb[0][0]).min().unwrap_or(0),
+        ore.iter().map(|b| b.aabb[1][0]).max().unwrap_or(-1),
+    );
+    let (z0, z1) = (
+        ore.iter().map(|b| b.aabb[0][2]).min().unwrap_or(0),
+        ore.iter().map(|b| b.aabb[1][2]).max().unwrap_or(-1),
+    );
+    (x0..=x1).step_by(2).any(|x| {
+        (z0..=z1).step_by(2).any(|z| {
+            let (top, _) = world.rock_top(i64::from(x), i64::from(z));
+            ore_in_column(ore, c, x, z, top, i32::MAX / 4)
+        })
+    })
 }
 
 /// A site's centre and box in y from its bodies `own` after they moved: the centre its first
@@ -1107,6 +1144,7 @@ pub fn anchor_folder(
         "bodies_moved": w.bodies_moved,
         "largest_move_blocks": w.largest_move,
         "kept": w.kept,
+        "gone": w.gone,
     });
     if essentials.is_empty()
         && !sites
@@ -1469,8 +1507,9 @@ mod tests {
     }
 
     /// A natural porphyry's gossan and its supergene child's blanket move down together to the
-    /// world's top rock block (ORE-285), its hypogene ore staying where it was; a profile already
-    /// under the rock top stays, and a guaranteed family is left to the guaranteed anchor.
+    /// world's top rock block (ORE-285), its hypogene ore staying where it was; a profile whose
+    /// hypogene ore lies wholly above the ground stays with it, unplaced; a profile already under
+    /// the rock top stays, and a guaranteed family is left to the guaranteed anchor.
     #[test]
     fn a_natural_weathering_profile_comes_down_to_the_worlds_ground() {
         let wp = WorldProjection::Lambert(deeptime_format::Projection::new(2048));
@@ -1496,9 +1535,10 @@ mod tests {
             b.aabb = b.computed_aabb();
             b
         };
+        // The hypogene ore reaches down to y 60, under the land's top rock block (66).
         let fresh = || {
             vec![
-                placed(1, 24, "ore", 128.0, 12.0, 140),
+                placed(1, 24, "ore", 100.0, 40.0, 140),
                 placed(2, 24, "gossan", 138.5, 1.5, 140),
                 placed(3, 25, "ore", 137.5, 1.5, 139),
             ]
@@ -1530,10 +1570,23 @@ mod tests {
                 ids.iter().map(|&i| bodies[i].aabb[1][1]).max().unwrap(),
             )
         };
-        assert_eq!(sites[0].center[1], 128);
+        assert_eq!(sites[0].center[1], 100);
         assert_eq!((sites[0].aabb[0][1], sites[0].aabb[1][1]), span(&[0, 1]));
         assert_eq!(sites[1].center[1], (137.5f64 - 74.0).floor() as i32);
         assert_eq!((sites[1].aabb[0][1], sites[1].aabb[1][1]), span(&[2]));
+        // The ground has come down below the whole hypogene body (its lowest block 116): the body
+        // is not in the world, and its gossan and blanket stay with it, above the ground.
+        let shallow = || {
+            let mut b = fresh();
+            b[0] = placed(1, 24, "ore", 128.0, 12.0, 140);
+            b
+        };
+        let mut gone = shallow();
+        let mut sites = all_sites();
+        let w = settle_weathering(&world, &mut sites, &mut gone, &BTreeMap::new());
+        assert_eq!((w.moved, w.kept, w.gone), (0, 0, 1));
+        assert_eq!(gone, shallow());
+        assert_eq!(sites, all_sites());
         // Under the rock top already: kept.
         let mut low = fresh();
         for b in &mut low {
@@ -1542,7 +1595,7 @@ mod tests {
         let before = low.clone();
         let mut sites = all_sites();
         let w = settle_weathering(&world, &mut sites, &mut low, &BTreeMap::new());
-        assert_eq!((w.moved, w.kept), (0, 1));
+        assert_eq!((w.moved, w.kept, w.gone), (0, 1, 0));
         assert_eq!(low, before);
         // A guaranteed parent: its family is the guaranteed anchor's.
         let mut held = fresh();
