@@ -489,6 +489,55 @@ cell its fill reaches, building out at the toe, rather than filling the nearest 
 mouth. Which rule is meant is a science question for the ledger. Changing it changes the planet,
 so it needs a pool base, not a pair.
 
+### A third round: the step's totals side by side, the flood's queue (2026-10-28)
+
+Master's margin after the mouth fill (PR #25): 891.7 and 894.8 s in the pairs, 878.7 s on the
+gate procedure (`phase1.sh` on 2f453594). Two parts the 300 Myr profile showed serial, each
+change keeping every value's bits:
+- **The surface step's float totals side by side** (`surface::side_by_side`). The outputs' ten
+  totals (the step's net change, carbonate, pelagic, periplatform, evaporite, eroded, fluvial,
+  lake and marine sediment, black shale) and the facies' four were summed one after another,
+  each an in-order pass over the 1.3 million cells of the L1 grid: about 1.2 ms each, bound by
+  the add chain's latency. Each total is still summed in order inside its own job, so its bits
+  are the serial sum's; the jobs run side by side. The dissolved load's total was taken twice
+  in a step (the rain's supply, the denudation) and is now taken once.
+- **The amplifier's flood repair on a radix heap** (`amplify::kernels::flood_repair`,
+  `surface::radix`). The repair is a Priority-Flood with a pit queue whose heap pops by height,
+  then the cell's index on the planet. Those keys are distinct, and a cell it pushes always
+  stands above the cell it came from, so the keys never go below the last popped: the radix
+  heap of Ahuja, Mehlhorn, Orlin & Tarjan (1990) pops exactly the binary heap's sequence, in
+  sequential runs instead of a path of cache misses per pop. A key below the last popped (a
+  NaN height) goes to a small binary heap that pops first. The queues carry each cell's column
+  and row, so the walk divides by nothing (the old walk divided twice a push and once a pop),
+  `Win::global` wraps a column with one add or subtract instead of `rem_euclid`, and the
+  outlets and the seeds are found by rows in parallel (the heap pops by key, so the order of
+  the pushes is free). The old flood stays in the tests as the reference:
+  `the_flood_is_the_binary_heaps_bit_for_bit` floods whole-metre terrain (ties everywhere)
+  with lakes, sinks and closed ground in a whole-planet window, a window across the seam either
+  way and one off the poles, at ε 0.01 and 0, and compares every height's bits and the stats.
+
+**Pairs** (`p1-19-pair.sh`, full 16k, scattered start, 1000 Myr, 8 pinned threads; master
+2f453594's v3 build against the branch's; run beside the exit check's later steps and the item 0
+re-run, which load both sets; `/data/ban/deeptime-runs/gate1028/pair`):
+
+| pair | master | branch | surface (master / branch) | amplify (master / branch) | files differing | the load beside it |
+|---|--:|--:|--:|--:|--:|---|
+| ab (master on set A) | 980.0 | 981.7 | 432.3 / 430.3 | 37.6 / 37.2 | 0 of 91 | others' busy CPUs 9.8, SMT siblings busy 22 % |
+| ba (branch on set A) | 1,243.6 | 1,225.6 | 556.1 / 543.2 | 34.0 / 33.8 | 0 of 91 | others' busy CPUs 16.5, SMT siblings busy 58 % |
+
+Both pairs ran beside heavy jobs (the exit check's MIC smoke, geology, viewer and scale steps, a
+branch build), so the totals say little: plates, whose code is the same in both builds, differ by
+2.2 and 7.8 s. What they show: identical worlds, and the two changed stages faster in both pairs
+(surface 2.0 and 12.9 s, amplify 0.4 and 0.2 s). The amplifier's flood passes went 4.4 to 4.1 s
+in the first pair. The surface's gain is smaller than the sums' count suggested (fourteen in-order
+passes a step, about 1.2 ms each); a pair on a quiet machine is the next measurement.
+
+**Looked at, left:** the climate clock's EBM (5,000 runs over 1000 Myr, each on the last one's
+state; its 90 bands are too few to share a step); the plates note's parse and write (not exact,
+above); the river network's flood in the bake (its heap items are already 8 bytes); plates
+`forces` (2.6 of 8 cores; its serial passes run over the boundary edges, and which one costs
+the time needs a line-level profile, the next step).
+
 ## P1-19 exit item 1: full 16k on eight pinned cores (2026-10-18)
 
 Plan §10 P1-19's first exit item is this page's full 16k gate: 900 s at 8 threads, scattered
