@@ -1265,5 +1265,5 @@ thinly over more cells is most of it), at about 84 ns a pop either way; on the f
 marine_fill takes 19.2 against 17.3 s (408 million cells popped, the most one fill popped 20,632 of
 its 200,000 cap). Planning the mouths' fills in parallel and applying them in turn (bit for bit,
 each plan checked against the cells it popped) re-planned 41 % of them and ran slower, so the fill
-stays serial; its heap item is packed into one u128 so a compare is one instruction
-(`the_packed_item_orders_as_its_fields`).
+stays serial; its heap item is packed into one u128 key (16 bytes, compared as one number;
+`the_packed_item_orders_as_its_fields`).
