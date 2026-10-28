@@ -887,3 +887,92 @@ fn rough_ground_is_the_same_on_any_thread_count() {
     assert_eq!(a.lakes, b.lakes);
     assert_eq!(a.rivers, b.rivers);
 }
+
+/// The open sea and the ground it reaches by the serial floods, as before the speed work of
+/// 2026-10-28.
+fn open_and_reached_serial(
+    w: usize,
+    h: usize,
+    deep: &dyn Fn(usize) -> bool,
+    low: &dyn Fn(usize) -> bool,
+    min_cells: usize,
+) -> (Vec<bool>, Vec<bool>) {
+    let n = w * h;
+    let nb = |c: usize, k: usize| super::neighbour8(w, h, c, k);
+    let mut done = vec![false; n];
+    let mut open = vec![false; n];
+    let (mut members, mut stack) = (Vec::new(), Vec::new());
+    for c0 in 0..n {
+        if done[c0] || !deep(c0) {
+            continue;
+        }
+        members.clear();
+        stack.push(c0);
+        done[c0] = true;
+        while let Some(c) = stack.pop() {
+            members.push(c);
+            for k in 0..8 {
+                if let Some(m) = nb(c, k)
+                    && !done[m]
+                    && deep(m)
+                {
+                    done[m] = true;
+                    stack.push(m);
+                }
+            }
+        }
+        if members.len() >= min_cells {
+            for &c in &members {
+                open[c] = true;
+            }
+        }
+    }
+    let mut reached = open.clone();
+    for c0 in (0..n).filter(|&c| open[c]) {
+        stack.push(c0);
+        while let Some(c) = stack.pop() {
+            for k in 0..8 {
+                if let Some(m) = nb(c, k)
+                    && !reached[m]
+                    && low(m)
+                {
+                    reached[m] = true;
+                    stack.push(m);
+                }
+            }
+        }
+    }
+    (open, reached)
+}
+
+/// The bodies found in parallel give the serial floods' open sea and reached ground, cell for
+/// cell, on pools of 1, 3 and 8 threads, with bodies across the x seam and on the edge rows.
+#[test]
+fn the_parallel_bodies_give_the_serial_floods_cells() {
+    let (w, h) = (97, 61);
+    let mut rng = crate::sphere::SplitMix64::new(21);
+    let z: Vec<i32> = (0..w * h)
+        .map(|c| {
+            let (i, j) = ((c % w) as f64, (c / w) as f64);
+            ((i * 0.21).sin() * 40.0 + (j * 0.17).cos() * 35.0 + rng.next_f64() * 30.0) as i32
+        })
+        .collect();
+    let deep = |c: usize| z[c] <= -20;
+    let low = |c: usize| z[c] <= 0;
+    for min_cells in [1, 5, 40] {
+        let want = open_and_reached_serial(w, h, &deep, &low, min_cells);
+        for t in [1, 3, 8] {
+            let pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(t)
+                .build()
+                .unwrap();
+            let got = pool.install(|| {
+                let open = super::open_sea_mask(w, h, deep, min_cells);
+                let reached = super::sea_reached(w, h, &open, low);
+                (open, reached)
+            });
+            assert!(want.0.iter().any(|&x| x) && want.1.iter().any(|&x| !x));
+            assert_eq!(got, want, "min_cells {min_cells}, {t} threads");
+        }
+    }
+}

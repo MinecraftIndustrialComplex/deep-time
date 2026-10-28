@@ -76,6 +76,28 @@ pub struct FillScratch {
     /// The cells the last [`fill`] raised.
     pub touched: Vec<u32>,
     visited: Vec<u32>,
+    /// The last plan's raises, (cell, metres) in the order the fill makes them ([`plan`]).
+    writes: Vec<(u32, f64)>,
+    /// The cells the last plan read: each cell it put on its heap, the mouth first.
+    read: Vec<u32>,
+    /// [`fill_all`]'s cells raised since its batch's plans read the heights (`== written_gen`).
+    written: Vec<u32>,
+    written_gen: u32,
+    /// [`fill_all`]'s scratch for each thread of the pool.
+    workers: Vec<std::sync::Mutex<FillScratch>>,
+}
+
+/// Counters of [`fill_all`]'s work since the process started (diagnostics printed by `deeptime
+/// bench`; not part of any world): the mouths it filled, and those whose plan an earlier mouth of
+/// its batch had changed the ground under, filled again in turn.
+static FILL_COUNTS: [std::sync::atomic::AtomicU64; 2] = [
+    std::sync::atomic::AtomicU64::new(0),
+    std::sync::atomic::AtomicU64::new(0),
+];
+
+/// [`fill_all`]'s counters: (mouths, mouths filled again in turn).
+pub fn fill_counts() -> [u64; 2] {
+    std::array::from_fn(|k| FILL_COUNTS[k].load(std::sync::atomic::Ordering::Relaxed))
 }
 
 /// Parameters of the mouth fill.
@@ -101,6 +123,110 @@ pub fn fill<G: SurfaceGrid>(
     dep: &mut [f32],
     s: &mut FillScratch,
 ) -> usize {
+    plan(d, sea, mouth, volume, p, h, s);
+    apply(&s.writes, h, dep, &mut s.touched);
+    s.touched.len()
+}
+
+/// Raises `h` and `dep` by a plan's `writes` in their order, and lists the cells in `touched`.
+fn apply(writes: &[(u32, f64)], h: &mut [f64], dep: &mut [f32], touched: &mut Vec<u32>) {
+    touched.clear();
+    for &(c, dz) in writes {
+        let cu = c as usize;
+        h[cu] += dz;
+        dep[cu] += dz as f32;
+        touched.push(c);
+    }
+}
+
+/// The fills of `mouths`, (cell, m³) in the order they are made, one after another as [`fill`]
+/// makes them; `after(k, touched)` runs after mouth `k`'s with the cells it raised. Bit for bit
+/// what the calls of [`fill`] in turn give (the speed work of 2026-10-28). Returns how many mouths
+/// were planned again.
+///
+/// A fill reads only the heights of the cells it puts on its heap, and raises only cells among
+/// them, each after its last read. So a batch of mouths is planned in parallel on the heights as
+/// they stand, and the plans are applied in order; a plan that read a cell an earlier mouth of
+/// the batch has raised since is made again on the heights as they are then. Every plan applied
+/// read the heights the mouths before it left, and the raises go in in the same order.
+#[allow(clippy::too_many_arguments)]
+pub fn fill_all<G: SurfaceGrid>(
+    d: &G,
+    sea: &[bool],
+    mouths: &[(usize, f64)],
+    p: &FillParams,
+    h: &mut [f64],
+    dep: &mut [f32],
+    s: &mut FillScratch,
+    mut after: impl FnMut(usize, &[u32]),
+) -> u64 {
+    use rayon::prelude::*;
+    use std::sync::atomic::Ordering::Relaxed;
+    /// Mouths planned at once: enough for the pool's threads, few enough that the later plans of a
+    /// batch seldom read ground an earlier mouth raised.
+    const BATCH: usize = 64;
+    let n = d.cells();
+    if s.written.len() != n {
+        s.written = vec![0; n];
+        s.written_gen = 0;
+    }
+    let threads = rayon::current_num_threads().max(1);
+    if s.workers.len() != threads {
+        s.workers = (0..threads).map(|_| Default::default()).collect();
+    }
+    let mut again = 0u64;
+    for (b, batch) in mouths.chunks(BATCH).enumerate() {
+        let plans: Vec<_> = {
+            let (heights, workers) = (&*h, &s.workers);
+            batch
+                .par_iter()
+                .map(|&(m, vol)| {
+                    let t = rayon::current_thread_index().unwrap_or(0) % workers.len();
+                    let mut ws = workers[t].lock().unwrap_or_else(|e| e.into_inner());
+                    plan(d, sea, m, vol, p, heights, &mut ws);
+                    (ws.read.clone(), ws.writes.clone())
+                })
+                .collect()
+        };
+        s.written_gen = s.written_gen.wrapping_add(1);
+        if s.written_gen == 0 {
+            s.written.iter_mut().for_each(|x| *x = 0);
+            s.written_gen = 1;
+        }
+        let mark = s.written_gen;
+        for (k, (read, writes)) in plans.into_iter().enumerate() {
+            let fresh = read.iter().all(|&c| s.written[c as usize] != mark);
+            let writes = if fresh {
+                writes
+            } else {
+                again += 1;
+                let (m, vol) = batch[k];
+                plan(d, sea, m, vol, p, h, s);
+                std::mem::take(&mut s.writes)
+            };
+            apply(&writes, h, dep, &mut s.touched);
+            for &(c, _) in &writes {
+                s.written[c as usize] = mark;
+            }
+            after(b * BATCH + k, &s.touched);
+        }
+    }
+    FILL_COUNTS[0].fetch_add(mouths.len() as u64, Relaxed);
+    FILL_COUNTS[1].fetch_add(again, Relaxed);
+    again
+}
+
+/// One mouth's fill worked out on the heights `h` as they stand, without changing them: its raises
+/// in `s.writes` in the order the fill makes them, and the cells it read in `s.read`.
+fn plan<G: SurfaceGrid>(
+    d: &G,
+    sea: &[bool],
+    mouth: usize,
+    volume: f64,
+    p: &FillParams,
+    h: &[f64],
+    s: &mut FillScratch,
+) {
     if s.stamp.len() != d.cells() {
         s.stamp = vec![0; d.cells()];
         s.generation = 0;
@@ -112,16 +238,17 @@ pub fn fill<G: SurfaceGrid>(
     }
     let stamp_id = s.generation;
     s.heap.clear();
-    s.touched.clear();
     s.visited.clear();
+    s.writes.clear();
+    s.read.clear();
     s.heap.push(Item {
         z: h[mouth],
         c: mouth as u32,
         dist: 0.0,
     });
     s.stamp[mouth] = stamp_id;
+    s.read.push(mouth as u32);
     let mut left = volume;
-    let mut touched = 0;
     let mut visited = 0;
     while left > 0.0 {
         let Some(it) = s.heap.pop() else { break };
@@ -133,11 +260,8 @@ pub fn fill<G: SurfaceGrid>(
             let a = d.area(c);
             let take = ((level - h[c]) * a).min(left);
             let dz = take / a;
-            h[c] += dz;
-            dep[c] += dz as f32;
+            s.writes.push((c as u32, dz));
             left -= take;
-            touched += 1;
-            s.touched.push(c as u32);
         }
         if left <= 0.0 || visited >= p.max_cells {
             break;
@@ -145,6 +269,7 @@ pub fn fill<G: SurfaceGrid>(
         for (m, dl) in d.neighbours(c) {
             if sea[m] && s.stamp[m] != stamp_id {
                 s.stamp[m] = stamp_id;
+                s.read.push(m as u32);
                 s.heap.push(Item {
                     z: h[m],
                     c: m as u32,
@@ -167,16 +292,9 @@ pub fn fill<G: SurfaceGrid>(
                 left / area.max(f64::MIN_POSITIVE)
             }
         };
-        for &c in &s.visited {
-            let c = c as usize;
-            h[c] += dz;
-            dep[c] += dz as f32;
-        }
         // (A cell may now appear twice in `touched`; its users are idempotent.)
-        touched += s.visited.len();
-        s.touched.extend_from_slice(&s.visited);
+        s.writes.extend(s.visited.iter().map(|&c| (c, dz)));
     }
-    touched
 }
 
 /// Share of a pair's excess the slope failure moves per iteration, and its iterations per LEM
@@ -822,6 +940,144 @@ mod tests {
             (after - before) * 1e6
         );
         assert!(h[210] <= -20.0 + 1e-9);
+    }
+
+    /// The mouth fill as it was before the speed work of 2026-10-28: the heights raised as the
+    /// queue pops each cell.
+    #[allow(clippy::too_many_arguments)]
+    fn fill_reference(
+        d: &Dims,
+        sea: &[bool],
+        mouth: usize,
+        volume: f64,
+        p: &FillParams,
+        h: &mut [f64],
+        dep: &mut [f32],
+        touched: &mut Vec<u32>,
+    ) {
+        let mut stamp = vec![false; d.cells()];
+        let mut heap = BinaryHeap::new();
+        let mut visited: Vec<u32> = Vec::new();
+        touched.clear();
+        heap.push(Item {
+            z: h[mouth],
+            c: mouth as u32,
+            dist: 0.0,
+        });
+        stamp[mouth] = true;
+        let mut left = volume;
+        while left > 0.0 {
+            let Some(it) = heap.pop() else { break };
+            let c = it.c as usize;
+            visited.push(c as u32);
+            let level = p.sea_level - p.fill_depth_m - p.shelf_slope * f64::from(it.dist);
+            if h[c] < level {
+                let a = d.area(c);
+                let take = ((level - h[c]) * a).min(left);
+                let dz = take / a;
+                h[c] += dz;
+                dep[c] += dz as f32;
+                left -= take;
+                touched.push(c as u32);
+            }
+            if left <= 0.0 || visited.len() >= p.max_cells {
+                break;
+            }
+            for (m, dl) in d.neighbours(c) {
+                if sea[m] && !stamp[m] {
+                    stamp[m] = true;
+                    heap.push(Item {
+                        z: h[m],
+                        c: m as u32,
+                        dist: it.dist + dl as f32,
+                    });
+                }
+            }
+        }
+        if left > 0.0 {
+            let dz = left / (visited.len().max(1) as f64 * d.uniform_area().unwrap());
+            for &c in &visited {
+                h[c as usize] += dz;
+                dep[c as usize] += dz as f32;
+            }
+            touched.extend_from_slice(&visited);
+        }
+    }
+
+    /// The mouths' fills planned in parallel give the fills in turn bit for bit (heights, deposit,
+    /// and each mouth's raised cells for the provenance), on pools of 1, 3 and 8 threads: mouths
+    /// along a crowded coast whose plans overlap, loads from a sliver of a cell to dozens of cells,
+    /// a closed sea that fills up and a mouth that runs out of cells.
+    #[test]
+    fn the_mouths_planned_in_parallel_fill_as_they_did_in_turn() {
+        let (w, rows) = (96, 64);
+        let d = Dims::new(w, rows, 1000.0, true);
+        let n = d.cells();
+        let mut rng = crate::sphere::SplitMix64::new(28);
+        // Land in the middle columns, a closed sea 3 × 3 inside it, the ocean either side.
+        let h0: Vec<f64> = (0..n)
+            .map(|c| {
+                let (i, j) = (c % w, c / w);
+                let coast = 40.0 + 6.0 * (j as f64 * 0.3).sin();
+                let x = i as f64 - coast;
+                if (20..23).contains(&j) && (50..53).contains(&i) {
+                    -300.0 - rng.next_f64() * 50.0
+                } else if (0.0..24.0).contains(&x) {
+                    100.0 + rng.next_f64() * 50.0
+                } else {
+                    -40.0 * x.abs().min((x - 24.0).abs()) - rng.next_f64() * 200.0
+                }
+            })
+            .collect();
+        let sea: Vec<bool> = h0.iter().map(|&z| z < 0.0).collect();
+        let closed = |c: usize| (20..23).contains(&(c / w)) && (50..53).contains(&(c % w));
+        let mouths: Vec<(usize, f64)> = (0..n)
+            .filter(|&c| sea[c] && d.neighbours(c).any(|(m, _)| !sea[m]))
+            .map(|c| {
+                let v = 10f64.powf(5.0 + 6.5 * rng.next_f64());
+                (c, if closed(c) { 1.0e10 } else { v })
+            })
+            .collect();
+        assert!(mouths.len() > 150, "{} mouths", mouths.len());
+        let p = FillParams {
+            sea_level: 0.0,
+            fill_depth_m: 5.0,
+            shelf_slope: 0.0005,
+            max_cells: 400,
+        };
+        let (mut h_want, mut dep_want) = (h0.clone(), vec![0.0f32; n]);
+        let mut touched_want = Vec::new();
+        let mut t = Vec::new();
+        for &(m, vol) in &mouths {
+            fill_reference(&d, &sea, m, vol, &p, &mut h_want, &mut dep_want, &mut t);
+            touched_want.push(t.clone());
+        }
+        for threads in [1, 3, 8] {
+            let pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(threads)
+                .build()
+                .unwrap();
+            let (mut h, mut dep) = (h0.clone(), vec![0.0f32; n]);
+            let mut touched = vec![Vec::new(); mouths.len()];
+            let mut s = FillScratch::default();
+            let again = pool.install(|| {
+                fill_all(&d, &sea, &mouths, &p, &mut h, &mut dep, &mut s, |k, t| {
+                    touched[k] = t.to_vec();
+                })
+            });
+            let bits = |v: &[f64]| v.iter().map(|x| x.to_bits()).collect::<Vec<_>>();
+            assert!(bits(&h) == bits(&h_want), "heights, {threads} threads");
+            assert!(
+                dep.iter()
+                    .zip(&dep_want)
+                    .all(|(a, b)| a.to_bits() == b.to_bits()),
+                "deposit, {threads} threads"
+            );
+            assert_eq!(touched, touched_want, "raised cells, {threads} threads");
+            assert!(again > 0, "no plan read ground an earlier mouth raised");
+            // The closed sea filled up: the rest spread over what it reached.
+            assert!(h[21 * w + 51] > p.sea_level - p.fill_depth_m);
+        }
     }
 
     /// The device's slope failure against the CPU's on the worlds of the bit-for-bit test above
