@@ -146,11 +146,13 @@ pub fn smoothstep(a: f64, b: f64, x: f64) -> f64 {
     t * t * (3.0 - 2.0 * t)
 }
 
+/// Insolation shapes by (bands, steps a year, obliquity, eccentricity, perihelion): each step's
+/// (shape, distance factor) per band.
+type Shapes = Option<([u64; 5], Vec<Vec<(f64, f64)>>)>;
+
 thread_local! {
-    /// The last insolation shapes [`EbmParams::run`] made, by (bands, steps a year, obliquity,
-    /// eccentricity, perihelion): each step's (shape, distance factor) per band.
-    static SHAPES: std::cell::RefCell<Option<([u64; 5], Vec<Vec<(f64, f64)>>)>> =
-        const { std::cell::RefCell::new(None) };
+    /// The last insolation shapes [`EbmParams::run`] made.
+    static SHAPES: std::cell::RefCell<Shapes> = const { std::cell::RefCell::new(None) };
 }
 
 impl EbmParams {
@@ -620,13 +622,13 @@ mod tests {
         // A run with a cold cache (a fresh thread) against the same run after others filled it:
         // another orbit (a miss) and the same orbit under another s₀ (a hit, scaled).
         let land: Vec<f64> = (0..90).map(|j| 0.1 + 0.4 * (j as f64 / 90.0)).collect();
-        let base = EbmParams::earth();
-        let mut other = EbmParams::earth();
+        let base = earth();
+        let mut other = earth();
         other.orbit = insolation::Orbit {
             ecc: 0.05,
             long_peri_rad: 1.3,
         };
-        let mut brighter = EbmParams::earth();
+        let mut brighter = earth();
         brighter.s0 *= 1.0137;
         let run = |p: &EbmParams| {
             let mut st = p.initial_state();
