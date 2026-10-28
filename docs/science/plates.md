@@ -9929,6 +9929,39 @@ continents it has just met, which fits Step 18's map, floor ringed by one plate'
 open floor left between it and the other plate should become one with it, against Earth's record of plates that
 stopped converging (India has not, after 50 Myr), before any new hazard.
 
+### Step 19: the weld is the old floor's trap; the stall needs the plates to stop moving (2026-10-27)
+
+The coordinator, inline, after Step 18 found the floor older than 250 Myr in basins ringed by one plate's continents
+and base27's welds taking 0.94 of the planet's area of ocean floor into other plates per run.
+
+- **Two diagnostic arms** (the pool, master's key ecc431ae09c1, earthlike_quick_16k, 1000 Myr, seeds 1 to 4 from both
+  starts, 8 runs each, read against base27's same 8 runs, medians): with no weld at all (`--set
+  tectonics.weld_after_myr=100000`, arm weld-off) the floor older than 250 Myr falls from 6.9 % to 2.6 % of the ocean,
+  older than 180 Myr from 15.5 % to 7.9 %, the floor's 90th-percentile age from 276 to 170 Myr (Earth's oldest floor in
+  place is about 180 Myr) and its median from 75 to 59 Myr; the steps with one plate over half the planet from 13.6 % to
+  none, the largest plate's median share from 0.31 to 0.21, the plates alive from 17 to 26. With the weld speed at 1
+  mm/yr instead of 5 (arm weld1) the welds fall from 33.5 to 12.5 a run and the floor older than 250 Myr to 4.8 %. So
+  the weld is what keeps the old floor: a plate welded with its ocean floor keeps that floor inside a plate ringed by
+  continents, with no trench, until the supercontinent breaks.
+- **What Earth does** (research sub-agent, 2026-10-27, bibliography notes): reconstructions merge plates mostly when a
+  ridge between them dies (India and Australia at 43 Ma, Seton et al. 2012, Morra et al. 2013), rarely after a
+  collision (Iberia captured by Eurasia at 28 Ma, Seton et al. 2012); collisions go on converging for a long time
+  (India-Asia still 40 to 50 mm/yr after 50 Myr, van Hinsbergen et al. 2011; Africa-Eurasia 4.5 to 5.5 mm/yr about 80
+  Myr after its onset, and still a plate boundary); the ocean trapped when plates stop is small (the Herodotus Basin
+  about 0.13 million km², the Levantine Sea 0.32, the Black Sea 0.44) against the welded plates' median 8 million km² of
+  ocean in base27.
+- **Two faults in the weld rule** (PLT-246): its speed, 5 mm/yr, had no source, and Earth keeps Africa and Eurasia apart
+  at that speed; Bird 2003 (paragraph [3], the source library's copy read) overlooks "internal velocity variations of
+  as much as 2 to 8 mm/a; the lower threshholds apply in regions of slow relative plate motion (e.g., North America,
+  Atlantic Ocean, Mediterranean, Africa)", so plates moving apart by less than 2 mm/yr in a slow region are one plate
+  and those by more are two. And the stall read the convergence across the front alone, so two plates whose collision
+  turned to strike-slip welded while sliding past each other; the rule's own design ("two plates are one plate when they
+  have stopped moving relative to each other", force-balance design 3.4) and Bird's velocity variations are motion in
+  any direction.
+- **The law** (`tectonics.weld_on_relative_speed`, on by default, PLT-721; `weld_speed_mm_yr` 2, PLT-246): a collision
+  stalls when both its convergence across the front and the plates' relative speed along the front (Σ edge length ×
+  relative speed over the edge length, `Front::relative_speed_mm_yr`) stay under 2 mm/yr for `weld_after_myr`.
+
 ## Plate speed (2026-10-25)
 
 The coordinator's brief for the plate speed lane: CHK-020's `speed_rms_mm_yr` (the plate check's
