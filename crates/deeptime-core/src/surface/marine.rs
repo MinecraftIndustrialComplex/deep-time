@@ -325,6 +325,48 @@ pub fn slope_failure(
         }
         dz
     };
+    // The dense passes on a row's inner cells, i in 1..w − 1 of a row j in 1..hgt − 1, into
+    // `out[i − 1]` (the speed work of 2026-10-28): each neighbour read as the row shifted by its
+    // index step, and a dry neighbour's term multiplied by 0 instead of skipped. That adds ±0 to a
+    // sum that is never −0, so the bits are `share`'s and `change`'s, and the row's cells go
+    // through the same arithmetic side by side, which the compiler vectorizes.
+    let rows_ok = w >= 3 && hgt >= 3;
+    let shifted = |j: usize, k: usize| (j * w + 1).wrapping_add_signed(step[k]);
+    let share_row = |j: usize, hh: &[f64], wt: &[bool], av: &[f64], out: &mut [f64]| {
+        let (len, base) = (w - 2, j * w + 1);
+        let hm: [&[f64]; 8] = std::array::from_fn(|k| &hh[shifted(j, k)..][..len]);
+        let wm: [&[bool]; 8] = std::array::from_fn(|k| &wt[shifted(j, k)..][..len]);
+        let (hc, wc, ac) = (&hh[base..][..len], &wt[base..][..len], &av[base..][..len]);
+        for (i, o) in out[..len].iter_mut().enumerate() {
+            let mut give = 0.0;
+            for k in 0..8 {
+                let wf = f64::from(u8::from(wm[k][i]));
+                give += wf * (p.rate * (hc[i] - hm[k][i] - crit[k]).max(0.0));
+            }
+            *o = if wc[i] && ac[i] > 0.0 && give > 0.0 {
+                (ac[i] / give).min(1.0)
+            } else {
+                0.0
+            };
+        }
+    };
+    let change_row = |j: usize, hh: &[f64], wt: &[bool], sc: &[f64], out: &mut [f64]| {
+        let (len, base) = (w - 2, j * w + 1);
+        let hm: [&[f64]; 8] = std::array::from_fn(|k| &hh[shifted(j, k)..][..len]);
+        let wm: [&[bool]; 8] = std::array::from_fn(|k| &wt[shifted(j, k)..][..len]);
+        let sm: [&[f64]; 8] = std::array::from_fn(|k| &sc[shifted(j, k)..][..len]);
+        let (hc, wc, scc) = (&hh[base..][..len], &wt[base..][..len], &sc[base..][..len]);
+        for (i, o) in out[..len].iter_mut().enumerate() {
+            let mut dz = 0.0;
+            for k in 0..8 {
+                let wf = f64::from(u8::from(wm[k][i]));
+                let out = (hc[i] - hm[k][i] - crit[k]).max(0.0);
+                let inn = (hm[k][i] - hc[i] - crit[k]).max(0.0);
+                dz += wf * (p.rate * (inn * sm[k][i] - out * scc[i]));
+            }
+            *o = if wc[i] { dz } else { 0.0 };
+        }
+    };
     // Above this many movers every cell is recomputed; below it only their neighbourhoods are
     // (either gives the same values: cells farther away have the inputs they had).
     let dense_above = n / 4;
@@ -356,6 +398,12 @@ pub fn slope_failure(
     let shares =
         |scale: &mut [f64], all: bool, s: u32, n1: &[u32], hh: &[f64], wt: &[bool], av: &[f64]| {
             scale.par_chunks_mut(w).enumerate().for_each(|(j, row)| {
+                if all && rows_ok && j >= 1 && j + 1 < hgt {
+                    row[0] = share(j * w, false, hh, wt, av);
+                    share_row(j, hh, wt, av, &mut row[1..w - 1]);
+                    row[w - 1] = share(j * w + w - 1, false, hh, wt, av);
+                    return;
+                }
                 for (i, x) in row.iter_mut().enumerate() {
                     let c = j * w + i;
                     if all || n1[c] == s {
@@ -409,18 +457,37 @@ pub fn slope_failure(
             let wt: &[bool] = &wet;
             let sc: &[f64] = &scale;
             let (n2, s): (&[u32], u32) = (&near2, stamp);
-            rows.par_iter_mut().enumerate().for_each(|(j, out)| {
-                out.clear();
-                for i in 0..w {
-                    let c = j * w + i;
-                    if all || n2[c] == s {
-                        let dz = change(c, inner(i, j), hh, wt, sc);
-                        if dz != 0.0 {
-                            out.push((c as u32, dz));
+            rows.par_iter_mut()
+                .enumerate()
+                .for_each_init(Vec::new, |buf, (j, out)| {
+                    out.clear();
+                    if all && rows_ok && j >= 1 && j + 1 < hgt {
+                        buf.resize(w - 2, 0.0);
+                        change_row(j, hh, wt, sc, buf);
+                        let row = (0..w).map(|i| {
+                            if i == 0 || i == w - 1 {
+                                change(j * w + i, false, hh, wt, sc)
+                            } else {
+                                buf[i - 1]
+                            }
+                        });
+                        for (i, dz) in row.enumerate() {
+                            if dz != 0.0 {
+                                out.push(((j * w + i) as u32, dz));
+                            }
+                        }
+                        return;
+                    }
+                    for i in 0..w {
+                        let c = j * w + i;
+                        if all || n2[c] == s {
+                            let dz = change(c, inner(i, j), hh, wt, sc);
+                            if dz != 0.0 {
+                                out.push((c as u32, dz));
+                            }
                         }
                     }
-                }
-            });
+                });
         }
         let count: usize = rows.iter().map(Vec::len).sum();
         let next = count > 0 && it + 1 < p.iterations;
