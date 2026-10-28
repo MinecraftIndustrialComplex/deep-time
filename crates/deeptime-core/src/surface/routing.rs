@@ -108,7 +108,8 @@ pub fn stack<G: SurfaceGrid>(d: &G, kind: &[u8], r: &mut Routing) {
             if kind[root] == SINK {
                 basin.push(root as u32);
             }
-            let mut todo: Vec<u32> = donors[count[root] as usize..count[root + 1] as usize].to_vec();
+            let mut todo: Vec<u32> =
+                donors[count[root] as usize..count[root + 1] as usize].to_vec();
             while let Some(c) = todo.pop() {
                 basin.push(c);
                 let c = c as usize;
@@ -138,8 +139,8 @@ pub fn stack<G: SurfaceGrid>(d: &G, kind: &[u8], r: &mut Routing) {
 /// n + 1) and the list: a counting sort over the cells in order.
 fn donors_in_order(n: usize, rcv: &[u32]) -> (Vec<u32>, Vec<u32>) {
     let mut count = vec![0u32; n + 1];
-    for c in 0..n {
-        let rc = rcv[c] as usize;
+    for (c, &rc) in rcv.iter().enumerate() {
+        let rc = rc as usize;
         if rc != c {
             count[rc + 1] += 1;
         }
@@ -149,8 +150,8 @@ fn donors_in_order(n: usize, rcv: &[u32]) -> (Vec<u32>, Vec<u32>) {
     }
     let mut donors = vec![0u32; count[n] as usize];
     let mut fill = count.clone();
-    for c in 0..n {
-        let rc = rcv[c] as usize;
+    for (c, &rc) in rcv.iter().enumerate() {
+        let rc = rc as usize;
         if rc != c {
             donors[fill[rc] as usize] = c as u32;
             fill[rc] += 1;

@@ -745,7 +745,9 @@ fn stack_serial(kind: &[u8], rcv: &[u32]) -> (Vec<u32>, Vec<(u32, u32, u32)>, Ve
         }
         optr.push(opos.len() as u32);
     }
-    let forest = vec![pos, rpos, dptr, dpos, size, tops, leaves, outlets, optr, opos];
+    let forest = vec![
+        pos, rpos, dptr, dpos, size, tops, leaves, outlets, optr, opos,
+    ];
     (stack, basins, forest)
 }
 
@@ -754,7 +756,11 @@ fn stack_serial(kind: &[u8], rcv: &[u32]) -> (Vec<u32>, Vec<(u32, u32, u32)>, Ve
 /// threads; a receiver that is not a neighbour sends the donors back to the counting sort.
 #[test]
 fn the_parallel_stack_is_the_serial_stack() {
-    for (seed, wrap, sea, coarse) in [(3, true, true, false), (8, false, true, true), (11, true, false, false)] {
+    for (seed, wrap, sea, coarse) in [
+        (3, true, true, false),
+        (8, false, true, true),
+        (11, true, false, false),
+    ] {
         let c = case(150, 90, seed, wrap, sea, coarse);
         for threads in [1, 3, 8] {
             in_pool(threads, || {
@@ -781,7 +787,9 @@ fn the_parallel_stack_is_the_serial_stack() {
                     assert_eq!(*a, b, "forest array {k}, seed {seed}, {threads} threads");
                 }
                 let mut far = r.rcv.clone();
-                let land = (0..n).find(|&m| kind[m] == LAND && far[m] as usize != m).unwrap();
+                let land = (0..n)
+                    .find(|&m| kind[m] == LAND && far[m] as usize != m)
+                    .unwrap();
                 far[land] = ((land + n / 2) % n) as u32;
                 assert_eq!(donors_by_neighbours(&c.d, &far), None);
             });
