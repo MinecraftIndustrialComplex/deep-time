@@ -550,12 +550,13 @@ pub fn tmult_fill(
     });
 }
 
-/// A flood's queue key: the height's bits in [`f32::total_cmp`]'s order, then the cell's index on
-/// the whole planet (the same tie-break in every window). Distinct for distinct cells, so the radix
-/// heap pops what the binary heap of (height, index) popped before it, bit for bit.
+/// A flood's queue key: the height's bits in [`f32::total_cmp`]'s order, then the cell's rank in
+/// its window, which orders as its index on the whole planet (the same tie-break in every
+/// window). Distinct for distinct cells, so the radix heap pops what the binary heap of (height,
+/// index) popped before it, bit for bit.
 #[inline]
-fn flood_key(z: f32, g: u64) -> u64 {
-    (u64::from(radix::ordered(z)) << 32) | g
+fn flood_key(z: f32, rank: u64) -> u64 {
+    (u64::from(radix::ordered(z)) << 32) | rank
 }
 
 /// What a flood did.
@@ -592,9 +593,19 @@ pub fn flood_repair(
     let filled = scratch;
     filled.copy_from_slice(z);
     assert!(
-        (win.gw as u64) * (win.gh as u64) <= 1 << 32,
-        "flood_repair: the planet's raster has more cells than a 32-bit index"
+        n as u64 <= 1 << 32,
+        "flood_repair: a window of more than 2^32 cells"
     );
+    // A cell's rank in the window, in the planet's order: rows down, and in a row the columns
+    // from the one the planet's column 0 falls on (none in the window: its first), round to the
+    // one before it. A window holds a column at most once, so the rank orders as the index on
+    // the whole planet, and it fits 32 bits whatever the planet's size.
+    let first = {
+        let f = (-win.gi0).rem_euclid(win.gw as i64) as usize;
+        if f < w { f } else { 0 }
+    };
+    let rank =
+        |i: usize, j: usize| (j * w + if i >= first { i - first } else { i + w - first }) as u64;
     // The queues hold a cell as its column and row, `(j << 32) | i`, so the walk divides by
     // nothing.
     let at = |i: usize, j: usize| ((j as u64) << 32) | i as u64;
@@ -633,7 +644,7 @@ pub fn flood_repair(
                 win.nbrs(i, j, &mut nb);
                 nb.iter()
                     .any(|&m| m != NONE && !closed[m as usize])
-                    .then(|| (flood_key(z[c], win.global_index(i, j)), at(i, j)))
+                    .then(|| (flood_key(z[c], rank(i, j)), at(i, j)))
             })
         })
         .collect();
@@ -675,7 +686,7 @@ pub fn flood_repair(
                 pit.push_back(at(mi, mj));
             } else {
                 filled[m] = z[m];
-                heap.push(flood_key(z[m], win.global_index(mi, mj)), at(mi, mj));
+                heap.push(flood_key(z[m], rank(mi, mj)), at(mi, mj));
             }
         }
     }
