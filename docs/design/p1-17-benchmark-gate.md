@@ -15,6 +15,10 @@ Statements are marked **measured** (a run made for this page), **read** (from th
 
 ## Summary
 
+- **The gate on master e4bf5d4b, and a round of exact fixes (2026-10-28; "Idle cores by part"
+  below).** Measured: full 16k, 1000 Myr, 8 pinned threads, x86-64-v3. Master took 979.6 s. With
+  the round's fixes it took **915.4 s**, worlds identical (91 of 91 files). That is 15.4 s over
+  the 900 s gate.
 - **The shipped builds (2026-10-18; below).** Measured: full 16k, 100 Myr, 8 threads, pairs run both
   ways round. Against plain `release`, the `ship` profile's x86-64-v3 build is **1.08×** faster
   in wall time (1.10× in CPU time). Its baseline build matches plain in wall time (1.00×) and is
@@ -307,6 +311,75 @@ The pair, 1000 Myr, set A against set B: the branch (the parallel initiation sca
 summed its rows with a rayon `reduce`, whose grouping follows the threads' work stealing. It
 differed in the last digit between two runs of identical worlds. It now sums the rows in row
 order.
+
+### Idle cores by part, and nine exact fixes (2026-10-28)
+
+**Where the cores sat idle on master e4bf5d4b.** Two measurements at 300 Myr:
+- A fresh frame-pointer profile (`P117_CPU=x86-64-v3 tools/review/p1-17-profile.sh`: 325 s, 4.96
+  busy threads, 123 s of idle-core wall). Its `serial.txt` lists what the driver thread ran while
+  the workers waited.
+- A run with the per-part CPU clock (`DEEPTIME_LAP_CPU=1 DEEPTIME_BENCH_NO_OVERLAP=1`). Busy cores
+  are a part's CPU over its wall.
+
+The idle time sits in many small places. The largest:
+- the climate's `ice` part: 18.1 s wall at 3.5 cores;
+- the surface's `advect`: 10.6 s at 1.6 cores;
+- `glacial`: 6.7 s at 1.3 cores;
+- the climate clock: the 1-D EBM, serial by nature.
+
+The perf readers needed one fix. `perf script -F tid,...` right-aligns the thread id, so a sample's
+header line can start with spaces. The readers now tell frame lines by their leading tab.
+
+**Speed with identical worlds.** Each change keeps every value's bits. What is summed is still
+summed in the same order. What runs in parallel only reads. A largest value or a count does not
+depend on order.
+- **The spread's search stops once the release is placed** (`plates::collapse::spread`, the
+  collapse, the founder and the rate release). Each plate's Dijkstra went over the whole reach
+  (5,000 km) before the nearest room was taken. It settles samples in order of distance, ties by
+  sample: the order the room list was sorted in. So the room is now taken as the search settles
+  it, and the search stops when the release is placed (`geometry::dijkstra_settled`).
+  Continent-first room (`collapse_continent_first`, off by default) still sorts the whole reach.
+  The test `the_settled_search_takes_the_room_the_sorted_search_does` covers it.
+- **The dissolved load's cells and weights in parallel** (the climate's `ice` part). The cell list
+  was built on one thread, and each cell's weight (an `exp_m1`) twice. The band sums still take
+  the weights in cell order.
+- **The flexure belts' two searches side by side** (`surface::flexure::belt_reach`). The two
+  breadth-first labellings are independent; they ran one after the other. The source scan and the
+  last filter now run in parallel, in cell order.
+- **The regional fields' line passes put back by rows in parallel**
+  (`deposits::regional::pass`). The column and diagonal passes wrote their lines back on one
+  thread. The test `line_passes_put_the_lines_back_where_the_serial_scatter_did` covers it.
+- **The lakes' open sea at the step's end by strips** (`lakes::at_step_end`). It used the serial
+  labelling; `pflood::parallel::open_sea` gives the same cells.
+- **The erosion bands' reliefs read in parallel.** The bands' sums take them in cell order, as
+  before.
+- **The EBM keeps its insolation shapes while the orbit stays the same** (`climate::ebm`). The
+  test `the_kept_insolation_shapes_give_the_same_bits` covers it.
+- The surface's dissolved field converted in parallel, and the plates' reach (the speed guard's
+  largest radius) in parallel.
+
+**Pairs** (`p1-19-pair.sh`, ab, the branch on set B, master e4bf5d4b on set A):
+- 300 Myr, without the reach: 334.4 s against 352.6 s.
+- 1000 Myr: **915.4 s against 979.6 s**.
+  - plates 264.9 against 291.5 s: collapse 19.5 to 4.5, rate 7.8 to 1.7;
+  - climate 114.1 against 132.9 s: ice 66.6 to 49.4;
+  - surface 397.2 against 410.8 s: flexure 54.9 to 44.6;
+  - deposits 22.9 against 29.2 s.
+- `p1-17-cmp.py`: 91 files, 0 differ.
+
+That leaves 15.4 s to the gate.
+
+**Measured, then reverted: the feedback's sums in parallel.** The plates' feedback adds each L1
+cell to its triangle's three samples in cell order. The parallel version cut the cells into runs.
+A sample belonged to the run of its first cell, and that run read on to the sample's last cell, so
+each sample still took its cells in order. But a call has only 1.33 million cells for 250,000
+samples, and the per-sample bookkeeping cost more than the serial pass: feedback went from 5.0 to
+9.1 s at 300 Myr.
+
+**Considered, not built:**
+- Keeping the relink's nearest sample from cell to cell, behind a margin from the two nearest.
+  There are 5.3 L1 cells per sample, so the margin would rarely cover the next cell.
+- The slope failure's moved metres: a sum in cell order, already beside the parallel apply.
 
 ## P1-19 exit item 1: full 16k on eight pinned cores (2026-10-18)
 
