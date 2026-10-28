@@ -88,6 +88,21 @@ impl PartialOrd for Item {
     }
 }
 
+/// Counters of the mouth fills since the process started (P1-17 diagnostics, printed by
+/// `deeptime bench`; not part of any world): fills, cells popped, cells raised, the most cells one
+/// fill popped.
+static FILL_COUNTS: [std::sync::atomic::AtomicU64; 4] = [
+    std::sync::atomic::AtomicU64::new(0),
+    std::sync::atomic::AtomicU64::new(0),
+    std::sync::atomic::AtomicU64::new(0),
+    std::sync::atomic::AtomicU64::new(0),
+];
+
+/// The mouth fills' counters: (fills, cells popped, cells raised, the most cells one fill popped).
+pub fn fill_counts() -> [u64; 4] {
+    std::array::from_fn(|k| FILL_COUNTS[k].load(std::sync::atomic::Ordering::Relaxed))
+}
+
 /// Scratch for [`fill`], reused between mouths and steps.
 #[derive(Default)]
 pub struct FillScratch {
@@ -175,6 +190,13 @@ pub fn fill<G: SurfaceGrid>(
                 });
             }
         }
+    }
+    {
+        use std::sync::atomic::Ordering::Relaxed;
+        FILL_COUNTS[0].fetch_add(1, Relaxed);
+        FILL_COUNTS[1].fetch_add(visited as u64, Relaxed);
+        FILL_COUNTS[2].fetch_add(touched as u64, Relaxed);
+        FILL_COUNTS[3].fetch_max(visited as u64, Relaxed);
     }
     if left > 0.0 {
         // A closed sea is full (or the mouth ran out of cells): the rest spreads evenly over
