@@ -398,56 +398,19 @@ pub fn dijkstra_sparse(
     allow: impl Fn(u32, u32) -> bool,
     max_rad: f64,
 ) -> Vec<(u32, f64, u32)> {
-    let n = geo.points().len();
-    SPARSE.with(|cell| {
-        let mut scratch = cell.borrow_mut();
-        let (dist, label) = &mut *scratch;
-        if dist.len() < n {
-            dist.resize(n, f64::INFINITY);
-            label.resize(n, u32::MAX);
-        }
-        let mut reached: Vec<u32> = Vec::new();
-        let mut heap = BinaryHeap::with_capacity(sources.len() * 2);
-        for &(v, d, l) in sources {
-            if d < dist[v as usize] {
-                if dist[v as usize] == f64::INFINITY {
-                    reached.push(v);
-                }
-                dist[v as usize] = d;
-                label[v as usize] = l;
-                heap.push(Entry { d, v, label: l });
-            }
-        }
-        while let Some(Entry { d, v, label: l }) = heap.pop() {
-            if d > dist[v as usize] || label[v as usize] != l {
-                continue;
-            }
-            for (u, len) in geo.edges(v) {
-                let nd = d + f64::from(len);
-                if nd <= max_rad && nd < dist[u as usize] && allow(v, u) {
-                    if dist[u as usize] == f64::INFINITY {
-                        reached.push(u);
-                    }
-                    dist[u as usize] = nd;
-                    label[u as usize] = l;
-                    heap.push(Entry {
-                        d: nd,
-                        v: u,
-                        label: l,
-                    });
-                }
-            }
-        }
-        let out = reached
-            .iter()
-            .map(|&v| (v, dist[v as usize], label[v as usize]))
-            .collect();
-        for &v in &reached {
-            dist[v as usize] = f64::INFINITY;
-            label[v as usize] = u32::MAX;
-        }
-        out
-    })
+    sparse_search(
+        geo,
+        sources,
+        allow,
+        max_rad,
+        |_, _| true,
+        |reached, dist, label| {
+            reached
+                .iter()
+                .map(|&v| (v, dist[v as usize], label[v as usize]))
+                .collect()
+        },
+    )
 }
 
 /// [`dijkstra_sparse`] of sources of one label, its vertices handed to `visit(vertex, distance)`
@@ -461,8 +424,23 @@ pub fn dijkstra_settled(
     sources: &[(u32, f64, u32)],
     allow: impl Fn(u32, u32) -> bool,
     max_rad: f64,
-    mut visit: impl FnMut(u32, f64) -> bool,
+    visit: impl FnMut(u32, f64) -> bool,
 ) {
+    sparse_search(geo, sources, allow, max_rad, visit, |_, _, _| ());
+}
+
+/// The search of [`dijkstra_sparse`] and [`dijkstra_settled`] in the per-thread scratch: `visit`
+/// sees each vertex as it settles and stops the search by returning false, then `finish` reads the
+/// vertices reached (in the order first reached) with the scratch's distances and labels, before
+/// the scratch is put back.
+fn sparse_search<R>(
+    geo: &Geo,
+    sources: &[(u32, f64, u32)],
+    allow: impl Fn(u32, u32) -> bool,
+    max_rad: f64,
+    mut visit: impl FnMut(u32, f64) -> bool,
+    finish: impl FnOnce(&[u32], &[f64], &[u32]) -> R,
+) -> R {
     let n = geo.points().len();
     SPARSE.with(|cell| {
         let mut scratch = cell.borrow_mut();
@@ -506,10 +484,12 @@ pub fn dijkstra_settled(
                 }
             }
         }
+        let out = finish(&reached, dist, label);
         for &v in &reached {
             dist[v as usize] = f64::INFINITY;
             label[v as usize] = u32::MAX;
         }
+        out
     })
 }
 

@@ -272,78 +272,26 @@ fn label_lakes<G: SurfaceGrid>(
 }
 
 /// [`label_lakes`] in parallel (the speed work of 2026-10-28): the lakes' cells joined by a
-/// union-find whose roots are each lake's least cell (the cell the serial scan starts it from),
-/// numbered in that order, then each lake's own depth-first walk from it, the lakes side by side.
-/// A walk claims only cells of its own lake, and must reach every one of them; on a grid whose
-/// neighbours are not each other's (where the walks and the joins part) it gives None and the
-/// serial labelling runs.
+/// union-find whose roots are each lake's least cell (the cell the serial scan starts it from;
+/// [`crate::hydro::joined`]), numbered in that order, then each lake's own depth-first walk from
+/// it, the lakes side by side. A walk claims only cells of its own lake, and must reach every one
+/// of them; on a grid whose neighbours are not each other's (where the walks and the joins part)
+/// it gives None and the serial labelling runs.
 fn label_lakes_parallel<G: SurfaceGrid>(
     d: &G,
     is_lake: &(impl Fn(usize) -> bool + Sync),
     filled: &[f64],
 ) -> Option<(Vec<u32>, Vec<Lake>)> {
-    use std::sync::atomic::{AtomicU32, Ordering::AcqRel, Ordering::Acquire, Ordering::Relaxed};
+    use std::sync::atomic::{AtomicU32, Ordering::Relaxed};
     let n = d.cells();
     if n >= NO_LAKE as usize {
         return None;
     }
     let joins = |c: usize, m: usize| (filled[m] - filled[c]).abs() <= LAKE_TOL_M;
-    let parent: Vec<AtomicU32> = (0..n as u32)
-        .into_par_iter()
-        .map(|c| AtomicU32::new(if is_lake(c as usize) { c } else { NO_LAKE }))
-        .collect();
-    let find = |mut x: u32| -> u32 {
-        loop {
-            let p = parent[x as usize].load(Acquire);
-            if p == x {
-                return x;
-            }
-            let g = parent[p as usize].load(Acquire);
-            if g != p {
-                let _ = parent[x as usize].compare_exchange_weak(p, g, AcqRel, Relaxed);
-            }
-            x = p;
-        }
-    };
-    (0..n).into_par_iter().for_each(|c| {
-        if parent[c].load(Relaxed) == NO_LAKE {
-            return;
-        }
-        for (m, _) in d.neighbours(c) {
-            if m == c || parent[m].load(Relaxed) == NO_LAKE || !joins(c, m) {
-                continue;
-            }
-            loop {
-                let (a, b) = (find(c as u32), find(m as u32));
-                if a == b {
-                    break;
-                }
-                let (hi, lo) = if a > b { (a, b) } else { (b, a) };
-                if parent[hi as usize]
-                    .compare_exchange(hi, lo, AcqRel, Relaxed)
-                    .is_ok()
-                {
-                    break;
-                }
-            }
-        }
-    });
-    let root: Vec<u32> = (0..n)
-        .into_par_iter()
-        .map(|c| {
-            if parent[c].load(Relaxed) == NO_LAKE {
-                NO_LAKE
-            } else {
-                find(c as u32)
-            }
-        })
-        .collect();
-    drop(parent);
-    let size: Vec<AtomicU32> = (0..n).into_par_iter().map(|_| AtomicU32::new(0)).collect();
-    root.par_iter().for_each(|&r| {
-        if r != NO_LAKE {
-            size[r as usize].fetch_add(1, Relaxed);
-        }
+    let (root, size) = crate::hydro::joined(n, is_lake, |c| {
+        d.neighbours(c)
+            .map(|(m, _)| m)
+            .filter(move |&m| joins(c, m))
     });
     let seeds: Vec<u32> = (0..n as u32)
         .into_par_iter()
@@ -377,7 +325,7 @@ fn label_lakes_parallel<G: SurfaceGrid>(
                     }
                 }
             }
-            (lake.cells.len() == size[s as usize].load(Relaxed) as usize).then_some(lake)
+            (lake.cells.len() == size[s as usize] as usize).then_some(lake)
         })
         .collect();
     let lakes: Vec<Lake> = lakes.into_iter().collect::<Option<_>>()?;

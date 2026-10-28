@@ -639,7 +639,9 @@ pub fn step(
     // it stands and taken in turn up to the first start, after which the rest are planned again
     // (the speed work of 2026-10-28: the same plans in the same order).
     let mut next = 0;
-    'plates: while next < ids.len() {
+    // The plate count changes only where one starts, so the cap is checked before each round of
+    // plans (the loop before checked it before each plate's plan).
+    while next < ids.len() && (state.alive().count() as u32) < k.max_plates {
         let eligible = |u: u32| {
             state.plates[u as usize].alive && !state.propagations.iter().any(|p| p.under == u)
         };
@@ -653,9 +655,6 @@ pub fn step(
         let first = next;
         next = ids.len();
         for (j, plan) in plans.into_iter().enumerate() {
-            if state.alive().count() as u32 >= k.max_plates {
-                break 'plates;
-            }
             match plan {
                 None | Some(Plan::None) => {}
                 Some(Plan::Stall) => state.counters.propagation_stalls += 1,

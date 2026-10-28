@@ -169,15 +169,28 @@ pub fn sea_reached(
 pub(crate) const NO_BODY: u32 = u32::MAX;
 
 /// The 8-connected bodies of the cells `member` picks, on a grid of `n` cells whose neighbour `k`
-/// (0..8) of cell `c` is `nb(c, k)` (a symmetric relation), in parallel (the speed work of
-/// 2026-10-28): each cell's body as its least cell ([`NO_BODY`] off the bodies), and each body's
-/// cell count at that least cell. A union-find over the neighbours' pairs, each pair joined once
-/// from its lower cell, the larger root always linked under the smaller, so every body's root is
-/// its least cell whatever the threads' order: the bodies the serial floods find.
+/// (0..8) of cell `c` is `nb(c, k)` (a symmetric relation): [`joined`] over the neighbours' pairs,
+/// each pair joined once from its lower cell. The bodies the serial floods find.
 pub(crate) fn bodies(
     n: usize,
     nb: impl Fn(usize, usize) -> Option<usize> + Sync,
     member: &(impl Fn(usize) -> bool + Sync),
+) -> (Vec<u32>, Vec<u32>) {
+    let nb = &nb;
+    joined(n, member, move |c| {
+        (0..8).filter_map(move |k| nb(c, k).filter(|&m| m > c))
+    })
+}
+
+/// The bodies of the cells `member` picks, each member joined to the members `links(c)` names, in
+/// parallel (the speed work of 2026-10-28): each cell's body as its least cell ([`NO_BODY`] off
+/// the bodies), and each body's cell count at that least cell. A union-find, the larger root
+/// always linked under the smaller, so every body's root is its least cell whatever the threads'
+/// order. A link named from either end joins the pair.
+pub(crate) fn joined<I: IntoIterator<Item = usize>>(
+    n: usize,
+    member: &(impl Fn(usize) -> bool + Sync),
+    links: impl Fn(usize) -> I + Sync,
 ) -> (Vec<u32>, Vec<u32>) {
     use std::sync::atomic::{AtomicU32, Ordering::AcqRel, Ordering::Acquire, Ordering::Relaxed};
     assert!(n < NO_BODY as usize, "cell indices fit in u32");
@@ -203,11 +216,8 @@ pub(crate) fn bodies(
         if parent[c].load(Relaxed) == NO_BODY {
             return;
         }
-        for k in 0..8 {
-            let Some(m) = nb(c, k) else {
-                continue;
-            };
-            if m <= c || parent[m].load(Relaxed) == NO_BODY {
+        for m in links(c) {
+            if parent[m].load(Relaxed) == NO_BODY {
                 continue;
             }
             loop {

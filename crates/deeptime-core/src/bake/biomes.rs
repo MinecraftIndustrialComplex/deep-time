@@ -1262,25 +1262,45 @@ pub fn settle_to_ground(
 /// the sea that already agree) and the sea, for the cube to search side by side first
 /// (`CubeSettle::prime`); none when the land call changes no node.
 pub fn settle_sources(c: &BiomeCells, sea: &[bool]) -> Vec<Vec<bool>> {
-    let now_land: Vec<bool> = c
-        .continents
-        .par_iter()
-        .map(|&v| is_land_continentalness(f64::from(v)))
-        .collect();
-    if !sea.par_iter().zip(&now_land).any(|(&s, &l)| s == l) {
-        return Vec::new();
+    match Flips::of(c, sea) {
+        Some(f) => vec![f.stable_land, f.stable_sea, sea.to_vec()],
+        None => Vec::new(),
     }
-    let stable_land = sea
-        .par_iter()
-        .zip(&now_land)
-        .map(|(&s, &l)| !s && l)
-        .collect();
-    let stable_sea = sea
-        .par_iter()
-        .zip(&now_land)
-        .map(|(&s, &l)| s && !l)
-        .collect();
-    vec![stable_land, stable_sea, sea.to_vec()]
+}
+
+/// The nodes the land call turns to land and to sea on `sea`, and the donors: the land and the
+/// sea that already agree.
+struct Flips {
+    to_land: Vec<bool>,
+    to_sea: Vec<bool>,
+    stable_land: Vec<bool>,
+    stable_sea: Vec<bool>,
+}
+
+impl Flips {
+    /// None when the land call turns no node.
+    fn of(c: &BiomeCells, sea: &[bool]) -> Option<Flips> {
+        let now_land: Vec<bool> = c
+            .continents
+            .par_iter()
+            .map(|&v| is_land_continentalness(f64::from(v)))
+            .collect();
+        if !sea.par_iter().zip(&now_land).any(|(&s, &l)| s == l) {
+            return None;
+        }
+        let set = |f: fn(bool, bool) -> bool| -> Vec<bool> {
+            sea.par_iter()
+                .zip(&now_land)
+                .map(|(&s, &l)| f(s, l))
+                .collect()
+        };
+        Some(Flips {
+            to_land: set(|s, l| !s && !l),
+            to_sea: set(|s, l| s && l),
+            stable_land: set(|s, l| !s && l),
+            stable_sea: set(|s, l| s && !l),
+        })
+    }
 }
 
 /// [`settle_to_ground`] on any grid: `fill` is [`fill_nearest`] on it and `dist` is
@@ -1298,19 +1318,16 @@ pub fn settle_to_ground_by(
     let n = sea.len();
     let r = reference();
     let edge = r.bands.continents[3];
-    let now_land: Vec<bool> = c
-        .continents
-        .iter()
-        .map(|&v| is_land_continentalness(f64::from(v)))
-        .collect();
-    let to_land: Vec<bool> = (0..n).map(|k| !sea[k] && !now_land[k]).collect();
-    let to_sea: Vec<bool> = (0..n).map(|k| sea[k] && now_land[k]).collect();
-    if !to_land.iter().any(|&f| f) && !to_sea.iter().any(|&f| f) {
+    // The flips, and the donors: the nodes that agree, by medium.
+    let Some(Flips {
+        to_land,
+        to_sea,
+        stable_land,
+        stable_sea,
+    }) = Flips::of(c, sea)
+    else {
         return Settled::default();
-    }
-    // Donors: the nodes that agree, by medium.
-    let stable_land: Vec<bool> = (0..n).map(|k| !sea[k] && now_land[k]).collect();
-    let stable_sea: Vec<bool> = (0..n).map(|k| sea[k] && !now_land[k]).collect();
+    };
     let take = |v: &mut [f32], flips: &[bool], donors: &[bool]| {
         let mut filled = v.to_vec();
         if fill(&mut filled, donors) {
