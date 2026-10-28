@@ -418,9 +418,6 @@ mod tests {
         }
     }
 
-    /// The octagon: a spike dilates into a dense octagon of the asked radius (nothing beyond it,
-    /// no hole inside the inscribed circle); a constant field keeps its value to the poles; an
-    /// east–west shift of the input shifts both outputs bit for bit.
     /// A line pass puts each line's values back where the serial scatter did (the speed work of
     /// 2026-10-28: rows in parallel).
     #[test]
@@ -449,6 +446,9 @@ mod tests {
         }
     }
 
+    /// The octagon: a spike dilates into a dense octagon of the asked radius (nothing beyond it,
+    /// no hole inside the inscribed circle); a constant field keeps its value to the poles; an
+    /// east–west shift of the input shifts both outputs bit for bit.
     #[test]
     fn octagons_have_the_radius_and_shift_exactly() {
         let (w, h) = (96usize, 64usize);
