@@ -146,6 +146,13 @@ pub fn smoothstep(a: f64, b: f64, x: f64) -> f64 {
     t * t * (3.0 - 2.0 * t)
 }
 
+thread_local! {
+    /// The last insolation shapes [`EbmParams::run`] made, by (bands, steps a year, obliquity,
+    /// eccentricity, perihelion): each step's (shape, distance factor) per band.
+    static SHAPES: std::cell::RefCell<Option<([u64; 5], Vec<Vec<(f64, f64)>>)>> =
+        const { std::cell::RefCell::new(None) };
+}
+
 impl EbmParams {
     /// The EBM of a climate section on a planet with this tilt and star flux (× Earth's).
     pub fn from_climate(
@@ -249,17 +256,42 @@ impl EbmParams {
                 self.a0 + self.a2 * 0.5 * (3.0 * x * x - 1.0)
             })
             .collect();
-        // Insolation of every step and band (the step's midpoint).
-        let q: Vec<Vec<f64>> = (0..spy)
-            .map(|s| {
-                let lam = self.orbit.lambda_at((s as f64 + 0.5) / spy as f64);
-                lat.iter()
-                    .map(|&l| {
-                        insolation::daily_orbit(self.s0, l, lam, self.obliquity_rad, &self.orbit)
+        // Insolation of every step and band (the step's midpoint): s₀ times a shape that the
+        // bands, the steps, the obliquity and the orbit fix, which stay the same from call to
+        // call outside the orbital window, so the shape and the orbit's distance factor are kept
+        // per thread and only scaled (the speed work of 2026-10-28; `insolation::daily_orbit`'s
+        // operations in its order, the same bits).
+        let key = [
+            n as u64,
+            spy as u64,
+            self.obliquity_rad.to_bits(),
+            self.orbit.ecc.to_bits(),
+            self.orbit.long_peri_rad.to_bits(),
+        ];
+        let q: Vec<Vec<f64>> = SHAPES.with(|cache| {
+            let mut cache = cache.borrow_mut();
+            if cache.as_ref().is_none_or(|(k, _)| *k != key) {
+                let shapes: Vec<Vec<(f64, f64)>> = (0..spy)
+                    .map(|s| {
+                        let lam = self.orbit.lambda_at((s as f64 + 0.5) / spy as f64);
+                        let df = self.orbit.distance_factor(lam);
+                        lat.iter()
+                            .map(|&l| (insolation::daily_shape(l, lam, self.obliquity_rad), df))
+                            .collect()
                     })
-                    .collect()
-            })
-            .collect();
+                    .collect();
+                *cache = Some((key, shapes));
+            }
+            let (_, shapes) = cache.as_ref().expect("filled above");
+            shapes
+                .iter()
+                .map(|row| {
+                    row.iter()
+                        .map(|&(x, df)| insolation::from_shape(self.s0, x) * df)
+                        .collect()
+                })
+                .collect()
+        });
         let wsum: f64 = cosl.iter().sum();
         let f: Vec<f64> = (0..n)
             .map(|j| land.get(j).copied().unwrap_or(0.0).clamp(0.0, 1.0))
@@ -583,6 +615,39 @@ mod tests {
 
     /// P1-17: the zonal model's diffusions are factored once per run; the factored solve gives
     /// `thomas`'s bits on band systems like the model's (diagonally dominant, zero end faces).
+    #[test]
+    fn the_kept_insolation_shapes_give_the_same_bits() {
+        // A run with a cold cache (a fresh thread) against the same run after others filled it:
+        // another orbit (a miss) and the same orbit under another s₀ (a hit, scaled).
+        let land: Vec<f64> = (0..90).map(|j| 0.1 + 0.4 * (j as f64 / 90.0)).collect();
+        let base = EbmParams::earth();
+        let mut other = EbmParams::earth();
+        other.orbit = insolation::Orbit {
+            ecc: 0.05,
+            long_peri_rad: 1.3,
+        };
+        let mut brighter = EbmParams::earth();
+        brighter.s0 *= 1.0137;
+        let run = |p: &EbmParams| {
+            let mut st = p.initial_state();
+            let r = p.run(&mut st, &land, &[], 3);
+            let bits = |v: &[f64]| v.iter().map(|x| x.to_bits()).collect::<Vec<_>>();
+            (r.t_global.to_bits(), r.asr.to_bits(), bits(&st.t_ocean), bits(&st.t_land))
+        };
+        let cold = |p: &EbmParams| std::thread::scope(|sc| sc.spawn(|| run(p)).join().unwrap());
+        let (base0, brighter0) = (cold(&base), cold(&brighter));
+        std::thread::scope(|sc| {
+            sc.spawn(|| {
+                run(&other);
+                assert_eq!(run(&base), base0, "after another orbit");
+                assert_eq!(run(&brighter), brighter0, "the kept shapes under another s0");
+                assert_eq!(run(&base), base0, "again");
+            })
+            .join()
+            .unwrap();
+        });
+    }
+
     #[test]
     fn the_factored_solve_equals_thomas_bit_for_bit() {
         let mut rng = crate::sphere::SplitMix64::new(3);
