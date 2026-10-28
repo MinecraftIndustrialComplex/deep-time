@@ -138,38 +138,61 @@ fn dt_1d_at(f: &[f64], pos: &[f64], out: &mut [f64], v: &mut Vec<usize>, z: &mut
 /// w × h grid whose row `j`'s cells are `sx[j]` metres wide and `sy[j]` metres high (rows are
 /// (sy[j] + sy[j + 1]) / 2 apart along a column; the Lambert grid's rows are uneven on the
 /// sphere); x wraps. Rows in parallel, then columns in parallel: deterministic.
+///
+/// Cost (the speed work of 2026-10-28; the climate clock calls it every 5 kyr of an orbital
+/// window): a row without ice is 0 throughout, which is what its transform gives, so only rows
+/// with ice are transformed. Such a row is read once round from an ice-free cell back to that
+/// cell, w + 1 samples: every ice cell's nearest ice-free cell along the row lies within that
+/// span, so the values are the squared whole-cell distances the transform of three copies of the
+/// row (across the seam) gave, bit for bit. A column without ice reaches no ice cell, so it is
+/// left at 0 (its transform gives 0 up to round-off on rows a micrometre apart past a pole, and
+/// [`thickness`] reads only ice cells). The scratch vectors are reused within each task.
 pub fn distance_to_margin(w: usize, h: usize, ice: &[bool], sx: &[f64], sy: &[f64]) -> Vec<f64> {
     let mut rows = vec![0.0; w * h];
-    rows.par_chunks_mut(w).enumerate().for_each(|(j, out)| {
-        // Three copies of the row so the transform sees across the seam.
-        let f: Vec<f64> = (0..3 * w)
-            .map(|k| if ice[j * w + k % w] { INF } else { 0.0 })
-            .collect();
-        let mut d = vec![0.0; 3 * w];
-        let (mut v, mut z) = (Vec::new(), Vec::new());
-        dt_1d(&f, sx[j].max(1e-6), &mut d, &mut v, &mut z);
-        out.copy_from_slice(&d[w..2 * w]);
-    });
+    rows.par_chunks_mut(w).enumerate().for_each_init(
+        || (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+        |(f, d, v, z), (j, out)| {
+            let row = &ice[j * w..(j + 1) * w];
+            if !row.contains(&true) {
+                return;
+            }
+            let Some(start) = row.iter().position(|&x| !x) else {
+                out.fill(INF);
+                return;
+            };
+            f.clear();
+            f.extend((0..=w).map(|k| if row[(start + k) % w] { INF } else { 0.0 }));
+            d.clear();
+            d.resize(w + 1, 0.0);
+            dt_1d(f, sx[j].max(1e-6), d, v, z);
+            for (k, &x) in d[..w].iter().enumerate() {
+                out[(start + k) % w] = x;
+            }
+        },
+    );
     // Row centres along a column, m (strictly increasing: a row wholly past a pole counts 1 µm).
     let mut pos = vec![0.0; h];
     for j in 1..h {
         pos[j] = pos[j - 1] + (0.5 * (sy[j - 1] + sy[j])).max(1e-6);
     }
-    let cols: Vec<Vec<f64>> = (0..w)
-        .into_par_iter()
-        .map(|i| {
-            let f: Vec<f64> = (0..h).map(|j| rows[j * w + i]).collect();
-            let mut d = vec![0.0; h];
-            let (mut v, mut z) = (Vec::new(), Vec::new());
-            dt_1d_at(&f, &pos, &mut d, &mut v, &mut z);
-            d
-        })
-        .collect();
+    // Each column into its own run of a column-major buffer.
+    let mut cols = vec![0.0; w * h];
+    cols.par_chunks_mut(h).enumerate().for_each_init(
+        || (Vec::new(), Vec::new(), Vec::new()),
+        |(f, v, z), (i, d)| {
+            if !(0..h).any(|j| ice[j * w + i]) {
+                return;
+            }
+            f.clear();
+            f.extend((0..h).map(|j| rows[j * w + i]));
+            dt_1d_at(f, &pos, d, v, z);
+        },
+    );
     // Back into rows, rows in parallel (P1-17).
     let mut out = vec![0.0; w * h];
     out.par_chunks_mut(w).enumerate().for_each(|(j, row)| {
-        for (x, col) in row.iter_mut().zip(&cols) {
-            *x = col[j].min(INF).sqrt();
+        for (i, x) in row.iter_mut().enumerate() {
+            *x = cols[i * h + j].min(INF).sqrt();
         }
     });
     out
@@ -419,6 +442,106 @@ mod tests {
         // All ice: every distance is huge; no ice: zero.
         let none = distance_to_margin(4, 3, &[false; 12], &[1.0; 3], &[1.0; 3]);
         assert!(none.iter().all(|&x| x == 0.0));
+    }
+
+    /// The transform as it was before 2026-10-28: every row as three copies (across the seam),
+    /// every column, one vector per column.
+    fn distance_to_margin_reference(
+        w: usize,
+        h: usize,
+        ice: &[bool],
+        sx: &[f64],
+        sy: &[f64],
+    ) -> Vec<f64> {
+        let mut rows = vec![0.0; w * h];
+        for j in 0..h {
+            let f: Vec<f64> = (0..3 * w)
+                .map(|k| if ice[j * w + k % w] { INF } else { 0.0 })
+                .collect();
+            let mut d = vec![0.0; 3 * w];
+            let (mut v, mut z) = (Vec::new(), Vec::new());
+            dt_1d(&f, sx[j].max(1e-6), &mut d, &mut v, &mut z);
+            rows[j * w..(j + 1) * w].copy_from_slice(&d[w..2 * w]);
+        }
+        let mut pos = vec![0.0; h];
+        for j in 1..h {
+            pos[j] = pos[j - 1] + (0.5 * (sy[j - 1] + sy[j])).max(1e-6);
+        }
+        let mut out = vec![0.0; w * h];
+        for i in 0..w {
+            let f: Vec<f64> = (0..h).map(|j| rows[j * w + i]).collect();
+            let mut d = vec![0.0; h];
+            let (mut v, mut z) = (Vec::new(), Vec::new());
+            dt_1d_at(&f, &pos, &mut d, &mut v, &mut z);
+            for j in 0..h {
+                out[j * w + i] = d[j].min(INF).sqrt();
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn the_transform_equals_the_three_copy_one_on_every_ice_cell() {
+        // Random caps, glaciers and whole ice rows on a grid with uneven rows and rows past the
+        // poles (1 µm apart): every ice cell bit for bit, every ice-free cell 0 in the new one.
+        let (w, h) = (97, 61);
+        let sx: Vec<f64> = (0..h)
+            .map(|j| 1.0e4 * (0.05 + (j as f64 / h as f64 * 3.1).sin().abs()))
+            .collect();
+        let mut sy: Vec<f64> = (0..h).map(|j| 9.0e3 + 50.0 * j as f64).collect();
+        sy[0] = 0.0;
+        sy[h - 1] = 0.0;
+        let mut seed = 0x9e37_79b9_7f4a_7c15u64;
+        let mut rnd = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            (seed >> 11) as f64 / (1u64 << 53) as f64
+        };
+        for case in 0..6 {
+            let mut ice = vec![false; w * h];
+            for j in 0..h {
+                let polar = (j < 8 || j + 8 > h) && case % 2 == 0;
+                for i in 0..w {
+                    ice[j * w + i] = polar && rnd() < 0.9 || rnd() < 0.04 * case as f64;
+                }
+            }
+            if case == 3 {
+                ice[20 * w..21 * w].fill(true);
+            }
+            let new = distance_to_margin(w, h, &ice, &sx, &sy);
+            let old = distance_to_margin_reference(w, h, &ice, &sx, &sy);
+            for c in 0..w * h {
+                if ice[c] {
+                    assert_eq!(
+                        new[c].to_bits(),
+                        old[c].to_bits(),
+                        "case {case} cell {c}: {} vs {}",
+                        new[c],
+                        old[c]
+                    );
+                } else {
+                    assert_eq!(new[c], 0.0, "case {case} ice-free cell {c}");
+                }
+            }
+            let t_new = thickness(w, h, &ice, &sx, &sy, 5.0e4, 4000.0, G);
+            let t_old: Vec<f32> = (0..w * h)
+                .map(|c| {
+                    if !ice[c] {
+                        return 0.0;
+                    }
+                    let half = 0.5 * sx[c / w].min(sy[c / w]);
+                    nye((old[c] - half).max(half), 5.0e4, 4000.0, G) as f32
+                })
+                .collect();
+            assert!(
+                t_new
+                    .iter()
+                    .zip(&t_old)
+                    .all(|(a, b)| a.to_bits() == b.to_bits()),
+                "case {case}: thickness differs"
+            );
+        }
     }
 
     #[test]

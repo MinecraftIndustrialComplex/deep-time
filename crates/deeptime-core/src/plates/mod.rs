@@ -149,6 +149,7 @@ fn lap(since: &mut std::time::Instant, what: &'static str) {
     let now = std::time::Instant::now();
     let ms = (now - *since).as_secs_f64() * 1000.0;
     *since = now;
+    crate::compute::cpu_part(STAGE_NAME, what);
     if let Ok(mut t) = TIMINGS.lock() {
         match t.iter_mut().find(|e| e.0 == what) {
             Some(e) => e.1 += ms,
@@ -270,6 +271,7 @@ impl PlatesStage {
     /// One plate step on `st` (taken out of the world while it runs).
     fn advance(&mut self, st: &mut PlateState, world: &mut WorldState) -> Result<(), CoreError> {
         let mut clock = std::time::Instant::now();
+        crate::compute::cpu_mark(STAGE_NAME);
         if self
             .cache
             .as_ref()
