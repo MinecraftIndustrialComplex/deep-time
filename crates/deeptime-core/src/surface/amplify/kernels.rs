@@ -43,13 +43,13 @@
 //! ensure for any depression the amplification itself creates (a coarse depression the young
 //! landscape had is a lake, or a dry basin with its sink, and stays one).
 
-use std::cmp::Ordering;
-use std::collections::{BinaryHeap, VecDeque};
+use std::collections::VecDeque;
 use std::time::Instant;
 
 use super::resample::{Fine, basin, cell, wet};
-use super::window::{NONE, STEP, Win, map_cells, map_cells2};
+use super::window::{NONE, OFFSETS, STEP, Win, map_cells, map_cells2};
 use crate::surface::detail::Noise;
+use crate::surface::radix::{self, RadixHeap};
 use crate::surface::thermal;
 
 /// `x^p`, spelled out for the exponents the amplifier defaults to.
@@ -550,30 +550,12 @@ pub fn tmult_fill(
     });
 }
 
-#[derive(Clone, Copy)]
-struct Entry {
-    z: f32,
-    g: u64,
-    c: u32,
-}
-
-impl PartialEq for Entry {
-    fn eq(&self, o: &Self) -> bool {
-        self.cmp(o) == Ordering::Equal
-    }
-}
-impl Eq for Entry {}
-impl Ord for Entry {
-    fn cmp(&self, o: &Self) -> Ordering {
-        // A min-heap on height, ties by the cell's index on the whole planet (the same in every
-        // window).
-        o.z.total_cmp(&self.z).then_with(|| o.g.cmp(&self.g))
-    }
-}
-impl PartialOrd for Entry {
-    fn partial_cmp(&self, o: &Self) -> Option<Ordering> {
-        Some(self.cmp(o))
-    }
+/// A flood's queue key: the height's bits in [`f32::total_cmp`]'s order, then the cell's index on
+/// the whole planet (the same tie-break in every window). Distinct for distinct cells, so the radix
+/// heap pops what the binary heap of (height, index) popped before it, bit for bit.
+#[inline]
+fn flood_key(z: f32, g: u64) -> u64 {
+    (u64::from(radix::ordered(z)) << 32) | g
 }
 
 /// What a flood did.
@@ -604,13 +586,20 @@ pub fn flood_repair(
     scratch: &mut [f32],
     core: (usize, usize, usize, usize),
 ) -> FloodStats {
+    use rayon::prelude::*;
     let n = win.cells();
     let (w, h) = (win.w, win.h);
-    let mut closed = vec![false; n];
     let filled = scratch;
     filled.copy_from_slice(z);
-    let mut heap: BinaryHeap<Entry> = BinaryHeap::new();
-    let mut pit: VecDeque<u32> = VecDeque::new();
+    assert!(
+        (win.gw as u64) * (win.gh as u64) <= 1 << 32,
+        "flood_repair: the planet's raster has more cells than a 32-bit index"
+    );
+    // The queues hold a cell as its column and row, `(j << 32) | i`, so the walk divides by
+    // nothing.
+    let at = |i: usize, j: usize| ((j as u64) << 32) | i as u64;
+    let mut heap: RadixHeap<u64> = RadixHeap::new();
+    let mut pit: VecDeque<u64> = VecDeque::new();
     let open_west_east = !win.wraps();
     let open_top = !win.top_edge();
     let open_bottom = !win.bottom_edge();
@@ -623,44 +612,49 @@ pub fn flood_repair(
             || (open_top && j == 0)
             || (open_bottom && j + 1 == h)
     };
-    let mut nb = [NONE; 8];
-    // Seed with the outlets that touch a cell that is not one.
-    for j in 0..h {
-        for i in 0..w {
-            let c = j * w + i;
-            if !outlet(i, j, c) {
-                continue;
-            }
-            closed[c] = true;
-            win.nbrs(i, j, &mut nb);
-            let touches_land = nb.iter().any(|&m| {
-                m != NONE && {
-                    let m = m as usize;
-                    !outlet(m % w, m / w, m)
-                }
-            });
-            if touches_land {
-                heap.push(Entry {
-                    z: z[c],
-                    g: win.global_index(i, j),
-                    c: c as u32,
-                });
-            }
+    // The outlets close at once; those that touch a cell that is not one seed the queue. By rows
+    // in parallel: the queue pops by key alone, so the order of the pushes is free.
+    let mut closed = vec![false; n];
+    closed.par_chunks_mut(w).enumerate().for_each(|(j, row)| {
+        for (i, x) in row.iter_mut().enumerate() {
+            *x = outlet(i, j, j * w + i);
         }
+    });
+    let seeds: Vec<(u64, u64)> = (0..h)
+        .into_par_iter()
+        .flat_map_iter(|j| {
+            let closed = &closed;
+            (0..w).filter_map(move |i| {
+                let c = j * w + i;
+                if !closed[c] {
+                    return None;
+                }
+                let mut nb = [NONE; 8];
+                win.nbrs(i, j, &mut nb);
+                nb.iter()
+                    .any(|&m| m != NONE && !closed[m as usize])
+                    .then(|| (flood_key(z[c], win.global_index(i, j)), at(i, j)))
+            })
+        })
+        .collect();
+    for (k, v) in seeds {
+        heap.push(k, v);
     }
+    let mut nb = [NONE; 8];
     let mut stats = FloodStats::default();
     loop {
-        let c = if let Some(c) = pit.pop_front() {
-            c as usize
-        } else if let Some(e) = heap.pop() {
-            e.c as usize
+        let v = if let Some(v) = pit.pop_front() {
+            v
+        } else if let Some((_, v)) = heap.pop() {
+            v
         } else {
             break;
         };
-        let (ci, cj) = (c % w, c / w);
-        let zc = filled[c];
+        let (ci, cj) = ((v & 0xffff_ffff) as usize, (v >> 32) as usize);
+        let zc = filled[cj * w + ci];
+        let interior = ci > 0 && ci + 1 < w && cj > 0 && cj + 1 < h;
         win.nbrs(ci, cj, &mut nb);
-        for &m in nb.iter() {
+        for (k, &m) in nb.iter().enumerate() {
             if m == NONE {
                 continue;
             }
@@ -669,41 +663,43 @@ pub fn flood_repair(
                 continue;
             }
             closed[m] = true;
+            let (mi, mj) = if interior {
+                let (di, dj) = OFFSETS[k];
+                ((ci as i64 + di) as usize, (cj as i64 + dj) as usize)
+            } else {
+                (m % w, m / w)
+            };
             let up = zc + eps;
             if z[m] <= up {
                 filled[m] = up;
-                pit.push_back(m as u32);
+                pit.push_back(at(mi, mj));
             } else {
                 filled[m] = z[m];
-                heap.push(Entry {
-                    z: z[m],
-                    g: win.global_index(m % w, m / w),
-                    c: m as u32,
-                });
+                heap.push(flood_key(z[m], win.global_index(mi, mj)), at(mi, mj));
             }
         }
     }
     let (cx0, cy0, cw, ch) = core;
-    for c in 0..n {
-        let in_core = {
-            let (i, j) = (c % w, c / w);
-            (cx0..cx0 + cw).contains(&i) && (cy0..cy0 + ch).contains(&j)
-        };
-        if !closed[c] {
-            if !wet_at(z, lake, sea, c) && in_core {
-                stats.unreached += 1;
+    for j in 0..h {
+        for i in 0..w {
+            let c = j * w + i;
+            let in_core = (cx0..cx0 + cw).contains(&i) && (cy0..cy0 + ch).contains(&j);
+            if !closed[c] {
+                if !wet_at(z, lake, sea, c) && in_core {
+                    stats.unreached += 1;
+                }
+                continue;
             }
-            continue;
-        }
-        let up = filled[c] - z[c];
-        if up > 0.0 {
-            z[c] = filled[c];
-            if in_core {
-                stats.raised_cells += 1;
-                stats.raised_m_cells += f64::from(up);
-                if up > stats.max_raise_m {
-                    stats.max_raise_m = up;
-                    stats.max_raise_at = c;
+            let up = filled[c] - z[c];
+            if up > 0.0 {
+                z[c] = filled[c];
+                if in_core {
+                    stats.raised_cells += 1;
+                    stats.raised_m_cells += f64::from(up);
+                    if up > stats.max_raise_m {
+                        stats.max_raise_m = up;
+                        stats.max_raise_at = c;
+                    }
                 }
             }
         }
@@ -990,6 +986,221 @@ pub fn middle_cpu(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BinaryHeap;
+
+    /// The flood before the radix heap: a binary heap of (height, the cell's index on the
+    /// planet), the reference [`flood_repair`] must match bit for bit.
+    #[derive(Clone, Copy)]
+    struct Entry {
+        z: f32,
+        g: u64,
+        c: u32,
+    }
+    impl PartialEq for Entry {
+        fn eq(&self, o: &Self) -> bool {
+            self.cmp(o) == std::cmp::Ordering::Equal
+        }
+    }
+    impl Eq for Entry {}
+    impl Ord for Entry {
+        fn cmp(&self, o: &Self) -> std::cmp::Ordering {
+            o.z.total_cmp(&self.z).then_with(|| o.g.cmp(&self.g))
+        }
+    }
+    impl PartialOrd for Entry {
+        fn partial_cmp(&self, o: &Self) -> Option<std::cmp::Ordering> {
+            Some(self.cmp(o))
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn flood_reference(
+        win: &Win,
+        z: &mut [f32],
+        lake: &[u8],
+        sea: f32,
+        eps: f32,
+        scratch: &mut [f32],
+        core: (usize, usize, usize, usize),
+    ) -> FloodStats {
+        let n = win.cells();
+        let (w, h) = (win.w, win.h);
+        let mut closed = vec![false; n];
+        let filled = scratch;
+        filled.copy_from_slice(z);
+        let mut heap: BinaryHeap<Entry> = BinaryHeap::new();
+        let mut pit: VecDeque<u32> = VecDeque::new();
+        let open_west_east = !win.wraps();
+        let open_top = !win.top_edge();
+        let open_bottom = !win.bottom_edge();
+        // ledger: AMP-017, AMP-097 (a dry basin drains to its sink)
+        let outlet = |i: usize, j: usize, c: usize| -> bool {
+            wet_at(z, lake, sea, c)
+                || cell::lake(lake[c])
+                || class(lake, c) == basin::SINK
+                || (open_west_east && (i == 0 || i + 1 == w))
+                || (open_top && j == 0)
+                || (open_bottom && j + 1 == h)
+        };
+        let mut nb = [NONE; 8];
+        // Seed with the outlets that touch a cell that is not one.
+        for j in 0..h {
+            for i in 0..w {
+                let c = j * w + i;
+                if !outlet(i, j, c) {
+                    continue;
+                }
+                closed[c] = true;
+                win.nbrs(i, j, &mut nb);
+                let touches_land = nb.iter().any(|&m| {
+                    m != NONE && {
+                        let m = m as usize;
+                        !outlet(m % w, m / w, m)
+                    }
+                });
+                if touches_land {
+                    heap.push(Entry {
+                        z: z[c],
+                        g: win.global_index(i, j),
+                        c: c as u32,
+                    });
+                }
+            }
+        }
+        let mut stats = FloodStats::default();
+        loop {
+            let c = if let Some(c) = pit.pop_front() {
+                c as usize
+            } else if let Some(e) = heap.pop() {
+                e.c as usize
+            } else {
+                break;
+            };
+            let (ci, cj) = (c % w, c / w);
+            let zc = filled[c];
+            win.nbrs(ci, cj, &mut nb);
+            for &m in nb.iter() {
+                if m == NONE {
+                    continue;
+                }
+                let m = m as usize;
+                if closed[m] {
+                    continue;
+                }
+                closed[m] = true;
+                let up = zc + eps;
+                if z[m] <= up {
+                    filled[m] = up;
+                    pit.push_back(m as u32);
+                } else {
+                    filled[m] = z[m];
+                    heap.push(Entry {
+                        z: z[m],
+                        g: win.global_index(m % w, m / w),
+                        c: m as u32,
+                    });
+                }
+            }
+        }
+        let (cx0, cy0, cw, ch) = core;
+        for c in 0..n {
+            let in_core = {
+                let (i, j) = (c % w, c / w);
+                (cx0..cx0 + cw).contains(&i) && (cy0..cy0 + ch).contains(&j)
+            };
+            if !closed[c] {
+                if !wet_at(z, lake, sea, c) && in_core {
+                    stats.unreached += 1;
+                }
+                continue;
+            }
+            let up = filled[c] - z[c];
+            if up > 0.0 {
+                z[c] = filled[c];
+                if in_core {
+                    stats.raised_cells += 1;
+                    stats.raised_m_cells += f64::from(up);
+                    if up > stats.max_raise_m {
+                        stats.max_raise_m = up;
+                        stats.max_raise_at = c;
+                    }
+                }
+            }
+        }
+        stats
+    }
+
+    /// Terrain in whole metres (so heights tie everywhere), lakes, dry basins' sinks and closed
+    /// ground, flooded in a window of every kind (the whole planet, across the seam either way,
+    /// off the poles): the radix heap's flood is the binary heap's, bit for bit.
+    #[test]
+    fn the_flood_is_the_binary_heaps_bit_for_bit() {
+        let (gw, gh) = (96usize, 40usize);
+        let mut s = 0x2545_f491_4f6c_dd1du64;
+        let mut next = move || {
+            s ^= s << 13;
+            s ^= s >> 7;
+            s ^= s << 17;
+            s
+        };
+        let z: Vec<f32> = (0..gw * gh).map(|_| (next() % 40) as f32 - 6.0).collect();
+        let lake: Vec<u8> = (0..gw * gh)
+            .map(|_| match next() % 50 {
+                0 => cell::of(true, basin::OPEN),
+                1 => cell::of(false, basin::SINK),
+                2..=6 => cell::of(false, basin::CLOSED),
+                _ => cell::of(false, basin::OPEN),
+            })
+            .collect();
+        let wins = [
+            Win::full(gw, gh),
+            Win {
+                w: 40,
+                h: 30,
+                gi0: -15,
+                gj0: 5,
+                gw,
+                gh,
+            },
+            Win {
+                w: 40,
+                h: 25,
+                gi0: 70,
+                gj0: 0,
+                gw,
+                gh,
+            },
+            Win {
+                w: 30,
+                h: 20,
+                gi0: 20,
+                gj0: 20,
+                gw,
+                gh,
+            },
+        ];
+        for win in wins {
+            let (zw, lw): (Vec<f32>, Vec<u8>) = (0..win.h)
+                .flat_map(|j| (0..win.w).map(move |i| (i, j)))
+                .map(|(i, j)| {
+                    let (gi, gj) = win.global(i, j);
+                    (z[gj * gw + gi], lake[gj * gw + gi])
+                })
+                .unzip();
+            let core = (3, 2, win.w - 6, win.h - 4);
+            for eps in [0.01f32, 0.0] {
+                let (mut a, mut b) = (zw.clone(), zw.clone());
+                let mut scratch = vec![0.0; win.cells()];
+                let sa = flood_repair(&win, &mut a, &lw, 0.0, eps, &mut scratch, core);
+                let sb = flood_reference(&win, &mut b, &lw, 0.0, eps, &mut scratch, core);
+                assert!(sa.raised_cells > 0, "{win:?}");
+                assert_eq!(sa, sb, "{win:?} eps {eps}");
+                assert_eq!(sa.raised_m_cells.to_bits(), sb.raised_m_cells.to_bits());
+                let bits = |v: &[f32]| v.iter().map(|x| x.to_bits()).collect::<Vec<_>>();
+                assert_eq!(bits(&a), bits(&b), "{win:?} eps {eps}");
+            }
+        }
+    }
 
     fn physics(dx: f32) -> Physics {
         Physics {
