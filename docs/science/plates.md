@@ -9929,6 +9929,52 @@ continents it has just met, which fits Step 18's map, floor ringed by one plate'
 open floor left between it and the other plate should become one with it, against Earth's record of plates that
 stopped converging (India has not, after 50 Myr), before any new hazard.
 
+### Step 19: the weld is the old floor's trap; the stall needs the plates to stop moving (2026-10-27)
+
+The coordinator, inline, after Step 18 found the floor older than 250 Myr in basins ringed by one plate's continents
+and base27's welds taking 0.94 of the planet's area of ocean floor into other plates per run.
+
+- **Two diagnostic arms** (the pool, master's key ecc431ae09c1, earthlike_quick_16k, 1000 Myr, seeds 1 to 4 from both
+  starts, 8 runs each, read against base27's same 8 runs, medians): with no weld at all (`--set
+  tectonics.weld_after_myr=100000`, arm weld-off) the floor older than 250 Myr falls from 6.9 % to 2.6 % of the ocean,
+  older than 180 Myr from 15.5 % to 7.9 %, the floor's 90th-percentile age from 276 to 170 Myr (Earth's oldest floor in
+  place is about 180 Myr) and its median from 75 to 59 Myr; the steps with one plate over half the planet from 13.6 % to
+  none, the largest plate's median share from 0.31 to 0.21, the plates alive from 17 to 26. With the weld speed at 1
+  mm/yr instead of 5 (arm weld1) the welds fall from 33.5 to 12.5 a run and the floor older than 250 Myr to 4.8 %. So
+  the weld is what keeps the old floor: a plate welded with its ocean floor keeps that floor inside a plate ringed by
+  continents, with no trench, until the supercontinent breaks.
+- **What Earth does** (research sub-agent, 2026-10-27, bibliography notes): reconstructions merge plates mostly when a
+  ridge between them dies (India and Australia at 43 Ma, Seton et al. 2012, Morra et al. 2013), rarely after a
+  collision (Iberia captured by Eurasia at 28 Ma, Seton et al. 2012); collisions go on converging for a long time
+  (India-Asia still 40 to 50 mm/yr after 50 Myr, van Hinsbergen et al. 2011; Africa-Eurasia 4.5 to 5.5 mm/yr about 80
+  Myr after its onset, and still a plate boundary); the ocean trapped when plates stop is small (the Herodotus Basin
+  about 0.13 million km², the Levantine Sea 0.32, the Black Sea 0.44) against the welded plates' median 8 million km² of
+  ocean in base27.
+- **Two faults in the weld rule** (PLT-246): its speed, 5 mm/yr, had no source, and Earth keeps Africa and Eurasia apart
+  at that speed; Bird 2003 (paragraph [3], the source library's copy read) overlooks "internal velocity variations of
+  as much as 2 to 8 mm/a; the lower threshholds apply in regions of slow relative plate motion (e.g., North America,
+  Atlantic Ocean, Mediterranean, Africa)", so plates moving apart by less than 2 mm/yr in a slow region are one plate
+  and those by more are two. And the stall read the convergence across the front alone, so two plates whose collision
+  turned to strike-slip welded while sliding past each other; the rule's own design ("two plates are one plate when they
+  have stopped moving relative to each other", force-balance design 3.4) and Bird's velocity variations are motion in
+  any direction.
+- **The law** (`tectonics.weld_on_relative_speed`, on by default, PLT-721; `weld_speed_mm_yr` 2, PLT-246): a collision
+  stalls when both its convergence across the front and the plates' relative speed along the front (Σ edge length ×
+  relative speed over the edge length, `Front::relative_speed_mm_yr`) stay under 2 mm/yr for `weld_after_myr`.
+- **The arm** (weldfix: the branch weld-relative-motion with both on, key 886f9af3f0d4, the same 8 runs, medians against
+  base27's; the plate check's passes of 8 in brackets): welds 33.5 to 6.5 a run; the floor older than 250 Myr 6.9 % to
+  3.4 % (0 to 2), older than 180 Myr 15.5 % to 9.5 % (0 to 5), its 90th-percentile age 276 to 189 Myr and median 75 to
+  62 Myr; the steps with one plate over half the planet 13.6 % to none (3 to 8), the largest plate's median share 0.31
+  to 0.23, plates alive 17 to 24; collisions 4.8 to 2.6 per 100 Myr (8 to 7), their 90th-percentile length 59 to 80
+  Myr, their convergence after 20 Myr 0.34 to 0.55 of the onset's (8 to 5; India-Asia keeps about 0.3, van Hinsbergen
+  et al. 2011's 16 cm/yr to 4 to 5). Worse: the active share of the continental margin 0.39 to 0.45 (7 to 0 within 0.25
+  to 0.4), the speed guard bound on 1 and 2 of 500 steps in two supercontinent runs (8 to 6), the most land gained in a
+  step (2 to 1). V1's census: land 0.320 to 0.295 (p 0.11), coast with high ground 0.131 to 0.154 (p 0.56), land above
+  2 km 0.039 to 0.046 (p 0.95), continental crust's net change -0.057 to -0.068 (p 0.046), the highest plate elevation
+  5,357 to 5,999 m (p 0.009); the guard's worst 10,328 to 10,491 m from the sea, no step beyond 2 Earth reliefs. On by
+  default (the coordinator's call, decisions log 2026-10-27): the corrected law is the rule's own definition and its
+  speed is sourced; the margins' active share and the speed guard are the next things to read on base28.
+
 ## Plate speed (2026-10-25)
 
 The coordinator's brief for the plate speed lane: CHK-020's `speed_rms_mm_yr` (the plate check's
