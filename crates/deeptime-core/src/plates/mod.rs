@@ -1236,85 +1236,62 @@ impl PlatesStage {
             wh: f64,
             zh: f64,
         }
-        // The flexure's sample (`sample_flexure`) beside the feedback's sums: both read the last
-        // sampling's links and neither writes what the other reads (P1-19). Each sums its cells in
-        // cell order per sample, in parallel ([`scatter_in_order`]; one pass on one thread each
-        // before the speed work of 2026-10-28).
+        // The flexure's sample (`sample_flexure`) beside the feedback's sums, on another thread:
+        // both read the last sampling's links and neither writes what the other reads (P1-19:
+        // one after the other before). Each stays one pass over the cells in order.
         let flex_field = world
             .fields
             .get(crate::surface::flexure::field::FLEXURE)
             .filter(|_| flexure);
         let points = cache.geo.points().len();
-        // A cell's part of the sums: its offset (NaN where the surface holds it), material, cones,
-        // and whether its offset is held.
-        struct Cell {
-            dz: f64,
-            dm: f64,
-            cone: [f64; 2],
-            taken: bool,
-            held: bool,
-        }
-        let cell = |c: usize| -> Option<Cell> {
-            let dz = f64::from(fb.data[c]);
-            // Without the material field the feedback is the rock (a held cell: none).
-            let dm = material
-                .as_ref()
-                .map_or(if dz.is_nan() { 0.0 } else { dz }, |m| f64::from(m.data[c]));
-            let cone = [0, 1].map(|k| {
-                cone_fields[k]
-                    .as_ref()
-                    .map_or(0.0, |f| f64::from(f.data[c]))
-            });
-            Some(Cell {
-                dz,
-                dm,
-                cone,
-                taken: !dz.is_nan(),
-                held: held_field.is_some_and(|h| h[c] > 0.5),
-            })
-        };
-        let add = |a: &mut Sums, x: &Cell, w: f64| {
-            a.w += w;
-            if x.taken {
-                a.z += w * x.dz;
-                a.mz += w * x.dm;
-            }
-            a.m += w * x.dm;
-            a.c[0] += w * x.cone[0];
-            a.c[1] += w * x.cone[1];
-            if x.held {
-                a.wh += w;
-                if x.taken {
-                    a.zh += w * x.dz;
-                }
-            }
-        };
         let ((sums, psum), flexure) = rayon::join(
-            || match parts.as_ref() {
-                Some(p) => {
-                    let both: Vec<(Sums, [f64; SP])> = scatter_in_order(
-                        links,
-                        tris,
-                        n,
-                        |c| {
-                            cell(c).map(|x| {
-                                let pc: [f64; SP] =
-                                    std::array::from_fn(|k| f64::from(p[k].data[c]));
-                                (x, pc)
-                            })
-                        },
-                        |a: &mut (Sums, [f64; SP]), (x, pc): &(Cell, [f64; SP]), w| {
-                            add(&mut a.0, x, w);
-                            if x.taken {
-                                for (a, x) in a.1.iter_mut().zip(pc) {
+            || {
+                let mut sums = vec![Sums::default(); n];
+                let mut psum = vec![[0.0f64; SP]; if parts.is_some() { n } else { 0 }];
+                for (c, l) in links.iter().enumerate() {
+                    let t = tris[l.tri as usize];
+                    let dz = f64::from(fb.data[c]);
+                    // Without the material field the feedback is the rock (a held cell: none).
+                    let dm = material
+                        .as_ref()
+                        .map_or(if dz.is_nan() { 0.0 } else { dz }, |m| f64::from(m.data[c]));
+                    let cone = [0, 1].map(|k| {
+                        cone_fields[k]
+                            .as_ref()
+                            .map_or(0.0, |f| f64::from(f.data[c]))
+                    });
+                    let pc = parts
+                        .as_ref()
+                        .map(|p| std::array::from_fn::<f64, SP, _>(|k| f64::from(p[k].data[c])));
+                    let taken = !dz.is_nan();
+                    let held = held_field.is_some_and(|h| h[c] > 0.5);
+                    for (&v, &w) in t.iter().zip(l.w.iter()) {
+                        let w = f64::from(w);
+                        if w > 0.0 {
+                            let a = &mut sums[v as usize];
+                            a.w += w;
+                            if taken {
+                                a.z += w * dz;
+                                a.mz += w * dm;
+                            }
+                            a.m += w * dm;
+                            a.c[0] += w * cone[0];
+                            a.c[1] += w * cone[1];
+                            if held {
+                                a.wh += w;
+                                if taken {
+                                    a.zh += w * dz;
+                                }
+                            }
+                            if let Some(pc) = pc.filter(|_| taken) {
+                                for (a, x) in psum[v as usize].iter_mut().zip(pc) {
                                     *a += w * x;
                                 }
                             }
-                        },
-                    );
-                    both.into_par_iter().unzip()
+                        }
+                    }
                 }
-                None => (scatter_in_order(links, tris, n, cell, add), Vec::new()),
+                (sums, psum)
             },
             || flex_field.and_then(|f| flexure_of(links, tris, points, f)),
         );
@@ -1483,129 +1460,33 @@ fn flexure_of(links: &[CellLink], tris: &[[u32; 3]], n: usize, field: &Field) ->
     if links.len() != field.data.len() {
         return None;
     }
-    let sums: Vec<(f64, f64)> = scatter_in_order(
-        links,
-        tris,
-        n,
-        |c| Some(f64::from(field.data[c])).filter(|x| x.is_finite()),
-        |a: &mut (f64, f64), &x, w| {
-            a.0 += w;
-            a.1 += w * x;
-        },
-    );
-    Some(
-        sums.into_par_iter()
-            .map(|(wsum, sum)| if wsum > 0.0 { sum / wsum } else { f64::NAN })
-            .collect(),
-    )
-}
-
-/// Per-sample sums over the cells as one pass over them in cell order leaves them, in parallel
-/// (the speed work of 2026-10-28). Every cell `c` that `data` gives a value adds it to each
-/// corner `v < n` of its triangle that it weighs (`w > 0`), corner by corner, through
-/// `add(sum, value, w)`. The cells are cut into runs; a sample belongs to the run of the first
-/// cell that weighs it, and that run's worker goes on past the run's end to the last cell that
-/// weighs one of its samples, adding to its own samples only. So each sample takes its cells' adds
-/// in cell order, as the serial pass gave them, and the sums keep their bits on any pool.
-fn scatter_in_order<D, A>(
-    links: &[CellLink],
-    tris: &[[u32; 3]],
-    n: usize,
-    data: impl Fn(usize) -> Option<D> + Sync,
-    add: impl Fn(&mut A, &D, f64) + Sync,
-) -> Vec<A>
-where
-    A: Default + Clone + Send + Sync,
-{
-    use std::sync::atomic::{AtomicU32, Ordering::Relaxed};
-    const NONE: u32 = u32::MAX;
-    let cells = links.len();
-    assert!(cells < NONE as usize, "cell indices fit in u32");
-    let corners = |c: usize| -> [(u32, f64); 3] {
-        let l = &links[c];
-        let t = tris[l.tri as usize];
-        std::array::from_fn(|k| (t[k], f64::from(l.w[k])))
-    };
-    let weighs = |v: u32, w: f64| w > 0.0 && (v as usize) < n;
-    // The runs.
-    let size = cells.div_ceil(4 * rayon::current_num_threads()).max(1);
-    let runs = cells.div_ceil(size);
-    // Each sample's first and last cell. A run reads its cells forwards for the first and
-    // backwards for the last, so it writes a sample only on its first meeting (a write for every
-    // corner made this pass dearer than the serial sums).
-    let first: Vec<AtomicU32> = (0..n)
-        .into_par_iter()
-        .map(|_| AtomicU32::new(NONE))
-        .collect();
-    let last: Vec<AtomicU32> = (0..n).into_par_iter().map(|_| AtomicU32::new(0)).collect();
-    (0..runs).into_par_iter().for_each(|r| {
-        let cs = r * size..((r + 1) * size).min(cells);
-        for c in cs.clone() {
-            for (v, w) in corners(c) {
-                if weighs(v, w) && (c as u32) < first[v as usize].load(Relaxed) {
-                    first[v as usize].fetch_min(c as u32, Relaxed);
-                }
-            }
+    let mut wsum = vec![0.0f64; n];
+    let mut sum = vec![0.0f64; n];
+    for (c, l) in links.iter().enumerate() {
+        let x = f64::from(field.data[c]);
+        if !x.is_finite() {
+            continue;
         }
-        for c in cs.rev() {
-            for (v, w) in corners(c) {
-                if weighs(v, w) && (c as u32) > last[v as usize].load(Relaxed) {
-                    last[v as usize].fetch_max(c as u32, Relaxed);
-                }
+        for (&v, &w) in tris[l.tri as usize].iter().zip(l.w.iter()) {
+            let w = f64::from(w);
+            if w > 0.0 && (v as usize) < n {
+                wsum[v as usize] += w;
+                sum[v as usize] += w * x;
             }
-        }
-    });
-    // Each sample's run and place in its run's sums, and how far each run reads.
-    let mut owner = vec![NONE; n];
-    let mut slot = vec![0u32; n];
-    let mut count = vec![0u32; runs];
-    let mut end: Vec<usize> = (0..runs).map(|r| ((r + 1) * size).min(cells)).collect();
-    for v in 0..n {
-        let f = first[v].load(Relaxed);
-        if f != NONE {
-            let r = f as usize / size;
-            owner[v] = r as u32;
-            slot[v] = count[r];
-            count[r] += 1;
-            end[r] = end[r].max(last[v].load(Relaxed) as usize + 1);
         }
     }
-    // What the runs read past their ends (a sample that cells far apart weigh: a gap's cells
-    // linked to its nearest sample).
-    crate::compute::add("scatter_cells_n", cells as f64);
-    crate::compute::add(
-        "scatter_read_cells_n",
-        (0..runs).map(|r| end[r] - r * size).sum::<usize>() as f64,
-    );
-    let sums: Vec<Vec<A>> = (0..runs)
-        .into_par_iter()
-        .map(|r| {
-            let mut acc = vec![A::default(); count[r] as usize];
-            let mine = |v: u32, w: f64| weighs(v, w) && owner[v as usize] == r as u32;
-            for c in r * size..end[r] {
-                let cs = corners(c);
-                if !cs.iter().any(|&(v, w)| mine(v, w)) {
-                    continue;
+    Some(
+        (0..n)
+            .into_par_iter()
+            .map(|v| {
+                if wsum[v] > 0.0 {
+                    sum[v] / wsum[v]
+                } else {
+                    f64::NAN
                 }
-                let Some(x) = data(c) else {
-                    continue;
-                };
-                for (v, w) in cs {
-                    if mine(v, w) {
-                        add(&mut acc[slot[v as usize] as usize], &x, w);
-                    }
-                }
-            }
-            acc
-        })
-        .collect();
-    (0..n)
-        .into_par_iter()
-        .map(|v| match owner[v] {
-            NONE => A::default(),
-            r => sums[r as usize][slot[v] as usize].clone(),
-        })
-        .collect()
+            })
+            .collect(),
+    )
 }
 
 /// `WorldState::globals`: the volcano stage's cones handed to the pools as felsic volcanic rock

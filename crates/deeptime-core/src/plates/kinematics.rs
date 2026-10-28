@@ -9,6 +9,7 @@
 //! whenever it binds; [`cap_speed`] caps the rotation itself (a weld's mixed motion).
 
 use glam::{DQuat, DVec3};
+use rayon::prelude::*;
 
 use super::normalise::Norm;
 use super::state::PlateState;
@@ -95,20 +96,39 @@ pub fn reach(state: &PlateState, pos: &[DVec3], omega: &[Option<DVec3>]) -> Vec<
         .iter()
         .map(|w| w.and_then(|w| w.try_normalize()))
         .collect();
-    let mut out = vec![0.0f64; omega.len()];
-    for (i, s) in state.samples.iter().enumerate() {
-        if s.is_hidden() {
-            continue;
-        }
-        let p = state.plate_of(i) as usize;
-        if let Some(Some(a)) = axes.get(p) {
-            let r = a.cross(pos[i]).length();
-            if r > out[p] {
-                out[p] = r;
-            }
-        }
-    }
-    out
+    // In parallel (the speed work of 2026-10-28; one thread before): a largest value is the
+    // same whatever order the samples come in.
+    let m = omega.len();
+    state
+        .samples
+        .par_iter()
+        .enumerate()
+        .fold(
+            || vec![0.0f64; m],
+            |mut out, (i, s)| {
+                if !s.is_hidden() {
+                    let p = state.plate_of(i) as usize;
+                    if let Some(Some(a)) = axes.get(p) {
+                        let r = a.cross(pos[i]).length();
+                        if r > out[p] {
+                            out[p] = r;
+                        }
+                    }
+                }
+                out
+            },
+        )
+        .reduce(
+            || vec![0.0f64; m],
+            |mut a, b| {
+                for (x, y) in a.iter_mut().zip(b) {
+                    if y > *x {
+                        *x = y;
+                    }
+                }
+                a
+            },
+        )
 }
 
 /// The speed guard (`max_plate_speed_mm_yr`; ledger PLT-022): scales Ω down so the plate's fastest
