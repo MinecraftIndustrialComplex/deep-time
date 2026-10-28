@@ -1186,6 +1186,17 @@ pub(crate) fn timings_line(
                 .join(",")
         ));
     }
+    // The parts' CPU, all threads (`DEEPTIME_LAP_CPU`, the speed work's diagnostic; `compute.rs`).
+    let cpu = deeptime_core::compute::cpu_timings();
+    if !cpu.is_empty() {
+        parts.push(format!(
+            "cpu[{}]",
+            cpu.iter()
+                .map(|(stage, part, ms)| format!("{stage}:{part}={:.1}s", ms / 1000.0))
+                .collect::<Vec<_>>()
+                .join(",")
+        ));
+    }
     // The GPU kernels' parts and their CPU twins (a process-wide gauge too; `compute.rs`):
     // seconds, and plain counts for the names ending in `_n`.
     let compute = deeptime_core::compute::timings();

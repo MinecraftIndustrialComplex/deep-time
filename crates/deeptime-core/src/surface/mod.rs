@@ -843,9 +843,11 @@ impl SurfaceStage {
 
     fn time(&mut self, what: &'static str, since: Instant) {
         *self.timings.entry(what).or_insert(0.0) += since.elapsed().as_secs_f64() * 1000.0;
+        crate::compute::cpu_part(STAGE_NAME, what);
     }
 
     fn advance(&mut self, world: &mut WorldState, ctx: &StageContext<'_>) -> Result<(), CoreError> {
+        crate::compute::cpu_mark(STAGE_NAME);
         let grid = self.grid()?;
         let n = grid.cells();
         let (w, hgt) = (grid.w as usize, grid.h as usize);
