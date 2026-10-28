@@ -85,10 +85,19 @@ impl Win {
     /// Global cell (column wrapped into [0, gw), row) of window cell (i, j).
     #[inline]
     pub fn global(&self, i: usize, j: usize) -> (usize, usize) {
-        (
-            (self.gi0 + i as i64).rem_euclid(self.gw as i64) as usize,
-            (self.gj0 + j as i64) as usize,
-        )
+        // A window's columns lie within one planet width of the raster's: one add or subtract
+        // wraps them, without the division `rem_euclid` costs (the same column either way).
+        let (gi, gw) = (self.gi0 + i as i64, self.gw as i64);
+        let gi = if (0..gw).contains(&gi) {
+            gi
+        } else if (-gw..0).contains(&gi) {
+            gi + gw
+        } else if (gw..2 * gw).contains(&gi) {
+            gi - gw
+        } else {
+            gi.rem_euclid(gw)
+        };
+        (gi as usize, (self.gj0 + j as i64) as usize)
     }
 
     /// The row-major index of global cell (gi, gj) on the whole planet: a tie-break that is the
