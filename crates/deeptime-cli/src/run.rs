@@ -1991,6 +1991,11 @@ pub fn bench(o: &BenchOptions) -> CliResult<()> {
             movers as f64 / sparse.max(1) as f64,
             visited as f64 / sparse.max(1) as f64
         );
+        let [fills, popped, raised, most] = deeptime_core::surface::marine::fill_counts();
+        println!(
+            "deeptime bench: threads={threads} mouth_fill fills={fills} popped={popped} raised={raised} \
+             most_popped={most}"
+        );
         let [built, reused] = deeptime_core::plates::geometry::tree_counts();
         println!("deeptime bench: threads={threads} sample_trees built={built} reused={reused}");
         // The P1-19 audit of the diffusion solve, when its environment variable is set.

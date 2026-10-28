@@ -1281,6 +1281,36 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference check: (ERO, ISO, HYP) title and year match the Crossref record; the series number 65 is from memory and was not verified. (RCK, STR, DEF) title and edition exist; year 2015 vs 2016 record unresolved. No table or page number in the code.
 - Read in WP-7 (2026-10-02): not read (book).
 
+### goSPL-marine
+- Reference: goSPL, the marine deposition of river loads (Geodels/gospl on GitHub; GPL-3.0). Tag v2021.08.03, `gospl/sed/sedplex.py` and `fortran/functions.F90` (`distocean`); the current `gospl/sed/seaplex.py` (master d1a6682, dev 3e17a13) for comparison. The model's paper: Salles, T., Mallard, C. and Zahirovic, S. (2020). gospl: Global Scalable Paleo Landscape Evolution. Journal of Open Source Software 5(56):2804.
+- DOI or URL: https://github.com/Geodels/gospl ; 10.21105/joss.02804
+- Cited as: "goSPL's marine deposition (sedplex.py, distocean)"
+- Ledger ids: ERO-050, ERO-052 (comparison only)
+- Access: open (source code; JOSS paper open)
+- Library (the project's source library, not distributed): not saved; the files were read from raw.githubusercontent.com in a research pass on 2026-10-28.
+- Read so far (by the project): source read 2026-10-28. sedplex.py: `sid = np.argsort(smthZ)[::-1]` then `distocean(flowDir, sid[topID:], sinkFlx, sRcv, sWght, self.marea, vdepth)` with `vdepth = hclino - gZ`; functions.F90 `distocean`: a cell whose incoming flux exceeds its room is filled (`dep(i) = depth(i)`) and passes `flx(i)-vol(i)` to its receivers by weight. The JOSS paper says only "dual-lithology marine deposition at river mouth based on a diffusion algorithm (Rivenaes, 1992)".
+- Reference check: the order (the highest bed first, each filled to the clinoform height, the rest passed downslope) is read in the code. The rule is cited; no code is ported (GPL).
+
+### FastScape-marine
+- Reference: fastscapelib-fortran, `src/Marine.f90` (fastscape-lem/fastscapelib-fortran on GitHub, commit 45f9036; GPL-3.0), the marine extension described in Yuan, X. P., Braun, J., Guerit, L., Simon, B., Bovy, B., Rouby, D., Robin, C. and Jiao, R. (2019). Linking continental erosion to marine sediment transport and deposition: A new implicit and O(N) method for inverse analysis. Earth and Planetary Science Letters 524:115728.
+- DOI or URL: https://github.com/fastscape-lem/fastscapelib-fortran ; 10.1016/j.epsl.2019.115728
+- Cited as: "FastScape's marine scheme (Marine.f90)"
+- Ledger ids: ERO-050, ERO-052 (comparison only)
+- Access: code open; the paper paywalled (Elsevier returned 403)
+- Library (the project's source library, not distributed): not saved.
+- Read so far (by the project): Marine.f90 read 2026-10-28: `shelfslope=-1.d-4`; `shelfdepth(ijr)=min(shelfdepth(ijr),shelfdepth(ijk)+mmlrec(k,ijk)*shelfslope)` over `mmstack` (donors first); `where (h.lt.sealevel) flux=flux+(h-shelfdepth)`, then `flux(ijr)=flux(ijr)+max(0.d0,flux(ijk)*mmwrec(k,ijk))`. The paper: abstract only. Shobe et al. 2022 (Basin Research 34:2111, preprint read by the research pass) describe it as "terrestrial sediment fluxes deposit at a fixed slope when they reach the shoreline and then become subject to marine sediment transport by linear diffusion (Yuan et al., 2019a)".
+- Reference check: the order (the shelf filled from the shore downstream, each cell's room taken off the flux before it passes on) and the slope 1e-4 are read in the code. The paper's authors, title, volume and article number match Crossref (2026-10-28).
+
+### Pirmez1998
+- Reference: Pirmez, C., Pratson, L. F. and Steckler, M. S. (1998). Clinoform development by advection-diffusion of suspended sediment: Modeling and comparison to natural systems. Journal of Geophysical Research 103(B10):24141-24157.
+- DOI or URL: 10.1029/98JB01516
+- Cited as: "Pirmez, Pratson & Steckler 1998"
+- Ledger ids: ERO-050 (context: which part of a clinoform takes the load)
+- Access: paywalled (AGU)
+- Library (the project's source library, not distributed): not saved.
+- Read so far (by the project): abstract only (Crossref, 2026-10-28): "low rates of sediment accumulation on both topset and bottomset regions, with a maximum accumulation rate on the upper foreset region"; "sediment bypasses the topset region ... This sedimentation pattern leads to progradation".
+- Reference check: authors, venue and DOI from Crossref.
+
 ### Not cited by the code but named in the task brief (identified for stage 2)
 - Whipple, K. X. and Tucker, G. E. (1999). Dynamics of the stream-power river incision model: Implications for height limits of mountain ranges, landscape response timescales, and research needs. Journal of Geophysical Research 104(B8):17661-17674. DOI 10.1029/1999JB900120 (Crossref confirmed). Paywalled; not fetched.
 - Fernandes, N. F. and Dietrich, W. E. (1997). Hillslope evolution by diffusive processes: The timescale for equilibrium adjustments. Water Resources Research 33(6):1307-1318. DOI 10.1029/97WR00534 (Crossref confirmed). Paywalled; not fetched.
