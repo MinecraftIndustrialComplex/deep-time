@@ -250,6 +250,19 @@ stage's, the bake lifted it with the strata (STR-056), and a buried blanket is a
 Guaranteed sites, and the families of guaranteed parents, stay with the guaranteed anchor
 (DEP-221). The pass's counts are in the manifest's `notes.bake.guaranteed.weathering`.
 
+A cap needs its body (the same day, after the exit check on master 2f453594). A gossan is the
+leached top of a sulphide body at the outcrop, and a blanket lies over the body's leached zone, so
+neither outlasts the erosion of the body under it. On the new planet the check's porphyry had its
+stockwork shell at y 116 to 133 (the history's ground clipped it at 133) and the world's ground
+across it at 86 to 115: the shell was wholly above the world's rock and placed nothing, yet the pass
+had brought its gossan down onto the rock at 111, a cap over nothing (16 copper ore blocks in the
+footprint against 27 in the box beside it). The pass now moves a profile only when an ore block of
+its site's hypogene bodies lies in the world's rock (`ore_in_rock`: every second column of their
+footprint, at or under the top rock block). A profile whose body is gone stays where the history
+put it, above the ground, so the world has neither, and is counted as `gone`. The check's pick
+(`tools/review/phase1_vm.py`) also passes over a porphyry whose ore body lies wholly above the
+terrain.
+
 ## Equations and constants
 
 The main constants by family; the ledgers hold every row.

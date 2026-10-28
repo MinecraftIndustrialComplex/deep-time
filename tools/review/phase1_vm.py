@@ -136,7 +136,14 @@ def cmd_pick(a):
             _, _, _, data = read_npy(out)
             sea = manifest["scale"].get("sea_level_y", 63)
             # Exposed means on dry land: a body under the sea (a 2026-10-05 run's first pick, y -24) is not "exposed".
-            return abs(data[0] - g["clip_top_y"]) if data[0] > sea + 1 else 1e9
+            if data[0] <= sea + 1:
+                return 1e9
+            # And the ore body is in the world: its lowest block at or under the terrain (2026-10-28, master 2f453594: the
+            # pick's stockwork shell lay at y 116 to 133 over terrain at 86 to 115, wholly eroded away).
+            ore = [b for b in by_site.get(s["id"], []) if b["role"] == "ore" and b.get("aabb")]
+            if ore and min(b["aabb"][0][1] for b in ore) > data[0]:
+                return 1e9
+            return abs(data[0] - g["clip_top_y"])
         except Exception:
             return 1e9
 
