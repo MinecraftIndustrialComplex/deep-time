@@ -276,6 +276,38 @@ predates the initiation scan, which the tests cover):
 
 That leaves 118 s to the gate.
 
+### The slope failure's row kernels, and two that did not pay (2026-10-28)
+
+**The slope failure** (`surface::marine::slope_failure`). 18,116 of its 20,460 iterations in a
+1000 Myr run are full sweeps over the raster's 1.3 million cells. Each sweep visits a cell's eight
+neighbours twice, once for the shares and once for the changes, with a branch per neighbour (wet
+or not, on the raster or not). The dense passes now treat each inner row in one go:
+- every neighbour is read as the row shifted by its index step;
+- a dry neighbour's term is multiplied by 0 instead of skipped. That adds ±0 to a sum that is
+  never −0, so the bits are the same.
+
+The row's cells then go through the same arithmetic side by side, and the compiler vectorizes
+it. The edge columns and the polar rows keep the per-cell path. The test
+`the_active_set_failure_equals_the_full_sweep_bit_for_bit` covers wrapped and unwrapped rasters,
+rows one and two cells wide, and 1, 2, 4 and 8 threads.
+
+The pair, 1000 Myr, set A against set B: the branch (the parallel initiation scan in too)
+981.6 s against PR #20's 1,017.1 s, slope failure 67.8 to 40.6 s; `p1-17-cmp.py` 91 files,
+0 differ.
+
+**Measured, then reverted:**
+- **The flexure Laplacian's interior as shifted slices.** flexure 54.6 to 54.2 s at 1000 Myr,
+  within noise: the loop was already as fast as its memory reads.
+- **The mouth fills worked out side by side.** Each fill is planned on the heights as a batch of
+  64 starts, and taken in order unless an earlier fill of the batch changed a cell it read.
+  822,087 of 1,900,423 fills had to be done again: a delta's mouths sit within each other's
+  reach. marine_fill went from 2.3 to 3.4 s at 300 Myr.
+
+**A determinism fix found by the pair.** The projection's statistic `ice_cover_world_planet`
+summed its rows with a rayon `reduce`, whose grouping follows the threads' work stealing. It
+differed in the last digit between two runs of identical worlds. It now sums the rows in row
+order.
+
 ## P1-19 exit item 1: full 16k on eight pinned cores (2026-10-18)
 
 Plan §10 P1-19's first exit item is this page's full 16k gate: 900 s at 8 threads, scattered
