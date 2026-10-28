@@ -615,8 +615,7 @@ mod tests {
         EbmParams::from_climate(&ClimateParams::default(), 23.4, 1.0)
     }
 
-    /// P1-17: the zonal model's diffusions are factored once per run; the factored solve gives
-    /// `thomas`'s bits on band systems like the model's (diagonally dominant, zero end faces).
+    /// The insolation shapes kept from call to call give the bits computed afresh.
     #[test]
     fn the_kept_insolation_shapes_give_the_same_bits() {
         // A run with a cold cache (a fresh thread) against the same run after others filled it:
@@ -659,6 +658,8 @@ mod tests {
         });
     }
 
+    /// P1-17: the zonal model's diffusions are factored once per run; the factored solve gives
+    /// `thomas`'s bits on band systems like the model's (diagonally dominant, zero end faces).
     #[test]
     fn the_factored_solve_equals_thomas_bit_for_bit() {
         let mut rng = crate::sphere::SplitMix64::new(3);
