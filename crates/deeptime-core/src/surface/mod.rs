@@ -704,6 +704,22 @@ pub fn basement_class(
     }
 }
 
+/// Float totals side by side, each summed in order inside its job: the values are the serial
+/// sums' whatever the thread count (a parallel sum's would not be), and the step waits for the
+/// longest one instead of all of them in turn.
+fn side_by_side<const N: usize>(jobs: [&(dyn Fn() -> f64 + Sync); N]) -> [f64; N] {
+    let mut out = [0.0; N];
+    out.par_iter_mut()
+        .zip(jobs.par_iter())
+        .for_each(|(o, job)| *o = job());
+    out
+}
+
+/// A field's total, summed in order.
+fn sum_in_order(v: &[f32]) -> f64 {
+    v.iter().map(|&x| f64::from(x)).sum::<f64>()
+}
+
 /// The provenance code of a sediment flux split by source family (none for an empty flux).
 fn dominant(mix: &[f64; spl::FAMILIES]) -> Option<u16> {
     let tot: f64 = mix.iter().sum();
@@ -1940,6 +1956,8 @@ impl SurfaceStage {
         let started = Instant::now();
         parts.siliceous = crate::alloc::filled(n, 0.0);
         parts.dust = crate::alloc::filled(n, 0.0);
+        // The dissolved load's total, in order: the rain's supply and the denudation (4b) read it.
+        let dissolved_m3 = dissolved.as_ref().map_or(0.0, |dz| dz.iter().sum::<f64>());
         let (rain_laid, rain_supply_m3) = {
             let (kind, ccd) = (&sc.kind, crate::structure::columns::CCD_M);
             // Each sea cell's water depth now (0 elsewhere): the floor, and the room it has.
@@ -1954,7 +1972,6 @@ impl SurfaceStage {
                 .filter(|&c| kind[c] != BASE && f64::from(clim.aridity[c]) < arid_index)
                 .map(|c| c as u32)
                 .collect();
-            let dissolved_m3 = dissolved.as_ref().map_or(0.0, |dz| dz.iter().sum::<f64>());
             let supply = pelagic::Supply::new(
                 dissolved_m3 * a,
                 kg_per_mol,
@@ -2018,10 +2035,10 @@ impl SurfaceStage {
         // answers its load as it does the erosion's.
         let mut dissolved_m = 0.0; // ledger: ERO-205
         if let Some(dz) = &dissolved {
-            for (z, &x) in sc.h.iter_mut().zip(dz) {
-                *z -= x;
-            }
-            dissolved_m = dz.iter().sum::<f64>();
+            sc.h.par_iter_mut()
+                .zip(dz.par_iter())
+                .for_each(|(z, &x)| *z -= x);
+            dissolved_m = dissolved_m3;
         }
         let net: Vec<f64> = (0..n)
             .into_par_iter()
@@ -2391,18 +2408,43 @@ impl SurfaceStage {
 
         // 6. Outputs.
         let started = Instant::now();
-        let sum_net: f64 = net.iter().sum();
-        let carb: f64 = parts.carbonate.iter().map(|&x| f64::from(x)).sum();
-        let pel: f64 = parts.pelagic.iter().map(|&x| f64::from(x)).sum();
-        let peri: f64 = parts.periplatform.iter().map(|&x| f64::from(x)).sum();
-        let evap: f64 = parts.evaporite.iter().map(|&x| f64::from(x)).sum();
+        // In order, as every float total here (the thread count must not change it), and side by
+        // side.
+        let [
+            sum_net,
+            carb,
+            pel,
+            peri,
+            evap,
+            eroded,
+            fluvial,
+            lake,
+            marine,
+            black_shale,
+        ] = side_by_side([
+            &|| net.iter().sum::<f64>(),
+            &|| sum_in_order(&parts.carbonate),
+            &|| sum_in_order(&parts.pelagic),
+            &|| sum_in_order(&parts.periplatform),
+            &|| sum_in_order(&parts.evaporite),
+            &|| sum_in_order(&parts.eroded),
+            &|| sum_in_order(&parts.fluvial),
+            &|| sum_in_order(&parts.lake),
+            &|| sum_in_order(&parts.marine),
+            &|| {
+                (0..n)
+                    .filter(|&c| kind_step[c] == fields::KIND_EUXINIC)
+                    .map(|c| net[c].max(0.0))
+                    .sum::<f64>()
+            },
+        ]);
         let opal = rain_laid.opal;
         let km3 = a / 1.0e9;
         let t = &mut st.totals;
-        t.eroded_km3 += parts.eroded.iter().map(|&x| f64::from(x)).sum::<f64>() * km3;
-        t.fluvial_km3 += parts.fluvial.iter().map(|&x| f64::from(x)).sum::<f64>() * km3;
-        t.lake_km3 += parts.lake.iter().map(|&x| f64::from(x)).sum::<f64>() * km3;
-        t.marine_km3 += parts.marine.iter().map(|&x| f64::from(x)).sum::<f64>() * km3;
+        t.eroded_km3 += eroded * km3;
+        t.fluvial_km3 += fluvial * km3;
+        t.lake_km3 += lake * km3;
+        t.marine_km3 += marine * km3;
         t.carbonate_km3 += carb * km3;
         t.pelagic_km3 += pel * km3;
         t.returned_carbonate_km3 += (rain_laid.chalk + rain_laid.carbonate) * km3;
@@ -2421,12 +2463,7 @@ impl SurfaceStage {
         t.dissolved_km3 += dissolved_m * km3;
         t.isostasy_km3 += iso * km3;
         t.slope_failure_km3 += failed_m_cells * km3;
-        // In order, as every float total here (the thread count must not change it).
-        t.black_shale_km3 += (0..n)
-            .filter(|&c| kind_step[c] == fields::KIND_EUXINIC)
-            .map(|c| net[c].max(0.0))
-            .sum::<f64>()
-            * km3;
+        t.black_shale_km3 += black_shale * km3;
         t.mass_residual_km3 += if dissolved.is_some() {
             (sum_net + dissolved_m - carb - pel - opal - evap) * km3
         } else {
@@ -2707,17 +2744,22 @@ impl SurfaceStage {
                     .position(|&f| f == name)
                     .map_or(&[], |i| &sc.step_fields[i])
             };
-            let sum = |v: &[f32]| v.iter().map(|&x| f64::from(x)).sum::<f64>();
             let toc = at("deeptime:source_rock_toc");
-            let rich = toc
-                .iter()
-                .filter(|&&x| f64::from(x) > fields::SHALE_TOC_WT)
-                .count() as f64;
+            let [platform, euxinic, toc_sum, rich] = side_by_side([
+                &|| sum_in_order(at("deeptime:carbonate_platform")),
+                &|| sum_in_order(at("deeptime:euxinic_basin")),
+                &|| sum_in_order(toc),
+                &|| {
+                    toc.iter()
+                        .filter(|&&x| f64::from(x) > fields::SHALE_TOC_WT)
+                        .count() as f64
+                },
+            ]);
             let km2_myr = a / 1.0e6 * dt_myr;
             let t = &mut st.totals;
-            t.platform_km2_myr += sum(at("deeptime:carbonate_platform")) * km2_myr;
-            t.euxinic_km2_myr += sum(at("deeptime:euxinic_basin")) * km2_myr;
-            t.toc_km2_myr += sum(toc) * km2_myr;
+            t.platform_km2_myr += platform * km2_myr;
+            t.euxinic_km2_myr += euxinic * km2_myr;
+            t.toc_km2_myr += toc_sum * km2_myr;
             t.toc_rich_km2_myr += rich * km2_myr;
         }
         // Inherited iron-formation basins (`deposits::bif_basins`; Ben, 2026-10-02): dealt once,
