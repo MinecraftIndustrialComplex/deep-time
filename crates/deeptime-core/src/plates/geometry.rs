@@ -386,6 +386,69 @@ pub fn dijkstra_sparse(
     })
 }
 
+/// [`dijkstra_sparse`] of sources of one label, its vertices handed to `visit(vertex, distance)`
+/// as the search settles them, until `visit` returns false (the speed work of 2026-10-28: a caller
+/// that takes only the nearest few stops there). They come nearest first, ties by vertex (the
+/// heap's order): the order of the finished search's list sorted by distance, then vertex, with
+/// the same distances, since every edge is longer than 0 (a vertex at a distance is pushed before
+/// any vertex of that distance is taken).
+pub fn dijkstra_settled(
+    geo: &Geo,
+    sources: &[(u32, f64, u32)],
+    allow: impl Fn(u32, u32) -> bool,
+    max_rad: f64,
+    mut visit: impl FnMut(u32, f64) -> bool,
+) {
+    let n = geo.points().len();
+    SPARSE.with(|cell| {
+        let mut scratch = cell.borrow_mut();
+        let (dist, label) = &mut *scratch;
+        if dist.len() < n {
+            dist.resize(n, f64::INFINITY);
+            label.resize(n, u32::MAX);
+        }
+        let mut reached: Vec<u32> = Vec::new();
+        let mut heap = BinaryHeap::with_capacity(sources.len() * 2);
+        for &(v, d, l) in sources {
+            if d < dist[v as usize] {
+                if dist[v as usize] == f64::INFINITY {
+                    reached.push(v);
+                }
+                dist[v as usize] = d;
+                label[v as usize] = l;
+                heap.push(Entry { d, v, label: l });
+            }
+        }
+        while let Some(Entry { d, v, label: l }) = heap.pop() {
+            if d > dist[v as usize] || label[v as usize] != l {
+                continue;
+            }
+            if !visit(v, d) {
+                break;
+            }
+            for (u, len) in geo.edges(v) {
+                let nd = d + f64::from(len);
+                if nd <= max_rad && nd < dist[u as usize] && allow(v, u) {
+                    if dist[u as usize] == f64::INFINITY {
+                        reached.push(u);
+                    }
+                    dist[u as usize] = nd;
+                    label[u as usize] = l;
+                    heap.push(Entry {
+                        d: nd,
+                        v: u,
+                        label: l,
+                    });
+                }
+            }
+        }
+        for &v in &reached {
+            dist[v as usize] = f64::INFINITY;
+            label[v as usize] = u32::MAX;
+        }
+    })
+}
+
 /// [`dijkstra_sparse`]'s reached vertices sorted by vertex: the order the belts' sums run in
 /// (P1-19: they ran over every sample before, in sample order, for the few thousand reached).
 ///
@@ -668,6 +731,77 @@ mod tests {
                 .collect();
             assert!(dense.len() > 100 && dense.len() < 3000);
             assert_eq!(sparse, dense);
+        }
+    }
+
+    /// `dijkstra_settled` hands the vertices over in the order of the finished search's list
+    /// sorted by distance, then vertex, with its distances; taking the nearest room until a
+    /// budget is placed (as the plates' spread does) gives the same handouts, bit for bit, when
+    /// the search stops early as when it ran over the whole reach.
+    #[test]
+    fn the_settled_search_takes_the_room_the_sorted_search_does() {
+        let geo = Geo::build(3000, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let mut rng = crate::sphere::SplitMix64::new(5);
+        let room: Vec<Option<f64>> = (0..3000)
+            .map(|_| (rng.below(3) == 0).then(|| rng.next_f64() * 900.0))
+            .collect();
+        let allow = |a: u32, b: u32| !(a + b).is_multiple_of(7);
+        let src = [(5, 0.0, 0), (1400, 0.0, 0), (2900, 0.0, 0)];
+        let all = dijkstra_sparse(&geo, &src, allow, 0.6);
+        let mut order: Vec<(f64, u32)> = all.iter().map(|&(v, d, _)| (d, v)).collect();
+        order.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+        let mut settled = Vec::new();
+        dijkstra_settled(&geo, &src, allow, 0.6, |v, d| {
+            settled.push((d, v));
+            true
+        });
+        assert_eq!(
+            settled
+                .iter()
+                .map(|&(d, v)| (d.to_bits(), v))
+                .collect::<Vec<_>>(),
+            order
+                .iter()
+                .map(|&(d, v)| (d.to_bits(), v))
+                .collect::<Vec<_>>()
+        );
+        let total: f64 = order.iter().filter_map(|&(_, v)| room[v as usize]).sum();
+        for budget in [1.0, 50.0, 2_000.0, 0.5 * total, 2.0 * total] {
+            let take = |list: &mut dyn Iterator<Item = u32>| {
+                let mut left = budget;
+                let mut given = Vec::new();
+                for v in list {
+                    if left <= 0.0 {
+                        break;
+                    }
+                    if let Some(r) = room[v as usize] {
+                        let g = r.min(left);
+                        given.push((v, g.to_bits()));
+                        left -= g;
+                    }
+                }
+                (left.to_bits(), given)
+            };
+            let sorted = take(&mut order.iter().map(|&(_, v)| v));
+            let mut left = budget;
+            let mut given = Vec::new();
+            let mut visited = 0;
+            dijkstra_settled(&geo, &src, allow, 0.6, |v, _| {
+                if left <= 0.0 {
+                    return false;
+                }
+                visited += 1;
+                if let Some(r) = room[v as usize] {
+                    let g = r.min(left);
+                    given.push((v, g.to_bits()));
+                    left -= g;
+                }
+                true
+            });
+            assert_eq!((left.to_bits(), given), sorted, "budget {budget}");
+            if budget < 100.0 {
+                assert!(visited < order.len() / 4, "stops early: {visited}");
+            }
         }
     }
 
