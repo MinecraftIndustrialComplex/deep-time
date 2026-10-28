@@ -623,7 +623,7 @@ pub fn flood_repair(
     let seeds: Vec<(u64, u64)> = (0..h)
         .into_par_iter()
         .flat_map_iter(|j| {
-            let closed = &closed;
+            let (closed, z) = (&closed, &*z);
             (0..w).filter_map(move |i| {
                 let c = j * w + i;
                 if !closed[c] {
