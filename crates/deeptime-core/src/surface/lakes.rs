@@ -29,6 +29,8 @@
 //! spills over the one its last exit drains to; the levels are those of the step's last flood, on
 //! the elevation it flooded.
 
+use rayon::prelude::*;
+
 use super::grid::SurfaceGrid;
 use super::pflood::{BASE, LAKE_TOL_M, LAND};
 use super::routing::Routing;
@@ -259,8 +261,11 @@ pub fn at_step_end<G: SurfaceGrid>(
 ) -> Levels {
     let n = d.cells();
     let mut open = vec![LAND; n];
-    super::pflood::open_sea(d, h, sea, min_cells, &mut open);
+    // By strips in parallel: the serial labelling's cells, cell for cell (the speed work of
+    // 2026-10-28; it ran on one thread every surface step).
+    super::pflood::parallel::open_sea(d, h, sea, min_cells, &mut open);
     let water_z: Vec<f64> = (0..n)
+        .into_par_iter()
         .map(|c| {
             if open[c] == BASE {
                 sea
@@ -269,15 +274,15 @@ pub fn at_step_end<G: SurfaceGrid>(
             }
         })
         .collect();
-    let (mut dry_below_sea, mut wet_above_sea) = (0, 0);
-    for c in 0..n {
-        if h[c] <= sea && h[c] > water_z[c] {
-            dry_below_sea += 1;
-        }
-        if h[c] > sea && h[c] < water_z[c] {
-            wet_above_sea += 1;
-        }
-    }
+    let (dry_below_sea, wet_above_sea) = (0..n)
+        .into_par_iter()
+        .map(|c| {
+            (
+                usize::from(h[c] <= sea && h[c] > water_z[c]),
+                usize::from(h[c] > sea && h[c] < water_z[c]),
+            )
+        })
+        .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
     Levels {
         water_z,
         lakes: flood.lakes,

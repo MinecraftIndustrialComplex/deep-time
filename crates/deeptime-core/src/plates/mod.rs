@@ -1527,23 +1527,35 @@ where
         std::array::from_fn(|k| (t[k], f64::from(l.w[k])))
     };
     let weighs = |v: u32, w: f64| w > 0.0 && (v as usize) < n;
-    // Each sample's first and last cell.
+    // The runs.
+    let size = cells.div_ceil(4 * rayon::current_num_threads()).max(1);
+    let runs = cells.div_ceil(size);
+    // Each sample's first and last cell. A run reads its cells forwards for the first and
+    // backwards for the last, so it writes a sample only on its first meeting (a write for every
+    // corner made this pass dearer than the serial sums).
     let first: Vec<AtomicU32> = (0..n)
         .into_par_iter()
         .map(|_| AtomicU32::new(NONE))
         .collect();
     let last: Vec<AtomicU32> = (0..n).into_par_iter().map(|_| AtomicU32::new(0)).collect();
-    (0..cells).into_par_iter().for_each(|c| {
-        for (v, w) in corners(c) {
-            if weighs(v, w) {
-                first[v as usize].fetch_min(c as u32, Relaxed);
-                last[v as usize].fetch_max(c as u32, Relaxed);
+    (0..runs).into_par_iter().for_each(|r| {
+        let cs = r * size..((r + 1) * size).min(cells);
+        for c in cs.clone() {
+            for (v, w) in corners(c) {
+                if weighs(v, w) && (c as u32) < first[v as usize].load(Relaxed) {
+                    first[v as usize].fetch_min(c as u32, Relaxed);
+                }
+            }
+        }
+        for c in cs.rev() {
+            for (v, w) in corners(c) {
+                if weighs(v, w) && (c as u32) > last[v as usize].load(Relaxed) {
+                    last[v as usize].fetch_max(c as u32, Relaxed);
+                }
             }
         }
     });
-    // The runs, each sample's run and place in its run's sums, and how far each run reads.
-    let size = cells.div_ceil(4 * rayon::current_num_threads()).max(1);
-    let runs = cells.div_ceil(size);
+    // Each sample's run and place in its run's sums, and how far each run reads.
     let mut owner = vec![NONE; n];
     let mut slot = vec![0u32; n];
     let mut count = vec![0u32; runs];
@@ -1558,6 +1570,13 @@ where
             end[r] = end[r].max(last[v].load(Relaxed) as usize + 1);
         }
     }
+    // What the runs read past their ends (a sample that cells far apart weigh: a gap's cells
+    // linked to its nearest sample).
+    crate::compute::add("scatter_cells_n", cells as f64);
+    crate::compute::add(
+        "scatter_read_cells_n",
+        (0..runs).map(|r| end[r] - r * size).sum::<usize>() as f64,
+    );
     let sums: Vec<Vec<A>> = (0..runs)
         .into_par_iter()
         .map(|r| {

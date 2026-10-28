@@ -296,12 +296,18 @@ fn pass<T: Copy + Default + Send + Sync>(
             f(&seq, false)
         })
         .collect();
+    // Back into rows, rows in parallel (the speed work of 2026-10-28; one thread before): cell
+    // (i, j) is line k's j-th value, k = i − d·j round the circle (a column: k = i).
+    let d = match line {
+        Line::Diag(d) => d,
+        _ => 0,
+    };
     let mut out = vec![T::default(); w * h];
-    for (k, vals) in lines.into_iter().enumerate() {
-        for (j, x) in vals.into_iter().enumerate() {
-            out[index(k, j)] = x;
+    out.par_chunks_mut(w).enumerate().for_each(|(j, row)| {
+        for (i, x) in row.iter_mut().enumerate() {
+            *x = lines[(i as i64 - d * j as i64).rem_euclid(w as i64) as usize][j];
         }
-    }
+    });
     out
 }
 
@@ -415,6 +421,34 @@ mod tests {
     /// The octagon: a spike dilates into a dense octagon of the asked radius (nothing beyond it,
     /// no hole inside the inscribed circle); a constant field keeps its value to the poles; an
     /// east–west shift of the input shifts both outputs bit for bit.
+    /// A line pass puts each line's values back where the serial scatter did (the speed work of
+    /// 2026-10-28: rows in parallel).
+    #[test]
+    fn line_passes_put_the_lines_back_where_the_serial_scatter_did() {
+        let (w, h) = (37, 23);
+        let v: Vec<i64> = (0..w * h).map(|c| (c as i64 * 7919) % 1009 - 500).collect();
+        for line in [Line::Col, Line::Diag(1), Line::Diag(-1)] {
+            let f = |seq: &[i64], circ: bool| window_sum(seq, 3, circ);
+            let got = pass(w, h, &v, line, &f);
+            let index = |k: usize, j: usize| -> usize {
+                match line {
+                    Line::Diag(d) => {
+                        j * w + (k as i64 + d * j as i64).rem_euclid(w as i64) as usize
+                    }
+                    _ => j * w + k,
+                }
+            };
+            let mut want = vec![0i64; w * h];
+            for k in 0..line.count(w, h) {
+                let seq: Vec<i64> = (0..h).map(|j| v[index(k, j)]).collect();
+                for (j, x) in f(&seq, false).into_iter().enumerate() {
+                    want[index(k, j)] = x;
+                }
+            }
+            assert_eq!(got, want);
+        }
+    }
+
     #[test]
     fn octagons_have_the_radius_and_shift_exactly() {
         let (w, h) = (96usize, 64usize);

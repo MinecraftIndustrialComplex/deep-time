@@ -2345,26 +2345,23 @@ impl ClimateStage {
                     .get(field::ICE_THICKNESS)
                     .filter(|f| f.data.len() == n)
                     .map(|f| f.data.as_slice());
-                let cells: Vec<carbon::DissolvedCell> = lt
-                    .cells
-                    .iter()
-                    .enumerate()
-                    .flat_map(|(j, row)| {
-                        let (band, area) = (geo.band[j], geo.area[j]);
-                        let (land, ice, sea_t, gw) = (&land, ice, lt.sea_t, geo.w);
-                        row.iter().enumerate().map(move |(i, x)| {
-                            let c = j * gw + i;
-                            if !land[c] {
-                                return carbon::DissolvedCell::default();
-                            }
-                            carbon::DissolvedCell {
-                                band,
-                                area_km2: area,
-                                kin: kpk * if sea_t { x.ks } else { x.kc },
-                                supply: x.supply,
-                                iced: ice.is_some_and(|v| v[c] >= ICE_MIN_M),
-                            }
-                        })
+                // In parallel, in cell order (the speed work of 2026-10-28).
+                let (sea_t, gw) = (lt.sea_t, geo.w);
+                let cells: Vec<carbon::DissolvedCell> = (0..lt.cells.len() * gw)
+                    .into_par_iter()
+                    .map(|c| {
+                        let j = c / gw;
+                        if !land[c] {
+                            return carbon::DissolvedCell::default();
+                        }
+                        let x = &lt.cells[j][c % gw];
+                        carbon::DissolvedCell {
+                            band: geo.band[j],
+                            area_km2: geo.area[j],
+                            kin: kpk * if sea_t { x.ks } else { x.kc },
+                            supply: x.supply,
+                            iced: ice.is_some_and(|v| v[c] >= ICE_MIN_M),
+                        }
                     })
                     .collect();
                 dissolved = Some(carbon::place_dissolved(
