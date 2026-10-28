@@ -7140,3 +7140,62 @@ fn a_backarc_sliver_opens_at_earth_s_rates() {
     );
     assert!(vt.abs() <= 160.0, "the trench moves {vt} mm/yr");
 }
+
+/// The ordered scatter (`scatter_in_order`, the speed work of 2026-10-28) gives the serial pass's
+/// sums bit for bit on pools of any size: cells without a value, corners of no weight or past the
+/// samples, and samples that cells far apart weigh (a run reads past its end).
+#[test]
+fn the_ordered_scatter_equals_the_serial_pass_bit_for_bit() {
+    let mut rng = crate::sphere::SplitMix64::new(11);
+    let (cells, n, nt) = (20_000usize, 900u64, 400u64);
+    let tris: Vec<[u32; 3]> = (0..nt)
+        .map(|_| [0, 1, 2].map(|_| rng.below(n + 5) as u32))
+        .collect();
+    let links: Vec<CellLink> = (0..cells)
+        .map(|c| {
+            let tri = if c % 37 == 0 {
+                rng.below(nt) as u32
+            } else {
+                ((c / 50) as u64 % nt) as u32
+            };
+            let w = [0, 1, 2].map(|_| {
+                if rng.below(5) == 0 {
+                    0.0
+                } else {
+                    rng.next_f64() as f32
+                }
+            });
+            CellLink { tri, nearest: 0, w }
+        })
+        .collect();
+    let vals: Vec<f64> = (0..cells).map(|_| rng.next_f64() * 100.0 - 50.0).collect();
+    let data = |c: usize| (!c.is_multiple_of(11)).then(|| vals[c]);
+    let add = |a: &mut (f64, f64), x: &f64, w: f64| {
+        a.0 += w;
+        a.1 += w * x;
+    };
+    let n = n as usize;
+    let mut serial = vec![(0.0, 0.0); n];
+    for (c, l) in links.iter().enumerate() {
+        let Some(x) = data(c) else {
+            continue;
+        };
+        for (&v, &w) in tris[l.tri as usize].iter().zip(&l.w) {
+            let w = f64::from(w);
+            if w > 0.0 && (v as usize) < n {
+                add(&mut serial[v as usize], &x, w);
+            }
+        }
+    }
+    let bits = |s: &[(f64, f64)]| -> Vec<(u64, u64)> {
+        s.iter().map(|x| (x.0.to_bits(), x.1.to_bits())).collect()
+    };
+    for t in [1, 2, 3, 8] {
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(t)
+            .build()
+            .unwrap();
+        let got = pool.install(|| scatter_in_order(&links, &tris, n, data, add));
+        assert_eq!(bits(&got), bits(&serial), "{t} threads");
+    }
+}
