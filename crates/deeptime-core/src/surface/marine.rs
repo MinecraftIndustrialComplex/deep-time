@@ -19,8 +19,10 @@
 //! shelves prograde from the mouths this way; the diffusion then smooths them. Mass is exact: a
 //! load that finds no more room (a full closed sea) spreads evenly over the cells it reached.
 
+use std::cmp::Ordering;
+use std::collections::BinaryHeap;
+
 use super::grid::{Dims, SurfaceGrid};
-use super::queue::MinQueue;
 
 #[cfg(feature = "gpu")]
 mod gpu;
@@ -44,12 +46,33 @@ pub fn submarine_kd(z: f64, d0: f64, wave_base: f64, tidal_range: f64, land: f64
     d0 * f1 * f2 + land * (1.0 - f1)
 }
 
+#[derive(Clone, Copy, PartialEq)]
+struct Item {
+    z: f64,
+    c: u32,
+    dist: f32,
+}
+
+impl Eq for Item {}
+
+impl Ord for Item {
+    fn cmp(&self, o: &Self) -> Ordering {
+        o.z.total_cmp(&self.z).then_with(|| o.c.cmp(&self.c))
+    }
+}
+
+impl PartialOrd for Item {
+    fn partial_cmp(&self, o: &Self) -> Option<Ordering> {
+        Some(self.cmp(o))
+    }
+}
+
 /// Scratch for [`fill`], reused between mouths and steps.
 #[derive(Default)]
 pub struct FillScratch {
     stamp: Vec<u32>,
     generation: u32,
-    heap: MinQueue,
+    heap: BinaryHeap<Item>,
     /// The cells the last [`fill`] raised.
     pub touched: Vec<u32>,
     visited: Vec<u32>,
@@ -91,18 +114,21 @@ pub fn fill<G: SurfaceGrid>(
     s.heap.clear();
     s.touched.clear();
     s.visited.clear();
-    s.heap
-        .push(MinQueue::low_first(h[mouth], mouth as u32, 0.0));
+    s.heap.push(Item {
+        z: h[mouth],
+        c: mouth as u32,
+        dist: 0.0,
+    });
     s.stamp[mouth] = stamp_id;
     let mut left = volume;
     let mut touched = 0;
     let mut visited = 0;
     while left > 0.0 {
-        let Some(k) = s.heap.pop() else { break };
-        let (c, dist) = MinQueue::cell_extra(k);
+        let Some(it) = s.heap.pop() else { break };
+        let c = it.c as usize;
         visited += 1;
         s.visited.push(c as u32);
-        let level = p.sea_level - p.fill_depth_m - p.shelf_slope * f64::from(dist);
+        let level = p.sea_level - p.fill_depth_m - p.shelf_slope * f64::from(it.dist);
         if h[c] < level {
             let a = d.area(c);
             let take = ((level - h[c]) * a).min(left);
@@ -119,8 +145,11 @@ pub fn fill<G: SurfaceGrid>(
         for (m, dl) in d.neighbours(c) {
             if sea[m] && s.stamp[m] != stamp_id {
                 s.stamp[m] = stamp_id;
-                s.heap
-                    .push(MinQueue::low_first(h[m], m as u32, dist + dl as f32));
+                s.heap.push(Item {
+                    z: h[m],
+                    c: m as u32,
+                    dist: it.dist + dl as f32,
+                });
             }
         }
     }

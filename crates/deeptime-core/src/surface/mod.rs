@@ -86,7 +86,6 @@ pub mod oracle;
 pub mod params;
 pub mod pelagic;
 pub mod pflood;
-pub mod queue;
 pub mod routing;
 pub mod spl;
 pub mod spread;
