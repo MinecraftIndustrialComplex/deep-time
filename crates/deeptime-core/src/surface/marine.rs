@@ -19,9 +19,6 @@
 //! shelves prograde from the mouths this way; the diffusion then smooths them. Mass is exact: a
 //! load that finds no more room (a full closed sea) spreads evenly over the cells it reached.
 
-use std::cmp::Ordering;
-use std::collections::BinaryHeap;
-
 use super::grid::{Dims, SurfaceGrid};
 
 #[cfg(feature = "gpu")]
@@ -46,24 +43,74 @@ pub fn submarine_kd(z: f64, d0: f64, wave_base: f64, tidal_range: f64, land: f64
     d0 * f1 * f2 + land * (1.0 - f1)
 }
 
-#[derive(Clone, Copy, PartialEq)]
-struct Item {
-    z: f64,
-    c: u32,
-    dist: f32,
-}
+/// The mouth fill's queue (the speed work of 2026-10-28): a min-heap with four children a node
+/// over packed keys, the height's total-order bits, then the cell, then the distance's bits. The
+/// fill pops the lowest height first, ties by the lower cell, as the `BinaryHeap` of items ordered
+/// that way did; a cell goes in at most once a fill, so no two keys share height and cell and
+/// every correct heap pops them in that one order. Four children a node halve the levels a sift
+/// walks, and the children of a node share a cache line.
+#[derive(Default)]
+struct FillQueue(Vec<u128>);
 
-impl Eq for Item {}
-
-impl Ord for Item {
-    fn cmp(&self, o: &Self) -> Ordering {
-        o.z.total_cmp(&self.z).then_with(|| o.c.cmp(&self.c))
+impl FillQueue {
+    fn key(z: f64, c: u32, dist: f32) -> u128 {
+        // `f64::total_cmp`'s order as an unsigned integer's.
+        let b = z.to_bits();
+        let zb = if b >> 63 == 1 { !b } else { b | (1 << 63) };
+        (u128::from(zb) << 64) | (u128::from(c) << 32) | u128::from(dist.to_bits())
     }
-}
 
-impl PartialOrd for Item {
-    fn partial_cmp(&self, o: &Self) -> Option<Ordering> {
-        Some(self.cmp(o))
+    /// The cell and the distance of a key.
+    fn cell_dist(k: u128) -> (usize, f32) {
+        ((k >> 32) as u32 as usize, f32::from_bits(k as u32))
+    }
+
+    fn clear(&mut self) {
+        self.0.clear();
+    }
+
+    fn push(&mut self, k: u128) {
+        let v = &mut self.0;
+        let mut i = v.len();
+        v.push(k);
+        while i > 0 {
+            let p = (i - 1) / 4;
+            if v[p] <= k {
+                break;
+            }
+            v[i] = v[p];
+            i = p;
+        }
+        v[i] = k;
+    }
+
+    fn pop(&mut self) -> Option<u128> {
+        let v = &mut self.0;
+        let last = v.pop()?;
+        let Some(&top) = v.first() else {
+            return Some(last);
+        };
+        let n = v.len();
+        let mut i = 0;
+        loop {
+            let first = 4 * i + 1;
+            if first >= n {
+                break;
+            }
+            let mut m = first;
+            for c in first + 1..(first + 4).min(n) {
+                if v[c] < v[m] {
+                    m = c;
+                }
+            }
+            if v[m] >= last {
+                break;
+            }
+            v[i] = v[m];
+            i = m;
+        }
+        v[i] = last;
+        Some(top)
     }
 }
 
@@ -72,7 +119,7 @@ impl PartialOrd for Item {
 pub struct FillScratch {
     stamp: Vec<u32>,
     generation: u32,
-    heap: BinaryHeap<Item>,
+    heap: FillQueue,
     /// The cells the last [`fill`] raised.
     pub touched: Vec<u32>,
     visited: Vec<u32>,
@@ -114,21 +161,17 @@ pub fn fill<G: SurfaceGrid>(
     s.heap.clear();
     s.touched.clear();
     s.visited.clear();
-    s.heap.push(Item {
-        z: h[mouth],
-        c: mouth as u32,
-        dist: 0.0,
-    });
+    s.heap.push(FillQueue::key(h[mouth], mouth as u32, 0.0));
     s.stamp[mouth] = stamp_id;
     let mut left = volume;
     let mut touched = 0;
     let mut visited = 0;
     while left > 0.0 {
-        let Some(it) = s.heap.pop() else { break };
-        let c = it.c as usize;
+        let Some(k) = s.heap.pop() else { break };
+        let (c, dist) = FillQueue::cell_dist(k);
         visited += 1;
         s.visited.push(c as u32);
-        let level = p.sea_level - p.fill_depth_m - p.shelf_slope * f64::from(it.dist);
+        let level = p.sea_level - p.fill_depth_m - p.shelf_slope * f64::from(dist);
         if h[c] < level {
             let a = d.area(c);
             let take = ((level - h[c]) * a).min(left);
@@ -145,11 +188,8 @@ pub fn fill<G: SurfaceGrid>(
         for (m, dl) in d.neighbours(c) {
             if sea[m] && s.stamp[m] != stamp_id {
                 s.stamp[m] = stamp_id;
-                s.heap.push(Item {
-                    z: h[m],
-                    c: m as u32,
-                    dist: it.dist + dl as f32,
-                });
+                s.heap
+                    .push(FillQueue::key(h[m], m as u32, dist + dl as f32));
             }
         }
     }
@@ -822,6 +862,84 @@ mod tests {
             (after - before) * 1e6
         );
         assert!(h[210] <= -20.0 + 1e-9);
+    }
+
+    /// The fill's queue item as it was before the speed work of 2026-10-28, ordered for
+    /// `BinaryHeap`: the lowest height first, ties by the lower cell.
+    #[derive(Clone, Copy, PartialEq)]
+    struct Item {
+        z: f64,
+        c: u32,
+        dist: f32,
+    }
+
+    impl Eq for Item {}
+
+    impl Ord for Item {
+        fn cmp(&self, o: &Self) -> std::cmp::Ordering {
+            o.z.total_cmp(&self.z).then_with(|| o.c.cmp(&self.c))
+        }
+    }
+
+    impl PartialOrd for Item {
+        fn partial_cmp(&self, o: &Self) -> Option<std::cmp::Ordering> {
+            Some(self.cmp(o))
+        }
+    }
+
+    /// The four-way queue pops what the `BinaryHeap` of items popped, pushes and pops interleaved
+    /// as a fill makes them: heights with ties (each cell once), both zeros, infinities and NaNs.
+    #[test]
+    fn the_fill_queue_pops_what_the_binary_heap_popped() {
+        let mut rng = crate::sphere::SplitMix64::new(4);
+        let specials = [
+            0.0,
+            -0.0,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NAN,
+            -f64::NAN,
+        ];
+        let (mut want, mut got) = (std::collections::BinaryHeap::new(), FillQueue::default());
+        let mut cells: Vec<u32> = (0..20_000).collect();
+        for k in (1..cells.len()).rev() {
+            cells.swap(k, (rng.next_f64() * (k + 1) as f64) as usize % (k + 1));
+        }
+        let mut next = cells.into_iter();
+        let mut popped = 0;
+        for round in 0..30_000 {
+            if rng.next_f64() < 0.6 {
+                let Some(c) = next.next() else { break };
+                let r = rng.next_f64();
+                let z = if r < 0.05 {
+                    specials[(r * 120.0) as usize % specials.len()]
+                } else {
+                    // Few distinct heights, so many ties.
+                    -((rng.next_f64() * 40.0).floor() * 25.0)
+                };
+                let dist = (round % 997) as f32 * 0.5;
+                want.push(Item { z, c, dist });
+                got.push(FillQueue::key(z, c, dist));
+            } else {
+                let (w, g) = (want.pop(), got.pop());
+                assert_eq!(w.is_some(), g.is_some());
+                if let (Some(w), Some(g)) = (w, g) {
+                    assert_eq!(
+                        (w.c as usize, w.dist),
+                        FillQueue::cell_dist(g),
+                        "pop {popped}"
+                    );
+                    popped += 1;
+                }
+            }
+        }
+        while let Some(w) = want.pop() {
+            let g = got.pop().expect("the queue ran out first");
+            assert_eq!((w.c as usize, w.dist), FillQueue::cell_dist(g));
+            popped += 1;
+        }
+        assert!(got.pop().is_none());
+        assert!(popped > 10_000, "{popped} pops");
     }
 
     /// The device's slope failure against the CPU's on the worlds of the bit-for-bit test above
