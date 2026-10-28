@@ -38,6 +38,7 @@ use std::collections::BTreeMap;
 use std::f64::consts::PI;
 
 use glam::{DQuat, DVec3};
+use rayon::prelude::*;
 
 use super::Env;
 use super::events::{self, PLATE_BIRTH};
@@ -242,6 +243,41 @@ struct Advance {
     stretch: usize,
 }
 
+/// The per-sample tables a [`View`] reads: each sample's plate, and whether it is coast floor (a
+/// visible ocean floor sample with a lattice neighbour of its own plate's visible continental crust
+/// within reach). They follow from the state alone, so a step builds them once, in parallel, and
+/// again only after a propagation changes the plates (the 2026-10-27 profile: built serially for
+/// every live propagation and every plate with a trench, they took about 16 s of CPU in a 400-Myr
+/// full 16k run, on one core).
+struct Tables {
+    plate: Vec<u32>,
+    coast: Vec<bool>,
+}
+
+impl Tables {
+    fn new(st: &PlateState, geo: &Geo, pos: &[DVec3], sp: f64) -> Tables {
+        let n = st.samples.len();
+        let plate: Vec<u32> = (0..n).into_par_iter().map(|i| st.plate_of(i)).collect();
+        let reach = BORDER_SPACINGS * sp;
+        let visible = |i: usize, pl: u32| plate[i] == pl && !st.samples[i].is_hidden();
+        let coast: Vec<bool> = (0..n)
+            .into_par_iter()
+            .map(|i| {
+                let pl = plate[i];
+                visible(i, pl)
+                    && st.samples[i].kind != CONTINENTAL
+                    && geo.edges(i as u32).any(|(j, _)| {
+                        let j = j as usize;
+                        visible(j, pl)
+                            && st.samples[j].kind == CONTINENTAL
+                            && pos[i].angle_between(pos[j]) < reach
+                    })
+            })
+            .collect();
+        Tables { plate, coast }
+    }
+}
+
 /// The lattice as this call sees it.
 struct View<'a> {
     st: &'a PlateState,
@@ -258,30 +294,24 @@ struct View<'a> {
 }
 
 impl<'a> View<'a> {
-    fn new(st: &'a PlateState, geo: &'a Geo, pos: &'a [DVec3], vis: &'a Tree, sp: f64) -> Self {
-        let n = st.samples.len();
-        let plate: Vec<u32> = (0..n).map(|i| st.plate_of(i)).collect();
-        let reach = BORDER_SPACINGS * sp;
-        let mut v = View {
+    fn new(
+        st: &'a PlateState,
+        geo: &'a Geo,
+        pos: &'a [DVec3],
+        vis: &'a Tree,
+        sp: f64,
+        tables: &Tables,
+    ) -> Self {
+        View {
             st,
             geo,
             pos,
-            plate,
+            plate: tables.plate.clone(),
             vis,
-            coast: Vec::new(),
+            coast: tables.coast.clone(),
             sp,
-            reach,
-        };
-        v.coast = (0..n)
-            .map(|i| {
-                let pl = v.plate[i];
-                v.floor(i, pl)
-                    && geo.edges(i as u32).any(|(j, _)| {
-                        v.land(j as usize, pl) && pos[i].angle_between(pos[j as usize]) < reach
-                    })
-            })
-            .collect();
-        v
+            reach: BORDER_SPACINGS * sp,
+        }
     }
 
     fn visible(&self, i: usize, pl: u32) -> bool {
@@ -555,6 +585,7 @@ pub fn step(
     let sp = env.norm.spacing_rad();
     let vis = Tree::over(pos, |i| !state.samples[i].is_hidden());
     let mut changed = false;
+    let mut tables = Tables::new(state, geo, pos, sp);
     let live: Vec<Propagation> = std::mem::take(&mut state.propagations);
     let mut kept: Vec<Propagation> = Vec::new();
     for mut pr in live {
@@ -564,7 +595,7 @@ pub fn step(
             continue;
         }
         let (plan, tip) = {
-            let v = View::new(state, geo, pos, &vis, sp);
+            let v = View::new(state, geo, pos, &vis, sp, &tables);
             match carry_on(&v, env, &mut pr) {
                 None => (Plan::None, None),
                 Some((plan, tip)) => (plan, Some(tip)),
@@ -586,6 +617,7 @@ pub fn step(
                 tally(T_ADV_GO);
                 // The tip moves to the broken stretch's end.
                 apply_advance(state, world, pos, env, &mut pr, &adv);
+                tables = Tables::new(state, geo, pos, sp);
                 changed = true;
             }
         }
@@ -610,7 +642,7 @@ pub fn step(
             continue;
         }
         let plan = {
-            let v = View::new(state, geo, pos, &vis, sp);
+            let v = View::new(state, geo, pos, &vis, sp, &tables);
             plan_start(&v, env, u)
         };
         match plan {
@@ -618,6 +650,7 @@ pub fn step(
             Plan::Stall => state.counters.propagation_stalls += 1,
             Plan::Go(cut) => {
                 apply_start(state, world, pos, env, &cut)?;
+                tables = Tables::new(state, geo, pos, sp);
                 changed = true;
             }
         }
