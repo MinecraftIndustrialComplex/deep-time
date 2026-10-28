@@ -1832,35 +1832,16 @@ fn flat_masks(g: &Grid, fill: &[i16], parent: &[u8], state: &mut [u8]) -> Vec<u3
 /// Marks the open sea: cells at or below `sea_raw` in an 8-connected body (x wrapping) of at
 /// least `min_cells`. The others stay land.
 fn open_sea(g: &Grid, elev: &[i16], sea_raw: i32, min_cells: usize, state: &mut [u8]) {
-    let n = g.w * g.h;
-    let mut done = vec![false; n];
-    let mut members: Vec<usize> = Vec::new();
-    let mut stack: Vec<usize> = Vec::new();
-    for c0 in 0..n {
-        if done[c0] || i32::from(elev[c0]) > sea_raw {
-            continue;
+    // The bodies at or below sea level in parallel (`super::bodies`; the same cells as the serial
+    // floods before the speed work of 2026-10-28).
+    let (root, size) = super::bodies(g.w * g.h, |c, k| g.nb(c, k), &|c| {
+        i32::from(elev[c]) <= sea_raw
+    });
+    state.par_iter_mut().enumerate().for_each(|(c, st)| {
+        if root[c] != super::NO_BODY && size[root[c] as usize] as usize >= min_cells {
+            *st |= SEA;
         }
-        members.clear();
-        stack.push(c0);
-        done[c0] = true;
-        while let Some(c) = stack.pop() {
-            members.push(c);
-            for k in 0..8 {
-                if let Some(nb) = g.nb(c, k)
-                    && !done[nb]
-                    && i32::from(elev[nb]) <= sea_raw
-                {
-                    done[nb] = true;
-                    stack.push(nb);
-                }
-            }
-        }
-        if members.len() >= min_cells {
-            for &c in &members {
-                state[c] |= SEA;
-            }
-        }
-    }
+    });
 }
 
 /// Priority-Flood with the pit queue from the open sea's shores. Fills `fill` (the spill level
