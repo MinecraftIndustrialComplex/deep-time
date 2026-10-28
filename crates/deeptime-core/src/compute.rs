@@ -225,6 +225,88 @@ pub fn lap(what: &'static str, since: std::time::Instant) {
     add(what, since.elapsed().as_secs_f64() * 1000.0);
 }
 
+/// The speed work's diagnostic (2026-10-28): with `DEEPTIME_LAP_CPU` set, each timed part of the
+/// plate, climate and surface steps also sums the process's CPU time (every thread) since the
+/// part before it in that stage, or since the stage's step began, so a part's CPU over its wall
+/// time is the cores it kept busy. Parts timed inside another part take the CPU since the last
+/// part's end. Run it with `DEEPTIME_BENCH_NO_OVERLAP` so the structure stage's steps do not run
+/// beside the plates'. Off (the default), nothing is read.
+pub fn lap_cpu_on() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("DEEPTIME_LAP_CPU").is_some())
+}
+
+/// The process's CPU time over all its threads, ms (`CLOCK_PROCESS_CPUTIME_ID`; 0 off Linux).
+pub fn process_cpu_ms() -> f64 {
+    #[cfg(target_os = "linux")]
+    {
+        #[repr(C)]
+        struct Timespec {
+            tv_sec: i64,
+            tv_nsec: i64,
+        }
+        unsafe extern "C" {
+            fn clock_gettime(clock: i32, ts: *mut Timespec) -> i32;
+        }
+        const CLOCK_PROCESS_CPUTIME_ID: i32 = 2;
+        let mut ts = Timespec {
+            tv_sec: 0,
+            tv_nsec: 0,
+        };
+        // SAFETY: `ts` is a valid, writable timespec of the C layout for the call's duration.
+        if unsafe { clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &mut ts) } == 0 {
+            return ts.tv_sec as f64 * 1.0e3 + ts.tv_nsec as f64 * 1.0e-6;
+        }
+    }
+    0.0
+}
+
+/// Each stage's last CPU reading, and the parts' CPU sums (`stage`, `part`, ms).
+static CPU_LAST: Mutex<Vec<(&'static str, f64)>> = Mutex::new(Vec::new());
+static CPU_TIMINGS: Mutex<Vec<(&'static str, &'static str, f64)>> = Mutex::new(Vec::new());
+
+/// Starts `stage`'s CPU clock (its step begins) when [`lap_cpu_on`].
+pub fn cpu_mark(stage: &'static str) {
+    if !lap_cpu_on() {
+        return;
+    }
+    let now = process_cpu_ms();
+    if let Ok(mut last) = CPU_LAST.lock() {
+        match last.iter_mut().find(|e| e.0 == stage) {
+            Some(e) => e.1 = now,
+            None => last.push((stage, now)),
+        }
+    }
+}
+
+/// Adds the CPU since `stage`'s last mark or part to `part` when [`lap_cpu_on`].
+pub fn cpu_part(stage: &'static str, part: &'static str) {
+    if !lap_cpu_on() {
+        return;
+    }
+    let now = process_cpu_ms();
+    let Ok(mut last) = CPU_LAST.lock() else {
+        return;
+    };
+    let Some(e) = last.iter_mut().find(|e| e.0 == stage) else {
+        last.push((stage, now));
+        return;
+    };
+    let ms = now - e.1;
+    e.1 = now;
+    if let Ok(mut t) = CPU_TIMINGS.lock() {
+        match t.iter_mut().find(|x| x.0 == stage && x.1 == part) {
+            Some(x) => x.2 += ms,
+            None => t.push((stage, part, ms)),
+        }
+    }
+}
+
+/// The parts' CPU sums (`stage`, `part`, ms), in the order they first ran.
+pub fn cpu_timings() -> Vec<(&'static str, &'static str, f64)> {
+    CPU_TIMINGS.lock().map(|t| t.clone()).unwrap_or_default()
+}
+
 /// The parts and their sums, in the order they first ran.
 pub fn timings() -> Vec<(&'static str, f64)> {
     TIMINGS.lock().map(|t| t.clone()).unwrap_or_default()
