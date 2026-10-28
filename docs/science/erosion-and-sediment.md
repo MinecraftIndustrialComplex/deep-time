@@ -1254,4 +1254,16 @@ sources' loads only go down. The level (ERO-050), the fill depth (ERO-051) and t
 question and is left as it is. The tests `a_mouth_fills_the_near_room_before_the_deep_floor_beyond`
 and `a_mouth_in_a_hollow_fills_it_from_its_floor` pin the order.
 
-**On the planet.** MOUTH_RESULT
+**On the planet.** Arm `mouth28` (8 runs, earthlike quick 16k, 1000 Myr, both starts) against
+master's base28 (`pool.sh table --base base28 --arm mouth28`, medians): land 0.307 to 0.328
+(Mann-Whitney p 0.033), the largest landmass 0.146 to 0.200 (p 0.33), continental crust under the
+sea 0.198 to 0.140 (p 0.094), coast with high ground 0.167 to 0.143 (p 0.85); every V1 target is
+met in both. The load that stays on the shelf beside the mouth instead of running to the deep floor
+builds land, which is the sources' order and needs no knob. The cost is in the walk: at 300 Myr the
+fills raise 6.25 against 2.84 million cells and pop 32.0 against 11.2 million (a topset aggrading
+thinly over more cells is most of it), at about 84 ns a pop either way; on the full 16k gate run
+marine_fill takes 19.2 against 17.3 s (408 million cells popped, the most one fill popped 20,632 of
+its 200,000 cap). Planning the mouths' fills in parallel and applying them in turn (bit for bit,
+each plan checked against the cells it popped) re-planned 41 % of them and ran slower, so the fill
+stays serial; its heap item is packed into one u128 key (16 bytes, compared as one number;
+`the_packed_item_orders_as_its_fields`).
