@@ -10032,6 +10032,73 @@ wedge obeying pro-wedge mechanics and a smaller landward-verging retro-wedge ...
 et al. 1993, p. 373), and Taiwan's 90 km belt is the Chinese margin's crust with the Luzon arc as its backstop (Dahlen
 1990, pp. 83-84; Simoes et al. 2007, p. 1). That is the lead for the coast with high ground; nothing is changed yet.
 
+### Step 20: two wedges about the suture (PLT-730, PLT-731; 2026-10-29)
+
+The coordinator, inline, from the lead above and the design `docs/design/collision-two-wedges.md`. A switch,
+`tectonics.collision_two_wedges`, off by default (its pool arm below).
+
+- **The rule.** A doubly vergent orogen grows as two critical wedges about the point S where the lower plate's mantle
+  goes down: a pro-wedge over the lower plate at the minimum critical taper, a retro-wedge over the upper plate,
+  steeper, at the maximum (Willett, Beaumont & Fullsack 1993, p. 372). With the switch the crest stands at the front.
+  The pro-wedge's surface falls from it over the incoming plate at `wedge_slope_deg` (alpha, 1.5 degrees, PLT-192), the
+  retro-wedge's over the overriding plate at beta, `retro_slope_ratio` (PLT-731) times as steep, both from one crest
+  height H:
+  S_pro(d) = min(H, h_s) - d tan alpha and S_retro(d) = min(h_s, H - d tan beta), with h_s the strength height
+  (PLT-253). The step's crust raises the ground under both surfaces with H found by bisection so that all of it is
+  placed (`fill_two_wedges`). On even ground each side takes its cross-section, H^2 / (2 tan), so the pro-wedge takes
+  tan beta / (tan alpha + tan beta) of the crust (0.61 at the ratio 1.55; "more mass is stored in the pro-wedge
+  than the retro-wedge", Naylor & Sinclair 2008, p. 21); a lower side takes more, so a drowned overriding edge fills
+  before the crest rises over the incoming plate's lowland. Past the strength height the pro-wedge stops rising and the
+  retro side widens as a plateau, as the taper belt does (Tibet behind the Himalaya, Dahlen 1990, p. 96). What both
+  cannot hold at the strength height goes to the no-room rule (PLT-700) as before.
+- **The retro slope** (PLT-731; a Sonnet research sub-agent, 2026-10-29, full texts, bibliography `DavisSuppeDahlen1983`,
+  `WillettSlingerlandHovius2001`, `He2021`). No source read states a retro-wedge's regional slope in its text. The one
+  orogen measured on both flanks is Taiwan: the western (pro) slope is 2.9 degrees (Davis, Suppe & Dahlen 1983, p.
+  1163) and their section labels the eastern surface above the sea 4.5 degrees (Fig. 10, p. 1162, read with p. 1171),
+  so tan beta / tan alpha = 1.55. The model's alpha is the Himalaya's 1.5 degrees, and the Himalaya has no retro-wedge
+  to measure (Tibet stands behind it), so the retro side is set as Taiwan's ratio, `retro_slope_ratio` 1.55, beta 2.33
+  degrees, and the pro-wedge takes 0.61 of the crust on even ground. Willett, Slingerland & Hovius 2001 find the
+  retro-wedge "steeper and shorter than the matching prowedge" in the Southern Alps, Taiwan and the Olympics (p. 477);
+  southern Taiwan's mean local slopes stand 1.43 times steeper on the retro flank (He et al. 2021).
+- **What it replaces.** The wedge capped by the overriding edge's height (PLT-244, with its floor PLT-380) and the taper
+  belt from that edge (PLT-600, PLT-601) while the switch is on. The pro-wedge's reach is the fall from a crest at the
+  strength height down to 500 m under the sea, (h_s - (S - 500 m)) / tan alpha, about 214 km, whatever the overriding
+  edge's height. Everything else stays: the stacking share (PLT-242), the crust that crosses whole (PLT-400: the
+  pro-wedge's crust rides its plate to the front, crosses whole and is stacked again on both sides), the overriding
+  plate's interior share (PLT-652), the foredeep read beyond the pro-wedge's toe.
+- **Which front.** PLT-600 read the model's front as the Himalaya's Main Frontal Thrust, the toe of a wedge on the
+  overriding side. With two wedges the front is S instead: the model's front is where the incoming plate's samples are
+  consumed and its crust leaves the incoming plate, which is where the lower plate goes down, and the incoming plate's
+  samples in front of it carry the pro-wedge as the lower plate carries the Lesser Himalaya to the suture. The crest
+  at S is a simplification: models put the topographic maximum somewhat retro-ward of the subduction point (Naylor &
+  Sinclair 2008, p. 15, after Willett et al. 1993).
+- **At the model's resolution.** The quick planet's samples are about 71 km apart on the model sphere, so a 3 km crest's
+  pro-wedge (115 km at 1.5 degrees) is one or two rows and its retro-wedge one; the unit fixture's 16,000 samples
+  (about 180 km apart) make each wedge its front row.
+- **On the pool: the lead is refuted, the switch stays off** (arm tw-wedges, key cfdf228e0c4c, `--set
+  tectonics.collision_two_wedges=true` and base29's crust-budget environment, earthlike_quick_16k, 1000 Myr, seeds 1 to
+  4 from both starts, 8 runs against base29's 24, medians, Mann-Whitney p in brackets; the arm ran with the first
+  draft's absolute retro slope, 2.5 degrees, a ratio of 1.67 against the default's 1.55). The mechanism works: the
+  incoming plate's wedge holds 0.39 of the collisions' kept crust at the end (the crust budget's `kept_wedge` over
+  `kept`, two runs read) against about 0.03 under the capped wedge, less than the even-ground 0.62 because drowned
+  overriding edges, lower, take more. But the coast with high ground rises from 0.159 to 0.207 (0.078), the
+  collision regime's land within 150 km of the sea from 0.289 to 0.372 of it, and that land's median distance to the
+  sea falls from 270 to 212 km (0.094; `measures_boundary.json`, `collcoast`). A crest at the front between two
+  drowned margins stands at the sea on both sides, as Taiwan does, where the old belt's toe left a strip of sea or
+  lowland in front of its 2 km line. Land above 2 km 0.049 to 0.039 (0.75), land 0.330 to 0.310 (0.064), the largest
+  landmass 0.193 to 0.153 (0.20), collisions per 100 Myr 2.75 to 2.35 (0.045), the boundary mix unchanged (`boundary`,
+  every share within 0.003). The guard: no step beyond two Earth reliefs, the highest plate elevation 5,418 m. So the
+  wedge's cap is not what puts collision belts at the coast. The model reads its front as PLT-600 does (the toe) with
+  the switch off by default; the two wedges stay as a measured alternative. The next lead is in the collision measure
+  itself: 0.437 of the collision high coast is a belt running along the coast, and small terranes (under 50 samples)
+  hand off 30.4 times per 100 Myr, so the belts along coasts may be terranes accreted to a margin with the sea behind
+  them (not yet measured).
+- **Tests.** `the_two_wedges_share_the_crust_by_their_slopes_and_keep_it` (one crest, both slopes, the share within
+  0.01 of the formula on 1 km rows, the plateau past the strength height, saturation, ground above a surface),
+  `the_two_wedges_raise_the_front_over_a_drowned_edge` (an overriding continent 600 m under the sea: no capped wedge and
+  the old belt's toe at the front; with two wedges the crest at the front and the incoming plate's front row raised),
+  `stacking_moves_crust_and_creates_none` (two cases added: the crust added is the share of what crossed).
+
 ## Plate speed (2026-10-25)
 
 The coordinator's brief for the plate speed lane: CHK-020's `speed_rms_mm_yr` (the plate check's

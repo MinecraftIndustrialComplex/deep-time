@@ -49,6 +49,22 @@
 //!    the metre (the sliver rule above and the strength height's passes): only where it lands
 //!    moves.
 //!
+//!    With `collision_two_wedges` (PLT-730, off: its pool arm put more collision land at the
+//!    coast, plates.md "Step 20") the orogen
+//!    is two wedges about the front instead: a doubly vergent orogen grows as a pro-wedge over
+//!    the lower plate at the lesser critical taper and a retro-wedge over the upper plate at the
+//!    greater, about the point where the lower plate's mantle goes down (Willett, Beaumont &
+//!    Fullsack 1993), and more of its mass stands in the pro-wedge (Naylor & Sinclair 2008). The
+//!    crest stands at the front; the pro-wedge falls from it over the incoming plate at
+//!    `wedge_slope_deg`, the retro-wedge over the overriding plate `retro_slope_ratio` times as
+//!    steep (PLT-731: Taiwan's two flanks, 2.9° and 4.5°, Davis, Suppe & Dahlen 1983), both from
+//!    one crest height `H` found so that the step's crust is all placed
+//!    ([`fill_two_wedges`]), so on even ground the pro-wedge takes `tan β / (tan α + tan β)` of
+//!    it. Neither side is capped by the other's edge height (PLT-244's cap goes with the wedge it
+//!    capped), and past the strength height the crest widens as a plateau on the overriding side.
+//!    The pro-wedge's crust rides its plate to the front and crosses whole (PLT-400), to be
+//!    stacked again on both sides.
+//!
 //!    With `collision_noroom_stays` (PLT-700, on) nothing goes down for want of room: the belt's
 //!    passes run until the crust is placed or every sample stands at the strength height (no
 //!    sliver floor, no fixed number of passes), and what is left stays in the crust, stacked on
@@ -498,7 +514,17 @@ impl<'a> Reach<'a> {
         };
         // ledger: PLT-192 (the wedge's surface slope), PLT-244 (the wedge's rule).
         let tan = k.wedge_slope_deg.to_radians().tan();
-        r.wedge_reach_km = ((r.z_front - (sea_m + WEDGE_FLOOR_M)).max(0.0) / (1000.0 * tan)).min(
+        // With two wedges (PLT-730) the pro-wedge falls from a crest that can stand as high as
+        // the strength height, whatever the overriding edge's height.
+        let top_m = if k.collision_two_wedges {
+            match k.strength_height_m(env.gravity) {
+                cap if cap > 0.0 => cap,
+                _ => k.max_elevation_m,
+            }
+        } else {
+            r.z_front
+        };
+        r.wedge_reach_km = ((top_m - (sea_m + WEDGE_FLOOR_M)).max(0.0) / (1000.0 * tan)).min(
             // A guard for gentle slopes: the profile never runs out further than the belt is
             // wide beyond the basin's reach.
             k.collision_belt_km + FOREDEEP_REACH_KM,
@@ -587,12 +613,14 @@ fn stack_front(
     let under_ok = |v: u32| reach.under_ok(v);
     let samples = &state.samples;
 
-    // The wedge's deficit under its profile, with each sample's distance from the front.
+    // The wedge's deficit under its profile, with each sample's distance from the front (with
+    // two wedges, PLT-730, the pro-wedge is filled with the belt below instead).
+    let two = k.collision_two_wedges;
     let mut wedge: Vec<(usize, f64, f64)> = Vec::new();
     let mut wedge_km = 0.0f64;
     for &(i, d, _) in &d_under {
         let i = i as usize;
-        if !under_ok(i as u32) || samples[i].kind != CONTINENTAL {
+        if two || !under_ok(i as u32) || samples[i].kind != CONTINENTAL {
             continue;
         }
         let d_km = norm.km(d);
@@ -750,53 +778,99 @@ fn stack_front(
     } else {
         BeltClass::Wide
     };
+    // The pro-wedge's crust with two wedges (PLT-730), km² × m of rise.
+    let mut pro_km2_m = 0.0;
     if belt_weight > 0.0 && belt_rise_km2_m > 0.0 {
         let cap_m = k.strength_height_m(env.gravity);
         let z_of: Vec<f64> = belt
             .iter()
             .map(|&(i, _)| f64::from(samples[i].elevation_m))
             .collect();
-        // The old fill: how much the belt keeps (PLT-243's room share, PLT-253's passes; with
-        // `collision_noroom_stays` the passes run to the end, PLT-700) and, with the taper off,
-        // where it lands.
-        let old = fill_belt(
-            &belt,
-            &z_of,
-            belt_rise_km2_m,
-            belt_weight,
-            area,
-            cap_m,
-            k.collision_noroom_stays,
-        );
-        let kept_km2_m = old.iter().sum::<f64>() * area;
-        // What was left over, and whether any sample still had room (measurement only).
-        let left = (belt_rise_km2_m - kept_km2_m).max(0.0) * COLUMN_ISOSTATIC_FACTOR;
-        let room = cap_m <= 0.0 || z_of.iter().zip(&old).any(|(z, g)| cap_m - z - g > 1e-6);
-        if room {
-            sliver_km2_m = left;
-        } else {
-            capped_km2_m = left;
-        }
-        let given = if k.collision_belt_taper {
-            // ledger: PLT-600 (the surface from critical taper), PLT-601 (the toe advances once
-            // the belt is full). The crust kept is the old fill's, to the m: only where it lands
-            // changes. It always fits (the same samples, the same strength height).
-            // The field lists its samples by index: the fill takes them nearest the front first.
-            let mut order: Vec<usize> = (0..belt_d.len()).collect();
-            order.sort_by(|&a, &b| belt_d[a].2.total_cmp(&belt_d[b].2).then(a.cmp(&b)));
-            let d_km: Vec<f64> = order.iter().map(|&j| norm.km(belt_d[j].2)).collect();
-            let z_near: Vec<f64> = order.iter().map(|&j| z_of[j]).collect();
-            let (near, toe) = fill_taper(&d_km, &z_near, z_front, tan, kept_km2_m, area, cap_m);
-            toe_km2_m = toe * COLUMN_ISOSTATIC_FACTOR;
-            let mut given = vec![0.0f64; belt_d.len()];
-            for (&j, g) in order.iter().zip(near) {
-                given[j] = g;
+        let given = if two {
+            // ledger: PLT-730 (the two wedges and their fill), PLT-731 (the retro slope). The
+            // pro-wedge: the incoming plate's continental ground within its reach.
+            let pro: Vec<(usize, f64)> = d_under
+                .iter()
+                .filter(|&&(i, d, _)| {
+                    under_ok(i)
+                        && samples[i as usize].kind == CONTINENTAL
+                        && norm.km(d) <= wedge_reach_km
+                })
+                .map(|&(i, d, _)| (i as usize, d))
+                .collect();
+            let pro_d: Vec<f64> = pro.iter().map(|&(_, d)| norm.km(d)).collect();
+            let pro_z: Vec<f64> = pro
+                .iter()
+                .map(|&(i, _)| f64::from(samples[i].elevation_m))
+                .collect();
+            let retro_d: Vec<f64> = belt_d.iter().map(|&(_, _, d)| norm.km(d)).collect();
+            let retro_tan = tan * k.retro_slope_ratio;
+            let (pro_g, retro_g) = fill_two_wedges(
+                Flank {
+                    d_km: &pro_d,
+                    z: &pro_z,
+                    tan,
+                },
+                Flank {
+                    d_km: &retro_d,
+                    z: &z_of,
+                    tan: retro_tan,
+                },
+                belt_rise_km2_m,
+                area,
+                cap_m,
+            );
+            for (&(i, d), g) in pro.iter().zip(pro_g) {
+                if g > 0.0 {
+                    rises.push((i, g, Part::Wedge, d));
+                    wedge_km = wedge_km.max(norm.km(d));
+                    pro_km2_m += g * area;
+                }
             }
-            capped_km2_m +=
-                (kept_km2_m - given.iter().sum::<f64>() * area).max(0.0) * COLUMN_ISOSTATIC_FACTOR;
-            given
+            // What the two could not hold with every sample at the strength height.
+            let placed = pro_km2_m + retro_g.iter().sum::<f64>() * area;
+            capped_km2_m = (belt_rise_km2_m - placed).max(0.0) * COLUMN_ISOSTATIC_FACTOR;
+            retro_g
         } else {
-            old
+            let old = fill_belt(
+                &belt,
+                &z_of,
+                belt_rise_km2_m,
+                belt_weight,
+                area,
+                cap_m,
+                k.collision_noroom_stays,
+            );
+            let kept_km2_m = old.iter().sum::<f64>() * area;
+            // What was left over, and whether any sample still had room (measurement only).
+            let left = (belt_rise_km2_m - kept_km2_m).max(0.0) * COLUMN_ISOSTATIC_FACTOR;
+            let room = cap_m <= 0.0 || z_of.iter().zip(&old).any(|(z, g)| cap_m - z - g > 1e-6);
+            if room {
+                sliver_km2_m = left;
+            } else {
+                capped_km2_m = left;
+            }
+            if k.collision_belt_taper {
+                // ledger: PLT-600 (the surface from critical taper), PLT-601 (the toe advances once
+                // the belt is full). The crust kept is the old fill's, to the m: only where it lands
+                // changes. It always fits (the same samples, the same strength height).
+                // The field lists its samples by index: the fill takes them nearest the front first.
+                let mut order: Vec<usize> = (0..belt_d.len()).collect();
+                order.sort_by(|&a, &b| belt_d[a].2.total_cmp(&belt_d[b].2).then(a.cmp(&b)));
+                let d_km: Vec<f64> = order.iter().map(|&j| norm.km(belt_d[j].2)).collect();
+                let z_near: Vec<f64> = order.iter().map(|&j| z_of[j]).collect();
+                let (near, toe) = fill_taper(&d_km, &z_near, z_front, tan, kept_km2_m, area, cap_m);
+                toe_km2_m = toe * COLUMN_ISOSTATIC_FACTOR;
+                let mut given = vec![0.0f64; belt_d.len()];
+                for (&j, g) in order.iter().zip(near) {
+                    given[j] = g;
+                }
+                capped_km2_m += (kept_km2_m - given.iter().sum::<f64>() * area).max(0.0)
+                    * COLUMN_ISOSTATIC_FACTOR;
+                given
+            } else {
+                old
+            }
         };
         let mut given = given;
         // ledger: PLT-700. What found no room under the strength height stays in the crust:
@@ -807,7 +881,8 @@ fn stack_front(
         // Whitney 2010); Stern & Scholl 2010's suture losses are the share's (PLT-242).
         let mut edge_rise: Vec<(usize, f64)> = Vec::new();
         if k.collision_noroom_stays {
-            let left_km2_m = (belt_rise_km2_m - given.iter().sum::<f64>() * area).max(0.0);
+            let left_km2_m =
+                (belt_rise_km2_m - pro_km2_m - given.iter().sum::<f64>() * area).max(0.0);
             let edge: Vec<usize> = f
                 .edge
                 .iter()
@@ -1190,6 +1265,94 @@ fn fill_taper(
     }
     let toe = (given.iter().sum::<f64>() - full).max(0.0) * area;
     (given, toe)
+}
+
+/// One side of a collision orogen for [`fill_two_wedges`]: its samples' distances from the front,
+/// km, their elevations, m, and its surface slope (the tangent).
+struct Flank<'a> {
+    d_km: &'a [f64],
+    z: &'a [f64],
+    tan: f64,
+}
+
+/// The two wedges' fill (`collision_two_wedges`, the module docs): the pro-wedge on the incoming
+/// plate and the retro-wedge on the overriding plate rise to one crest at the front. Their
+/// surfaces are `min(H, cap) − d tan α` (the pro-wedge, α its slope) and `min(cap, H − d tan β)`
+/// (the retro-wedge, β), with `cap` the strength height (≤ 0: no limit), and the step's crust,
+/// `rise_km2_m` (km² × m of Airy rise on samples of `area` km²), raises the ground under both
+/// with `H` found by bisection so that all of it is placed. A doubly vergent orogen grows as two
+/// critical wedges about the point where the lower plate goes down, the pro-wedge over the lower
+/// plate at the lesser taper, the retro-wedge over the upper plate at the greater (Willett,
+/// Beaumont & Fullsack 1993, p. 372); one crest for both, so on even ground the pro-wedge takes
+/// `tan β / (tan α + tan β)` of each step's crust, as their cross-sections `H² / (2 tan)` are
+/// (Naylor & Sinclair 2008, pp. 8-9, "more mass is stored in the pro-wedge than the
+/// retro-wedge"). Ground above a surface takes nothing; once the crest stands at the strength
+/// height the pro-wedge stops rising and the retro side widens as a plateau (the plateau behind
+/// the Himalaya). Returns each side's rises, m. When every sample stands at its surface's limit
+/// some crust may be left (the caller's no-room rule, PLT-700, places it).
+// ledger: PLT-730 (the two wedges and their fill), PLT-731 (the retro slope).
+fn fill_two_wedges(
+    pro: Flank,
+    retro: Flank,
+    rise_km2_m: f64,
+    area: f64,
+    cap_m: f64,
+) -> (Vec<f64>, Vec<f64>) {
+    let mut given = (vec![0.0f64; pro.d_km.len()], vec![0.0f64; retro.d_km.len()]);
+    if rise_km2_m <= 0.0 || area <= 0.0 || pro.d_km.len() + retro.d_km.len() == 0 {
+        return given;
+    }
+    let capped = |s: f64| if cap_m > 0.0 { s.min(cap_m) } else { s };
+    let pro_at =
+        |h: f64, j: usize| (capped(h) - 1000.0 * pro.d_km[j] * pro.tan - pro.z[j]).max(0.0);
+    let retro_at =
+        |h: f64, j: usize| (capped(h - 1000.0 * retro.d_km[j] * retro.tan) - retro.z[j]).max(0.0);
+    let fill = |h: f64| {
+        (0..pro.d_km.len()).map(|j| pro_at(h, j)).sum::<f64>()
+            + (0..retro.d_km.len()).map(|j| retro_at(h, j)).sum::<f64>()
+    };
+    let total = rise_km2_m / area;
+    // Where each sample starts to take crust: the crest at its ground plus its fall from the
+    // front. Below the lowest of those nothing rises.
+    let starts = || {
+        let p = (0..pro.d_km.len()).map(|j| pro.z[j] + 1000.0 * pro.d_km[j] * pro.tan);
+        let r = (0..retro.d_km.len()).map(|j| retro.z[j] + 1000.0 * retro.d_km[j] * retro.tan);
+        p.chain(r)
+    };
+    let mut lo = starts().fold(f64::INFINITY, f64::min);
+    // At `hi` every sample stands at its surface's limit (with a strength height) or takes more
+    // than all of the crust (without one).
+    let mut hi = if cap_m > 0.0 {
+        let far = retro.d_km.iter().copied().fold(0.0, f64::max);
+        (cap_m + 1000.0 * far * retro.tan).max(lo)
+    } else {
+        starts().fold(f64::NEG_INFINITY, f64::max) + total + 1.0
+    };
+    let at_hi = fill(hi);
+    if at_hi > total {
+        for _ in 0..200 {
+            let mid = 0.5 * (lo + hi);
+            if mid <= lo || mid >= hi {
+                break;
+            }
+            if fill(mid) > total {
+                hi = mid;
+            } else {
+                lo = mid;
+            }
+        }
+    }
+    // At `hi` the fill is at least the crust (or all there is room for): scaled back to the
+    // crust, no sample rises above its surface.
+    let f = fill(hi);
+    let scale = if f > total { total / f } else { 1.0 };
+    for (j, g) in given.0.iter_mut().enumerate() {
+        *g = scale * pro_at(hi, j);
+    }
+    for (j, g) in given.1.iter_mut().enumerate() {
+        *g = scale * retro_at(hi, j);
+    }
+    given
 }
 
 /// Where a rise of the step's stacking goes: the wedge on the incoming plate, the belt behind the
@@ -1983,10 +2146,18 @@ mod tests {
     /// (PLT-243's, the critical taper's PLT-600): only where the crust lands differs.
     #[test]
     fn stacking_moves_crust_and_creates_none() {
-        for (taper, share) in [(false, 1.0), (false, 0.5), (true, 1.0), (true, 0.5)] {
+        for (taper, two, share) in [
+            (false, false, 1.0),
+            (false, false, 0.5),
+            (true, false, 1.0),
+            (true, false, 0.5),
+            (true, true, 1.0),
+            (true, true, 0.5),
+        ] {
             let mut fx = Fixture::new();
             fx.preset.tectonics.collision_threshold_km = 1.0e9;
             fx.preset.tectonics.collision_belt_taper = taper;
+            fx.preset.tectonics.collision_two_wedges = two;
             fx.preset.tectonics.collision_stacking_share = share;
             fx.preset.tectonics.collision_restack_whole = false;
             // A crust strong enough that the strength height (PLT-253) never binds here.
@@ -2601,6 +2772,214 @@ mod tests {
             cap,
         );
         assert!(g[1] > 0.0 && close(g[1], g[2]) && g[3] == 0.0, "{g:?}");
+    }
+
+    /// PLT-730: the two wedges rise to one crest at the front, each falling at its own slope, and
+    /// on even ground the pro-wedge takes `tan β / (tan α + tan β)` of the crust; all of it is
+    /// placed until both stand at the strength height, the crest widening behind the front as a
+    /// plateau past it.
+    #[test]
+    fn the_two_wedges_share_the_crust_by_their_slopes_and_keep_it() {
+        let tan_p = 1.5f64.to_radians().tan();
+        let tan_r = 1.55 * tan_p;
+        let (z0, cap, area) = (300.0, 5200.0, 1.0);
+        // A line of samples every 1 km in front of the front and behind it, out to 400 km.
+        let d: Vec<f64> = (0..=400).map(f64::from).collect();
+        let flat = vec![z0; d.len()];
+        let placed =
+            |g: &(Vec<f64>, Vec<f64>)| (g.0.iter().sum::<f64>() + g.1.iter().sum::<f64>()) * area;
+        let close = |a: f64, b: f64, tol: f64| (a - b).abs() <= tol * b.abs().max(1.0);
+        let fill = |z_p: &[f64], z_r: &[f64], rise: f64| {
+            fill_two_wedges(
+                Flank {
+                    d_km: &d,
+                    z: z_p,
+                    tan: tan_p,
+                },
+                Flank {
+                    d_km: &d,
+                    z: z_r,
+                    tan: tan_r,
+                },
+                rise,
+                area,
+                cap,
+            )
+        };
+
+        // 1. Below the strength height: one crest H, both sides at their slopes from it, the
+        //    pro-wedge's share the slopes' (to the line's 1 km spacing), all of it placed.
+        let rise = 2.0e5;
+        let g = fill(&flat, &flat, rise);
+        assert!(
+            close(placed(&g), rise, 1e-9),
+            "{} placed of {rise}",
+            placed(&g)
+        );
+        let h = z0 + g.0[0];
+        assert!(
+            close(z0 + g.1[0], h, 1e-9) && h < cap,
+            "one crest: {h} and {}",
+            z0 + g.1[0]
+        );
+        for (side, tan) in [(&g.0, tan_p), (&g.1, tan_r)] {
+            let last = side.iter().rposition(|&x| x > 0.0).unwrap();
+            assert!(last > 10 && last < 400, "{last}");
+            for j in 0..last {
+                assert!(close(z0 + side[j], h - 1000.0 * d[j] * tan, 1e-9), "{j}");
+            }
+            assert!(side[last + 1..].iter().all(|&x| x == 0.0));
+        }
+        let pro = g.0.iter().sum::<f64>() * area / rise;
+        let want = tan_r / (tan_p + tan_r);
+        assert!(
+            (pro - want).abs() < 0.01,
+            "pro share {pro}, the slopes' {want}"
+        );
+
+        // 2. Past the strength height: the pro-wedge falls from the crest at the limit, the
+        //    retro side is a plateau at the limit behind the front, then falls at its slope.
+        let rise = 1.5e6;
+        let g = fill(&flat, &flat, rise);
+        assert!(
+            close(placed(&g), rise, 1e-9),
+            "{} placed of {rise}",
+            placed(&g)
+        );
+        assert!(close(z0 + g.0[0], cap, 1e-9));
+        let fall = (cap - z0) / (1000.0 * tan_p);
+        for (j, (&x, &dj)) in g.0.iter().zip(&d).take(fall as usize).enumerate() {
+            assert!(close(z0 + x, cap - 1000.0 * dj * tan_p, 1e-9), "{j}");
+        }
+        let plateau =
+            g.1.iter()
+                .take_while(|&&x| close(z0 + x, cap, 1e-9))
+                .count();
+        assert!(plateau > 20, "a plateau {plateau} km wide behind the front");
+        let edge = d[plateau];
+        let last = g.1.iter().rposition(|&x| x > 0.0).unwrap();
+        for j in plateau + 1..last {
+            let slope = (g.1[j - 1] - g.1[j]) / (1000.0 * (d[j] - d[j - 1]));
+            assert!(
+                (slope - tan_r).abs() < 1e-9,
+                "{j} past the plateau's {edge} km: {slope}"
+            );
+        }
+
+        // 3. More than both hold at the strength height: every sample at its limit, the rest
+        //    left for the caller.
+        let g = fill(&flat, &flat, 1.0e8);
+        assert!(g.1.iter().all(|&x| close(z0 + x, cap, 1e-9)));
+        for (j, (&x, &dj)) in g.0.iter().zip(&d).enumerate() {
+            let want = (cap - 1000.0 * dj * tan_p - z0).max(0.0);
+            assert!(close(x, want, 1e-9), "{j}: {x} for {want}");
+        }
+        assert!(placed(&g) < 1.0e8);
+
+        // 4. Ground above a surface takes nothing; a lower side takes more (an overriding edge
+        //    under the sea fills before the crest rises over the incoming plate's lowland).
+        let mut high = flat.clone();
+        high[5] = 4000.0;
+        let low = vec![-600.0; d.len()];
+        let g = fill(&high, &low, rise / 10.0);
+        assert_eq!(g.0[5], 0.0);
+        assert!(close(placed(&g), rise / 10.0, 1e-9));
+        assert!(
+            g.1.iter().sum::<f64>() > g.0.iter().sum::<f64>(),
+            "the low side takes more"
+        );
+        // Nothing to fill: nothing placed.
+        let none = fill_two_wedges(
+            Flank {
+                d_km: &[],
+                z: &[],
+                tan: tan_p,
+            },
+            Flank {
+                d_km: &[],
+                z: &[],
+                tan: tan_r,
+            },
+            rise,
+            area,
+            cap,
+        );
+        assert!(none.0.is_empty() && none.1.is_empty());
+    }
+
+    /// PLT-730 on a head-on collision against an overriding continent 600 m under the sea, under
+    /// PLT-244's floor: the capped wedge has no reach there and the belt takes every metre from
+    /// the drowned edge inland; the two wedges put the crest at the front and give the incoming
+    /// plate its pro-wedge. Both keep the step's crust.
+    #[test]
+    fn the_two_wedges_raise_the_front_over_a_drowned_edge() {
+        let mut out = Vec::new();
+        for two in [false, true] {
+            let mut fx = Fixture::new();
+            fx.preset.tectonics.collision_threshold_km = 1.0e9;
+            fx.preset.tectonics.collision_two_wedges = two;
+            let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
+            let pts = fx.geo.points();
+            for (i, s) in st.samples.iter_mut().enumerate() {
+                if s.kind == CONTINENTAL && pts[i].x < 0.0 {
+                    s.elevation_m = -600.0;
+                }
+            }
+            let area = fx.norm.sample_area_km2();
+            let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
+            let before = crust_km2_m(&st, area);
+            let (stacked, _) = fx.step(&mut st, 1, None);
+            let s = &stacked[&0];
+            let added = crust_km2_m(&st, area) - before;
+            let kept = s.belt_km2_m + s.wedge_km2_m + s.upper_km2_m;
+            assert!(
+                (added - kept).abs() < 1e-4 * added.max(1.0),
+                "two {two}: the record is the crust added, {added} vs {kept}"
+            );
+            // The highest rise on each side, and on the overriding side the rise at the front.
+            let (mut over_near, mut over_all, mut under_all) = (0.0f64, 0.0f64, 0.0f64);
+            for (i, x) in st.samples.iter().enumerate() {
+                let p = pts[i];
+                if !arc(p) || p.y < 0.95 {
+                    continue;
+                }
+                let dz = f64::from(x.elevation_m - z0[i]);
+                if p.x < 0.0 {
+                    over_all = over_all.max(dz);
+                    if fx
+                        .geo
+                        .edges(i as u32)
+                        .any(|(v, _)| pts[v as usize].x >= 0.0)
+                    {
+                        over_near = over_near.max(dz);
+                    }
+                } else {
+                    under_all = under_all.max(dz);
+                }
+            }
+            let front = s.belt_km2_m + s.wedge_km2_m;
+            out.push((
+                s.wedge_km2_m / front,
+                over_near,
+                over_all,
+                under_all,
+                s.wedge_km,
+            ));
+        }
+        let (old, new) = (out[0], out[1]);
+        assert_eq!(old.0, 0.0, "no capped wedge over a drowned edge: {old:?}");
+        assert!(
+            old.1 < 0.5 * old.2,
+            "the old belt's toe at the front: {old:?}"
+        );
+        // The fixture's samples stand about 180 km apart, so each wedge is its front row here
+        // and the drowned side, 900 m lower, takes most of the crust.
+        assert!(new.0 > 0.1, "the pro-wedge's share: {new:?}");
+        assert!(new.1 > 0.9 * new.2, "the crest at the front: {new:?}");
+        assert!(
+            new.3 > 100.0 && old.3 == 0.0,
+            "the incoming plate rose: {new:?}, {old:?}"
+        );
     }
 
     /// PLT-600 on a head-on collision: the belt's ground rises behind the front, not at it (the
