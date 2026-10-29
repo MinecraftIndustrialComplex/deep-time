@@ -1249,7 +1249,11 @@ the bake's top less the salt's depth: no flat's surface left to read), as it doe
 gives a playa column a member of `#deeptime:salt_flat`, vanilla's desert (no trees; its cactus and dead bushes
 need sand) or Biomes O' Plenty's cold desert (no tree feature; a TerraBlender region of Biomes O' Plenty's has no
 desert, so the rule had no candidate there and the redwood came back on one of two runs), in any pack whose source can place one, after Expanded Ecosphere's salt lakes where that file is
-active (its id sorts first). A game-choice; a salt crust growing no tree is HYD-180's reading, from memory.
+active (its id sorts first). A biome query reads at the centre of its 4 x 4 cell, and on that planet the centre of the redwoods' cell, (-430, 146),
+lay a block off the flat whose edge columns at z 144 and 145 held salt, so the rule never ran there and the
+redwoods stood on both TerraBlender runs that followed; the playa condition now holds a cell when any of its columns is
+salt (Expanded Ecosphere's salt lakes with it). A game-choice; a salt crust growing no tree is HYD-180's reading,
+from memory.
 
 ## Land on a delta plain (2026-10-23, BIO-185)
 
