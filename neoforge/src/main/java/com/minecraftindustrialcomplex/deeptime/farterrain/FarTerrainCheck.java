@@ -137,9 +137,14 @@ public final class FarTerrainCheck {
             add(far, real, null);
         }
 
-        /** As {@link #add(FarTerrain.Column, RealColumn)}; {@code chunk}, while still generating, tells a carver's cut apart. */
+        /**
+         * As {@link #add(FarTerrain.Column, RealColumn)}; {@code chunk}, while still generating, tells a carver's cut apart:
+         * real ground more than the one block of tolerance under far terrain's, where a carver opened far terrain's
+         * ground block. (Until 2026-10-29 the cut had to be over 2 blocks, so a carver taking the top two blocks of a
+         * beach counted as far terrain's miss: the -PwithMic seam rows of de67c78f's test planet, far 66, real 64.)
+         */
         public void add(FarTerrain.Column far, RealColumn real, ChunkAccess chunk) {
-            if (chunk != null && real.ground() < far.ground() - 2 && carved(chunk, far.x(), far.ground(), far.z())) {
+            if (chunk != null && real.ground() < far.ground() - 1 && carved(chunk, far.x(), far.ground(), far.z())) {
                 carved++;
                 if (carvedAt.length() < 200)
                     carvedAt += (carvedAt.isEmpty() ? "" : " ") + "(" + far.x() + ", " + far.z() + ") far " + far.ground() + " real " + real.ground();
