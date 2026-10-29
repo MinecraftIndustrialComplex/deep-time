@@ -129,7 +129,7 @@
 //! mantle's hold on the slab, a capacity of the plastic resistance that reaches about 9 × 10¹³ N/m
 //! at full depth, an order of magnitude over what a range pushes with. It is kinematic: the balance
 //! still resists as before. The 1-D strip carries F undiminished to the plate's far side; with
-//! `collision_upper_decay` (PLT-733) the strip is read as a 2-D sheet, whose response to a front W
+//! `collision_upper_decay` (PLT-733, on) the strip is read as a 2-D sheet, whose response to a front W
 //! wide decays behind it over 2 W / π at the sheet law's n = 1 (England, Houseman & Sonder 1985;
 //! Ježek et al. 2002; England et al. 2016): each column takes T w e^(−x/L) at its distance x behind
 //! the front, the interior's rate integrates w e^(−x/L), and the lowland the belt pushes on is
