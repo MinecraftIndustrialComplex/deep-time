@@ -16,6 +16,10 @@
 //! away during it: `balance` (default) uplifts each cell by the erosion rate of the last
 //! deep-time step (`surface/erosion_m_myr`), i.e. it assumes the landscape was in balance;
 //! `plates` uses the plate model's uplift (`plates/uplift_mm_yr`); `none` is pure decay.
+//! **Steps** are as long as the deep-time surface's (`YoungParams::steps_for`; one on the presets,
+//! whose surface steps 2 Myr): the balance uplift is the rate that step gave and K was
+//! calibrated with it, and 0.5 Myr steps on a quick 16k planet left land eroding 200 m/Myr or
+//! more 15 blocks under the history's surface on average, 8 with the history's step (YNG-002).
 //!
 //! Outputs (fields on L2): `young/elevation_m`, `young/area_m2` (effective drainage area),
 //! `young/lake_m` (depth of a lake or closed basin, else 0), `young/runoff_weight`,
@@ -106,8 +110,10 @@ pub enum UpliftMode {
 pub struct YoungParams {
     /// Erosion time added on L2, Myr (plan §8.2: the last 2–10).
     pub myr: f64,
-    /// LEM steps.
-    pub steps: u32,
+    /// LEM steps; unset (the default), steps as long as the deep-time surface's
+    /// ([`YoungParams::steps_for`]).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub steps: Option<u32>,
     pub uplift: UpliftMode,
     /// Multiplier on the uplift rate.
     pub uplift_factor: f64,
@@ -131,7 +137,7 @@ impl Default for YoungParams {
     fn default() -> Self {
         YoungParams {
             myr: 2.0,
-            steps: 4,
+            steps: None,
             uplift: UpliftMode::Balance,
             uplift_factor: 1.0,
             min_lake_depth_m: 5.0,
@@ -147,7 +153,7 @@ impl YoungParams {
         if !(self.myr.is_finite() && self.myr > 0.0 && self.myr <= 50.0) {
             return Err(bad("myr", "must be in (0, 50]"));
         }
-        if !(1..=100).contains(&self.steps) {
+        if self.steps.is_some_and(|s| !(1..=100).contains(&s)) {
             return Err(bad("steps", "must be in [1, 100]"));
         }
         if !(self.uplift_factor.is_finite() && (0.0..=10.0).contains(&self.uplift_factor)) {
@@ -165,6 +171,25 @@ impl YoungParams {
             return Err(bad("sea_floor_slope_deg", "must be in [0, 60)"));
         }
         Ok(())
+    }
+
+    /// The LEM steps the stage takes: `steps` when set, else `myr` in steps as long as the
+    /// deep-time surface's (the plate step over `surface.substeps`), at least one. The `balance`
+    /// uplift is the erosion rate the surface's implicit stream power gave over its own step, and
+    /// K was calibrated with that step (ERO-004, ERO-179, ERO-180); on the same ground a shorter
+    /// step erodes fast-eroding land faster (n = 2), so shorter steps lowered it under the uplift
+    /// meant to hold it (YNG-002).
+    pub fn steps_for(&self, preset: &PlanetPreset) -> u32 {
+        if let Some(s) = self.steps {
+            return s;
+        }
+        let plate = match preset.dt_myr() {
+            dt if dt.is_finite() && dt > 0.0 => dt,
+            _ => preset.tectonics.time_step_myr,
+        };
+        let substeps = preset.surface.as_ref().map_or(1, |s| s.substeps.max(1));
+        let lem = plate / f64::from(substeps);
+        (self.myr / lem).round().clamp(1.0, 100.0) as u32
     }
 }
 
@@ -214,7 +239,7 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
     let surface = super::estimate(p);
     StageEstimate {
         bytes: super::retained_bytes(p) + surface.history_bytes + cells * OWN_BYTES_PER_L2_CELL,
-        seconds: cells as f64 * f64::from(y.steps) * 1.0e-6,
+        seconds: cells as f64 * f64::from(y.steps_for(p)) * 1.0e-6,
         history_bytes: surface.history_bytes,
     }
 }
@@ -229,6 +254,8 @@ pub struct YoungStage {
     preset: PlanetPreset,
     p: YoungParams,
     sp: SurfaceParams,
+    /// [`YoungParams::steps_for`].
+    steps: u32,
     done: u64,
     timings: BTreeMap<&'static str, f64>,
 }
@@ -293,17 +320,19 @@ impl YoungStage {
     pub fn new(preset: PlanetPreset) -> YoungStage {
         let p = preset.young.clone().unwrap_or_default();
         let sp = preset.surface.clone().unwrap_or_default();
+        let steps = p.steps_for(&preset);
         YoungStage {
             preset,
             p,
             sp,
+            steps,
             done: 0,
             timings: BTreeMap::new(),
         }
     }
 
     fn total(&self) -> u64 {
-        1 + u64::from(self.p.steps)
+        1 + u64::from(self.steps)
     }
 
     fn l2(&self) -> Result<GridDesc, CoreError> {
@@ -490,7 +519,7 @@ impl YoungStage {
             STAGE_NAME.into(),
             json!({
                 "l2": {"w": g2.w, "h": g2.h, "r": g2.r},
-                "steps": self.p.steps, "myr": self.p.myr,
+                "steps": self.steps, "myr": self.p.myr,
                 "uplift": self.p.uplift,
                 "filled_small_depressions": small,
                 "sea_floor_failed_km3": sea_floor_km3,
@@ -589,7 +618,7 @@ impl YoungStage {
 
         let sp = self.sp.clone();
         let k_scale = self.p.k_scale;
-        let dt_myr = self.p.myr / f64::from(self.p.steps);
+        let dt_myr = self.p.myr / f64::from(self.steps);
         let dt = dt_myr * 1.0e6;
         let gp = sp.glacial.clone();
         let gravity = self.preset.planet.gravity_m_s2;
@@ -1161,6 +1190,38 @@ mod tests {
     /// (2026-10-24) gave it a `u32` and an `f32` more (`carrier`, `carrier_lithosphere_km`), the
     /// same 8 B in the same three copies, added the same way (quick 949 → 951, full 3,468 → 3,474
     /// MiB); quick lists 1,109 MiB.
+    /// YNG-002: unset, the stage steps as long as the deep-time surface (the plate step over
+    /// `surface.substeps`); a preset's `steps` still wins.
+    #[test]
+    fn the_young_steps_are_as_long_as_the_surfaces() {
+        let planet = |young: serde_json::Value, substeps: u32| {
+            let text = crate::preset::with_timeline(
+                crate::preset::builtin("earthlike_quick_16k").unwrap(),
+                Some("scattered_continents"),
+                Some(500.0),
+            )
+            .unwrap();
+            let mut v: serde_json::Value = serde_json::from_str(&text).unwrap();
+            v["young"] = young;
+            v["surface"]["substeps"] = serde_json::json!(substeps);
+            let crate::preset::PresetBody::Planet(p) =
+                crate::preset::Preset::from_json(&v.to_string()).unwrap().body
+            else {
+                panic!("a planet preset");
+            };
+            p
+        };
+        let steps = |p: &PlanetPreset| p.young.clone().unwrap_or_default().steps_for(p);
+        let p = planet(serde_json::json!({}), 1);
+        assert_eq!(p.dt_myr(), 2.0);
+        assert_eq!(steps(&p), 1, "2 Myr in the surface's 2 Myr steps");
+        assert_eq!(steps(&planet(serde_json::json!({}), 4)), 4);
+        assert_eq!(steps(&planet(serde_json::json!({"myr": 0.4}), 1)), 1, "at least one");
+        assert_eq!(steps(&planet(serde_json::json!({"myr": 10.0}), 1)), 5);
+        assert_eq!(steps(&planet(serde_json::json!({"steps": 4}), 1)), 4, "set, it wins");
+        assert_eq!(YoungStage::new(p).total(), 2, "the set-up and one step");
+    }
+
     #[test]
     fn the_estimate_covers_the_measured_hold_closely() {
         const MIB: u64 = 1 << 20;

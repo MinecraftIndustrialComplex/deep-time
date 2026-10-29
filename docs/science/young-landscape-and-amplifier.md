@@ -20,7 +20,7 @@ The deep-time simulation works on cells several kilometres wide. Two later steps
 | [AMP](ledger/AMP.md) | lake shores | AMP-090, AMP-091 (2) |
 | [AMP](ledger/AMP.md) | closed basins | AMP-095 to AMP-097 (3) |
 
-Rows by status (YNG and AMP, recounted 2026-10-23): `verified` 1, `cited-unverified` 8, `from-memory` 1, `calibrated` 3, `game-choice` 73, `uncited` 19.
+Rows by status (YNG and AMP, recounted 2026-10-29): `verified` 1, `cited-unverified` 8, `from-memory` 1, `calibrated` 3, `game-choice` 74, `uncited` 18.
 
 ## Material for the stage 2 writer
 
@@ -31,6 +31,53 @@ Rows by status (YNG and AMP, recounted 2026-10-23): `verified` 1, `cited-unverif
 
 - `coarse_iteration_factor` is coded 2.0 where the build log and plan say 3 (extraction notes AMP, flag 1).
 - The thermal slope comment says "Schott: tan 30 degrees = 0.57" and the default is 0.6. In Schott's published shader 0.57 is used only on a non-default branch; the default threshold is a tangent of 0.9 to 1.4 (AMP-034, AMP-038).
+
+## The young landscape's step (item 3, 2026-10-29)
+
+**What was wrong.** The young stage claims to keep "the relief the deep-time run left" (its `balance` uplift, YNG-003,
+lifts each cell by the erosion rate of the surface's last step), but it took 2 Myr in four 0.5 Myr steps while the
+deep-time surface steps 2 Myr (the plate step, `surface.substeps` 1 on every preset). On a quick 16k planet
+(`earthlike_quick_16k`, scattered continents, 500 Myr, the shipped essentials as the content bundle, master 2f453594;
+each L2 cell's young ground against the L1 surface sampled bilinearly at its centre, over land) the land where the
+last step eroded 200 m/Myr or more (6 % of the land) ended 15.1 blocks (530 m) under the history's surface on average,
+median 11.4, 5th percentile 47.9, 31 % of it more than 20 blocks under; below 50 m/Myr 0.1. The amplifier lowered it
+5.8 blocks more. Porphyries sit in such arcs: Phase 1's item 3 found the world's ground 20 to 45 blocks under both
+gossan porphyries of one planet, and their ore bodies, placed against the history's surface, were gone from the world.
+
+**Why.** Arms of the stage alone from the deposits checkpoint (`deeptime stage young --set ...`), the mean change on
+that land, in blocks:
+
+| young | change |
+|---|---|
+| 0.01 Myr in one step | -5.8 |
+| 2 Myr in one step (the surface's own step) | -8.0 |
+| 0.5 Myr in one step | -8.6 |
+| 2 Myr in 4 steps (the old default) | -15.1 |
+| 2 Myr in 16 steps | -18.9 |
+| 2 Myr in 4 steps, the plate model's uplift | -18.5 |
+| 2 Myr in 4 steps, no uplift | -24.0 |
+
+The first line is the critical slope (ERO-012, ERO-013) on L2's 2.4 km links: the history's 4.8 km links held a span
+of two L2 links under S_c without holding each half under it, and the law, which caps the relief over a span of any
+length, now acts at the finer scale; the cut rock becomes sediment of its cell, as on L1. Past it the lowering grows with
+the number of steps. With n = 2 the implicit stream power (`spl.rs`) erodes fast-eroding ground less over one long step
+than over several short ones, and the `balance` uplift is the rate the surface's 2 Myr step gave; K was calibrated
+against measured regional rates with that same step (ERO-004, ERO-179, ERO-180). At the surface's step the young
+stage nearly keeps the history's ground (the 2.2 blocks between the first two lines); at a quarter of it the same K
+eroded that land about 1.7 times as fast as the uplift meant to hold it.
+
+**The rule.** Unset (the presets), `young.steps` is `young.myr` over the surface's LEM step (the plate step over
+`surface.substeps`), rounded, at least one: one step on every preset today (YNG-002). A preset's `steps` still sets
+it. On the planet above, young then amplifier: the fast-eroding land ends 14.6 blocks under the history's surface
+(20.9 before), 8.0 of it from the young stage (15.1); the land's 90th percentile 1,431 m in the history, 1,388 m after
+the young stage (1,338 before), its highest point 5,248 m and 5,376 m (4,310 before); 44,426 L2 lake cells (37,567),
+6,695 km3 cut by glaciers (8,481). The young stage runs one step of LEM instead of four.
+
+**Left as it is.** The critical slope's cut at L2 (the law); the amplifier's own 6 blocks on that land (its incision,
+AMP-023 to AMP-033); whether the history's own 2 Myr step leaves fast-eroding ranges too high, which the pool arm
+`sub4-young` (`surface.substeps=4` on base29's key) reads, and which would change K's calibration, not this rule.
+Deposits and strata stay in the history's frame: the world's ground cuts both alike, so moving bodies to the world's
+ground would take ore out of its host rock.
 
 ## One-cell spires (margins and spires task, 2026-10-03)
 
