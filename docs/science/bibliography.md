@@ -1068,7 +1068,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Rey, P., Vanderhaeghe, O. and Teyssier, C. (2001). Gravitational collapse of the continental crust: definition, regimes and modes. Tectonophysics 342(3-4):435-449.
 - DOI or URL: 10.1016/S0040-1951(01)00174-3.
 - Cited as: (ERO, ISO, HYP) "Rey, Vanderhaeghe & Teyssier 2001, Tectonophysics 342(3-4):435-449". (PLT) "Rey, Vanderhaeghe & Teyssier 2001 (Tectonophysics 342:435)".
-- Ledger ids: ISO-019, ISO-020
+- Ledger ids: ISO-019, ISO-020, PLT-079 (note, 2026-10-29)
 - Access: paywalled; not fetched. [other sections: paywalled.]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -1076,6 +1076,51 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Read in this pass: (ERO, ISO, HYP) not fetched. (PLT) metadata only.
 - Reference check: (ERO, ISO, HYP) Crossref matches title, volume 342, issue 3-4, pages 435-449. (PLT) correct.
 - Read in the high-ground task (2026-10-22, PLT-412): the abstract, verbatim, from the University of Minnesota's research portal (Experts@Minnesota, https://experts.umn.edu/en/publications/gravitational-collapse-of-the-continental-crust-definition-regime/; the full text stays paywalled). "Gravitational collapse corresponds to the decay of lateral contrast in gravitational potential energy that builds up during lithospheric deformation"; "When the surrounding lithosphere is fixed (fixed-boundary collapse), collapse occurs through a transfer of gravitational potential energy from the elevated regions towards the low lands. This transfer is accommodated by a combination of gravitational sliding of the brittle crust and horizontal spread of the lower crust. In orogenic domains, fixed-boundary divergent collapse implies the lateral growth of the orogenic domain at the expense of the surrounding lithosphere"; and of convergent collapse, "a deficit in gravitational potential energy drives crustal material towards the deformed lithosphere. This regime can be expected to occur following thinning of the continental crust." Ledger ids added: PLT-412.
+- Read 2026-10-29 (the collision-front lane, a Sonnet research sub-agent, a Wayback copy of the first author's page, geosci.usyd.edu.au/users/prey/Publi/PapersPDF/ReyVDHTeyssier01.pdf): its collapse after root removal is illustrated, not derived: "After convective thinning, which we assume to occur 30 Ma after convergence" (pp. 440-441). PLT-079.
+
+### EnglandThompson1984
+- Reference: England, P. C., Thompson, A. B. (1984). Pressure-Temperature-Time Paths of Regional Metamorphism I. Heat Transfer during the Evolution of Regions of Thickened Continental Crust. Journal of Petrology 25(4):894-928.
+- DOI or URL: DOI not printed in the copy read; static1.squarespace.com/static/54b9bb6fe4b07b4a7d145b55/t/55186a9fe4b0932ce9d1855c/1427663519956/England_JPet_1984.pdf.
+- Cited as: "England & Thompson 1984" (PLT-079 note, 2026-10-29).
+- Ledger ids: PLT-079 (note).
+- Access: paywalled; a copy on a third-party site.
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): full text, 2026-10-29 (a Sonnet research sub-agent). "rapid temperature rises occur within the crust in the first few tens of Myr after thickening" (p. 918); "most of them lie within 50 °C of the maximum temperature attained for one third or more of the total duration of their burial and uplift" (p. 894); "an appropriate time scale for the erosion of orogenic belts lies between 50 and 200 Myr" (p. 901); the thermal perturbations of the upper 50 to 70 km "decay to 1/e of their original values over times of 100 to 200 Myr" (p. 918); the conductive results do not hold once paths pass above the solidus (p. 917).
+- Read in this pass: full text (2026-10-29).
+- Reference check: authors, year, title, journal, volume and pages as printed in the copy.
+
+### ThompsonEngland1984
+- Reference: Thompson, A. B., England, P. C. (1984). Pressure-Temperature-Time Paths of Regional Metamorphism II. Their Inference and Interpretation using Mineral Assemblages in Metamorphic Rocks. Journal of Petrology 25:929-955.
+- DOI or URL: 10.1093/petrology/25.4.929 (printed); read from the ETH research collection.
+- Cited as: "Thompson & England 1984" (PLT-079 note, 2026-10-29).
+- Ledger ids: PLT-079 (note).
+- Access: an institutional repository copy.
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): full text, 2026-10-29 (a Sonnet research sub-agent). Fig. 8 (p. 951), a 50 km thrust, 20 Myr of heating, then erosion: "Isotherms and extents of partial melting fields are shown at 0 (8a), 20 (8b), 50 (8c), 80 (8d) and 120 (8e) Myr post thrusting"; read by eye, no melt at 0, a small field at 20, a large one at 50, still one at 80, none at 120. Path A spends "130 Myr, out of the 220 Myr, within 100 °C of its peak temperature" (p. 940).
+- Read in this pass: full text (2026-10-29).
+- Reference check: authors, year, title, journal, pages and DOI as printed.
+
+### Hopkinson2017
+- Reference: Hopkinson, Harris, Warren, Spencer, Roberts, Horstwood, Parrish, EIMF (2017). The identification and significance of pure sediment-derived granites. Earth and Planetary Science Letters 467:57-63.
+- DOI or URL: 10.1016/j.epsl.2017.03.018 (printed); read from nora.nerc.ac.uk/id/eprint/517000.
+- Cited as: "Hopkinson et al. 2017" (PLT-079 note, 2026-10-29).
+- Ledger ids: PLT-079 (note).
+- Access: an institutional repository copy.
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): full text, 2026-10-29 (a Sonnet research sub-agent). p. 58: "Thermal models for orogenic evolution require a time period of at least 20 to 30 million yrs between collision and melting for all realistic values of heat production and sedimentary thicknesses and assuming no advective heat source" (after Medvedev & Beaumont 2006, not read); p. 61: "a time lag of 30-40 Myr between collision and widespread melt formation within the upper GHS is entirely consistent with the known thermal characteristics of the source rocks".
+- Read in this pass: full text (2026-10-29).
+- Reference check: as printed (the author list as the copy gives it, the initials not recorded by the read).
+
+### Weller2021
+- Reference: Weller, Mottram, St-Onge, Möller, Strachan, Rivers, Copley. The metamorphic and magmatic record of collisional orogens. Nature Reviews Earth & Environment (per the repository record; the year from the DOI).
+- DOI or URL: 10.1038/s43017-021-00218-z (from the repository page, not the manuscript); the accepted manuscript at repository.cam.ac.uk.
+- Cited as: "Weller et al. 2021" (PLT-079 note, 2026-10-29).
+- Ledger ids: PLT-079 (note).
+- Access: an accepted manuscript in an institutional repository.
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): full text, 2026-10-29 (a Sonnet research sub-agent). The Himalaya: "collision occurred at 50 ± 10 Ma is adopted"; Barrovian M1 about 35 to 32 Ma, sillimanite M2 about 24 to 17 Ma, and "the km-scale ~25-15 Ma Himalayan leucogranite bodies ... with younger leucogranite bodies (to ~8 Ma) recorded in the eastern Himalaya". The Greenland Caledonides: melting c. 440 to 415 Ma about a c. 430 Ma terminal collision, the Internal Zone assembled by c. 400 to 390 Ma, thrusting in the External Zone c. 400 to 380 Ma. Mountain-building after collision on "timescales on the order of 10s of Myr" (PDF pp. 17-18). Page numbers are the manuscript's.
+- Read in this pass: full text (2026-10-29).
+- Reference check: the initials and the year to confirm from the journal.
 
 ### Beaumont2001
 - Reference: Beaumont, C., Jamieson, R. A., Nguyen, M. H. and Lee, B. (2001). Himalayan tectonics explained by extrusion of a low-viscosity crustal channel coupled to focused surface denudation. Nature 414(6865):738-742.
