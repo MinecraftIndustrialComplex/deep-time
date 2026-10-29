@@ -1229,7 +1229,7 @@ mod tests {
             4,
             "set, it wins"
         );
-        assert_eq!(YoungStage::new(p).total(), 2, "the set-up and one step");
+        assert_eq!(YoungStage::new(*p).total(), 2, "the set-up and one step");
     }
 
     #[test]
