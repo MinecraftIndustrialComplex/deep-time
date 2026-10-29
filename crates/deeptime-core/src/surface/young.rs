@@ -1205,7 +1205,9 @@ mod tests {
             v["young"] = young;
             v["surface"]["substeps"] = serde_json::json!(substeps);
             let crate::preset::PresetBody::Planet(p) =
-                crate::preset::Preset::from_json(&v.to_string()).unwrap().body
+                crate::preset::Preset::from_json(&v.to_string())
+                    .unwrap()
+                    .body
             else {
                 panic!("a planet preset");
             };
@@ -1216,9 +1218,17 @@ mod tests {
         assert_eq!(p.dt_myr(), 2.0);
         assert_eq!(steps(&p), 1, "2 Myr in the surface's 2 Myr steps");
         assert_eq!(steps(&planet(serde_json::json!({}), 4)), 4);
-        assert_eq!(steps(&planet(serde_json::json!({"myr": 0.4}), 1)), 1, "at least one");
+        assert_eq!(
+            steps(&planet(serde_json::json!({"myr": 0.4}), 1)),
+            1,
+            "at least one"
+        );
         assert_eq!(steps(&planet(serde_json::json!({"myr": 10.0}), 1)), 5);
-        assert_eq!(steps(&planet(serde_json::json!({"steps": 4}), 1)), 4, "set, it wins");
+        assert_eq!(
+            steps(&planet(serde_json::json!({"steps": 4}), 1)),
+            4,
+            "set, it wins"
+        );
         assert_eq!(YoungStage::new(p).total(), 2, "the set-up and one step");
     }
 
