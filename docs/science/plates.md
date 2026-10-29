@@ -10107,7 +10107,7 @@ The coordinator, inline, from the lead above and the design `docs/design/collisi
   "coast in a collision belt" (0.257 of the coast) counts that stamped interior, not belts at the coast. Whether the
   interior's slow thickening is an orogeny, and how far behind a front it reaches, were read next (a Sonnet research
   sub-agent, 2026-10-29; bibliography `Gordon1998`, `Calais2006`, `Calais2003`, `Hao2019`). The stamp's 5 m/Myr of
-  rise is about 9.5e-10 per year of crustal strain on a 35 km crust: above the upper bound of stable plate interiors,
+  rise is about 1.0e-9 per year of crustal strain on a 35.1 km column (Airy's factor 7.02, PLT-281): above the upper bound of stable plate interiors,
   4e-10 per year (Gordon 1998, p. 615), and below what GPS resolves as deforming in Asia, 3e-9 per year (Calais et al.
   2006, p. 5). India's collision deforms Asia as far as Lake Baikal, about 3,000 km from the Himalayan front (Hao et
   al. 2019), but not as a strip: about 60 % of the area strains as slowly as stable interiors, with rigid blocks
