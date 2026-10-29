@@ -174,7 +174,8 @@ impl YoungParams {
     }
 
     /// The LEM steps the stage takes: `steps` when set, else `myr` in steps as long as the
-    /// deep-time surface's (the plate step over `surface.substeps`), at least one. The `balance`
+    /// deep-time surface's (the plate step over `surface.substeps`), at least one and at most 100,
+    /// the range a preset may set (past it, steps are longer than the surface's). The `balance`
     /// uplift is the erosion rate the surface's implicit stream power gave over its own step, and
     /// K was calibrated with that step (ERO-004, ERO-179, ERO-180); on the same ground a shorter
     /// step erodes fast-eroding land faster (n = 2), so shorter steps lowered it under the uplift
