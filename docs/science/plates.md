@@ -11299,6 +11299,45 @@ interior's largest share. The law has no free value to close that gap, and none 
 by default since this arm: the law is built and tested against its sources, it conserves crust, and
 the guard is clean (the rule of 2026-10-23: the V1 numbers are realism checks, not a gate).
 
+### The interior as a 2-D sheet (PLT-733, 2026-10-29)
+
+**Why.** On base30 (master d850490b, 24 runs, the crust-budget maps 50 Myr before each run's end)
+the coast with high ground by v1census version 1's rule is 0.178; 0.342 of all the coast lies within
+150 km of a collision belt, those coasts hold 0.695 of the high coasts, and without them coast_hi
+would be 0.049. The collision high coasts face their own plate's sea (0.789 of them; ocean floor a
+median 51 Myr old), lie on an overriding plate (0.890), a median 590 km behind the collision front,
+with their high ground (Himalayan, 0.870) a median 569 km behind it. The fronts are short against
+the continents behind them: a median 306 km along strike (771 km length-weighted, 1,133 km at the
+90th percentile). So the high coasts are the far coasts of overriding plates whose interiors the
+collision thickened: the 1-D strip above carries the belt's push undiminished to the plate's far
+side.
+
+**The law.** A thin viscous sheet driven over a boundary segment responds over a length set by the
+segment, not the sheet. England, Houseman & Sonder 1985 (the abstract; their equations were not
+seen): with the velocity normal to the boundary "the deformation field decays away from the
+boundary with a characteristic length scale 1/3 to 1/10 the wavelength of the imposed boundary
+velocity distribution for n between 1 and 10", the lengths decreasing "approximately as n^-1/2".
+Ježek et al. 2002 (eq. 1, p. 95, after England et al. 1985, Ar = 0) write it as
+v(y) = v0 exp(−(π√n / 2L) y) with L the indenter's width, and England et al. 2016 (Sect. 3.2,
+Appendix A1.2) give a strain rate reach of about w/√n for a stress or velocity condition over a
+length w, and for a Newtonian sheet driven as cos(πy/2w) an e-fold of 4w/π. With the switch
+`tectonics.collision_upper_decay` the strip is read that way: a column x behind the front (along
+the front's mean normal, from its foremost edge sample) takes the share in proportion to
+T w e^(−x/L), the interior's rate is F / (4 η_0 L_lith) ∫ w e^(−x/L) dx, and the lowland the belt
+pushes on is the strip's column energy weighted by e^(−x/L). L = 2W/π, W the front's extent along
+strike: a third of the wavelength 2W, the abstract's figure for n = 1, which is the sheet law's own
+(PLT-414's ε̇ = F / (4 η L) is linear). Earth's lithosphere fits India-Asia with n of 3 or more
+(England & Houseman 1986, abstract), which would shorten L by √3; the model's law is the linear one,
+so its own n stands. The 1985 solutions are for Ar = 0: the gravitational spreading that lengthens
+the deformation with Ar (Houseman & England 1986) is the surface stage's and the collapse's
+(PLT-414) here, which spread a thickened column after the plate stage has placed it.
+
+The project's readings: the front's extent along strike is the indenter's width; the strain rate,
+the velocity's gradient, decays as the velocity does; x is measured along the front's mean normal.
+In the unit fixture (a cap 60 degrees across, its front about 6,700 km long, so L is about 4,200 km)
+the interior takes less crust with the switch and lays its rise nearer the front
+(`the_two_dimensional_sheet_keeps_the_interiors_crust_near_the_front`).
+
 ## Sediment by margin type and the margin's sediment (PLT-660 to PLT-662, 2026-10-25)
 
 The drowning diagnosis (build log 2026-10-25, "M5 lane: why the land drowns on m5-unfreeze") found the
