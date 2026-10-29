@@ -9994,6 +9994,28 @@ and base27's welds taking 0.94 of the planet's area of ocean floor into other pl
     - the guard's worst 10,328 to 10,568 m, with no step beyond 2 Earth reliefs.
   - **Next:** the collision fronts that no longer weld keep converging faster than 2 mm/yr, so the question is the collision's resistance in the force balance. Not a knob on the weld.
 
+**Sources for that step, and base29's numbers** (2026-10-29, the coordinator; a Sonnet research sub-agent read both
+in full, bibliography `SternScholl2010`, `LallemandArcay2021`). The boundary measure's `front_coll_km` is a run's mean
+(`plates/collision_front_km_myr` over the run), and Stern & Scholl 2010 (p. 16) give ~12,000 km of active suture today,
+an average of ~6,000 km over the supercontinent cycle (after Scholl & von Huene 2009) and 1,000 to 20,000 km over
+geologic time; so base29's 13,356 km is about 2.2 times Earth's mean, not 1.1 times the registry's bound. Lallemand &
+Arcay 2021 (70 Cenozoic initiations): a collision is the trigger of about half (p. 74), the new zone forms "either on
+the opposite side of the upper plate volcanic arc (flip) or less frequently back of the lower plate buoyant feature
+(jump or transference)" (p. 82), it takes "3 to ~15 Myr" to succeed (p. 86), and in their Melanesian cases the
+collisions "shutdowned the previous SZs" (p. 83). Where a collision ends on Earth, then, is mostly a new subduction
+zone taking over its convergence within about 15 Myr, which bears on the model's fronts that converge at 12 to 13
+mm/yr for 60 Myr and more (Docking, above). base29 (`pool.sh table --base base28 --arm base29 --registry
+tools/review/pool/measures_boundary.json --measure boundary`): the active share of the continental margin 0.444,
+the coast at a subduction front 0.192 and in a collision belt 0.257, collision length p50 / p90 42 / 76 Myr,
+polarity reversals 9.8 and initiations 4.15 per 100 Myr. The docking measures on the same runs (`pool.sh measure --arm
+base29 --registry tools/review/pool/measures_docking.json --measures sutures,coastwalk`): 38.9 sutures and 37,944 km of
+suture per 100 Myr (Macdonald et al. 2019: 19 to 39 and 23,235 to 50,919), a median suture of 427 km (his 1,019); at
+a run's end 18,683 km of collision front open, 0.71 of it on contacts over 60 Myr old, the open collisions 33 Myr
+along (median) at a median peak of 44.5 mm/yr; in the last 30 Myr 0.84 of the front-time is collisions that end
+with no hand-off or are still open. The sutures are Earth's in number and length; what is not is the fronts that
+stay open for tens of Myr with no new zone taking their convergence (one run, supercontinent seed 1: 17
+transferences and 79 polarity reversals in 1000 Myr).
+
 ## Plate speed (2026-10-25)
 
 The coordinator's brief for the plate speed lane: CHK-020's `speed_rms_mm_yr` (the plate check's
