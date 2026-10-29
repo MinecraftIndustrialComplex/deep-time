@@ -1192,7 +1192,10 @@ pub fn seam(
     // skips it: on 2026-10-28 three rows at z 71 to 73 failed where a cave crossed the seam under a
     // sand surface and the sand above it had fallen in on one side.
     let excluded = |x: i32, z: i32| {
-        wd.is_some_and(|wd| surf.exclusion(&world, x, z, wd.expected_top(x, z)).is_some())
+        wd.is_some_and(|wd| {
+            surf.exclusion(&world, x, z, wd.expected_top(x, z))
+                .is_some()
+        })
     };
     let mut mismatches = Vec::new();
     let (mut rows, mut rows_excluded) = (0, 0);
