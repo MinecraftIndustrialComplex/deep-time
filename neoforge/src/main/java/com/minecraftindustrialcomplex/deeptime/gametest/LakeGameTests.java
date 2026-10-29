@@ -314,7 +314,8 @@ public final class LakeGameTests {
                 if (ringWrong++ < 12)
                     detail.append(" spring-ring:").append(bad).append('(').append(c[0]).append(',').append(gr.y()).append(',').append(c[1])
                             .append(' ').append(biome(level, c[0], gr.y(), c[1])).append(" spring ").append(site.kind()).append('@')
-                            .append(site.x()).append(',').append(site.z()).append(')');
+                            .append(site.x()).append(',').append(site.z())
+                            .append(column(level, playa, c[0], gr.y() + 4, c[1])).append(')');
             }
         }
         wrong += ringWrong;
