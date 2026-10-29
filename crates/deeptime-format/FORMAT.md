@@ -2175,7 +2175,9 @@ game-side pieces, no world-data layer of their own:
   `#deeptime:snow_line/snowfield` (frozen and jagged peaks, snowy slopes) on a column whose warmest month at its
   own height is 10 °C or more, or `minecraft:grove` where the coldest month is 0 °C or more, and the column is
   not under ice, a member of `#deeptime:snow_line/snowless` (vanilla's stony peaks, meadow and windswept hills,
-  Terralith's rocky mountains and highlands, optional) answers; docs/science/biomes.md, "The snow line"). A
+  Terralith's rocky mountains and highlands, optional) answers; docs/science/biomes.md, "The snow line") and
+  `deeptime:salt_flat` (requires `#deeptime:salt_flat`, vanilla's desert; a playa, layer `playa` > 0, takes a
+  member of the tag, after Expanded Ecosphere's salt lakes where that file is active; BIO-199). A
   datapack adds a file, or replaces one by its id.
 - `/deeptime probe biomes` reports what decided each sampled land column (`census.rules`: per rule, per
   role and the climate search; candidates seen and absent; the checks the GameTests read).
