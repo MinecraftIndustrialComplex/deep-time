@@ -2413,8 +2413,9 @@ mod tests {
             format!("{:?}", off.st.contacts),
             format!("{:?}", on.st.contacts)
         );
-        // The belt stood and pushed after the first step.
-        assert_eq!(on.fronts[0].upper_force_n_m, 0.0);
+        // The belt stood and pushed after the first step (the first step's push is the decay-
+        // weighted lowland mean's rounding, under 1 N/m against a belt's 10¹² N/m, PLT-733).
+        assert!(on.fronts[0].upper_force_n_m.abs() < 1.0, "{:?}", on.fronts[0]);
         assert!(on.fronts[1..].iter().all(|s| s.upper_force_n_m > 0.0));
     }
 
@@ -2597,9 +2598,14 @@ mod tests {
                 .collect::<Vec<_>>()
         );
         eprintln!("PLT-652 (interior, front) km2 m over the run: {took:?}");
-        // The first step: no belt yet, no push, the front takes it all.
+        // The first step: no belt yet, no push (but the decay-weighted lowland mean's rounding,
+        // PLT-733), the front takes it all.
         for f in &runs {
-            assert_eq!((f[0].upper_share, f[0].upper_force_n_m), (0.0, 0.0));
+            assert!(
+                f[0].upper_share < 1e-12 && f[0].upper_force_n_m.abs() < 1.0,
+                "{:?}",
+                (f[0].upper_share, f[0].upper_force_n_m)
+            );
         }
         assert!(runs[0].iter().all(|s| s.upper_share < 0.05), "{shares:?}");
         assert!(shares[5] > 0.5, "{shares:?}");
