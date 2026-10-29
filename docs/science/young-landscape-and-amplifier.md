@@ -97,8 +97,9 @@ over long ones, so the value at 2.4 km could be higher.
 relief over a full diameter; they do not analyse the window's size. DiBiase et al. 2010 measured relief over several
 windows in the San Gabriel Mountains (10 m DEM, "elevation range divided by window diameter", p. 137): at high channel
 steepness about 0.13 to 0.20 over a 10 km diameter, 0.25 to 0.29 over 5 km and 0.34 to 0.40 over 2 km, only the last
-saturating (Fig. 4, read by eye). That is roughly 0.15 x (L / 10 km)^-0.5: 0.31 at L2's 2.4 km links and 0.22 at L1's
-4.8 km. Support is moderate for the direction and weak for the value: one range, a figure read, and "no clear
+saturating (Fig. 4, read by eye). A power law through Montgomery & Brandon's 0.15 at 10 km and the 2 km window, 0.15 x
+(L / 10 km)^-0.5 (it falls under the 5 km window's 0.25 to 0.29, at 0.21), gives 0.31 at L2's 2.4 km links and 0.22 at
+L1's 4.8 km: this project's interpolation, not a value the sources state. Support is moderate for the direction and weak for the value: one range, a figure read, and "no clear
 demonstration of such a threshold in any given setting" at 1 to 5 km (Whipple et al. 2013, p. 563).
 
 **The arms** (`deeptime stage young --in dep.dtcp --set surface.threshold_slope=...`, one scratch deposits checkpoint of
@@ -112,7 +113,8 @@ surface bilinear at its centre, over land, in blocks; the scratch is deleted):
 | 0.306 (2.4 km by the scaling) | +0.13 | -24.9 | -2.8 | +31.6 | 9.2 % |
 
 All the land moves by under 0.12 blocks in the mean. On this planet the critical slope's scale is worth about 2.8
-blocks of the fast-eroding land's mean (the 500 Myr scattered planet above lost 8.0 there), and nothing of its tail:
+blocks of the fast-eroding land's mean (on the 500 Myr scattered planet above the critical slope's part was the 5.8 of
+the table's first line), and nothing of its tail:
 the 5th and 95th percentiles stand 25 to 32 blocks either side of the history's surface at every S_c. That spread is
 the L2 landscape's own relief, valleys and ridges drawn on a surface the history only resolved at 4.8 km, not a bias.
 A porphyry whose L1 ground the history exposed and that sits under an L2 valley loses its body to the world's ground,
