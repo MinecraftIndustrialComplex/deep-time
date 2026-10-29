@@ -10129,8 +10129,18 @@ The coordinator, inline, from the lead above and the design `docs/design/collisi
   feeds the young orogens' weakness; no step beyond two Earth reliefs, the highest plate elevation 5,610 m (0.69). On
   by default as sourced physics with the guard clean. What stays of the regime far from the fronts is older: stamps 4
   to 30 Myr old lie a median 1,569 km from a flagged front, collisions' orogens outliving their fronts for
-  `collision_orogeny_myr`, 30 Myr, a value with no ledger row yet. Three seed-chosen weld tests moved seeds (the sweep
+  `collision_orogeny_myr`, 30 Myr (PLT-079, a `game-choice`; the code now carries its id). Three seed-chosen weld tests moved seeds (the sweep
   `weld_seed_sweep`, now on the tests' own laws).
+- **The collision orogeny's window** (PLT-079, research only, 2026-10-29; a Sonnet research sub-agent, bibliography
+  `EnglandThompson1984`, `ThompsonEngland1984`, `Hopkinson2017`, `Weller2021`, `Rey2001`). `collision_orogeny_myr`, 30 Myr,
+  sets how long stamped crust stays in the collision regime and locked against being forced under another plate, and
+  so which folds, plutons and orogen provinces a run's end places. The sources time these differently. Crustal melt
+  (the S-type plutons) begins 20 to 40 Myr after collision (Hopkinson et al. 2017, pp. 58 and 61; the Himalaya's
+  leucogranites about 25 to 35 Myr after its 50 ± 10 Ma collision, Weller et al. 2021) and the crust stays hot for tens
+  of Myr after (Thompson & England 1984, Fig. 8), so the window ends about where these plutons start. Thrusting goes on
+  30 to 50 Myr after a collision's onset (Weller et al. 2021); no source gives a fold window. An orogen erodes over 50
+  to 200 Myr (England & Thompson 1984, p. 901). One value cannot serve all three; splitting it by use (the regime and
+  lock, the plutons, the provinces) is the lane's next design, and 30 Myr stands until then.
 - **Tests.** `the_two_wedges_share_the_crust_by_their_slopes_and_keep_it` (one crest, both slopes, the share within
   0.01 of the formula on 1 km rows, the plateau past the strength height, saturation, ground above a surface),
   `the_two_wedges_raise_the_front_over_a_drowned_edge` (an overriding continent 600 m under the sea: no capped wedge and

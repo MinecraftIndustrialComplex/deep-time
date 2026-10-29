@@ -1252,7 +1252,8 @@ pub struct TectonicParams {
     /// Contacts unseen for longer than this are closed, Myr (12 steps at the 2-Myr step).
     /// Ledger PLT-059.
     pub contact_timeout_myr: f64,
-    /// Duration recorded for a collision orogeny, Myr.
+    /// Duration recorded for a collision orogeny, Myr: how long stamped crust stays in the
+    /// collision regime and locked. ledger: PLT-079
     pub collision_orogeny_myr: f64,
     /// Sample L1 every this many steps (0 = only for keyframes and at the end).
     pub l1_every_steps: u32,
@@ -1499,7 +1500,7 @@ impl Default for TectonicParams {
             initiation_stress_mpa: 20.0, // ledger: PLT-505 (game-choice; on since 2026-10-23)
             transference: true,          // ledger: PLT-516
             contact_timeout_myr: 24.0,   // ledger: PLT-059
-            collision_orogeny_myr: 30.0,
+            collision_orogeny_myr: 30.0, // ledger: PLT-079
             l1_every_steps: 0,
             forsyth_uyeda_balance: false, // ledger: PLT-585 (built 2026-10-25, off)
             plate_speed_scale_mm_yr: 75.0, // ledger: PLT-181
