@@ -1241,8 +1241,11 @@ with MIC the same columns' ground three blocks under the bake's top, the crater 
 MIC's `impact_breccia`) at the surface, in `minecraft:forest`. The bake there: playa 1 block, Köppen class 14, top
 y 64 and 65. A guard on `WorldGenRegion.setBlock` refusing logs on the salt and solid blocks in its place did not
 help (tried and reverted the same day): the test's ground under the redwood's wood stood at y 65 over the bake's
-top at 64, a block set on the salt first, so no log stood on salt itself; and with MIC whatever lowered the ground
-was not a solid block written over the salt (not traced further). As with the swamp beside a salt flat (BIO-178), the biome gives way: the rule file `deeptime:salt_flat`
+top at 64, a block set on the salt first, so no log stood on salt itself; and the MIC columns were not built on at
+all: air from the bake's top at y 65 down to the breccia at 62 at two pairs of columns by the springs, no
+structure's piece there (the test asked `getStructureWithPieceAt`), so the ground was opened through the salt after
+the surface stage, as a carver's mouth is. The test now counts such a column apart (ground more than a block under
+the bake's top less the salt's depth: no flat's surface left to read), as it does water and lava flows over the flat. As with the swamp beside a salt flat (BIO-178), the biome gives way: the rule file `deeptime:salt_flat`
 gives a playa column a member of `#deeptime:salt_flat`, vanilla's desert (no trees; its cactus and dead bushes
 need sand), in any pack whose source can place one, after Expanded Ecosphere's salt lakes where that file is
 active (its id sorts first). A game-choice; a salt crust growing no tree is HYD-180's reading, from memory.
