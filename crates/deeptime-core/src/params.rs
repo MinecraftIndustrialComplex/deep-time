@@ -1423,7 +1423,7 @@ impl Default for TectonicParams {
             collision_underthrust: false, // ledger: PLT-546, ISO-131, ISO-136 (off: step noise on the pool)
             collision_upper_plate_shortening: true, // ledger: PLT-652 (on since 2026-10-25)
             collision_upper_stamp_resolvable: true, // ledger: PLT-732 (on since 2026-10-29)
-            collision_upper_decay: true, // ledger: PLT-733 (on since 2026-10-29)
+            collision_upper_decay: true,  // ledger: PLT-733 (on since 2026-10-29)
             thermal_backstop: false,      // ledger: PLT-470 (off: a stand-in, not physics)
             thermal_keel_km: crate::plates::thermal::KEEL_KM, // ledger: PLT-463
             heat_flow_refresh: true, // ledger: PLT-469 (game-choice: on since 2026-10-23, the coordinator's call)
