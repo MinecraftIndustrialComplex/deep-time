@@ -10016,6 +10016,20 @@ with no hand-off or are still open. The sutures are Earth's in number and length
 stay open for tens of Myr with no new zone taking their convergence (one run, supercontinent seed 1: 17
 transferences and 79 polarity reversals in 1000 Myr).
 
+**Where the shortened crust goes** (2026-10-29, the coordinator; a second Sonnet research sub-agent, full texts,
+bibliography `WillettBeaumontFullsack1993`, `NaylorSinclair2008`, `Simoes2007`, `Dahlen1990`). Over base29's 24 runs the
+front-time by a collision state's age (the dock tally, after the first 100 Myr; medians) is 0.189 under 10 Myr (41.8
+mm/yr), 0.387 at 10 to 30 Myr (29.5), 0.294 at 30 to 60 Myr (7.4) and 0.118 past 60 Myr (6.2): mostly young fronts
+converging fast, not base3's old ones. At the front of the youngest the overriding plate's edge is dry for 0.334 of the
+front-time (10 to 30 Myr: 0.551). The wedge on the incoming plate rises only up to that edge's height
+(`wedge_reach_km = (z_front - (sea - 500 m)) / tan(wedge_slope_deg)`, PLT-244), so against a submerged edge there is
+little or no wedge and the belt on the overriding plate takes the crust, at what becomes the coast. Earth's orogens do
+the reverse: a doubly vergent orogen keeps most of its mass in the pro-wedge over the lower plate (Naylor & Sinclair
+2008, p. 21; about 62 % with their assumed 1.5 and 2.5 degree slopes, pp. 8-9), at an active margin "a large accretionary
+wedge obeying pro-wedge mechanics and a smaller landward-verging retro-wedge ... overlying the arc basement" (Willett
+et al. 1993, p. 373), and Taiwan's 90 km belt is the Chinese margin's crust with the Luzon arc as its backstop (Dahlen
+1990, pp. 83-84; Simoes et al. 2007, p. 1). That is the lead for the coast with high ground; nothing is changed yet.
+
 ## Plate speed (2026-10-25)
 
 The coordinator's brief for the plate speed lane: CHK-020's `speed_rms_mm_yr` (the plate check's
