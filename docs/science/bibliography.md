@@ -6907,11 +6907,34 @@ Not read: Péron-Pinvidic, Manatschal & Osmundsen 2013 (Marine and Petroleum Geo
 
 ### Montgomery2002
 - Reference: Montgomery, D. R. and Brandon, M. T. (2002). Topographic controls on erosion rates in tectonically active mountain ranges. Earth and Planetary Science Letters 201(3-4):481-489.
-- DOI or URL: 10.1016/S0012-821X(02)00725-2 (the DOI from memory, not checked); copy https://repository.geologyscience.ru/bitstream/handle/123456789/28097/Mont_02.pdf
+- DOI or URL: 10.1016/S0012-821X(02)00725-2 (as printed in Binnie et al. 2007's references, 2026-10-29; the copies print only the PII); copy https://repository.geologyscience.ru/bitstream/handle/123456789/28097/Mont_02.pdf
 - Cited as: "Montgomery & Brandon 2002" (erosion rate against mean local relief; the erosion audit's reference line).
-- Ledger ids: ERO-172, ERO-179, ERO-180, ERO-181
+- Ledger ids: ERO-013, ERO-172, ERO-179, ERO-180, ERO-181
 - Access: copy on a repository, open.
 - Read so far (by the project): full text, 2026-10-05: tectonically inactive areas E = 0.2 Rz (mm/yr, Rz in km); active ranges above that line with mean local relief 1,000-2,000 m; E0 = 0.01 mm/yr from the chemical denudation of the 35 largest rivers; Olympic Mountains E0 0.016-0.059 mm/yr; rates above 10 mm/yr rare. Read again 2026-10-18 (the same copy, text extracted with pdftotext) for the erosion recalibration: eq. 2, E = E0 + K Rz / (1 - (Rz/Rc)^2), fitted with E0 = 0.01 mm/yr, Rc = 1,500 m and K = 2.5e-4 mm/yr (Fig. 4); the power law E = 1.4e-6 Rz^1.8 (E mm/yr, Rz m, Rz above 100 m; R² 0.66; one standard error 1.6 to 2.0 for the exponent), which "underestimates erosion rates at high mean local relief" (Fig. 5); Rz is the range within a 10-km-diameter circle of each 30-arc-second GTOPO30 cell; at most 2 % of the land of Asia, Europe and the Americas has Rz above 1,500 m and at most 5 % above 1,000 m (Fig. 7).
+- Read again 2026-10-29 (the item 3 lane, a Sonnet research sub-agent, the Yale author copy end to end) for the scale of ERO-013: local relief is "the difference between the minimum and maximum elevation within a 10-km-diameter circle for each grid cell" on "the 30 arc-second GTOPO30 digital elevation model" (p. 484), Rc is "a limiting local relief", a fitted parameter of eq. 2 (pp. 484-485), active belts have "mean local relief of 1000-2000 m" (p. 485); the mean slopes are over "a 10-km-diameter analysis window" of 10 m cells in the Olympics, S = 4 + 0.014 Rz (degrees, Rz in m; p. 483). No analysis of the window's size; p. 487: the relief "would be larger if determined using a 10 m DEM". The DOI 10.1016/S0012-821X(02)00725-2 is printed in Binnie et al. 2007's references (the copy prints only the PII).
+
+### DiBiase2010
+- Reference: DiBiase, R. A., Whipple, K. X., Heimsath, A. M., Ouimet, W. B. (2010). Landscape form and millennial erosion rates in the San Gabriel Mountains, CA. Earth and Planetary Science Letters 289:134-144.
+- DOI or URL: 10.1016/j.epsl.2009.10.036 (printed); read from a Wayback copy of the ASU-hosted journal PDF.
+- Cited as: "DiBiase et al. 2010" (ERO-013's scale, 2026-10-29).
+- Ledger ids: ERO-013 (note, 2026-10-29).
+- Access: paywalled; an archived copy of the author's PDF.
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): full text, 2026-10-29 (a Sonnet research sub-agent). p. 137: local relief "within a circular window with radius ranging from 100 m to 5 km", and "normalized local relief is defined as elevation range divided by window diameter" (10 m DEM). p. 139, Fig. 4 caption: "Measured at 1 km scale or less, relief values reach a threshold"; at erosion rates above about 300 m/Ma catchment-mean slopes are "invariant at a threshold value of ~35°". Read from Fig. 4 by eye (the sub-agent, about plus or minus 0.02): normalized relief at high channel steepness 0.34 to 0.40 at 1 km radius (saturating), 0.25 to 0.29 at 2.5 km (not saturated), 0.13 to 0.20 at 5 km (not saturated). p. 138: "This optimal relief scale is not universal".
+- Read in this pass: full text (2026-10-29).
+- Reference check: correct as read.
+
+### Whipple2013
+- Reference: Whipple, K. X., DiBiase, R. A., Crosby, B. T. (2013). Bedrock rivers. In Treatise on Geomorphology, vol. 9, pp. 550-573.
+- DOI or URL: 10.1016/B978-0-12-374739-6.00254-2 (printed).
+- Cited as: "Whipple et al. 2013" (ERO-013's scale, 2026-10-29; a review).
+- Ledger ids: ERO-013 (note, 2026-10-29).
+- Access: paywalled; read from a copy the sub-agent found (URL not recorded).
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): section 9.28.4.2 and the figure captions, 2026-10-29 (a Sonnet research sub-agent). p. 563: "Although it has been argued that local relief at the 1-5 km scale saturates at threshold values as erosion rates become extreme (Montgomery and Brandon, 2002), there has been no clear demonstration of such a threshold in any given setting."
+- Read in this pass: part (2026-10-29).
+- Reference check: correct as read.
 
 ### Tremblay2015
 - Reference: Tremblay, M. M. et al. (2015). Erosion in southern Tibet shut down at ∼10 Ma due to enhanced rock uplift within the Himalaya. Proceedings of the National Academy of Sciences 112(39):12030-12035.
@@ -8924,10 +8947,44 @@ The sources of the front lane's diagnosis (plates.md "The front's length: why th
 - Reference: Gordon, R. G. (1998). The plate tectonic approximation: plate nonrigidity, diffuse plate boundaries, and global plate reconstructions. Annual Review of Earth and Planetary Sciences 26:615-642.
 - DOI or URL: 10.1146/annurev.earth.26.1.615
 - Cited as: "Gordon 1998".
-- Ledger ids: PLT-532
+- Ledger ids: PLT-532, PLT-652 (note, 2026-10-29)
 - Access: paywalled; the full text was read from a copy on a third-party site (2026-10-24).
 - Library: not kept.
 - Read so far (by the project): full text, 2026-10-24 (the lane's research agent): "The central assumption of plate tectonics is that the plates are rigid."
+- Read again 2026-10-29 (the collision-front lane, a Sonnet research sub-agent, a copy at revistamaya.com) for the strain of stable interiors: "Strain rates of stable plate interiors are bounded between 10^-12-10^-11 year^-1 and ∼4 × 10^-10 year^-1" (p. 615; the upper bound "1 × 10^-17 s^-1", p. 633); other diffuse plate boundaries strain at "10^-9-10^-8 year^-1" (p. 634), "an overlap of ranges of strain rates is likely"; "∼15% of Earth's surface is now covered by plate boundary zones" (p. 621). PLT-652 (note).
+
+### Calais2006
+- Reference: Calais, E., et al. (2006). (Title not recorded by the read.) Geophysical Research Letters 33, L24319.
+- DOI or URL: 10.1029/2006GL028433; read from www.geoazur.fr/PERSO/vergnolle/Documents/Calaisetal_GRL_06.pdf.
+- Cited as: "Calais et al. 2006" (PLT-652 note, 2026-10-29).
+- Ledger ids: PLT-652 (note).
+- Access: paywalled; an author-group copy.
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): full text, 2026-10-29 (a Sonnet research sub-agent). Of about 37 mm/yr of India-Asia convergence, about 20 in the Himalaya and "the remaining 17 mm/yr are distributed from Tibet to the Siberian platform, mostly taken up in the Tien Shan" (p. 3 of 6). Significant strain, above 3 x 10^-9 per year, only in the Himalaya, Tibet, the Pamir-Tien Shan, the Altay, the Gobi Altay and the Baikal rift (p. 4); "Strain rates in a significant part of Asia (about 60% of the area considered in this study) are therefore comparable to stable plate interiors (less than 3 × 10^-9/yr)", a value that "corresponds to the current precision level of the GPS data set" (p. 5).
+- Read in this pass: full text (2026-10-29).
+- Reference check: first author, year, journal, article number and DOI as read; the title and authors to complete from the journal.
+
+### Calais2003
+- Reference: Calais, E., et al. (2003). (Title not recorded by the read.) Journal of Geophysical Research 108(B10), 2501.
+- DOI or URL: 10.1029/2002JB002373; read from www.geoazur.fr/PERSO/vergnolle/Documents/Calaisetal_JGR_03.pdf.
+- Cited as: "Calais et al. 2003" (PLT-652 note, 2026-10-29).
+- Ledger ids: PLT-652 (note).
+- Access: paywalled; an author-group copy.
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): sections, 2026-10-29 (a Sonnet research sub-agent). "Current deformation in Asia is distributed over a broad area extending from the Himalayas in the south to the Baikal rift zone in the north, with a number of rigid blocks such as the Tarim basin, south China, north China, and the Sunda block, embedded in the deforming zone" (ETG 14-1); northward velocities "from 10 mm yr−1 south of the Altay at Urumqi, 4 mm yr−1 in the Altay, to about zero on the Siberian platform" (ETG 14-6); "15% of the India-Eurasia convergence is accommodated north of the Tien Shan" (abstract).
+- Read in this pass: sections (2026-10-29).
+- Reference check: first author, year, journal, volume, article number and DOI as read; the title and authors to complete from the journal.
+
+### Hao2019
+- Reference: Hao, M., et al. (2019). Scientific Reports 9:16797 (title not recorded by the read).
+- DOI or URL: 10.1038/s41598-019-53306-y (open access, PMC6856154).
+- Cited as: "Hao et al. 2019" (PLT-652 note, 2026-10-29).
+- Ledger ids: PLT-652 (note).
+- Access: open.
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): sections, 2026-10-29 (a Sonnet research sub-agent). "The convergence between India and Asia causes intercontinental deformation over a large distances of up to ~3000 km, reaching as far as Lake Baikal" (Introduction, after Molnar & Tapponnier 1975 and Molnar 1988, not read); along a GPS profile relative to South China, about 30 mm/yr across Tibet from the Himalayan Main Frontal Thrust to the Altyn Tagh over 1,700 km, then from 5 to −2 mm/yr over 1,500 km to southern Lake Baikal; principal compressive strain rates "decrease from 2 to 0.1 × 10^-8/yr along this profile".
+- Read in this pass: sections (2026-10-29).
+- Reference check: first author, journal, article number and DOI as read; the title and authors to complete from the journal.
 
 ### Wang2013
 - Reference: Wang, Y., Forsyth, D. W., Rau, C. J., Carriero, N., Schmandt, B., Gaherty, J. B. and Savage, B. (2013). Fossil slabs attached to unsubducted fragments of the Farallon plate. Proceedings of the National Academy of Sciences 110(14):5342-5346 (authors, title and pages from memory).
