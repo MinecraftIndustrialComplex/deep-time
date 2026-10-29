@@ -533,8 +533,10 @@ fn sutures_and_initiations_keep_continents_whole() {
     // supercontinent 4 and scattered 1; this test passes on the pairs 4 and 1, 7 and 2, 11 and
     // 3, 14 and 4, 15 and 5, 21 and 6, 23 and 10, 24 and 14; with incipient subduction on by
     // default, PLT-610, 2026-10-25, neither supercontinent 4 nor scattered 1 welds, the sweep's
-    // first welding seeds being supercontinent 5 and scattered 2).
-    for (start, seed) in [("supercontinent", 5), ("scattered_continents", 2)] {
+    // first welding seeds being supercontinent 5 and scattered 2; with the interior's stamp at a
+    // resolvable strain rate on by default, PLT-732, 2026-10-29, neither welds, the sweep's first
+    // welding seeds being supercontinent 8 and scattered 1).
+    for (start, seed) in [("supercontinent", 8), ("scattered_continents", 1)] {
         let mut p = preset(8000, 300.0, start, seed);
         // The old law (PLT-585 off, PLT-540 on): under Forsyth & Uyeda's balance on this small
         // planet, whose ridge push is several times Earth's (`plates_quick_16k`, ridge -1,000 m,
@@ -859,8 +861,11 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // seed 23 twice; 9 of seeds 1 to 24 with the weld on the plates' relative speed at 2 mm/yr,
     // PLT-246 and PLT-721, 2026-10-27, the sweep `weld_seed_sweep`: 4, 10, 12, 15, 17, 18, 20, 21
     // and 24, seed 2 no more, so seed 4; from the supercontinent 5, 7 to 9, 11, 12, 14, 15, 21
-    // and 22).
-    let mut p = preset(8000, 300.0, "scattered_continents", 4);
+    // and 22; 9 of seeds 1 to 24 with the interior's stamp at a resolvable strain rate on by
+    // default, PLT-732, 2026-10-29, the sweep `weld_seed_sweep` (now on the weld tests' laws,
+    // PLT-585 off and suction saturating): 1, 3, 6, 11, 18, 20 to 22 and 24, seed 4 no more, so
+    // seed 1; from the supercontinent 8, 11, 14, 15, 19 and 22, seed 8 three times).
+    let mut p = preset(8000, 300.0, "scattered_continents", 1);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: under Forsyth & Uyeda's
     // balance on this small planet, whose ridge push is several times Earth's
     // (`plates_quick_16k`, ridge -1,000 m, floor -10,000 m), the speed guard bound on every
@@ -933,7 +938,10 @@ fn weld_seed_sweep() {
             (1..=24u64)
                 .into_par_iter()
                 .map(|seed| {
-                    let p = preset(8000, 300.0, start, seed);
+                    // The laws the weld tests run (2026-10-29: the sweep had run the defaults).
+                    let mut p = preset(8000, 300.0, start, seed);
+                    p.tectonics.forsyth_uyeda_balance = false;
+                    p.tectonics.suction_saturates = true;
                     let world = run_stage(&p, |_, _, _| {});
                     let d = world.plates.as_ref().unwrap().dynamics.as_ref().unwrap();
                     let guarded = d
@@ -1045,8 +1053,11 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // PLT-600, the same day, when seed 4 no longer welds: the sweep's welding seeds 1, 2, 6, 7,
     // 11, 14, 15, 16, 22 and 24, seed 2 again the first after seed 1; seed 4 since the weld on
     // the plates' relative speed at 2 mm/yr, PLT-246 and PLT-721, 2026-10-27, when seed 2 no
-    // longer welds: the sweep's welding seeds 4, 10, 12, 15, 17, 18, 20, 21 and 24).
-    let mut p = preset(8000, 300.0, "scattered_continents", 4);
+    // longer welds: the sweep's welding seeds 4, 10, 12, 15, 17, 18, 20, 21 and 24; seed 3 since
+    // the interior's stamp at a resolvable strain rate went on by default, PLT-732, 2026-10-29,
+    // when seed 4 no longer welds: the sweep's welding seeds 1, 3, 6, 11, 18, 20 to 22 and 24, the
+    // guard binding on none but 20, seed 3 the first after seed 1).
+    let mut p = preset(8000, 300.0, "scattered_continents", 3);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: the guard asserted below
     // bound under Forsyth & Uyeda's balance on every welding seed of 1 to 24 of this small planet
     // but supercontinent 11, whose ridge push is several times Earth's (`plates_quick_16k`, ridge

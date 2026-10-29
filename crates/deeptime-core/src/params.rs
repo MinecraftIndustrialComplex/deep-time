@@ -739,6 +739,16 @@ pub struct TectonicParams {
     /// plate most. Does nothing without `thermal_state` or a sheet viscosity. On since 2026-10-25 (arm
     /// fl-upper-unfreeze, the guard clean). ledger: PLT-652
     pub collision_upper_plate_shortening: bool,
+    /// `true` (the default since 2026-10-29, the arm up-stamp): the overriding plate's interior
+    /// share (`collision_upper_plate_shortening`) stamps a column as part of the collision orogeny
+    /// only where it thickens the crust at a resolvable strain rate, 3e-9 per year (the share of
+    /// the step's crust over the column's thickness and the step), as well as by the belt's
+    /// 5 m/Myr of rise. Slower thickening is the strain of a
+    /// stable interior (under 4e-10 per year, Gordon 1998) or below what GPS resolves as
+    /// deforming (Calais et al. 2006). The crust lands where it did; only the stamp (the collision
+    /// regime, the structure stage's folds, the orogen provinces) changes. `false`: the belt's
+    /// rule alone. ledger: PLT-732
+    pub collision_upper_stamp_resolvable: bool,
     /// The cordillera's back-arc source from the state: the crust behind an arc's range gives
     /// its share of the range's shortening in proportion to its weakness, the thin sheet's
     /// η_0 / η at its thermal age, so a cold, keeled craton is a backstop that hardly thins and a
@@ -1404,6 +1414,7 @@ impl Default for TectonicParams {
             thermal_strength: true,       // ledger: ISO-112 (on since 2026-10-23)
             collision_underthrust: false, // ledger: PLT-546, ISO-131, ISO-136 (off: step noise on the pool)
             collision_upper_plate_shortening: true, // ledger: PLT-652 (on since 2026-10-25)
+            collision_upper_stamp_resolvable: true, // ledger: PLT-732 (on since 2026-10-29)
             thermal_backstop: false,      // ledger: PLT-470 (off: a stand-in, not physics)
             thermal_keel_km: crate::plates::thermal::KEEL_KM, // ledger: PLT-463
             heat_flow_refresh: true, // ledger: PLT-469 (game-choice: on since 2026-10-23, the coordinator's call)
