@@ -31,7 +31,7 @@ import java.util.List;
  * {@link IcePass}. Columns whose surface is fluid, and air, fluid and bedrock blocks, are left as
  * they are. Only the column's own blocks are read.
  *
- * <p>No feature lays soil over the salt afterwards ({@link #refusesSoil}, ledger HYD-180).
+ * <p>No feature lays soil or a tree on the salt or replaces it afterwards ({@link #refusesOnSalt}, ledger HYD-180).
  */
 public final class PlayaPass {
 
@@ -81,21 +81,38 @@ public final class PlayaPass {
     }
 
     /**
-     * Whether a feature's write of {@code next} at {@code pos} is refused: soil ({@code #minecraft:dirt}:
-     * grass, dirt, podzol, moss, mud, ...) over a salt flat's salt in a Deep Time level (ledger HYD-180). A salt
-     * crust grows no soil; Expanded Ecosphere's {@code cliff_grass} turns any calcite under air, halite's vanilla
-     * stand-in, into grass. Asked by every {@code WorldGenRegion.setBlock} ({@code mixin.WorldGenRegionSaltMixin});
-     * a write that is no soil costs one tag test, and the plants a patch would set on that soil then find none.
+     * Whether a feature's write of {@code next} at {@code pos} is refused on a salt flat in a Deep Time level, where
+     * the playa layer holds salt (ledger HYD-180): soil ({@code #minecraft:dirt}: grass, dirt, podzol, moss, mud, ...)
+     * over the salt; a log ({@code #minecraft:logs}) set on the salt; or another solid block in place of the salt's top
+     * block (the one under air or plants). A salt crust grows no soil and no tree, and no feature's patch of its own
+     * rock covers it. Expanded Ecosphere's {@code cliff_grass} turns any calcite under air, halite's vanilla stand-in,
+     * into grass; on the test planet of master 649baf54 Biomes O' Plenty's redwoods set their trunks' wood on a playa
+     * by a spring and Create Metallurgy's slag replaced its salt, the flat lying under a forest's biome. Expanded
+     * Ecosphere's own salt (white concrete powder) may still replace it: salt over salt. Asked by every
+     * {@code WorldGenRegion.setBlock} ({@code mixin.WorldGenRegionSaltMixin}); a write elsewhere costs a tag test or
+     * a block read before the playa layer is sampled. Deep Time's own passes write through the chunk, not here.
      */
-    public static boolean refusesSoil(WorldGenRegion region, BlockPos pos, BlockState next) {
-        if (!next.is(BlockTags.DIRT))
+    public static boolean refusesOnSalt(WorldGenRegion region, BlockPos pos, BlockState next) {
+        boolean soil = next.is(BlockTags.DIRT);
+        boolean log = !soil && next.is(BlockTags.LOGS);
+        boolean solid = !soil && !log && !next.isAir() && next.getFluidState().isEmpty()
+                && !next.is(Blocks.WHITE_CONCRETE_POWDER) && !next.is(Blocks.WHITE_CONCRETE);
+        if (!soil && !log && !solid)
             return false;
         if (!(region.getLevel().getChunkSource().getGenerator() instanceof GeologicChunkGenerator g)
                 || !(g.terrain() instanceof WorldDataTerrain w) || !w.data().has(Playa.LAYER))
             return false;
         BlockState salt = salt(w.data());
-        if (salt == null || !region.hasChunk(pos.getX() >> 4, pos.getZ() >> 4) || region.getBlockState(pos) != salt)
+        if (salt == null || next == salt)
             return false;
+        BlockPos on = log ? pos.below() : pos;
+        if (!region.hasChunk(on.getX() >> 4, on.getZ() >> 4) || region.getBlockState(on) != salt)
+            return false;
+        if (solid) {
+            BlockPos up = pos.above();
+            if (!region.hasChunk(up.getX() >> 4, up.getZ() >> 4) || region.getBlockState(up).isSolid())
+                return false;
+        }
         double v = w.data().layer(Playa.LAYER).nearest(pos.getX(), pos.getZ());
         return !Double.isNaN(v) && Math.round(v) > 0;
     }
