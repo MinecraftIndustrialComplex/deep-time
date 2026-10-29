@@ -524,7 +524,8 @@ pub struct TectonicParams {
     pub collision_restack_whole: bool,
     /// Surface slope of the orogenic wedge on the incoming plate, degrees: the wedge rises
     /// towards the front at this slope up to the belt's height there (a critical wedge keeps
-    /// its shape as it grows; the Lesser Himalayan wedge's surface slope is 1–1.6°).
+    /// its shape as it grows; the Lesser Himalayan wedge's surface slope is 1–1.6°). With
+    /// `collision_two_wedges`, the pro-wedge's slope, falling from the crest at the front.
     pub wedge_slope_deg: f64,
     /// `true` (the default since 2026-10-25): the collision belt's surface from critical taper
     /// (`plates/belts.rs`, `fill_taper`). The front is the toe of the orogenic wedge (the plate
@@ -536,6 +537,24 @@ pub struct TectonicParams {
     /// where the thickening lands moves. `false`: the profile `1 − (d/W)²`, highest at the front
     /// (ledger PLT-243). ledger: PLT-600, PLT-601
     pub collision_belt_taper: bool,
+    /// `true`: a collision orogen is two wedges about the front (`plates/belts.rs`,
+    /// `fill_two_wedges`; the design `docs/design/collision-two-wedges.md`). The crest stands at
+    /// the front: a pro-wedge over the incoming plate falls from it at `wedge_slope_deg` and a
+    /// retro-wedge over the overriding plate `retro_slope_ratio` times as steep, both from one
+    /// crest height, and the step's crust fills the ground under the two surfaces together, so
+    /// each side takes its own cross-section (on even ground the pro-wedge
+    /// `tan β / (tan α + tan β)` of it). Past
+    /// the strength height the crest widens as a plateau on the overriding side. In place of the
+    /// wedge capped by the overriding edge's height (PLT-244) and the belt from that edge
+    /// (`collision_belt_taper`). `false` (the default; the pool arm of 2026-10-29 put more
+    /// collision land at the coast, plates.md "Step 20"): those, as before. ledger: PLT-730,
+    /// PLT-731
+    pub collision_two_wedges: bool,
+    /// How much steeper the retro-wedge on the overriding plate stands than the pro-wedge, with
+    /// `collision_two_wedges`: tan β / tan α, β the retro-wedge's surface slope and α
+    /// `wedge_slope_deg`. Taiwan's, measured on both flanks of one orogen (2.9° west, 4.5° east,
+    /// Davis, Suppe & Dahlen 1983). ledger: PLT-731
+    pub retro_slope_ratio: f64,
     /// `true` (the default since 2026-10-26, the suture-loss lane): the crust a collision belt
     /// has no room for stays in the crust. The belt's passes run until its crust is placed or
     /// every sample stands at the strength height (no pass limit and no half-belt floor), and
@@ -1347,6 +1366,8 @@ impl Default for TectonicParams {
             collision_restack_whole: true,    // ledger: PLT-400 (game-choice; on since 2026-10-22)
             wedge_slope_deg: 1.5,             // ledger: PLT-192
             collision_belt_taper: true,       // ledger: PLT-600, PLT-601 (on since 2026-10-25)
+            collision_two_wedges: false,      // ledger: PLT-730
+            retro_slope_ratio: 1.55,          // ledger: PLT-731
             collision_noroom_stays: true,     // ledger: PLT-700 (on since 2026-10-26)
             weld_speed_mm_yr: 2.0,            // ledger: PLT-246 (Bird 2003 [3], since 2026-10-27)
             weld_after_myr: 10.0,             // ledger: PLT-246
@@ -1756,6 +1777,13 @@ impl PlanetPreset {
             k.wedge_slope_deg > 0.0 && k.wedge_slope_deg < 45.0,
             "$.tectonics.wedge_slope_deg",
             "must be in (0, 45)",
+        )?;
+        check(
+            k.retro_slope_ratio > 0.0
+                && (k.wedge_slope_deg.to_radians().tan() * k.retro_slope_ratio).atan()
+                    < 45f64.to_radians(),
+            "$.tectonics.retro_slope_ratio",
+            "must be positive, with a retro slope under 45 degrees",
         )?;
         for (v, key) in [
             (k.weld_speed_mm_yr, "$.tectonics.weld_speed_mm_yr"),

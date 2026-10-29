@@ -4627,8 +4627,8 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Davis, D., Suppe, J., Dahlen, F. A. (1983). Mechanics of fold-and-thrust belts and accretionary wedges. Journal of Geophysical Research 88(B2):1153-1172.
 - DOI or URL: 10.1029/JB088iB02p01153.
 - Cited as: "Davis, Suppe & Dahlen 1983, JGR 88:1153-1172" (from memory).
-- Ledger ids: PLT-192, PLT-244 (plate tasks 3 and 4: a critical wedge grows at constant taper; abstract)
-- Access: paywalled (abstract only).
+- Ledger ids: PLT-192, PLT-244 (plate tasks 3 and 4: a critical wedge grows at constant taper; abstract), PLT-731 (2026-10-29: Taiwan's two flanks, full text)
+- Access: paywalled; an open copy as read 2026-10-29 (below).
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
 - Read so far (by the project): from memory, not checked.
@@ -4636,6 +4636,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference check: the citation is correct (authors, year, volume, pages; issue B2). The paper's title was missing in the design. The abstract concerns critical taper and gives no taper angle in degrees.
 - Read in WP-13a (2026-10-02): abstract (OpenAlex): a critical wedge "slides stably, continuing to grow at constant taper"; Taiwan's surface slope and basal dip are in the body, not read (Wiley). Dahlen 1990 (Annu. Rev. Earth Planet. Sci. 18:55-99) is closed too. The Himalayan figures come from DeCelles & Carrapa 2021 instead. PLT-192.
 - Read through Dahlen 1990 (M5 lane, 2026-10-25; see Dahlen1990): Taiwan's steady-state region has "a regional surface slope alpha = 3 deg and a regional basal dip beta = 6 deg (Davis et al 1983)", with a pore-fluid to lithostatic pressure ratio of 0.67. This is Dahlen's account of the paper; the paper itself is still not read.
+- Read 2026-10-29 (the collision-front lane, a Sonnet research sub-agent), full text, from an open copy at www.tectonicsweb.eu/Classes/MAT/DavisSuppeDahlen_JGR_83.pdf (20 pages; pp. 1162-1164 as page images, p. 1168 and p. 1171 as text). p. 1163: "Best fit linear regressions to the western slope of Taiwan vary between 2.5° and 3.4° (Figure 12) with the mean slope being α = 2.9° ± 0.3°"; Table 1 (p. 1168): Taiwan alpha 2.9 ± 0.3, beta 6.0 ± 0.5 degrees; Himalaya alpha 4.0 ± 0.5, beta 3.0 ± 1.0. Fig. 10 (p. 1162), the section across south-central Taiwan from Chiai toward Chengkung, labels the east-dipping surface east of the crest "4 1/2°" above sea level and "6 1/2°" where it runs under the sea; the caption does not explain the labels, and p. 1171 reads them as subaerial and submarine: the emergence "should produce about a 1° drop in surface slope; such a drop, although somewhat larger, is observed in eastern Taiwan (see Figure 10)". PLT-731.
 
 ### Dahlen1990
 - Reference: Dahlen, F. A. (1990). Critical taper model of fold-and-thrust belts and accretionary wedges. Annual Review of Earth and Planetary Sciences 18:55-99.
@@ -4647,9 +4648,9 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 
 ### WillettBeaumontFullsack1993
 - Reference: Willett, S., Beaumont, C., Fullsack, P. (1993). Mechanical model for the tectonics of doubly vergent compressional orogens. Geology 21(4):371-374.
-- DOI or URL: not recorded; read from a copy at cinty-lee.squarespace.com/s/Geology-1993-Willett-371-4.pdf.
+- DOI or URL: 10.1130/0091-7613(1993)021<0371:MMFTTO>2.3.CO;2 (not printed in the copy read; from a search result, and doi.org resolves it to the article's page); read from a copy at cinty-lee.squarespace.com/s/Geology-1993-Willett-371-4.pdf (an offprint, not the publisher's copy).
 - Cited as: "Willett et al. 1993" (STATUS.md's collision-front row, 2026-10-29).
-- Ledger ids: none yet (read for the collision-front lane, no value in the code).
+- Ledger ids: PLT-730 (2026-10-29).
 - Access: paywalled; an open copy as above.
 - Library (the project's source library, not distributed): not fetched.
 - Substitute: the copy above.
@@ -4661,7 +4662,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Naylor, M., Sinclair, H. D. (2008). Pro- vs. retro-foreland basins. Basin Research 20:285-303.
 - DOI or URL: not recorded; the Edinburgh preprint, pure.ed.ac.uk/ws/files/10949660/PDF_Pro_Vs_Retro.pdf (page numbers below are the preprint's).
 - Cited as: "Naylor & Sinclair 2008" (STATUS.md's collision-front row, 2026-10-29).
-- Ledger ids: none yet.
+- Ledger ids: PLT-730, PLT-731 (2026-10-29).
 - Access: paywalled; the preprint is open.
 - Library (the project's source library, not distributed): not fetched.
 - Substitute: the preprint.
@@ -4680,6 +4681,28 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read so far (by the project): full text, 2026-10-29 (a Sonnet research sub-agent). p. 1: "Taiwan results from the collision between the Chinese continental margin and the Luzon volcanic arc. The Longitudinal Valley (LV) ... is the suture ... [it] separates the Taiwan mountain belt, which refers to the accreted passive margin sequences to the west, from the deformed volcanic arc to the east"; Fig. 1: the LV and the Coastal Range are "considered to form the backstop of the wedge"; of the 90 mm/yr of convergence "42 mm a-1 ... has been absorbed by crustal shortening west of the LV".
 - Read in this pass: full text (2026-10-29).
 - Reference check: first author, year, journal and article number as read; the authors and title to complete from the journal.
+
+### WillettSlingerlandHovius2001
+- Reference: Willett, S. D., Slingerland, R., Hovius, N. (2001). Uplift, shortening, and steady state topography in active mountain belts. American Journal of Science 301(4-5):455-485.
+- DOI or URL: 10.2475/ajs.301.4-5.455 (from the journal page's metadata); open at ajsonline.org/article/88260.pdf.
+- Cited as: "Willett, Slingerland & Hovius 2001" (PLT-731).
+- Ledger ids: PLT-731.
+- Access: open (the journal's site).
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): full text, 2026-10-29 (a Sonnet research sub-agent), pp. 474-477. p. 474, the Southern Alps: "The topography of the Southern Alps is strongly asymmetric with steeper regional slopes on the west side of the range"; p. 476, Taiwan: "separating the steeply dipping east flank of the mountain belt from the shallower west flank"; p. 477, the Southern Alps, Taiwan and the Olympics: "in each case the retrowedge is steeper and shorter than the matching prowedge". No slope is stated in the text (the sub-agent's read-offs of the river profiles in Fig. 10 are not used).
+- Read in this pass: full text (2026-10-29).
+- Reference check: correct as read.
+
+### He2021
+- Reference: He, C., Yang, C.-J., Turowski, J. M., Rao, G., Roda-Boluda, D. C., Yuan, X.-P. (2021). (Title not recorded by the read.) Nature Communications 12:544.
+- DOI or URL: 10.1038/s41467-020-20748-2 (open access).
+- Cited as: "He et al. 2021" (PLT-731, supporting only).
+- Ledger ids: PLT-731 (supporting).
+- Access: open (the journal's page).
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): full text of the journal's HTML page, 2026-10-29 (a Sonnet research sub-agent). Methods, "Southern Taiwan": "The SE flank (average slope = 21.5°) is steeper than the NW flank (average slope = 15.0°)", a ratio of 1.43; mean local slopes on a 30 m DEM, not regional surface slopes, so they support the sense and rough size of the asymmetry only.
+- Read in this pass: full text (2026-10-29).
+- Reference check: first author, the author list, year, journal, article number and DOI as read; the title to complete from the journal.
 
 ### Christensen_Mooney1995
 - Reference: Christensen, N. I., Mooney, W. D. (1995). Seismic velocity structure and composition of the continental crust: a global view. Journal of Geophysical Research 100(B6):9761-9788.
