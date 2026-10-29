@@ -1238,7 +1238,7 @@ pub fn seam(
         "seam_rows_excluded": rows_excluded,
         "seam_mismatches": mismatches.len(),
         "seam_mismatch_rows": mismatches.iter().take(20).collect::<Vec<_>>(),
-        "seam_rule": "a row mismatches when |h(C/2-1) - h(-C/2)| > max(|h(C/2-1) - h(C/2-2)|, |h(-C/2) - h(-C/2+1)|, 1), h = the terrain surface; a row with one of the four columns excluded (the exclusion rules) is skipped and counted in seam_rows_excluded",
+        "seam_rule": "a row mismatches when |h(C/2-1) - h(-C/2)| > max(|h(C/2-1) - h(C/2-2)|, |h(-C/2) - h(-C/2+1)|, 1), h = the terrain surface; a row with one of the four columns excluded (the exclusion rules) is skipped and counted in seam_rows_excluded; without world data nothing can be judged excluded, and every row is compared",
         "per_column": per_column,
         "exclusions": {"rules": EXCLUSION_RULES, "params": opts.to_json()},
     });
