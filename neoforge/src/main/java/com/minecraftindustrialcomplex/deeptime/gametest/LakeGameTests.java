@@ -135,15 +135,15 @@ public final class LakeGameTests {
     }
 
     /**
-     * Whether something opened column (x, z) through its salt: its ground lies more than a block under the bake's
-     * terrain top less the salt's depth, so no flat's surface is left to read (a carver's mouth on the flat; 649baf54's
-     * test planet with MIC: air from the bake's top at y 65 down to the crater breccia at 62, at two pairs of columns
-     * by its springs), as water or the ice cover over it are not.
+     * Whether something opened column (x, z) through its salt: its ground lies at or under the salt's bottom (the
+     * bake's terrain top less the salt's depth), so no flat's surface is left to read (a carver's mouth on the flat;
+     * 649baf54's test planet with MIC: air from the bake's top at y 64 and 65 down to the crater breccia at 62, at two
+     * pairs of columns by its springs), as water or the ice cover over it are not.
      */
     private static boolean opened(WorldDataTerrain w, RasterSampler playa, Ground gr, int x, int z) {
         double v = playa.nearest(x, z);
         int n = Double.isNaN(v) ? 0 : (int) Math.round(v);
-        return gr.y() < (int) Math.floor(w.height(x, z)) - n - 1;
+        return gr.y() <= (int) Math.floor(w.height(x, z)) - n;
     }
 
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 4800)
