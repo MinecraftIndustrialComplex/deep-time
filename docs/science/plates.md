@@ -10087,12 +10087,35 @@ The coordinator, inline, from the lead above and the design `docs/design/collisi
   drowned margins stands at the sea on both sides, as Taiwan does, where the old belt's toe left a strip of sea or
   lowland in front of its 2 km line. Land above 2 km 0.049 to 0.039 (0.75), land 0.330 to 0.310 (0.064), the largest
   landmass 0.193 to 0.153 (0.20), collisions per 100 Myr 2.75 to 2.35 (0.045), the boundary mix unchanged (`boundary`,
-  every share within 0.003). The guard: no step beyond two Earth reliefs, the highest plate elevation 5,418 m. So the
+  every share within 0.003). The guard (`guard`, base29 measured too): no step beyond two Earth reliefs in either, the
+  highest plate elevation 5,418 m against 5,554 (0.29). So the
   wedge's cap is not what puts collision belts at the coast. The model reads its front as PLT-600 does (the toe) with
   the switch off by default; the two wedges stay as a measured alternative. The next lead is in the collision measure
   itself: 0.437 of the collision high coast is a belt running along the coast, and small terranes (under 50 samples)
   hand off 30.4 times per 100 Myr, so the belts along coasts may be terranes accreted to a margin with the sea behind
   them (not yet measured).
+- **Where the collision regime stands** (2026-10-29, after the arm; base29's crust-budget maps, the map 50 Myr before
+  each run's end, 24 runs, medians; scratch scripts, nothing kept). The collision regime is every sample stamped with a
+  collision orogeny in the last 30 Myr (`collision_orogeny_myr`, PLT-247's stamp at 5 m/Myr). Its samples stand a
+  median 1,463 km from the nearest sample the boundary mix flags as a collision front's overriding side
+  (`MAP_FRONT_COLLISION`); 0.133 of them lie within the belt's 400 km and 0.491 beyond 1,500 km. Stamps of the last two
+  steps alone (half of them, about 3,100 samples) are as far: a median 1,387 km, 0.125 within 400 km. The flag marks
+  only part of the open front (about 110 samples, some 7,800 km), so the distances overstate, but the code says the
+  same: the overriding plate's share (PLT-652, `upper_plate`) spreads its crust over a strip that is every continental
+  sample of that plate between the front's ends and behind it, with no limit on depth, and stamps a collision orogeny
+  wherever it adds 10 m in a step. So the collision regime reaches across whole overriding plates, and the measure's
+  "coast in a collision belt" (0.257 of the coast) counts that stamped interior, not belts at the coast. Whether the
+  interior's slow thickening is an orogeny, and how far behind a front it reaches, were read next (a Sonnet research
+  sub-agent, 2026-10-29; bibliography `Gordon1998`, `Calais2006`, `Calais2003`, `Hao2019`). The stamp's 5 m/Myr of
+  rise is about 1.0e-9 per year of crustal strain on a 35.1 km column (Airy's factor 7.02, PLT-281): above the upper bound of stable plate interiors,
+  4e-10 per year (Gordon 1998, p. 615), and below what GPS resolves as deforming in Asia, 3e-9 per year (Calais et al.
+  2006, p. 5). India's collision deforms Asia as far as Lake Baikal, about 3,000 km from the Himalayan front (Hao et
+  al. 2019), but not as a strip: about 60 % of the area strains as slowly as stable interiors, with rigid blocks
+  (Tarim, south and north China, Sunda) inside the deforming zone, the strain significant only in the high belts (the
+  Himalaya, Tibet, the Pamir-Tien Shan, the Altay, the Baikal rift), and 15 % of the convergence taken north of the
+  Tien Shan (Calais et al. 2003). So the interior share's reach has the sources behind it and its stamp does not: a
+  column thickening below 3e-9 per year is not resolvably deforming. Nothing is changed yet; the rule to build is in
+  STATUS's Follow-ups.
 - **Tests.** `the_two_wedges_share_the_crust_by_their_slopes_and_keep_it` (one crest, both slopes, the share within
   0.01 of the formula on 1 km rows, the plateau past the strength height, saturation, ground above a surface),
   `the_two_wedges_raise_the_front_over_a_drowned_edge` (an overriding continent 600 m under the sea: no capped wedge and
