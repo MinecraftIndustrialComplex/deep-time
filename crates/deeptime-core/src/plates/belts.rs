@@ -2415,7 +2415,11 @@ mod tests {
         );
         // The belt stood and pushed after the first step (the first step's push is the decay-
         // weighted lowland mean's rounding, under 1 N/m against a belt's 10¹² N/m, PLT-733).
-        assert!(on.fronts[0].upper_force_n_m.abs() < 1.0, "{:?}", on.fronts[0]);
+        assert!(
+            on.fronts[0].upper_force_n_m.abs() < 1.0,
+            "{:?}",
+            on.fronts[0]
+        );
         assert!(on.fronts[1..].iter().all(|s| s.upper_force_n_m > 0.0));
     }
 
