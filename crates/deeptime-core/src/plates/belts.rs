@@ -128,9 +128,12 @@
 //! the balance's buoyancy of the continental lithosphere dragged down (FRC-030): that is the
 //! mantle's hold on the slab, a capacity of the plastic resistance that reaches about 9 × 10¹³ N/m
 //! at full depth, an order of magnitude over what a range pushes with. It is kinematic: the balance
-//! still resists as before, and the 1-D strip carries F undiminished to the plate's far side, where
-//! a 2-D sheet would spread it (England, Houseman & Sonder 1985), so it is the interior's largest
-//! share. The interior's columns are stamped as the belt's are (the collision orogeny) but kept
+//! still resists as before. The 1-D strip carries F undiminished to the plate's far side; with
+//! `collision_upper_decay` (PLT-733, on) the strip is read as a 2-D sheet, whose response to a front W
+//! wide decays behind it over 2 W / π at the sheet law's n = 1 (England, Houseman & Sonder 1985;
+//! Ježek et al. 2002; England et al. 2016): each column takes T w e^(−x/L) at its distance x behind
+//! the front, the interior's rate integrates w e^(−x/L), and the lowland the belt pushes on is
+//! weighted the same way. Without it the strip gives the interior its largest share. The interior's columns are stamped as the belt's are (the collision orogeny) but kept
 //! out of the belt's record, and with `collision_upper_stamp_resolvable` (PLT-732, on) only where
 //! the share thickens a column at a resolvable strain rate, 3e-9 per year (Calais et al. 2006):
 //! the strip reaches the plate's far side, and slower thickening is a stable interior's strain
@@ -1441,6 +1444,16 @@ fn upper_applies(k: &crate::params::TectonicParams) -> bool {
 /// The interior's share of a front's convergence `conv_mm_yr` when it shortens at `rate_mm_yr`
 /// under the belt's push: the rate over the convergence, at most all of it.
 // ledger: PLT-652
+/// The e-folding length of a thin viscous sheet's response behind a front `width_km` wide, km
+/// (`collision_upper_decay`): 2 W / (π √n) for a normal velocity or traction over a boundary
+/// segment W long (Ježek et al. 2002, eq. 1, after England, Houseman & Sonder 1985; England et
+/// al. 2016's 4w/π for a Newtonian sheet driven by cos(πy / 2w)), at n = 1, the sheet law's own
+/// (ε̇ = F / (4 η L), PLT-414). Earth's n of 3 or more (England & Houseman 1986) would shorten it
+/// by √n. ledger: PLT-733
+fn sheet_reach_km(width_km: f64) -> f64 {
+    2.0 / std::f64::consts::PI * width_km
+}
+
 fn upper_share(rate_mm_yr: f64, conv_mm_yr: f64) -> f64 {
     if conv_mm_yr > 0.0 && rate_mm_yr > 0.0 {
         (rate_mm_yr / conv_mm_yr).min(1.0)
@@ -1529,8 +1542,17 @@ fn upper_plate(
         .km(hi.clamp(-1.0, 1.0).asin() - lo.clamp(-1.0, 1.0).asin())
         .max(norm.km(norm.spacing_rad()));
     let tau = k.collapse_sheet_strength_myr; // ledger: PLT-415
-    // Each strip sample with its weakness, T w and column energy.
-    let strip: Vec<(usize, f64, f64, f64)> = (0..s.len())
+    // With the 2-D sheet the push decays behind the front over the sheet's length scale for a
+    // front this wide (PLT-733); the 1-D strip carries it undiminished.
+    let reach_km = if k.collision_upper_decay {
+        sheet_reach_km(width_km)
+    } else {
+        f64::INFINITY
+    };
+    let behind = ahead.clamp(-1.0, 1.0).asin();
+    // Each strip sample with its weakness times the push's decay, T times that, its column
+    // energy and the decay alone.
+    let strip: Vec<(usize, f64, f64, f64, f64)> = (0..s.len())
         .into_par_iter()
         .filter_map(|i| {
             let x = &s[i];
@@ -1546,16 +1568,20 @@ fn upper_plate(
             if d_over.binary_search_by_key(&(i as u32), |e| e.0).is_ok() {
                 return None;
             }
-            let w = sheet_weakness(tau, x.lithosphere_km);
-            Some((i, w, w * f64::from(x.thickness_m), energy(i)))
+            let x_km = norm.km(behind - p.dot(n).clamp(-1.0, 1.0).asin()).max(0.0);
+            let decay = (-x_km / reach_km).exp();
+            let w = sheet_weakness(tau, x.lithosphere_km) * decay;
+            Some((i, w, w * f64::from(x.thickness_m), energy(i), decay))
         })
         .collect();
-    if strip.is_empty() {
+    let reached = strip.iter().map(|e| e.4).sum::<f64>();
+    if strip.is_empty() || reached <= 0.0 {
         return none;
     }
     // The belt's push per metre on the lowland it drives (Molnar & Lyon-Caen 1988; FRC-018's edge
-    // term read across the belt): the belt's mean column energy over the strip's.
-    let u_strip = strip.iter().map(|e| e.3).sum::<f64>() / strip.len() as f64;
+    // term read across the belt): the belt's mean column energy over the strip's, the strip's
+    // weighted by the push's decay (the lowland the push reaches; uniform on the 1-D strip).
+    let u_strip = strip.iter().map(|e| e.3 * e.4).sum::<f64>() / reached;
     let force_n_m = belt_push_n_m(k, u_belt - u_strip);
     let path_km = strip.iter().map(|e| e.1).sum::<f64>() * norm.sample_area_km2() / width_km;
     let rate_mm_yr = upper_rate_mm_yr(force_n_m, k.collapse_sheet_viscosity_pa_s, path_km); // ledger: PLT-414
@@ -1566,7 +1592,7 @@ fn upper_plate(
         cells: strip
             .into_iter()
             .filter(|e| e.2 > 0.0)
-            .map(|(i, _, tw, _)| (i, tw))
+            .map(|(i, _, tw, _, _)| (i, tw))
             .collect(),
     }
 }
@@ -2387,8 +2413,13 @@ mod tests {
             format!("{:?}", off.st.contacts),
             format!("{:?}", on.st.contacts)
         );
-        // The belt stood and pushed after the first step.
-        assert_eq!(on.fronts[0].upper_force_n_m, 0.0);
+        // The belt stood and pushed after the first step (the first step's push is the decay-
+        // weighted lowland mean's rounding, under 1 N/m against a belt's 10¹² N/m, PLT-733).
+        assert!(
+            on.fronts[0].upper_force_n_m.abs() < 1.0,
+            "{:?}",
+            on.fronts[0]
+        );
         assert!(on.fronts[1..].iter().all(|s| s.upper_force_n_m > 0.0));
     }
 
@@ -2488,6 +2519,55 @@ mod tests {
         );
     }
 
+    /// PLT-733: the 2-D sheet's reach behind a front is about a third of the boundary's
+    /// wavelength at n = 1 (England, Houseman & Sonder 1985's abstract: "1/3 to 1/10 the
+    /// wavelength ... for n between 1 and 10"; a front W wide is half a wavelength), and with the
+    /// switch the interior takes less of the convergence and puts its crust nearer the front.
+    #[test]
+    fn the_two_dimensional_sheet_keeps_the_interiors_crust_near_the_front() {
+        for w in [300.0, 771.0, 6670.0] {
+            let lambda = 2.0 * w;
+            let r = sheet_reach_km(w) / lambda;
+            assert!((0.30..0.34).contains(&r), "{w} km: {r}");
+        }
+        // Beyond the belt's zone, the interior's added thickness and its mean distance behind the
+        // front (the fixture's front is the plane x = 0 across a cap 60 degrees wide).
+        let spread = |r: &UpperRun| {
+            let pts = r.fx.geo.points();
+            let belt_rad = r.fx.norm.rad(r.fx.preset.tectonics.collision_belt_km);
+            let (mut sum, mut at) = (0.0f64, 0.0f64);
+            for ((s, p), z0) in r.st.samples.iter().zip(pts).zip(&r.z0) {
+                let x = (-p.x).asin();
+                if s.group == 0 && s.kind == CONTINENTAL && x > belt_rad {
+                    let dz = f64::from(s.elevation_m - z0).max(0.0);
+                    sum += dz;
+                    at += dz * x;
+                }
+            }
+            (sum, at / sum.max(1e-12))
+        };
+        let off = upper_run(60.0, true, 6, |fx| {
+            fx.preset.tectonics.collision_upper_decay = false;
+        });
+        let on = upper_run(60.0, true, 6, |fx| {
+            fx.preset.tectonics.collision_upper_decay = true;
+        });
+        let crust = |r: &UpperRun| r.fronts.iter().map(|s| s.upper_km2_m).sum::<f64>();
+        assert!(crust(&off) > 0.0 && crust(&on) > 0.0);
+        assert!(
+            crust(&on) < crust(&off),
+            "the interior's crust: {} with the switch, {} without",
+            crust(&on),
+            crust(&off)
+        );
+        let ((rise_off, x_off), (rise_on, x_on)) = (spread(&off), spread(&on));
+        assert!(rise_off > 0.0 && rise_on > 0.0);
+        assert!(
+            x_on < x_off,
+            "the interior's rise lies a mean {x_on} rad behind the front with the switch, {x_off} without"
+        );
+    }
+
     /// PLT-652 has no share parameter, and the belt sets its own height: on the same collision a
     /// fresh front has no belt and no push, so the front takes the first step; then a cold,
     /// keeled plate (200 km of lithosphere, a start continent's `thermal_keel_km`) takes almost
@@ -2522,9 +2602,14 @@ mod tests {
                 .collect::<Vec<_>>()
         );
         eprintln!("PLT-652 (interior, front) km2 m over the run: {took:?}");
-        // The first step: no belt yet, no push, the front takes it all.
+        // The first step: no belt yet, no push (but the decay-weighted lowland mean's rounding,
+        // PLT-733), the front takes it all.
         for f in &runs {
-            assert_eq!((f[0].upper_share, f[0].upper_force_n_m), (0.0, 0.0));
+            assert!(
+                f[0].upper_share < 1e-12 && f[0].upper_force_n_m.abs() < 1.0,
+                "{:?}",
+                (f[0].upper_share, f[0].upper_force_n_m)
+            );
         }
         assert!(runs[0].iter().all(|s| s.upper_share < 0.05), "{shares:?}");
         assert!(shares[5] > 0.5, "{shares:?}");

@@ -535,8 +535,11 @@ fn sutures_and_initiations_keep_continents_whole() {
     // default, PLT-610, 2026-10-25, neither supercontinent 4 nor scattered 1 welds, the sweep's
     // first welding seeds being supercontinent 5 and scattered 2; with the interior's stamp at a
     // resolvable strain rate on by default, PLT-732, 2026-10-29, neither welds, the sweep's first
-    // welding seeds being supercontinent 8 and scattered 1).
-    for (start, seed) in [("supercontinent", 8), ("scattered_continents", 1)] {
+    // welding seeds being supercontinent 8 and scattered 1; with the interior as a 2-D sheet on by
+    // default, PLT-733, the same day, scattered 1 no more, the sweep's welding seeds supercontinent
+    // 6, 8, 10, 13 and 17 to 20 and scattered 8, 19, 21 and 23, so supercontinent 8 and
+    // scattered 8).
+    for (start, seed) in [("supercontinent", 8), ("scattered_continents", 8)] {
         let mut p = preset(8000, 300.0, start, seed);
         // The old law (PLT-585 off, PLT-540 on): under Forsyth & Uyeda's balance on this small
         // planet, whose ridge push is several times Earth's (`plates_quick_16k`, ridge -1,000 m,
@@ -864,8 +867,10 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // and 22; 9 of seeds 1 to 24 with the interior's stamp at a resolvable strain rate on by
     // default, PLT-732, 2026-10-29, the sweep `weld_seed_sweep` (now on the weld tests' laws,
     // PLT-585 off and suction saturating): 1, 3, 6, 11, 18, 20 to 22 and 24, seed 4 no more, so
-    // seed 1; from the supercontinent 8, 11, 14, 15, 19 and 22, seed 8 three times).
-    let mut p = preset(8000, 300.0, "scattered_continents", 1);
+    // seed 1; from the supercontinent 8, 11, 14, 15, 19 and 22, seed 8 three times; 4 of seeds 1
+    // to 24 with the interior as a 2-D sheet on by default, PLT-733, the same day: 8, 19, 21 and
+    // 23, seed 1 no more, so seed 8; from the supercontinent 6, 8, 10, 13 and 17 to 20).
+    let mut p = preset(8000, 300.0, "scattered_continents", 8);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: under Forsyth & Uyeda's
     // balance on this small planet, whose ridge push is several times Earth's
     // (`plates_quick_16k`, ridge -1,000 m, floor -10,000 m), the speed guard bound on every
@@ -1056,8 +1061,11 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // longer welds: the sweep's welding seeds 4, 10, 12, 15, 17, 18, 20, 21 and 24; seed 3 since
     // the interior's stamp at a resolvable strain rate went on by default, PLT-732, 2026-10-29,
     // when seed 4 no longer welds: the sweep's welding seeds 1, 3, 6, 11, 18, 20 to 22 and 24, the
-    // guard binding on none but 20, seed 3 the first after seed 1).
-    let mut p = preset(8000, 300.0, "scattered_continents", 3);
+    // guard binding on none but 20, seed 3 the first after seed 1; seed 19 since the interior as
+    // a 2-D sheet went on by default, PLT-733, the same day, when seed 3 no longer welds: the
+    // sweep's welding seeds 8, 19, 21 and 23, the guard binding on none, seed 19 the first after
+    // seed 8).
+    let mut p = preset(8000, 300.0, "scattered_continents", 19);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: the guard asserted below
     // bound under Forsyth & Uyeda's balance on every welding seed of 1 to 24 of this small planet
     // but supercontinent 11, whose ridge push is several times Earth's (`plates_quick_16k`, ridge
