@@ -29,9 +29,11 @@ MAC = os.path.join(REPO, "tools", "remote", "mac.sh")
 
 # The seam tests of P0-06, as their agent ran them (one at a time; positions next to the seam). The
 # pole prototype (prototypepushback) became P1-18's cap: its tests load their own polar chunks.
+# The pole cap's tests (entitypushedback, hardstopat80) went with the cap in the cube plan's step 7.4
+# (d5efce1c); the run asked for them until 2026-10-28 and timed out waiting.
 PLANET_RUNS = ("--run columnscontinuous,entitycrossesseam,structurestraddlesseam,treestraddlesseam,"
                "shaftlineacrossseam@8185,250,0 --run jetcrossesseam@8185,250,64 "
-               "--run entitypushedback,hardstopat80@0,300,64 --scenario sable_straddle")
+               "--scenario sable_straddle")
 
 
 def step_defs():
@@ -62,7 +64,7 @@ def step_defs():
          "tools/smoke/install.sh terrablender >/dev/null 2>&1; ./gametest.sh -PwithTerraBlender 2>&1 | grep -E 'required tests|\\[gametest\\] bopBiomesPresent' | sed 's/^.*\\[gametest\\]/[gametest]/;s/^.*GameTestServer\\]: //'",
          [r"All \d+ required tests passed", r"\[gametest\] bopBiomesPresent biomesoplenty=\d+"],
          lambda out, rc: re.search(r"All \d+ required tests passed", out) is not None and re.search(r"biomesoplenty=[1-9]", out) is not None),
-        ("planet", "Planet server: seam, Sable, structures, pole prototype (C = 16,384)", ["--server"],
+        ("planet", "Planet server: seam, Sable, structures (C = 16,384)", ["--server"],
          "tools/smoke/install.sh standalone >/dev/null 2>&1; ./gametest-planet.sh " + PLANET_RUNS + " 2>&1 | grep -E 'probe tw|gametest-summary|sable_straddle|^PASS|^FAIL'",
          [r"probe tw: .*", r"\[gametest-summary\] \w+: .*", r"sable_straddle: .*", r"^(PASS|FAIL).*"],
          lambda out, rc: re.search(r"^PASS", out, re.M) is not None),
