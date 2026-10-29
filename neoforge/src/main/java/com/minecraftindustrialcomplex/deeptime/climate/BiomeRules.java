@@ -363,10 +363,16 @@ public final class BiomeRules {
             return ice.isPresent() && ice.get().blocks(x, z) > 0;
         }
 
+        /**
+         * A playa holds the column's biome cell: its own column, or any column of the 4 x 4 cell it stands for (a
+         * biome query reads at a cell's centre, {@code VolcanicBiomes}), so no edge column of a salt flat keeps the
+         * climate's biome (BIO-199: on 649baf54's test planet the cell's centre lay a block off a flat whose edge
+         * columns then grew Biomes O' Plenty's redwoods).
+         */
         @Override
         public boolean playa() {
             RasterSampler p = o().playa();
-            return p != null && p.nearest(x, z) > 0;
+            return p != null && (p.nearest(x, z) > 0 || p.anyInBox(x - 2, z - 2, x + 1, z + 1, v -> v > 0));
         }
 
         @Override
