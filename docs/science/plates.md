@@ -11340,7 +11340,7 @@ the interior takes less crust with the switch and lays its rise nearer the front
 
 **On the pool (arm up-decay, 2026-10-29): on by default.** `pool.sh run up-decay --seeds 1,2,3,4
 --set tectonics.collision_upper_decay=true +DEEPTIME_CRUST_BUDGET=1
-+DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps` (key 05bc0302, 8 runs), read against base30 (24) with the
++DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps` (key 05bc034a48ac, 8 runs), read against base30 (24) with the
 default, `coastset`, `guard` and `collcoast` measures (medians, Mann-Whitney p). The collision
 regime falls from 0.124 to 0.082 of the land and the coast within 150 km of a collision belt from
 0.342 to 0.256: the interior's crust now lands near its front. The coast with high ground does not
