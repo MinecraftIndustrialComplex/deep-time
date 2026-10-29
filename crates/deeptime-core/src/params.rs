@@ -749,6 +749,13 @@ pub struct TectonicParams {
     /// regime, the structure stage's folds, the orogen provinces) changes. `false`: the belt's
     /// rule alone. ledger: PLT-732
     pub collision_upper_stamp_resolvable: bool,
+    /// `true` (the default since 2026-10-29, the arm up-decay): the overriding plate's interior
+    /// share (`collision_upper_plate_shortening`) as a 2-D thin sheet: the belt's push decays behind the front over the sheet's length scale for a front
+    /// of its width (England, Houseman & Sonder 1985), so the strip's columns take the share by
+    /// T w e^(−x / L) at their distance x behind the front, and the interior's rate integrates
+    /// w e^(−x / L). `false`: the 1-D strip, which carries the push undiminished to the plate's
+    /// far side. ledger: PLT-733
+    pub collision_upper_decay: bool,
     /// The cordillera's back-arc source from the state: the crust behind an arc's range gives
     /// its share of the range's shortening in proportion to its weakness, the thin sheet's
     /// η_0 / η at its thermal age, so a cold, keeled craton is a backstop that hardly thins and a
@@ -1416,6 +1423,7 @@ impl Default for TectonicParams {
             collision_underthrust: false, // ledger: PLT-546, ISO-131, ISO-136 (off: step noise on the pool)
             collision_upper_plate_shortening: true, // ledger: PLT-652 (on since 2026-10-25)
             collision_upper_stamp_resolvable: true, // ledger: PLT-732 (on since 2026-10-29)
+            collision_upper_decay: true,  // ledger: PLT-733 (on since 2026-10-29)
             thermal_backstop: false,      // ledger: PLT-470 (off: a stand-in, not physics)
             thermal_keel_km: crate::plates::thermal::KEEL_KM, // ledger: PLT-463
             heat_flow_refresh: true, // ledger: PLT-469 (game-choice: on since 2026-10-23, the coordinator's call)

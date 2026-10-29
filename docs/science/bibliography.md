@@ -8444,11 +8444,12 @@ Nothing was saved to the library.
 - Reference: Houseman, G. A. and England, P. C. (1986). Finite strain calculations of continental deformation: 1. Method and general results for convergent zones. Journal of Geophysical Research 91(B3):3651-3663.
 - DOI or URL: 10.1029/JB091iB03p03651
 - Cited as: "Houseman & England 1986" (the thin viscous sheet, the Argand number).
-- Ledger ids: PLT-414, PLT-652
+- Ledger ids: PLT-414, PLT-652, PLT-733
 - Access: paywalled; the abstract from OpenAlex's record.
 - Library: not fetched.
 - Read so far (by the project): the abstract, 2026-10-22 (the high-ground task): "the strength of the sheet relative to the gravitational forces (which may be expressed as a dimensionless number: the Argand number Ar)"; "For n > 3 and Ar between 1 and 10 a plateau of thickened crust is formed in front of the indenter"; "the length scale of deformation increases with Ar and time since the start of the collision and decreases with n".
 - Cited in the front lane's PLT-652 task (2026-10-25, the overriding plate's share): not read again; the thin viscous sheet, "a plateau of thickened crust is formed in front of the indenter". Ledger ids added: PLT-652.
+- Read again 2026-10-29 (the collision-front lane, a Sonnet research sub-agent, the abstract from https://api.crossref.org/works/10.1029/JB091iB03p03651): "the length scale of deformation increases with Ar and time since the start of the collision and decreases with n" (PLT-733: the 2-D sheet's length is Ar = 0's, the surface stage's spreading standing for Ar).
 
 ### EnglandHouseman1989
 - Reference: England, P. and Houseman, G. (1989). Extension during continental convergence, with application to the Tibetan Plateau. Journal of Geophysical Research 94(B12):17561-17579.
@@ -9218,16 +9219,33 @@ The sources of the front lane's overriding-plate shortening (plates.md "The over
 - Read again 2026-10-25 (the M5 lane's sub-agent, the group's PDF, full text): "600-750 km of N-S Cenozoic shortening across, and north of, the Tibetan Plateau. The Pamir-Hindu Kush region accommodated ~1050 km of N-S convergence"; "the India-Asia convergence rate around 50 Ma was more than 150 km/Myr".
 
 ### EnglandHousemanSonder1985
-- Reference: England, P., Houseman, G. and Sonder, L. (1985). Length scales for continental deformation in convergent, divergent, and strike-slip environments: analytical and approximate solutions for a thin viscous sheet model. Journal of Geophysical Research 90(B5):3551-3557 (from memory; not checked against Crossref here).
-- DOI or URL: 10.1029/JB090iB05p03551 (from memory)
+- Reference: England, P., Houseman, G. and Sonder, L. (1985). Length scales for continental deformation in convergent, divergent, and strike-slip environments: analytical and approximate solutions for a thin viscous sheet model. Journal of Geophysical Research 90(B5):3551-3557 (the DOI resolves to the Crossref record whose abstract was read 2026-10-29; the title, initials, volume and pages as entered earlier from memory, not re-read).
+- DOI or URL: 10.1029/JB090iB05p03551; the abstract read from https://api.crossref.org/works/10.1029/JB090iB05p03551.
 - Cited as: "England, Houseman & Sonder 1985".
-- Ledger ids: PLT-652 (from-memory: a thin viscous sheet spreads a boundary's stress over a length scale set by the boundary's wavelength and the sheet's power law, so the 1-D strip, which carries the front's force undiminished to the plate's far side, gives the interior's largest share)
-- Access: not fetched.
+- Ledger ids: PLT-652 (note), PLT-733
+- Access: paywalled (Wiley and ResearchGate refused; OpenAlex and Semantic Scholar mark it closed).
 - Library: not fetched.
-- Read so far (by the project): nothing; the claim is from memory.
-## Chemical denudation (ERO-205 to ERO-207; notes on CLM-153, CLM-155, CLM-156), added 2026-10-25
+- Read so far (by the project): the abstract, 2026-10-29 (the collision-front lane, a Sonnet research sub-agent): "When the imposed velocity vector is normal to the boundary (congressional [sic] or extensional regime) the deformation field decays away from the boundary with a characteristic length scale 1/3 to 1/10 the wavelength of the imposed boundary velocity distribution for n between 1 and 10, where n is the stress-strain exponent in the rheology; in contrast, when the imposed velocity vector is parallel to the boundary (transcurrent regime), the length scale of the deformation field is approximately 4 times smaller. In each case these length scales decrease approximately as n^-1/2." The exact solutions are for a Newtonian fluid, the approximate ones for a power-law fluid. The paper's equations were not seen (Ježek et al. 2002 cite its eqs. 18, 20, 23, 24, 33 and 34). Before 2026-10-29 the claim was from memory.
 
-The sources of the dissolved load the surface stage takes off the land (erosion-and-sediment.md "Chemical denudation (M5 lane, 2026-10-25)"). All were read by a Sonnet sub-agent of the M5 lane on 2026-10-25 (downloads in its scratch, not in the library). Rudnick & Gao 2003 (RudnickGao2003, above) was not readable; a search snippet of an OCR copy gave SiO2 66.6, Al2O3 15.4 and MgO 2.48 wt% (CLM-153's note).
+### Jezek2002
+- Reference: Ježek et al. (2002). Strain partitioning in front of an obliquely convergent indenter. EGU Stephan Mueller Special Publication Series 1, 93-104. (The other authors not recorded by the read.)
+- DOI or URL: https://smsps.copernicus.org/articles/1/93/2002/smsps-1-93-2002.pdf
+- Cited as: "Ježek et al. 2002".
+- Ledger ids: PLT-733
+- Access: open (Copernicus).
+- Library: not fetched.
+- Read so far (by the project): full text, 2026-10-29 (the collision-front lane, a Sonnet research sub-agent, p. 95 checked as an image). Eqs. (1) and (2), attributed to England et al. (1985) for Ar = 0 and a sinusoidal boundary condition: v(y) = v0 exp(−(π√n / 2L) y) for velocity normal to the boundary and u(y) = u0 exp(−4 (π√n / 2L) y) parallel to it, "where y is the distance from the indenter, v0 and u0 are velocities applied at the boundary of the sheet, n is the power law exponent, and L is the width of the indenter"; "deformation in front of the indenter decays nearly exponentially and that the characteristic length-scale for the frontal collision is four times greater than that for a transcurrent regime"; Houseman and England (1986) verified the equations "for geologically more reasonable boundary conditions that could be characterized as a rectangle with rounded corners".
+- Reference check: first author, year, title, series and pages as read; the other authors to complete from the publisher's page.
+
+### EnglandHousemanNocquet2016
+- Reference: England, Houseman and Nocquet (2016). (Title not recorded by the read.) Journal of Geophysical Research 121, 8888-8916.
+- DOI or URL: read from https://eprints.whiterose.ac.uk/id/eprint/108047/7/repository12.pdf (the Leeds accepted manuscript) and https://hal.science/hal-03572855/document (the published version).
+- Cited as: "England et al. 2016".
+- Ledger ids: PLT-733
+- Access: open (accepted manuscript and HAL copy).
+- Library: not fetched.
+- Read so far (by the project): full text, 2026-10-29 (the collision-front lane, a Sonnet research sub-agent). Sect. 3.2 (pp. 8893 to 8894): "a condition of stress or velocity, when applied over a length w of boundary, influences strain rates over a distance from that boundary that is ∼ w/(α√n), where n is the exponent in the power-law rheology (equation (1)) and α depends on the nature of the boundary condition [England et al., 1985; Sonder et al., 1986]. When the boundary condition is one of normal velocity or traction, α ∼ 1; when the condition is tangential, the length scale is four times shorter (α ∼ 4)"; and "the influence of an individual boundary segment extends no further into the sheet than the length of that segment [England et al., 1985]". Appendix A1.2 (page not seen): for a boundary velocity ∝ cos(πy/2w) the Newtonian solution decays as exp(−πx/4w); "The length scale for the decay is 4w/π, which is close to the length scale given by the analysis of England et al. [1985] for the case of a Newtonian fluid ... For a power law fluid, this length scale would be reduced by a factor of √n"; with w about 300 km, an e-fold of "about 400 km".
+- Reference check: authors' surnames, year, journal, volume and pages as read; the title, initials and DOI to complete from the journal.
 
 ### West2005
 - Reference: West, A. J., Galy, A. and Bickle, M. (2005). Tectonic and climatic controls on silicate weathering. Earth and Planetary Science Letters 235:211-228.
