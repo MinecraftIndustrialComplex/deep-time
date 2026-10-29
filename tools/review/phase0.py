@@ -75,7 +75,8 @@ def step_defs():
         ("inspect", "deeptime-inspect: generated surface vs world data, seam strip", [],
          "cargo run -q --release -p deeptime-inspect -- compare --world smoke/standalone/server/planet --world-data smoke/standalone/server/planet/deeptime --out review/out/phase0-inspect | python3 -c \"import json,sys; d=json.load(sys.stdin); print('p99_abs_diff_blocks', d.get('p99_abs_diff_blocks'), 'compared', d.get('columns_compared'), 'of', d.get('columns_total'))\"; cargo run -q --release -p deeptime-inspect -- seam --world smoke/standalone/server/planet --out review/out/phase0-inspect | sed 's/ png=.*//; s/^/seam /'",
          [r"p99_abs_diff_blocks \S+ .*", r"seam .*"],
-         lambda out, rc: re.search(r"p99_abs_diff_blocks (0|1)(\.0)? ", out) is not None and "seam_mismatches=0 " in out),
+         lambda out, rc: re.search(r"p99_abs_diff_blocks (0|1)(\.0)? ", out) is not None and "seam_mismatches=0 " in out
+         and seam_rows_compared(out)),
         ("smoke-mic-32k", "Smoke: current MIC pack at C = 32,768 (test terrain, seam pregenerated)", ["--server", "--pack"],
          "tools/smoke/install.sh mic --size 32768 --test-terrain wrap-test >/dev/null 2>&1; python3 tools/smoke/run.py --profile mic --fresh --chunky 128 --chunky-center seam 2>&1 | grep -E '\\[(PASS|FAIL)\\]|tw\\.|peak RSS|^(PASS|FAIL)'",
          [r"\[(PASS|FAIL)\] .*", r"tw\.\w+: .*", r"^(PASS|FAIL).*"],
@@ -103,6 +104,14 @@ def run_step(sid, flags, cmd):
     out = "\n".join(l for l in out.splitlines() if not noise.match(l))
     open(os.path.join(LOGS, f"{sid}.log"), "w").write(out + "\n")
     return out, r.returncode, time.time() - t0
+
+
+def seam_rows_compared(out):
+    """The seam rule compared most rows: it skips a row with an excluded column (carved, a
+    structure), and a strip that skipped as many as it compared says little (Graphide's review of
+    PR #31)."""
+    m = re.search(r"seam_rows=(\d+) seam_rows_excluded=(\d+) ", out)
+    return m is not None and int(m.group(1)) > int(m.group(2))
 
 
 def natives_row():

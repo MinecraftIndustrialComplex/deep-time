@@ -1187,14 +1187,27 @@ pub fn seam(
             img.set(width as usize, h - 1 - dy, INK);
         }
     }
-    // The seam step per row, as GeneratorGameTests.periodicAcrossSeam judges it.
+    // The seam step per row, as GeneratorGameTests.periodicAcrossSeam judges it. A row with a
+    // seam column the diff excludes (carved, a structure, ...) is skipped and counted, as the diff
+    // skips it: on 2026-10-28 three rows at z 71 to 73 failed where a cave crossed the seam under a
+    // sand surface and the sand above it had fallen in on one side.
+    let excluded = |x: i32, z: i32| {
+        wd.is_some_and(|wd| surf.exclusion(&world, x, z, wd.expected_top(x, z)).is_some())
+    };
     let mut mismatches = Vec::new();
-    let mut rows = 0;
+    let (mut rows, mut rows_excluded) = (0, 0);
     for z in z0..=z1 {
         let t = |x: i32| world.full_chunk(x, z).and(world.terrain_top(x, z));
         if let (Some(e), Some(e2), Some(wv), Some(w2)) =
             (t(half - 1), t(half - 2), t(-half), t(-half + 1))
         {
+            if [half - 1, half - 2, -half, -half + 1]
+                .into_iter()
+                .any(|x| excluded(x, z))
+            {
+                rows_excluded += 1;
+                continue;
+            }
             rows += 1;
             let step = (e - wv).abs();
             if step > (e - e2).abs().max((wv - w2).abs()).max(1) {
@@ -1222,9 +1235,10 @@ pub fn seam(
         "png": strip_png,
         "diff_png": diff_png,
         "seam_rows": rows,
+        "seam_rows_excluded": rows_excluded,
         "seam_mismatches": mismatches.len(),
         "seam_mismatch_rows": mismatches.iter().take(20).collect::<Vec<_>>(),
-        "seam_rule": "a row mismatches when |h(C/2-1) - h(-C/2)| > max(|h(C/2-1) - h(C/2-2)|, |h(-C/2) - h(-C/2+1)|, 1), h = the terrain surface",
+        "seam_rule": "a row mismatches when |h(C/2-1) - h(-C/2)| > max(|h(C/2-1) - h(C/2-2)|, |h(-C/2) - h(-C/2+1)|, 1), h = the terrain surface; a row with one of the four columns excluded (the exclusion rules) is skipped and counted in seam_rows_excluded; without world data nothing can be judged excluded, and every row is compared",
         "per_column": per_column,
         "exclusions": {"rules": EXCLUSION_RULES, "params": opts.to_json()},
     });

@@ -626,8 +626,9 @@ fn run(cli: Cli) -> Result<()> {
             };
             let v = render::seam(&common.world, wd.as_ref(), &args, &table, &out_of(&common))?;
             println!(
-                "seam_rows={} seam_mismatches={} p99_abs_diff_blocks={} png={} diff_png={}",
+                "seam_rows={} seam_rows_excluded={} seam_mismatches={} p99_abs_diff_blocks={} png={} diff_png={}",
                 v["seam_rows"],
+                v["seam_rows_excluded"],
                 v["seam_mismatches"],
                 v["p99_abs_diff_blocks"],
                 v["png"],

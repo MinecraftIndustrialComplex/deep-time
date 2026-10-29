@@ -138,9 +138,11 @@ public final class SeamGameTests {
                 level.getChunkSource().getGenerator()).terrain();
         int badFolds = 0, jumps = 0, rows = 0, unloadedRows = 0, disturbedRows = 0;
         StringBuilder detail = new StringBuilder();
-        // Rows inside the strip the harness forceloads around the seam (z ± 32).
-        for (int i = 0; i < 16; i++) {
-            int z = (i - 8) * 4 + 1;
+        // Every row inside the strip the harness forceloads around the seam (z ± 32). Until
+        // 2026-10-28 one row in four (16): carving across the seam (a band 3 blocks under the
+        // terrain function on both sides alike, deeper at z 13 to 21) disturbed 8 of them on the
+        // planet server, leaving too few to judge.
+        for (int z = -31; z <= 31; z++) {
             for (int k = 0; k < 4; k++) {
                 var folded = shape.fold(new net.minecraft.core.BlockPos(c / 2 + k, 64, z));
                 if (folded.getX() != -c / 2 + k || folded.getZ() != z) {
@@ -178,7 +180,7 @@ public final class SeamGameTests {
         }
         DeepTime.LOGGER.info("[gametest] columnsContinuous C={} cleanRows={} disturbedRows={} unloadedRows={} badFolds={} seamJumps={}{}",
                 c, rows, disturbedRows, unloadedRows, badFolds, jumps, detail);
-        helper.assertTrue(rows >= 10, "only " + rows + " clean seam rows (disturbed " + disturbedRows + ", unloaded " + unloadedRows + ")");
+        helper.assertTrue(rows >= 24, "only " + rows + " clean seam rows of 63 (disturbed " + disturbedRows + ", unloaded " + unloadedRows + ")");
         helper.assertTrue(badFolds == 0 && jumps == 0, "seam discontinuities:" + detail);
         helper.succeed();
     }
