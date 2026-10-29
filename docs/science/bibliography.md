@@ -4643,7 +4643,43 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Ledger ids: PLT-600, PLT-601.
 - Access: open copy (course page).
 - Library (the project's source library, not distributed): fetched by the M5 lane (2026-10-25; PDF, text layer, kept outside the repository).
-- Read by the M5 lane (2026-10-25), full text: the bulldozer wedge, eq. 1-3 (pp. 59-60). Mass balance is (1/2) rho W^2 tan(alpha + beta) = rho h V t, so W = [2hVt / tan(alpha + beta)]^(1/2): "both the width and the height of a bulldozer wedge grow like t^1/2. The growth is self-similar". The Taiwan values come from Davis et al. 1983 (pp. 84-85). The height limit is on p. 96: a slowly eroding wedge "can only grow self-similarly if the drag on its base is purely frictional. It is thus the existence of a brittle-plastic transition at 10-15 km depth that ultimately limits the height of very wide fold-and-thrust belts and accretionary wedges. This provides a natural explanation for the break in topographic slope of the Higher Himalaya at the edge of the Tibetan Plateau (Figure 20)."
+- Read by the M5 lane (2026-10-25), full text: the bulldozer wedge, eq. 1-3 (pp. 59-60). Mass balance is (1/2) rho W^2 tan(alpha + beta) = rho h V t, so W = [2hVt / tan(alpha + beta)]^(1/2): "both the width and the height of a bulldozer wedge grow like t^1/2. The growth is self-similar". The Taiwan values come from Davis et al. 1983 (pp. 84-85). The height limit is on p. 96: a slowly eroding wedge "can only grow self-similarly if the drag on its base is purely frictional. It is thus the existence of a brittle-plastic transition at 10-15 km depth that ultimately limits the height of very wide fold-and-thrust belts and accretionary wedges. This provides a natural explanation for the break in topographic slope of the Higher Himalaya at the edge of the Tibetan Plateau (Figure 20)." Read again 2026-10-29 (the collision-front lane, a Sonnet research sub-agent), pp. 83-84: Taiwan's subaerial belt "forms by an expansion of this accretionary wedge as the arc encounters the thick sedimentary deposits on the Chinese continental slope and shelf", with "a remarkably uniform surface slope and width W = 90 km" between 23°N and 25°N: the belt is the lower plate's margin, the arc its backstop.
+
+### WillettBeaumontFullsack1993
+- Reference: Willett, S., Beaumont, C., Fullsack, P. (1993). Mechanical model for the tectonics of doubly vergent compressional orogens. Geology 21(4):371-374.
+- DOI or URL: not recorded; read from a copy at cinty-lee.squarespace.com/s/Geology-1993-Willett-371-4.pdf.
+- Cited as: "Willett et al. 1993" (STATUS.md's collision-front row, 2026-10-29).
+- Ledger ids: none yet (read for the collision-front lane, no value in the code).
+- Access: paywalled; an open copy as above.
+- Library (the project's source library, not distributed): not fetched.
+- Substitute: the copy above.
+- Read so far (by the project): full text, 2026-10-29 (a Sonnet research sub-agent). No widths, tapers or partition shares are given; the statements are qualitative. p. 372: detachment "occurs first to the left, or upstream, of the singularity. We call this the 'pro' direction ... Downstream of the singularity is termed the 'retro' direction"; the pro-wedge has the minimum critical taper, "The retro-wedge, in contrast, is steeper and corresponds to the maximum permissible taper angle"; material deformed in the retro-wedge "remains in place". p. 373, at an active margin: "a large accretionary wedge obeying pro-wedge mechanics and a smaller landward-verging retro-wedge, landward of an outer-arc high and overlying the arc basement", the disparity "largely the result of fore-arc sedimentation".
+- Read in this pass: full text (2026-10-29).
+- Reference check: correct.
+
+### NaylorSinclair2008
+- Reference: Naylor, M., Sinclair, H. D. (2008). Pro- vs. retro-foreland basins. Basin Research 20:285-303.
+- DOI or URL: not recorded; the Edinburgh preprint, pure.ed.ac.uk/ws/files/10949660/PDF_Pro_Vs_Retro.pdf (page numbers below are the preprint's).
+- Cited as: "Naylor & Sinclair 2008" (STATUS.md's collision-front row, 2026-10-29).
+- Ledger ids: none yet.
+- Access: paywalled; the preprint is open.
+- Library (the project's source library, not distributed): not fetched.
+- Substitute: the preprint.
+- Read so far (by the project): full text, 2026-10-29 (a Sonnet research sub-agent). pp. 8-9: with "typical surface angles of α pro = 1.5°, α retro = 2.5°" a 3 km high orogen has "a pro-wedge 115 km wide and a retro-wedge 69 km wide" (their assumed angles, not Willett's results; the pro-wedge then holds about 62 % of the cross-section, the sub-agent's arithmetic). p. 15: models show "a retro-ward shift in the topographic maximum with respect to the subduction point (Willett et al., 1993; Naylor et al., 2005)"; p. 21: "more mass is stored in the pro-wedge than the retro-wedge".
+- Read in this pass: full text (2026-10-29).
+- Reference check: correct.
+
+### Simoes2007
+- Reference: Simoes, M., et al. (2007). Mountain building in Taiwan (the title's subtitle and the full author list not recorded by the read). Journal of Geophysical Research 112, B11405.
+- DOI or URL: the author copy, web.gps.caltech.edu/~avouac/publications/simoes_etal_2007b.pdf.
+- Cited as: "Simoes et al. 2007" (STATUS.md's collision-front row, 2026-10-29).
+- Ledger ids: none yet.
+- Access: paywalled; the author copy is open.
+- Library (the project's source library, not distributed): not fetched.
+- Substitute: the author copy.
+- Read so far (by the project): full text, 2026-10-29 (a Sonnet research sub-agent). p. 1: "Taiwan results from the collision between the Chinese continental margin and the Luzon volcanic arc. The Longitudinal Valley (LV) ... is the suture ... [it] separates the Taiwan mountain belt, which refers to the accreted passive margin sequences to the west, from the deformed volcanic arc to the east"; Fig. 1: the LV and the Coastal Range are "considered to form the backstop of the wedge"; of the 90 mm/yr of convergence "42 mm a-1 ... has been absorbed by crustal shortening west of the LV".
+- Read in this pass: full text (2026-10-29).
+- Reference check: first author, year, journal and article number as read; the authors and title to complete from the journal.
 
 ### Christensen_Mooney1995
 - Reference: Christensen, N. I., Mooney, W. D. (1995). Seismic velocity structure and composition of the continental crust: a global view. Journal of Geophysical Research 100(B6):9761-9788.
