@@ -16,8 +16,6 @@ import com.minecraftindustrialcomplex.deeptime.worldgen.LavaFlows;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
@@ -27,7 +25,6 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraft.world.level.levelgen.structure.StructureStart;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -87,18 +84,6 @@ public final class LakeGameTests {
     }
 
     /**
-     * The id of a structure with a piece whose box holds (x, y, z), or null: a structure placed there owns that
-     * ground (a village or a ruin levels or digs it), so the salt rule does not read it.
-     */
-    static String structureAt(ServerLevel level, int x, int y, int z) {
-        StructureStart start = level.structureManager().getStructureWithPieceAt(new BlockPos(x, y, z), h -> true);
-        if (!start.isValid())
-            return null;
-        ResourceLocation id = level.registryAccess().registryOrThrow(Registries.STRUCTURE).getKey(start.getStructure());
-        return id == null ? "?" : id.toString();
-    }
-
-    /**
      * The pack's own salt laid over Deep Time's: Expanded Ecosphere's {@code salt} patch turns calcite (halite's vanilla
      * stand-in) under air at y 62 into white concrete powder, the salt of its salt lakes (its surface rules use the same
      * block). Salt over salt, so the flat is still salt (41b11137's test planet, -752 62 198).
@@ -147,6 +132,18 @@ public final class LakeGameTests {
         for (int k = y + 1; k >= y - n - 1; k--)
             b.append(' ').append(BuiltInRegistries.BLOCK.getKey(chunk.getBlockState(pos.set(x, k, z)).getBlock()).getPath());
         return b.toString();
+    }
+
+    /**
+     * Whether something opened column (x, z) through its salt: its ground lies more than a block under the bake's
+     * terrain top less the salt's depth, so no flat's surface is left to read (a carver's mouth on the flat; 649baf54's
+     * test planet with MIC: air from the bake's top at y 65 down to the crater breccia at 62, at two pairs of columns
+     * by its springs), as water or the ice cover over it are not.
+     */
+    private static boolean opened(WorldDataTerrain w, RasterSampler playa, Ground gr, int x, int z) {
+        double v = playa.nearest(x, z);
+        int n = Double.isNaN(v) ? 0 : (int) Math.round(v);
+        return gr.y() < (int) Math.floor(w.height(x, z)) - n - 1;
     }
 
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 4800)
@@ -221,7 +218,7 @@ public final class LakeGameTests {
         }
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         StringBuilder detail = new StringBuilder();
-        int wrong = 0, frozenWarm = 0, openCold = 0, frozenRead = 0, openRead = 0, saltRead = 0, overhung = 0, underFlow = 0;
+        int wrong = 0, frozenWarm = 0, openCold = 0, frozenRead = 0, openRead = 0, saltRead = 0, overhung = 0, underFlow = 0, openedColumns = 0;
         StringBuilder flowDetail = new StringBuilder();
         for (Spot s : frozen) {
             BlockState top = level.getChunk(s.x() >> 4, s.z() >> 4).getBlockState(pos.set(s.x(), s.top(), s.z()));
@@ -261,6 +258,10 @@ public final class LakeGameTests {
                 underFlow++;   // a lava flow over the flat
                 continue;
             }
+            if (!bad.isEmpty() && opened(w, playa, gr, s.x(), s.z())) {
+                openedColumns++;   // opened through its salt: no flat's surface to read
+                continue;
+            }
             if (!bad.isEmpty()) {
                 wrong++;
                 detail.append(' ').append(bad).append('(').append(s.x()).append(',').append(gr.y()).append(',').append(s.z()).append(' ')
@@ -270,7 +271,7 @@ public final class LakeGameTests {
         // Round every hot spring by a playa, the flat it does not claim is salt too: no role biome comes within
         // VolcanicBiomes.PLAYA_MARGIN of a playa (BIO-165; before it, Biomes O' Plenty's hot springs dug ponds into the
         // flat and ringed them with thermal calcite, which the sparse grid above found only where it happened to fall).
-        int springs = 0, ringRead = 0, ringWrong = 0, ringUnderFlow = 0, ringUnderStructure = 0;
+        int springs = 0, ringRead = 0, ringWrong = 0, ringUnderFlow = 0, ringOpened = 0;
         for (Geothermal.Site site : geo.sites()) {
             if (springs >= MOST)
                 break;
@@ -301,14 +302,8 @@ public final class LakeGameTests {
                                 .append(site.x()).append(',').append(site.z()).append(')');
                     continue;   // a lava flow over the flat beside the spring
                 }
-                // A structure's piece over the flat (649baf54's test planet with MIC: three blocks of a ring's
-                // ground gone after the surface stage, the crater breccia under them at the top): its terrain
-                // is the structure's, as a lava flow's is the flow's.
-                String structure = structureAt(level, c[0], gr.y() + 1, c[1]);
-                if (structure != null) {
-                    if (ringUnderStructure++ < 4)
-                        flowDetail.append(" structure:").append(structure).append('(').append(c[0]).append(',')
-                                .append(gr.y()).append(',').append(c[1]).append(')');
+                if (opened(w, playa, gr, c[0], c[1])) {
+                    ringOpened++;   // opened through its salt: no flat's surface to read
                     continue;
                 }
                 if (ringWrong++ < 12)
@@ -320,11 +315,11 @@ public final class LakeGameTests {
         }
         wrong += ringWrong;
         DeepTime.LOGGER.info("[gametest] lakeIceAndSaltFollowTheClimate lakeCells={} playaCells={} frozenLakeColumns={} (iceRead={} inWarmBiome={}) "
-                        + "openLakeColumns={} (waterRead={} inColdBiome={}) playaColumns={} (saltRead={} underCanopy={} onSpring={} salt={}) "
-                        + "underFlow={} springsOnPlaya={} (ringRead={} ringWrong={} ringUnderFlow={} ringUnderStructure={}) threshold={} wrong={}{}{}",
-                lakeCells, playaCells, frozen.size(), frozenRead, frozenWarm, open.size(), openRead, openCold, salt.size(), saltRead, overhung, onSpring,
+                        + "openLakeColumns={} (waterRead={} inColdBiome={}) playaColumns={} (saltRead={} underCanopy={} onSpring={} opened={} salt={}) "
+                        + "underFlow={} springsOnPlaya={} (ringRead={} ringWrong={} ringUnderFlow={} ringOpened={}) threshold={} wrong={}{}{}",
+                lakeCells, playaCells, frozen.size(), frozenRead, frozenWarm, open.size(), openRead, openCold, salt.size(), saltRead, overhung, onSpring, openedColumns,
                 saltBlock == null ? "none" : BuiltInRegistries.BLOCK.getKey(saltBlock.getBlock()), underFlow, springs, ringRead, ringWrong,
-                ringUnderFlow, ringUnderStructure, ice.threshold(), wrong, flowDetail, detail);
+                ringUnderFlow, ringOpened, ice.threshold(), wrong, flowDetail, detail);
         helper.assertTrue(wrong == 0, wrong + " columns break the lake-ice or salt rule:" + detail);
         helper.succeed();
     }
