@@ -131,7 +131,10 @@
 //! still resists as before, and the 1-D strip carries F undiminished to the plate's far side, where
 //! a 2-D sheet would spread it (England, Houseman & Sonder 1985), so it is the interior's largest
 //! share. The interior's columns are stamped as the belt's are (the collision orogeny) but kept
-//! out of the belt's record; the crust is the crossing crust's mix. On the pool (arm
+//! out of the belt's record, and with `collision_upper_stamp_resolvable` (PLT-732, on) only where
+//! the share thickens a column at a resolvable strain rate, 3e-9 per year (Calais et al. 2006):
+//! the strip reaches the plate's far side, and slower thickening is a stable interior's strain
+//! (Gordon 1998), not an orogeny. The crust is the crossing crust's mix. On the pool (arm
 //! fl-upper-unfreeze against its switch-off twin, 2026-10-25) the interiors took 0.13 of the
 //! crust crossed, a quarter to a third of Arabia's and India's shares.
 
@@ -213,6 +216,30 @@ pub const UPPER_MOST_GLOBAL: &str = "plates/collision_upper_most_km2";
 /// How young a collision orogeny on the incoming crust counts as raised by this collision's
 /// wedge, Myr (measurement only; the agent's window, ledger: PLT-401).
 const RECENT_MYR: f64 = 30.0;
+/// The slowest thickening the interior share stamps as deformation with
+/// `collision_upper_stamp_resolvable`, per year of strain: the GPS resolution below which Asia's
+/// strain is "comparable to stable plate interiors" (Calais et al. 2006, p. 5); stable interiors
+/// strain under 4e-10 per year (Gordon 1998, p. 615). ledger: PLT-732
+const RESOLVABLE_STRAIN_PER_YR: f64 = 3.0e-9;
+
+/// Whether the interior share's rise stamps its column as part of the collision orogeny: by the
+/// belt's rule (`airy_dz` of rise at least `stamp_m`) and, with `resolvable`, only where the crust
+/// `added_m` (m) thickens the column of `thickness_m` at [`RESOLVABLE_STRAIN_PER_YR`] or more over
+/// the step of `dt_yr`. ledger: PLT-247, PLT-732
+fn interior_deforms(
+    airy_dz: f64,
+    stamp_m: f64,
+    added_m: f64,
+    thickness_m: f64,
+    dt_yr: f64,
+    resolvable: bool,
+) -> bool {
+    airy_dz >= stamp_m
+        && (!resolvable
+            || (thickness_m > 0.0
+                && dt_yr > 0.0
+                && added_m / thickness_m / dt_yr >= RESOLVABLE_STRAIN_PER_YR))
+}
 /// The lowest ground the wedge's profile is followed down to, m below the sea (the reach of its
 /// distance field; ground lower than this is not continental lowland). ledger: PLT-380
 const WEDGE_FLOOR_M: f64 = -500.0;
@@ -979,9 +1006,19 @@ fn stack_front(
             Part::Wedge => out.stacked.wedge_km2_m += added * area,
             Part::Belt => out.stacked.belt_km2_m += added * area,
             Part::Upper => {
-                // The interior's columns: stamped as the belt's are, outside the belt's record.
+                // The interior's columns: stamped as the belt's are (with
+                // `collision_upper_stamp_resolvable` only at a resolvable strain rate, PLT-732),
+                // outside the belt's record.
                 out.stacked.upper_km2_m += added * area;
-                if airy_dz >= stamp_m {
+                let column_m: f64 = before.iter().map(|&x| f64::from(x)).sum();
+                if interior_deforms(
+                    airy_dz,
+                    stamp_m,
+                    added,
+                    column_m,
+                    env.dt_yr,
+                    k.collision_upper_stamp_resolvable,
+                ) {
                     s.orogeny = OROGENY_HIMALAYAN;
                     s.orogeny_myr = env.t_myr as f32;
                     s.fold = to_group(rot, tangent(pos[i], side.normal).normalize_or_zero());
@@ -2386,6 +2423,69 @@ mod tests {
             }
             assert!(upper > 0.0, "{l_km} km: the interior took nothing");
         }
+    }
+
+    /// PLT-732: with the switch the interior share stamps a column only where it thickens it at
+    /// 3e-9 per year or more (on a 35.1 km column over 2 Myr, 210.6 m of crust, 30.0 m of rise),
+    /// never where the belt's rule would not; the crust it adds is the same.
+    #[test]
+    fn the_interior_stamps_only_resolvable_thickening_with_the_switch() {
+        let (t, dt) = (35_100.0, 2.0e6);
+        let edge = RESOLVABLE_STRAIN_PER_YR * t * dt;
+        assert!((edge - 210.6).abs() < 1e-6, "{edge}");
+        let rise = |added: f64| added / COLUMN_ISOSTATIC_FACTOR;
+        for (added, off, on) in [
+            (100.0, true, false),
+            (205.0, true, false),
+            (215.0, true, true),
+        ] {
+            assert_eq!(
+                interior_deforms(rise(added), 10.0, added, t, dt, false),
+                off
+            );
+            assert_eq!(
+                interior_deforms(rise(added), 10.0, added, t, dt, true),
+                on,
+                "{added}"
+            );
+        }
+        // Below the belt's 5 m/Myr nothing is stamped either way; no column, no stamp.
+        assert!(!interior_deforms(9.0, 10.0, 1.0e4, t, dt, false));
+        assert!(!interior_deforms(9.0, 10.0, 1.0e4, t, dt, true));
+        assert!(!interior_deforms(30.0, 10.0, 210.0, 0.0, dt, true));
+
+        // On the collision: the same crust, no more stamps.
+        let interior = |r: &UpperRun| {
+            let pts = r.fx.geo.points();
+            let belt_rad = r.fx.norm.rad(r.fx.preset.tectonics.collision_belt_km);
+            r.st.samples
+                .iter()
+                .zip(pts)
+                .filter(|(s, p)| {
+                    s.group == 0 && s.orogeny == OROGENY_HIMALAYAN && (-p.x).asin() > belt_rad
+                })
+                .count()
+        };
+        let off = upper_run(60.0, true, 6, |fx| {
+            fx.preset.tectonics.collision_upper_stamp_resolvable = false;
+        });
+        let on = upper_run(60.0, true, 6, |fx| {
+            fx.preset.tectonics.collision_upper_stamp_resolvable = true;
+        });
+        let crust = |r: &UpperRun| r.fronts.iter().map(|s| s.upper_km2_m).sum::<f64>();
+        assert!(crust(&off) > 0.0);
+        assert!(
+            (crust(&on) - crust(&off)).abs() <= 1e-9 * crust(&off),
+            "the interior's crust: {} with the switch, {} without",
+            crust(&on),
+            crust(&off)
+        );
+        assert!(
+            interior(&on) <= interior(&off),
+            "stamped interior samples: {} with the switch, {} without",
+            interior(&on),
+            interior(&off)
+        );
     }
 
     /// PLT-652 has no share parameter, and the belt sets its own height: on the same collision a
