@@ -10012,15 +10012,17 @@ base29 --registry tools/review/pool/measures_docking.json --measures sutures,coa
 suture per 100 Myr (Macdonald et al. 2019: 19 to 39 and 23,235 to 50,919), a median suture of 427 km (his 1,019); at
 a run's end 18,683 km of collision front open, 0.71 of it on contacts over 60 Myr old, the open collisions 33 Myr
 along (median) at a median peak of 44.5 mm/yr; in the last 30 Myr 0.84 of the front-time is collisions that end
-with no hand-off or are still open. The sutures are Earth's in number and length; what is not is the fronts that
-stay open for tens of Myr with no new zone taking their convergence (one run, supercontinent seed 1: 17
-transferences and 79 polarity reversals in 1000 Myr).
+with no hand-off or are still open. The sutures are Earth's in number and length. At a run's end, then, the open
+fronts sit mostly on old contacts; over the whole run they do not (the next paragraph: by a collision state's own
+age, most of the front-time is collisions under 30 Myr old). One run, supercontinent seed 1, made 17 transferences
+and 79 polarity reversals in 1000 Myr.
 
 **Where the shortened crust goes** (2026-10-29, the coordinator; a second Sonnet research sub-agent, full texts,
 bibliography `WillettBeaumontFullsack1993`, `NaylorSinclair2008`, `Simoes2007`, `Dahlen1990`). Over base29's 24 runs the
 front-time by a collision state's age (the dock tally, after the first 100 Myr; medians) is 0.189 under 10 Myr (41.8
 mm/yr), 0.387 at 10 to 30 Myr (29.5), 0.294 at 30 to 60 Myr (7.4) and 0.118 past 60 Myr (6.2): mostly young fronts
-converging fast, not base3's old ones. At the front of the youngest the overriding plate's edge is dry for 0.334 of the
+converging fast, not base3's old ones (the contacts can be old while the states on them are young: a contact
+hands its collision on to a new state every 100 km of shortening, PLT-068). At the front of the youngest the overriding plate's edge is dry for 0.334 of the
 front-time (10 to 30 Myr: 0.551). The wedge on the incoming plate rises only up to that edge's height
 (`wedge_reach_km = (z_front - (sea - 500 m)) / tan(wedge_slope_deg)`, PLT-244), so against a submerged edge there is
 little or no wedge and the belt on the overriding plate takes the crust, at what becomes the coast. Earth's orogens do

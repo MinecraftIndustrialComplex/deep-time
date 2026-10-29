@@ -20,8 +20,8 @@ is correct and the numbers do not get worse elsewhere.
 On base29 (24 runs, the dock tally after the first 100 Myr, medians) the overriding edge is dry for only
 0.334 of the front-time of collisions under 10 Myr old (0.551 at 10 to 30 Myr), and those two classes
 hold 0.58 of the front-time. So most collision crust starts its orogen on the overriding plate's edge,
-which at an active margin is the coast, and land reaches 2 km about 76 km inland of it
-(2,000 m / tan 1.5 degrees): inside the measure's 200 km.
+which at an active margin is the coast, and from a toe at sea level land reaches 2 km about 76 km
+inland of it (2,000 m / tan 1.5 degrees; nearer from a toe standing higher): inside the measure's 200 km.
 
 ## What Earth's orogens do
 
