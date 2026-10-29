@@ -9994,8 +9994,8 @@ and base27's welds taking 0.94 of the planet's area of ocean floor into other pl
     - the guard's worst 10,328 to 10,568 m, with no step beyond 2 Earth reliefs.
   - **Next:** the collision fronts that no longer weld keep converging faster than 2 mm/yr, so the question is the collision's resistance in the force balance. Not a knob on the weld.
 
-**Sources for that step, and base29's numbers** (2026-10-29, the coordinator; a Sonnet research sub-agent read both
-in full, bibliography `SternScholl2010`, `LallemandArcay2021`). The boundary measure's `front_coll_km` is a run's mean
+**Sources for that step, and base29's numbers** (2026-10-29, the coordinator; a Sonnet research sub-agent read Lallemand &
+Arcay 2021 in full and Stern & Scholl 2010's pp. 16 and 18, bibliography `LallemandArcay2021`, `SternScholl2010`). The boundary measure's `front_coll_km` is a run's mean
 (`plates/collision_front_km_myr` over the run), and Stern & Scholl 2010 (p. 16) give ~12,000 km of active suture today,
 an average of ~6,000 km over the supercontinent cycle (after Scholl & von Huene 2009) and 1,000 to 20,000 km over
 geologic time; so base29's 13,356 km is about 2.2 times Earth's mean, not 1.1 times the registry's bound. Lallemand &
