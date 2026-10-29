@@ -81,9 +81,47 @@ step changes little, so K's calibration stands; what shorter steps changed in th
 an upsampled surface that is not yet the L2 grid's own, which the stage is not meant to carry out ("a refinement of
 the last steps, not more history", YNG-014).
 
-**Left as it is.** The critical slope's cut at L2 (the law); the amplifier's own 6 blocks on that land (its incision,
+**Left as it is.** The critical slope's cut at L2 (the law; its scale is read in the next section); the amplifier's own 6 blocks on that land (its incision,
 AMP-023 to AMP-033). Deposits and strata stay in the history's frame: the world's ground cuts both alike, so moving
 bodies to the world's ground would take ore out of its host rock.
+
+## The critical slope's scale (item 3, 2026-10-29, research and arms; nothing changed)
+
+**The question.** The young stage runs the critical slope S_c (ERO-013, 0.15) on L2's 2.4 km links, and the step's
+section above put about 6 blocks of the fast-eroding land's lowering on it. S_c is Montgomery & Brandon 2002's limiting
+relief over a window (Rc 1,500 m) divided by the window, and threshold landscapes stand steeper over short spans than
+over long ones, so the value at 2.4 km could be higher.
+
+**What the sources say** (a Sonnet research sub-agent, full texts; bibliography `Montgomery2002`, `DiBiase2010`,
+`Whipple2013`). Montgomery & Brandon's window is a 10-km-diameter circle on a 30 arc-second DEM (p. 484), so 0.15 is
+relief over a full diameter; they do not analyse the window's size. DiBiase et al. 2010 measured relief over several
+windows in the San Gabriel Mountains (10 m DEM, "elevation range divided by window diameter", p. 137): at high channel
+steepness about 0.13 to 0.20 over a 10 km diameter, 0.25 to 0.29 over 5 km and 0.34 to 0.40 over 2 km, only the last
+saturating (Fig. 4, read by eye). That is roughly 0.15 x (L / 10 km)^-0.5: 0.31 at L2's 2.4 km links and 0.22 at L1's
+4.8 km. Support is moderate for the direction and weak for the value: one range, a figure read, and "no clear
+demonstration of such a threshold in any given setting" at 1 to 5 km (Whipple et al. 2013, p. 563).
+
+**The arms** (`deeptime stage young --in dep.dtcp --set surface.threshold_slope=...`, one scratch deposits checkpoint of
+`earthlike_quick_16k`, supercontinent, 1000 Myr, master 4f6f8bdf; the young ground of each L2 cell against the L1
+surface bilinear at its centre, over land, in blocks; the scratch is deleted):
+
+| S_c on L2 | land eroding 200 m/Myr or more (3 % of the land): mean | p5 | p50 | p95 | under 20 blocks |
+|---|---|---|---|---|---|
+| 0.15 (today) | -2.70 | -27.4 | -4.6 | +28.9 | 11.9 % |
+| 0.217 (4.8 km by the scaling) | -0.83 | -25.5 | -3.3 | +30.6 | 9.9 % |
+| 0.306 (2.4 km by the scaling) | +0.13 | -24.9 | -2.8 | +31.6 | 9.2 % |
+
+All the land moves by under 0.12 blocks in the mean. On this planet the critical slope's scale is worth about 2.8
+blocks of the fast-eroding land's mean (the 500 Myr scattered planet above lost 8.0 there), and nothing of its tail:
+the 5th and 95th percentiles stand 25 to 32 blocks either side of the history's surface at every S_c. That spread is
+the L2 landscape's own relief, valleys and ridges drawn on a surface the history only resolved at 4.8 km, not a bias.
+A porphyry whose L1 ground the history exposed and that sits under an L2 valley loses its body to the world's ground,
+as sites 2 and 6 of the Phase 1 planet did (20 to 31 blocks).
+
+**Left as it is.** A scale-dependent S_c has the sources' direction behind it but a figure-read value from one range,
+and at L1 it would change the history the erosion recalibration of 2026-10-18 measured (ERO-013 `calibrated`): a lane
+of its own, with a pool arm. Item 3's gossans need the other way forward in STATUS's Follow-ups: decide a porphyry's
+exposure, and so its weathering profile, against the world's ground.
 
 ## One-cell spires (margins and spires task, 2026-10-03)
 
