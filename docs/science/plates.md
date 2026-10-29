@@ -11338,6 +11338,22 @@ In the unit fixture (a cap 60 degrees across, its front about 6,700 km long, so 
 the interior takes less crust with the switch and lays its rise nearer the front
 (`the_two_dimensional_sheet_keeps_the_interiors_crust_near_the_front`).
 
+**On the pool (arm up-decay, 2026-10-29): on by default.** `pool.sh run up-decay --seeds 1,2,3,4
+--set tectonics.collision_upper_decay=true +DEEPTIME_CRUST_BUDGET=1
++DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps` (key 05bc0302, 8 runs), read against base30 (24) with the
+default, `coastset`, `guard` and `collcoast` measures (medians, Mann-Whitney p). The collision
+regime falls from 0.124 to 0.082 of the land and the coast within 150 km of a collision belt from
+0.342 to 0.256: the interior's crust now lands near its front. The coast with high ground does not
+move (v1census 0.155 against 0.157, p 0.88; version 1's rule 0.156 against 0.178, p 0.72): the
+collision belts' own coasts are higher (their high-coast rate 0.384 to 0.464), since the crust the
+interior no longer takes goes to the belt and the wedge, whose ends meet the sea. Land 0.333 (p
+0.25), the largest landmass 0.169 (p 0.11), land above 2 km 0.047, collisions per 100 Myr 3.20
+(p 0.15), criteria met 6 at the median and 6.25 in the mean against 5.79 (p 0.039). No guard step
+beyond two Earth reliefs; the guard's worst cell 10,913 m from the sea against 10,152 (p 0.025),
+the highest plate elevation 5,552 m (5,534). The physics is sourced and the pool clean, so it goes
+on (the project's rule; the V1 numbers are not a gate). The high coasts are then the belts' own
+ends, a question for the belt, not the interior.
+
 ## Sediment by margin type and the margin's sediment (PLT-660 to PLT-662, 2026-10-25)
 
 The drowning diagnosis (build log 2026-10-25, "M5 lane: why the land drowns on m5-unfreeze") found the
