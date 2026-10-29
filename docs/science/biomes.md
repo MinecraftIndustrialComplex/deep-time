@@ -1231,6 +1231,21 @@ alike): the water bake changed 68 of its own nodes beside its 190 playa cells, a
 then passes standalone and with MIC: 24 playa columns read, every one salt (calcite), 2 of them under a neighbour's
 canopy, none wrong.
 
+## A salt flat in any pack (2026-10-29, BIO-199)
+
+Only Expanded Ecosphere's rules gave a playa a biome of its own (its salt lakes, BIO-120). With any other set the
+flat took the climate's biome, and where that was a forest its trees and features stood on the salt. The gate on
+master 649baf54 found it on that commit's test planet: `lakeIceAndSaltFollowTheClimate` met Biomes O' Plenty's
+`redwood_wood` over the salt by a spring at (-430, 144) in `biomesoplenty:redwood_forest` (TerraBlender), and
+with MIC the same columns' ground three blocks under the bake's top, the crater breccia (`createmetallurgy:slag_block`,
+MIC's `impact_breccia`) at the surface, in `minecraft:forest`. The bake there: playa 1 block, Köppen class 14, top
+y 64 and 65. A guard on `WorldGenRegion.setBlock` refusing logs on the salt and solid blocks in its place did not
+help (tried and reverted the same day): the redwood set its own block on the salt before its trunk, and the dig
+wrote air. As with the swamp beside a salt flat (BIO-178), the biome gives way: the rule file `deeptime:salt_flat`
+gives a playa column a member of `#deeptime:salt_flat`, vanilla's desert (no trees; its cactus and dead bushes
+need sand), in any pack whose source can place one, after Expanded Ecosphere's salt lakes where that file is
+active (its id sorts first). A game-choice; a salt crust growing no tree is HYD-180's reading, from memory.
+
 ## Land on a delta plain (2026-10-23, BIO-185)
 
 A delta plain (rivers-and-lakes.md, "Deltas and distributaries") is laid by the bake's water part, after the climate
