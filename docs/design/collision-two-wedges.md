@@ -1,6 +1,8 @@
 # Collision orogens as two wedges about the suture: design
 
-Status: **design, nothing built** (2026-10-29, the coordinator). For V1's one missed target, the coast
+Status: **built behind the switch** (2026-10-29, the coordinator; PLT-730, PLT-731, `fill_two_wedges` in
+`plates/belts.rs`, plates.md "Step 20"). **Off by default**: the arm tw-wedges raised the coast with high
+ground (0.159 to 0.207) and put collision land nearer the sea, so the lead below is refuted (plates.md "Step 20"). For V1's one missed target, the coast
 with high ground (0.159 on base29 against at most 0.11; the coast in a collision belt 0.257 of the
 coast). Undoable; built behind a switch, measured on the pool against base29, on by default only if it
 is correct and the numbers do not get worse elsewhere.
@@ -46,9 +48,10 @@ plate, where Earth's toe sits out on the lower plate and its larger wedge rises 
 
 1. The orogen's crest stands at the front (the suture, S). The step's crust is split between the two
    sides by the wedges' own cross-sections at their tapers: the incoming plate's pro-wedge at
-   `wedge_slope_deg` (PLT-192, 1.5 degrees) and the overriding plate's retro-wedge at a retro slope to
-   be sourced (Naylor & Sinclair's 2.5 degrees is their assumption; a measured retro slope is the first
-   reading to find). Pro share = tan(retro) / (tan(pro) + tan(retro)).
+   `wedge_slope_deg` (PLT-192, 1.5 degrees) and the overriding plate's retro-wedge at a retro slope
+   (Naylor & Sinclair's 2.5 degrees is their assumption). Built: the retro slope as Taiwan's ratio to the
+   pro slope, `retro_slope_ratio` 1.55 (2.9 and 4.5 degrees, Davis, Suppe & Dahlen 1983; PLT-731), so
+   2.33 degrees. Pro share = tan(retro) / (tan(pro) + tan(retro)), 0.61.
 2. Each side rises from its toe toward the crest at its slope, the crest height following the
    accumulated cross-section, `A = H^2 / 2 * (1/tan(pro) + 1/tan(retro))`, so neither side is capped
    by the other's edge height (the end of PLT-244's cap).
