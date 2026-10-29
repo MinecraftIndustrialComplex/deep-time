@@ -73,11 +73,17 @@ it. On the planet above, young then amplifier: the fast-eroding land ends 14.6 b
 the young stage (1,338 before), its highest point 5,248 m and 5,376 m (4,310 before); 44,426 L2 lake cells (37,567),
 6,695 km3 cut by glaciers (8,481). The young stage runs one step of LEM instead of four.
 
+**The history's own step is not the fault.** The pool arm `sub4-young` (`surface.substeps=4`, four 0.5 Myr steps
+of the surface in each plate step, on base29's key: earthlike quick 16k, 1000 Myr, both starts, seeds 1 to 4) against
+base29's 24 runs, medians with the Mann-Whitney p: land above 2 km 0.049 and 0.049 (p 0.92), coast with high ground
+0.146 and 0.159 (p 0.78), land 0.300 and 0.330 (p 0.051), criteria met 6 and 6. On the history's own ground a shorter
+step changes little, so K's calibration stands; what shorter steps changed in the young stage was the adjustment of
+an upsampled surface that is not yet the L2 grid's own, which the stage is not meant to carry out ("a refinement of
+the last steps, not more history", YNG-014).
+
 **Left as it is.** The critical slope's cut at L2 (the law); the amplifier's own 6 blocks on that land (its incision,
-AMP-023 to AMP-033); whether the history's own 2 Myr step leaves fast-eroding ranges too high, which the pool arm
-`sub4-young` (`surface.substeps=4` on base29's key) reads, and which would change K's calibration, not this rule.
-Deposits and strata stay in the history's frame: the world's ground cuts both alike, so moving bodies to the world's
-ground would take ore out of its host rock.
+AMP-023 to AMP-033). Deposits and strata stay in the history's frame: the world's ground cuts both alike, so moving
+bodies to the world's ground would take ore out of its host rock.
 
 ## One-cell spires (margins and spires task, 2026-10-03)
 
