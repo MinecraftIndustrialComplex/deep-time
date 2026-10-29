@@ -16,6 +16,8 @@ import com.minecraftindustrialcomplex.deeptime.worldgen.LavaFlows;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
@@ -25,6 +27,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.structure.StructureStart;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -81,6 +84,18 @@ public final class LakeGameTests {
                 return "not-salt:" + BuiltInRegistries.BLOCK.getKey(top.getBlock());
             return "";
         }
+    }
+
+    /**
+     * The id of a structure with a piece whose box holds (x, y, z), or null: a structure placed there owns that
+     * ground (a village or a ruin levels or digs it), so the salt rule does not read it.
+     */
+    static String structureAt(ServerLevel level, int x, int y, int z) {
+        StructureStart start = level.structureManager().getStructureWithPieceAt(new BlockPos(x, y, z), h -> true);
+        if (!start.isValid())
+            return null;
+        ResourceLocation id = level.registryAccess().registryOrThrow(Registries.STRUCTURE).getKey(start.getStructure());
+        return id == null ? "?" : id.toString();
     }
 
     /**
@@ -255,7 +270,7 @@ public final class LakeGameTests {
         // Round every hot spring by a playa, the flat it does not claim is salt too: no role biome comes within
         // VolcanicBiomes.PLAYA_MARGIN of a playa (BIO-165; before it, Biomes O' Plenty's hot springs dug ponds into the
         // flat and ringed them with thermal calcite, which the sparse grid above found only where it happened to fall).
-        int springs = 0, ringRead = 0, ringWrong = 0, ringUnderFlow = 0;
+        int springs = 0, ringRead = 0, ringWrong = 0, ringUnderFlow = 0, ringUnderStructure = 0;
         for (Geothermal.Site site : geo.sites()) {
             if (springs >= MOST)
                 break;
@@ -286,6 +301,16 @@ public final class LakeGameTests {
                                 .append(site.x()).append(',').append(site.z()).append(')');
                     continue;   // a lava flow over the flat beside the spring
                 }
+                // A structure's piece over the flat (649baf54's test planet with MIC: three blocks of a ring's
+                // ground gone after the surface stage, the crater breccia under them at the top): its terrain
+                // is the structure's, as a lava flow's is the flow's.
+                String structure = structureAt(level, c[0], gr.y() + 1, c[1]);
+                if (structure != null) {
+                    if (ringUnderStructure++ < 4)
+                        flowDetail.append(" structure:").append(structure).append('(').append(c[0]).append(',')
+                                .append(gr.y()).append(',').append(c[1]).append(')');
+                    continue;
+                }
                 if (ringWrong++ < 12)
                     detail.append(" spring-ring:").append(bad).append('(').append(c[0]).append(',').append(gr.y()).append(',').append(c[1])
                             .append(' ').append(biome(level, c[0], gr.y(), c[1])).append(" spring ").append(site.kind()).append('@')
@@ -295,10 +320,10 @@ public final class LakeGameTests {
         wrong += ringWrong;
         DeepTime.LOGGER.info("[gametest] lakeIceAndSaltFollowTheClimate lakeCells={} playaCells={} frozenLakeColumns={} (iceRead={} inWarmBiome={}) "
                         + "openLakeColumns={} (waterRead={} inColdBiome={}) playaColumns={} (saltRead={} underCanopy={} onSpring={} salt={}) "
-                        + "underFlow={} springsOnPlaya={} (ringRead={} ringWrong={} ringUnderFlow={}) threshold={} wrong={}{}{}",
+                        + "underFlow={} springsOnPlaya={} (ringRead={} ringWrong={} ringUnderFlow={} ringUnderStructure={}) threshold={} wrong={}{}{}",
                 lakeCells, playaCells, frozen.size(), frozenRead, frozenWarm, open.size(), openRead, openCold, salt.size(), saltRead, overhung, onSpring,
                 saltBlock == null ? "none" : BuiltInRegistries.BLOCK.getKey(saltBlock.getBlock()), underFlow, springs, ringRead, ringWrong,
-                ringUnderFlow, ice.threshold(), wrong, flowDetail, detail);
+                ringUnderFlow, ringUnderStructure, ice.threshold(), wrong, flowDetail, detail);
         helper.assertTrue(wrong == 0, wrong + " columns break the lake-ice or salt rule:" + detail);
         helper.succeed();
     }
