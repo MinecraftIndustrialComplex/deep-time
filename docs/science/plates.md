@@ -10116,6 +10116,21 @@ The coordinator, inline, from the lead above and the design `docs/design/collisi
   Tien Shan (Calais et al. 2003). So the interior share's reach has the sources behind it and its stamp does not: a
   column thickening below 3e-9 per year is not resolvably deforming. Nothing is changed yet; the rule to build is in
   STATUS's Follow-ups.
+- **The interior's stamp at a resolvable strain rate** (PLT-732, `tectonics.collision_upper_stamp_resolvable`, on by
+  default since 2026-10-29). The interior share's crust lands where it did; a column is stamped as part of the
+  collision orogeny only where the step's share thickens it at 3e-9 per year or more (210.6 m of crust, 30.0 m of rise,
+  on a 35.1 km column over a 2 Myr step), as well as by PLT-247's 5 m/Myr. The arm up-stamp (`--set
+  tectonics.collision_upper_stamp_resolvable=true`, base29's environment, seeds 1 to 4 from both starts, 8 runs against
+  base29's 24): the collision regime falls from 0.148 to 0.117 of the land, its fresh stamps (the last two steps,
+  base29's crust-budget maps 50 Myr before the end) from about 3,100 samples a median 1,387 km from a flagged front to
+  about 1,800 a median 820 km (0.24 within 400 km). The V1 checks do not move: coast with high ground 0.164 (0.92),
+  land above 2 km 0.049 (0.65), land 0.330 (1.0), criteria met 6; the continental crust's net change over the run
+  -0.047 against -0.064 (0.006) and the guard's worst depth 10,062 m against 10,840 (under 0.001), since the stamp
+  feeds the young orogens' weakness; no step beyond two Earth reliefs, the highest plate elevation 5,610 m (0.69). On
+  by default as sourced physics with the guard clean. What stays of the regime far from the fronts is older: stamps 4
+  to 30 Myr old lie a median 1,569 km from a flagged front, collisions' orogens outliving their fronts for
+  `collision_orogeny_myr`, 30 Myr, a value with no ledger row yet. Three seed-chosen weld tests moved seeds (the sweep
+  `weld_seed_sweep`, now on the tests' own laws).
 - **Tests.** `the_two_wedges_share_the_crust_by_their_slopes_and_keep_it` (one crest, both slopes, the share within
   0.01 of the formula on 1 km rows, the plateau past the strength height, saturation, ground above a surface),
   `the_two_wedges_raise_the_front_over_a_drowned_edge` (an overriding continent 600 m under the sea: no capped wedge and
