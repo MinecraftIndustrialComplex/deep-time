@@ -3449,13 +3449,31 @@ mod tests {
             .collect();
         let env = fx.env(1);
         let not_yet = crate::plates::collision::collide(
-            &mut st, &mut world, &fx.geo, &pos, &env, 0, &seeds, &[], false, None,
+            &mut st,
+            &mut world,
+            &fx.geo,
+            &pos,
+            &env,
+            0,
+            &seeds,
+            &[],
+            false,
+            None,
         )
         .unwrap();
         assert!(not_yet.deferred && !not_yet.sutured);
         assert!(st.plates.iter().all(|p| p.alive) && st.contacts[0].collision.is_some());
         let done = crate::plates::collision::collide(
-            &mut st, &mut world, &fx.geo, &pos, &env, 0, &seeds, &[], true, None,
+            &mut st,
+            &mut world,
+            &fx.geo,
+            &pos,
+            &env,
+            0,
+            &seeds,
+            &[],
+            true,
+            None,
         )
         .unwrap();
         assert!(done.sutured && !done.deferred);
@@ -3560,7 +3578,19 @@ mod tests {
         };
         let run =
             |fx: &Fixture, st: &mut PlateState, world: &mut crate::world::WorldState, push| {
-                collide(st, world, &fx.geo, &pos, &fx.env(3), 0, &seeds, &[], false, push).unwrap()
+                collide(
+                    st,
+                    world,
+                    &fx.geo,
+                    &pos,
+                    &fx.env(3),
+                    0,
+                    &seeds,
+                    &[],
+                    false,
+                    push,
+                )
+                .unwrap()
             };
 
         // Short of the critical convergence, or of the force, or with no push recorded: it waits.
@@ -3688,7 +3718,12 @@ mod tests {
         )
         .expect("a back coast");
         assert!(wide.push_n < narrow.push_n, "{wide:?} {narrow:?}");
-        assert!(!transference_due(enough * wide.push_n, wide.coast_m, TRANSFERENCE_KM, 1.0));
+        assert!(!transference_due(
+            enough * wide.push_n,
+            wide.coast_m,
+            TRANSFERENCE_KM,
+            1.0
+        ));
         let terrane = crust_of(&wide_st, 1);
         let seeds: Vec<u32> = terrane.iter().copied().take(5).collect();
         let kept = collide(
@@ -3712,11 +3747,24 @@ mod tests {
         let ocean: Vec<u32> = (0..N as u32)
             .filter(|&i| st.plate_of(i as usize) == 0 && !st.samples[i as usize].is_continental())
             .collect();
-        let run = |fx: &Fixture, st: &mut PlateState, world: &mut crate::world::WorldState,
+        let run = |fx: &Fixture,
+                   st: &mut PlateState,
+                   world: &mut crate::world::WorldState,
                    stalled: bool,
                    push: f64| {
-            collide(st, world, &fx.geo, &pos, &fx.env(3), 0, &seeds, &edge, stalled, Some(push))
-                .unwrap()
+            collide(
+                st,
+                world,
+                &fx.geo,
+                &pos,
+                &fx.env(3),
+                0,
+                &seeds,
+                &edge,
+                stalled,
+                Some(push),
+            )
+            .unwrap()
         };
         // Short of the force or of the critical convergence: it waits.
         assert!(run(&fx, &mut st, &mut world, false, enough / 1.02).deferred);
@@ -3756,7 +3804,10 @@ mod tests {
         assert!(!done.deferred && !done.sutured);
         let behind_wins = narrow.push_n / narrow.coast_m > 1.0 / margin_m;
         assert_eq!(
-            (twice.counters.backarc_reversals, twice.counters.transferences),
+            (
+                twice.counters.backarc_reversals,
+                twice.counters.transferences
+            ),
             if behind_wins { (1, 0) } else { (0, 1) }
         );
 
@@ -3770,7 +3821,11 @@ mod tests {
         assert!(st.plates.iter().all(|p| p.alive));
         assert!(st.contacts[0].collision.is_none());
         assert_eq!(
-            (st.counters.backarc_reversals, st.counters.transferences, st.counters.sutures),
+            (
+                st.counters.backarc_reversals,
+                st.counters.transferences,
+                st.counters.sutures
+            ),
             (1, 0, 0)
         );
         for &i in &block {
@@ -3862,7 +3917,16 @@ mod tests {
                 .collect();
             let env = fx.env(1);
             let done = crate::plates::collision::collide(
-                &mut st, &mut world, &fx.geo, &pos, &env, 0, &seeds, &[], true, None,
+                &mut st,
+                &mut world,
+                &fx.geo,
+                &pos,
+                &env,
+                0,
+                &seeds,
+                &[],
+                true,
+                None,
             )
             .unwrap();
             assert_eq!(done.sutured, weld);
