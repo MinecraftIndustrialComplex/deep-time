@@ -1264,7 +1264,8 @@ pub struct TectonicParams {
     /// ocean floor the force that starts a new subduction zone (PLT-517). A narrow block's far
     /// coast sees most of the push, a wide continent's almost none. Where transference is due
     /// too, the margin with the larger force per metre ruptures. `collision::backarc_block`.
-    /// ledger: PLT-737
+    /// On by default since 2026-10-30 (arm backarc against base32-s4: the guard clean, about 1.9
+    /// reversals per 100 Myr). ledger: PLT-737
     pub collision_backarc_reversal: bool,
     /// Contacts unseen for longer than this are closed, Myr (12 steps at the 2-Myr step).
     /// Ledger PLT-059.
@@ -1531,7 +1532,7 @@ impl Default for TectonicParams {
             subduction_initiation_offshore: true,     // ledger: PLT-503 (on since 2026-10-23)
             initiation_stress_mpa: 20.0, // ledger: PLT-505 (game-choice; on since 2026-10-23)
             transference: true,          // ledger: PLT-516
-            collision_backarc_reversal: false, // ledger: PLT-737
+            collision_backarc_reversal: true, // ledger: PLT-737 (on since 2026-10-30)
             contact_timeout_myr: 24.0,   // ledger: PLT-059
             collision_orogeny_myr: 30.0, // ledger: PLT-079
             collision_melt_after_myr: 20.0, // ledger: PLT-735
