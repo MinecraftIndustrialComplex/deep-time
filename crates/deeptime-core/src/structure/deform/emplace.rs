@@ -46,7 +46,7 @@ pub struct Inputs<'a> {
     pub m_per_block_v: f64,
     pub regime: &'a [f32],
     pub crust_type: &'a [f32],
-    /// Whether the cell's crust melts after a collision ([`crate::structure::collision_melt`]):
+    /// Whether the cell's crust melts after a collision (`plates/collision_melt`):
     /// the granite stocks' window.
     pub melt: &'a [bool],
     pub flags: &'a [f32],

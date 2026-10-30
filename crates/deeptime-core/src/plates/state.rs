@@ -126,11 +126,14 @@ pub struct Sample {
     pub formed_myr: f32,
     /// When the last orogenic uplift happened here, Myr (a_c = t − this).
     pub orogeny_myr: f32,
-    /// When this sample's current collision orogeny began, Myr ([`Sample::stamp_collision`]);
-    /// −∞ where it has had none. The structure stage's melt window counts from it
-    /// (`plates/orogeny_onset_age_myr`). ledger: PLT-734
+    /// When this sample's current collision orogeny began, and its last collision stamp, Myr
+    /// ([`Sample::stamp_collision`]; −∞: none). Only a collision's stamp sets them: an arc that
+    /// later relabels the sample Andean (and renews `orogeny_myr`) leaves them, and the melt
+    /// window reads them ([`Sample::collision_melt`]). ledger: PLT-734
     #[serde(default = "never_myr")]
-    pub orogeny_onset_myr: f32,
+    pub collision_onset_myr: f32,
+    #[serde(default = "never_myr")]
+    pub collision_myr: f32,
     /// r, the local ridge direction (oceanic), a tangent vector in the group frame.
     pub ridge: [f32; 3],
     /// f, the local fold (shortening) direction (continental), a tangent vector in the group frame.
@@ -218,7 +221,8 @@ impl Sample {
             thickness_m: 0.0,
             formed_myr: 0.0,
             orogeny_myr: f32::NEG_INFINITY,
-            orogeny_onset_myr: f32::NEG_INFINITY,
+            collision_onset_myr: f32::NEG_INFINITY,
+            collision_myr: f32::NEG_INFINITY,
             ridge: [0.0; 3],
             fold: [0.0; 3],
             pools: [0.0; pool::COUNT],
@@ -251,18 +255,32 @@ impl Sample {
     }
 
     /// A collision stamps this sample at `t_myr` (the belt, the wedge, the interior's share:
-    /// `belts.rs`, ledger PLT-247): a Himalayan orogeny, renewed now. It is a new orogeny, whose
-    /// onset is now, where the sample was not Himalayan, had no onset, or was last stamped
-    /// `window_myr` (`collision_orogeny_myr`) or more ago; otherwise the onset stays. ledger: PLT-734
-    pub fn stamp_collision(&mut self, t_myr: f64, window_myr: f64) {
-        if self.orogeny != OROGENY_HIMALAYAN
-            || !self.orogeny_onset_myr.is_finite()
-            || t_myr - f64::from(self.orogeny_myr) >= window_myr
-        {
-            self.orogeny_onset_myr = t_myr as f32;
+    /// `belts.rs`, ledger PLT-247): a Himalayan orogeny, renewed now. It is a new collision
+    /// orogeny, whose onset is now, where the sample had none or its last collision stamp is more
+    /// than `melt_end_myr` (`collision_melt_end_myr`) ago: crust still hot from a collision that
+    /// is thickened again goes on melting. ledger: PLT-734
+    pub fn stamp_collision(&mut self, t_myr: f64, melt_end_myr: f64) {
+        // With no collision before, `collision_myr` is −∞ and the age +∞.
+        if t_myr - f64::from(self.collision_myr) > melt_end_myr {
+            self.collision_onset_myr = t_myr as f32;
         }
+        self.collision_myr = t_myr as f32;
         self.orogeny = OROGENY_HIMALAYAN;
         self.orogeny_myr = t_myr as f32;
+    }
+
+    /// Whether this sample's crust melts after a collision at `t_myr`: continental, its
+    /// collision orogeny begun `after_myr` (`collision_melt_after_myr`) or more ago and last
+    /// stamped `end_myr` (`collision_melt_end_myr`) or less ago. Thickened crust heats up for tens
+    /// of Myr after the thickening and stays hot for tens more (England & Thompson 1984; Thompson
+    /// & England 1984, Fig. 8): the collision granites, the granite stocks and the burial of
+    /// regional metamorphism come in this window (the structure stage reads it as
+    /// `plates/collision_melt`), not while the belt is thrust (the `collision` regime).
+    /// ledger: PLT-735, PLT-736
+    pub fn collision_melt(&self, t_myr: f64, after_myr: f64, end_myr: f64) -> bool {
+        self.kind == CONTINENTAL
+            && t_myr - f64::from(self.collision_onset_myr) >= after_myr
+            && t_myr - f64::from(self.collision_myr) <= end_myr
     }
 
     /// Ocean floor becomes continental crust (an island arc matured, `finish_samples`; crust

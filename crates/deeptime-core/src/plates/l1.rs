@@ -33,7 +33,7 @@ use super::Env;
 use super::geometry::{Geo, Tree, cover};
 use super::kinematics::{azimuth_deg, quat, tangent, to_world};
 use super::pools::floor_at;
-use super::state::{CONTINENTAL, OCEANIC, OROGENY_HIMALAYAN, OROGENY_NONE, PlateState, regime};
+use super::state::{CONTINENTAL, OCEANIC, OROGENY_NONE, PlateState, regime};
 use crate::params::ScaleParams;
 use crate::sphere::Coupling;
 use crate::sphere::kdtree::angle_of_chord2;
@@ -487,6 +487,7 @@ pub(super) fn sample_with(
     let cells = links.len();
     // The deposit engine's inputs and the surface's basement (P1-04): the nearest sample's flags,
     // top rock pool and trench values; the rest interpolated.
+    let (melt_after, melt_end) = (k.collision_melt_after_myr, k.collision_melt_end_myr);
     let extra = |c: usize, interp: &[f64; INTERP]| -> [f32; 15] {
         let s = &samples[links[c].nearest as usize];
         if info[c].mode == GAP {
@@ -506,7 +507,7 @@ pub(super) fn sample_with(
                 0.0,
                 1.0,
                 0.0,
-                f32::NAN,
+                0.0,
             ];
         }
         let top = TOP_ORDER
@@ -533,11 +534,7 @@ pub(super) fn sample_with(
             s.shortening_km,
             0.0,
             interp[CRUST_UP] as f32,
-            if s.orogeny == OROGENY_HIMALAYAN && s.orogeny_onset_myr.is_finite() {
-                (t - f64::from(s.orogeny_onset_myr)).max(0.0) as f32
-            } else {
-                f32::NAN
-            },
+            f32::from(u8::from(s.collision_melt(t, melt_after, melt_end))),
         ]
     };
     // The rock pools, interpolated like the other thicknesses (P1-07's basement columns,
@@ -680,10 +677,10 @@ pub(super) fn sample_with(
         // (`Sample::crust_uplift_mm_yr`; 0 in gaps): the surface's flexure takes only this as a
         // load. ledger: ISO-091
         CRUST_UPLIFT_FIELD,
-        // Myr since the nearest sample's collision orogeny began (`Sample::orogeny_onset_myr`);
-        // NaN where it is not Himalayan, and in gaps. The structure stage's melt window reads it
-        // with `plates/orogeny_age_myr` (ledger: PLT-734, RCK-098).
-        ONSET_AGE_FIELD,
+        // 1 where the nearest sample's crust melts after a collision (`Sample::collision_melt`),
+        // 0 elsewhere and in gaps: the structure stage's collision granites, granite stocks and
+        // metamorphic burial (ledger: PLT-735, PLT-736).
+        MELT_FIELD,
     ];
     // Every layer written in one pass over the cells, each block of cells on one thread (P1-19:
     // the cells' values were collected per group, then each layer drawn out of them in a pass of
@@ -786,9 +783,8 @@ pub const GAP_FIELD: &str = "plates/gap";
 /// The L1 field of the crust uplift, mm/yr (`Sample::crust_uplift_mm_yr`).
 pub const CRUST_UPLIFT_FIELD: &str = "plates/crust_uplift_mm_yr";
 
-/// The L1 field of the time since the collision orogeny began, Myr (`Sample::orogeny_onset_myr`;
-/// NaN: none).
-pub const ONSET_AGE_FIELD: &str = "plates/orogeny_onset_age_myr";
+/// The L1 field of the collision's melt window (`Sample::collision_melt`): 1 or 0.
+pub const MELT_FIELD: &str = "plates/collision_melt";
 
 /// The L1 fields holding the rock pools (interpolated), metres, in [`pool`] order
 /// (`plates/pool/<name>_m`; P1-07 builds the basement below the strata log from them).
