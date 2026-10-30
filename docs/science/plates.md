@@ -11509,6 +11509,25 @@ the block's back coast becomes the new subduction zone and grows an arc, so a hi
 now an arc's, as on Earth behind a reversal. The next lead for coast with high ground is not this
 rule.
 
+**What is left on base33, and the belt's width read again** (2026-10-30, PLT-241's second note).
+On base33 (24 runs, the reversal on) the collision high coasts by a belt along the coast (the
+crust-budget maps 50 Myr before each run's end, as above; a scratch script, not kept) number 3,722
+against base32's 4,151; their nearest collision front lies a median 326 km away (528 km on base32),
+on the coast's own plate for 0.725 of them, within 400 km for 0.564; the sea in front is their own
+plate's (0.754); their high ground within 200 km stands a median 3,411 m over the sea (quartiles
+2,889 and 3,939) on crust up to a median 61 km thick. The reversal took the far coasts of the
+narrowest blocks; what remains lies within the belt's own reach of its front. The sources on doubly
+vergent orogens read again (PLT-241's second note) have the upper plate's wedge grow from the
+singularity at the greater critical taper, and no fixed width from the onset; Taiwan's and Timor's
+collision zones are 100 to 200 km wide, and narrow upper plates do stand high at the sea (Taiwan's
+eastern flank, the Finisterre-Huon ranges at 2 to 4 km). The model's default fill already widens
+the belt from the front as it grows (PLT-600); 400 km bounds how far it spreads. A retro flank on
+blocks a median 326 km wide would still stand high within 200 km of their coast, so no rule follows
+from these sources that removes those coasts. The measure's own Earth figure (the M5 note,
+docs/research/notes/m5-coast-high-ground-2026-10-25.md: Earth's coast within 200 km of a collision
+boundary, 0.093 of the coast, is high for 0.135 of it) reads settings differently from `coastset`
+(the model's collision belt coast, 0.084, high for 0.685), so the two are not compared here.
+
 ## Sediment by margin type and the margin's sediment (PLT-660 to PLT-662, 2026-10-25)
 
 The drowning diagnosis (build log 2026-10-25, "M5 lane: why the land drowns on m5-unfreeze") found the
