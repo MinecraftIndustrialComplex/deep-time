@@ -11355,6 +11355,63 @@ the highest plate elevation 5,552 m (5,534). The physics is sourced and the pool
 on (the project's rule; the V1 numbers are not a gate). The high coasts are then the belts' own
 ends, a question for the belt, not the interior.
 
+### The collision window split (PLT-734 to PLT-736, 2026-10-30)
+
+**Why.** One window, `collision_orogeny_myr` (30 Myr from a sample's last collision stamp,
+PLT-079), served uses the sources time differently (PLT-079's note; design
+docs/design/collision-window-split.md, PR #42 and its review): it made the collision regime, and
+through the regime put the collision granites, the granite stocks and the thickened crust's
+metamorphic burial in the first 30 Myr after each stamp, during the thrusting. Thermal models need
+"at least 20 to 30 million yrs between collision and melting" (Hopkinson et al. 2017, p. 58), the
+Himalaya's leucogranites came about 25 to 35 Myr after its collision (Weller et al. 2021), and
+Thompson & England's (1984) Fig. 8 shows a 50 km thrust's melt field from 20 Myr after the thrust,
+still there at 80 and gone by 120.
+
+**What it does.** (1) A collision's stamp (`Sample::stamp_collision`) records the orogeny's onset
+and its last collision stamp; an arc that later relabels the sample Andean (the 30 Myr guard)
+leaves them, and a stamp more than `collision_melt_end_myr` after the last starts a new orogeny,
+so hot crust thickened again goes on melting (PLT-734). The two times are packed into the 3 bytes
+the `Sample` struct's alignment left free, the onset to the half-Myr and the last stamp to ±2 Myr,
+since the full 16k preset's estimate fits its 5 GiB cap with about 1 MiB to spare. (2) The
+collision regime is the active orogen: a Himalayan sample stamped this step or the last (PLT-734).
+(3) The melt window, `tectonics.collision_melt_after_myr` 20 (PLT-735) to
+`tectonics.collision_melt_end_myr` 80 (PLT-736), is written by the plates as the L1 layer
+`plates/collision_melt`; the structure stage's collision granites (RCK-058), its granite stocks
+(DEF-041, DEF-045: where they rise, the full rate, granite) and its metamorphic burial (RCK-032)
+read it. (4) The lock and the Andean guard keep the 30 Myr.
+
+**On the pool (arm win-split2, 2026-10-30): the default.** `pool.sh run win-split2 --seeds 1,2,3,4
++DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps` (key b3e7ef433376, 8 runs), read
+against base31's same seeds (arm base31-s4, cached) with the default, `guard`, `collcoast` and
+`coastset` measures (medians, Mann-Whitney p). The planet changes, but within the seeds' spread:
+the surface reads the regime below the collision regime in `finish_samples`' order (an arc's weak
+lithosphere and load in the flexure, a trench in the advection), so a sample an arc or a trench
+touches reads as one up to 30 Myr sooner, and the plates read the flexure back. Land 0.329 against
+0.333 (p 0.72), largest landmass 0.165 against 0.169, continental crust under the sea 0.175
+against 0.190, land above 2 km 0.043 against 0.047, coast with high ground 0.126 against 0.155
+(p 0.96), land under ice 0.082 against 0.073, collisions per 100 Myr 2.35 against 3.20 (p 0.11),
+criteria met median 6 (mean 6.00 against 6.25, p 0.50); the guard clean (no step beyond two Earth
+reliefs, its worst 10,291 m against 10,913). The collision regime falls from 0.082 to 0.017 of the
+land (`collcoast`), so the measures that read it move by definition: the coastset's collision
+share of the high coasts 0.713 to 0.385 and the arc's 0.175 to 0.357. The structure stage's
+counts, run for run against the same seeds (`summary.txt`): plutons emplaced × 1.29, pluton bodies
+kept × 1.57, granite stocks × 1.59, dykes × 1.13 (the rifts the collision regime had hidden),
+metamorphosed volume × 0.88, fold trains × 0.98, thrusts × 0.96. The melt window runs about
+30 Myr longer than the old 30 Myr after the last stamp, and its plutons are younger, so more of
+them survive erosion to the end.
+
+**Where the collision high coasts are** (the lane's question, `collcoast`'s `geom_*` on the active
+regime): 0.471 of them lie by a belt that runs along the coast, 0.287 where a belt runs out at the
+coast, 0.270 by a belt that is not elongated; 0.721 are on landmasses of 0.10 of the land or more
+(0.559 on base31-s4), and the collision land's median distance to the sea falls from 219 to 165 km
+(p 0.028).
+
+**Limits.** The melt window's end is the project's reading of one figure for one thrust, applied
+from the last stamp of a belt thickened over many steps. The collision granites' rate per area
+(RCK-058, 0.3 of the arc rate, a game choice) is unchanged, so their total grew with the window:
+against Vigneresse & Burg 2003 (RCK-058's row) the rate already sat above Himalayan leucogranite
+production.
+
 ## Sediment by margin type and the margin's sediment (PLT-660 to PLT-662, 2026-10-25)
 
 The drowning diagnosis (build log 2026-10-25, "M5 lane: why the land drowns on m5-unfreeze") found the
