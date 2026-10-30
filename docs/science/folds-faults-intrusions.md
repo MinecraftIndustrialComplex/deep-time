@@ -241,8 +241,11 @@ built twice, before (stretch 1, the old intrusion sizes and relief 1) and after;
   250 km foreland on both sides whatever its size.
 - **The foreland's strain does not follow the basin's depth**, only whether it passes 100 m: a
   500 m basin and a 4 km one fold alike (DEF-076).
-- **Stocks in a collision belt still follow the collision regime**, not the convergence: the
-  magmatism of a belt outlasts the shortening (the regime stays 30 Myr after the last uplift).
+- **Stocks in a collision belt follow its melt window**, not the convergence (since 2026-10-30,
+  PLT-735, PLT-736): where they rise, their full rate and their granite all read it, from 20 Myr
+  after the collision began to 80 Myr after its last stamp. A belt still being thrust before then
+  gets no collision stocks; until 2026-10-30 they came with the collision regime, during the
+  thrusting.
 - **No structure older than the run.** The planet starts with undeformed crust, so the basement of
   a craton that no structure reached in the run (35 % of craton cells here) is still flat-layered,
   where on Earth every craton's basement is old, deformed metamorphic rock.
