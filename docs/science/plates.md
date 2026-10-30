@@ -11404,7 +11404,13 @@ them survive erosion to the end.
 regime): 0.471 of them lie by a belt that runs along the coast, 0.287 where a belt runs out at the
 coast, 0.270 by a belt that is not elongated; 0.721 are on landmasses of 0.10 of the land or more
 (0.559 on base31-s4), and the collision land's median distance to the sea falls from 219 to 165 km
-(p 0.028).
+(p 0.028). What faces them (the crust-budget maps 50 Myr before each run's end, the 8 runs pooled;
+a collision high coast within 150 km of a Himalayan sample stamped in the last 3 Myr): of the
+1,596 by a belt along the coast, the nearest collision front is on the coast's own plate (0.764)
+and a median 510 km away, and the sea in front is the coast's own plate's (0.729), mostly ocean
+floor (0.728) a median 1,151 m deep; 0.056 of those seas lie at a front. They are the far coasts of
+overriding blocks narrower than the belt's reach (PLT-241's 400 km and the interior's share), which
+stack crust up to the block's own far coast; base31's same seeds read alike.
 
 **Limits.** The melt window's end is the project's reading of one figure for one thrust, applied
 from the last stamp of a belt thickened over many steps. The collision granites' rate per area
