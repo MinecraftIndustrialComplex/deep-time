@@ -1864,6 +1864,10 @@ impl PlanetPreset {
                 k.trench_release_half_life_myr,
                 "$.tectonics.trench_release_half_life_myr",
             ),
+            (
+                k.collision_melt_after_myr,
+                "$.tectonics.collision_melt_after_myr",
+            ),
         ] {
             check(v.is_finite() && v >= 0.0, key, "must be ≥ 0")?;
         }
@@ -1980,11 +1984,6 @@ impl PlanetPreset {
         ] {
             check(v.is_finite() && v > 0.0, key, "must be positive")?;
         }
-        check(
-            k.collision_melt_after_myr.is_finite() && k.collision_melt_after_myr >= 0.0,
-            "$.tectonics.collision_melt_after_myr",
-            "must be ≥ 0",
-        )?;
         for (v, key) in [
             (k.hotspot_lifetime_myr, "$.tectonics.hotspot_lifetime_myr"),
             (k.continent_elevation_m, "$.tectonics.continent_elevation_m"),
