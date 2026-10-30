@@ -11509,6 +11509,30 @@ the block's back coast becomes the new subduction zone and grows an arc, so a hi
 now an arc's, as on Earth behind a reversal. The next lead for coast with high ground is not this
 rule.
 
+**What is left on base33, and the belt's width read again** (2026-10-30, PLT-241's second note).
+On base33 (24 runs, the reversal on) the collision high coasts by a belt along the coast (the
+crust-budget maps 50 Myr before each run's end, as above; a scratch script, not kept) number 3,722
+against base32's 4,151; their nearest collision front lies a median 326 km away (528 km on base32),
+on the coast's own plate for 0.725 of them, within 400 km for 0.564; the sea in front is their own
+plate's (0.754); their high ground within 200 km stands a median 3,411 m over the sea (quartiles
+2,889 and 3,939) on crust up to a median 61 km thick. The reversal took the far coasts of the
+narrowest blocks; of what remains, 0.564 lies within the belt's reach (400 km) of its front. The sources on doubly
+vergent orogens read again (PLT-241's second note) have the upper plate's wedge grow from the
+singularity at the greater critical taper, and no fixed width from the onset; Taiwan's and Timor's
+collision zones are 100 to 200 km wide. Taiwan's high ground near its east coast is the Central Range,
+on the accreted Eurasian margin (the lower plate's crust); its upper plate, the Coastal Range (the
+Luzon arc's crust), stands 0 to 1.68 km (Lai et al. 2022), well under these coasts' 3.4 km; the
+Finisterre-Huon ranges, an accreting island arc terrane, stand 2 to 4 km at PNG's north coast. The model's default fill already widens
+the belt from the front as it grows (PLT-600); 400 km bounds how far it spreads. A retro flank behind
+fronts a median 326 km from these coasts would still stand high within 200 km of the coast, so no
+rule follows from these sources alone that removes them. Taiwan's upper plate standing lower than
+its orogen does suggest the default puts too much of the orogen on the overriding plate (the crust
+that crosses the front is stacked on that plate's samples; the two wedges of PLT-730, which put the
+pro-wedge on the incoming plate, are off): a lead, not a finding. The measure's own Earth figure (the M5 note,
+docs/research/notes/m5-coast-high-ground-2026-10-25.md: Earth's coast within 200 km of a collision
+boundary, 0.093 of the coast, is high for 0.135 of it) reads settings differently from `coastset`
+(the model's collision belt coast, 0.084, high for 0.685), so the two are not compared here.
+
 ## Sediment by margin type and the margin's sediment (PLT-660 to PLT-662, 2026-10-25)
 
 The drowning diagnosis (build log 2026-10-25, "M5 lane: why the land drowns on m5-unfreeze") found the
