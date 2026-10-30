@@ -836,6 +836,7 @@ impl PlatesStage {
                 &env,
                 f.contact,
                 &f.seeds,
+                &f.front,
                 f.stalled,
                 balance.collision_n.get(&f.contact).copied(),
             )?;
