@@ -11415,9 +11415,11 @@ stack crust up to the block's own far coast; base31's same seeds read alike.
 **Narrow upper plates on Earth** (read 2026-10-30, PLT-241's note). No source read gives the width
 of the thickened belt on an upper plate or treats an upper plate narrower than the belt. Where the
 upper plate is a narrow block, its back does rise: Taiwan's Coastal Range, the Luzon arc's crust,
-stands 0 to 1.68 km (Lai et al. 2022). But in the Banda arc "most of the shortening associated with
+stands 0 to 1.68 km (Lai et al. 2022). In the Banda arc "most of the shortening associated with
 ~70 km/Ma of plate convergence is taken up in other locations such as the back arc region (Wetar and
-Flores Thrust systems)" (Harris 2011): the block is thrust over its back-arc basin. And how an
+Flores Thrust systems), the rear of the accretionary wedge and at the deformation front in the Timor
+Trough", and the Wetar Ridge overthrusts the South Banda Basin along the Wetar Thrust, "which takes
+up some of the convergence" (Harris 2011): part of the convergence moves behind the block. And how an
 indented continent thickens depends "mainly upon the degree of lateral confinement, but also upon
 layer rheologies and the dimensions of indented and indenting continents" (Davy & Cobbold 1988). The
 model has no back-arc thrust: the belt and the interior's share stack the crust up to the block's
