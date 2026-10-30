@@ -1122,6 +1122,39 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Read in this pass: full text (2026-10-29).
 - Reference check: the initials and the year to confirm from the journal.
 
+### Harris2011
+- Reference: Harris, R. (2011). The Nature of the Banda Arc-Continent Collision in the Timor Region. Chapter 7 in Arc-Continent Collision (Springer), pp. 163-211 (the editors not recorded).
+- DOI or URL: link.springer.com/chapter/10.1007/978-3-540-88558-0_7 (the chapter page); the full text read from a copy a research sub-agent fetched.
+- Cited as: "Harris 2011" (PLT-241 note, 2026-10-30).
+- Ledger ids: PLT-241 (note).
+- Access: paywalled; a copy.
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): full text, 2026-10-30 (the coordinator, from a text extraction without page numbers). "Most of the shortening associated with ~70 km/Ma of plate convergence is taken up in other locations such as the back arc region (Wetar and Flores Thrust systems), the rear of the accretionary wedge and at the deformation front in the Timor Trough"; "The southern part of the South Banda Basin is now being overthrust by the Wetar Ridge along the Wetar Thrust, which takes up some of the convergence between the Australia and Asia plates". Pages not recorded.
+- Read in this pass: full text (2026-10-30).
+- Reference check: author, title, chapter number and pages as printed in the copy and on the chapter page.
+
+### DavyCobbold1988
+- Reference: Davy, P., Cobbold, P. R. (1988). Indentation tectonics in nature and experiment. 1. Experiments scaled for gravity. Bulletin of the Geological Institutions of Uppsala, N.S., 14:129-141.
+- DOI or URL: none printed; the full text read from a copy a research sub-agent fetched.
+- Cited as: "Davy & Cobbold 1988" (PLT-241 note, 2026-10-30).
+- Ledger ids: PLT-241 (note).
+- Access: a copy.
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): full text, 2026-10-30 (the coordinator, from a text extraction without page numbers). Abstract: "Indentation results in different patterns of faulting and crustal thickening, depending mainly upon the degree of lateral confinement, but also upon layer rheologies and the dimensions of indented and indenting continents. Strong lateral confinement leads to crustal thickening alone, localized in a plateau region in front of the indenter. Weak lateral confinement at an eastern margin favours eastwards lateral escape, but some thickening also occurs near the indenter." Body: "Houseman & England (1986) did not investigate conditions of unconstrained margins".
+- Read in this pass: full text (2026-10-30).
+- Reference check: authors, year, title, series, volume and pages as printed in the copy.
+
+### Lai2022
+- Reference: Lai et al. (2022). Extremely rapid up-and-down motions of island arc crust during arc-continent collision. Communications Earth & Environment 3:100 (the full author list not recorded).
+- DOI or URL: nature.com/articles/s43247-022-00429-2 (the DOI 10.1038/s43247-022-00429-2 is the project's reading of that URL, not seen printed).
+- Cited as: "Lai et al. 2022" (PLT-241 note, 2026-10-30).
+- Ledger ids: PLT-241 (note).
+- Access: open access.
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): nearly the full text, 2026-10-30 (a Sonnet research sub-agent). The Coastal Range of eastern Taiwan, the Luzon arc's crust in the collision: "present elevations of the Coastal Range (0-1.33 km in the north, 0-1.68 km in the south)"; "Since ~0.8-0.5 Ma, arc crust has undergone extremely rapid (~9.0-14.4 mm yr-1) uplift to form the modern Coastal Range". No widths given.
+- Read in this pass: nearly the full text (2026-10-30).
+- Reference check: title, journal, volume and article number as the agent printed them.
+
 ### Beaumont2001
 - Reference: Beaumont, C., Jamieson, R. A., Nguyen, M. H. and Lee, B. (2001). Himalayan tectonics explained by extrusion of a low-viscosity crustal channel coupled to focused surface denudation. Nature 414(6865):738-742.
 - DOI or URL: 10.1038/414738a.
