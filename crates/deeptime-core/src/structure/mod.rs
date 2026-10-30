@@ -55,7 +55,7 @@ use crate::deposits::random::Rng;
 use crate::error::CoreError;
 use crate::params::{PlanetPreset, ScaleParams};
 use crate::plates::l1::POOL_FIELDS;
-use crate::plates::state::{CONTINENTAL, OROGENY_HIMALAYAN, pool, regime};
+use crate::plates::state::{CONTINENTAL, pool, regime};
 use crate::stage::{Stage, StageContext, StageEstimate, from_state, to_state};
 use crate::surface::SurfaceState;
 use crate::surface::grid::Dims;
@@ -374,6 +374,17 @@ pub struct CellSource<'a> {
     p: StructureParams,
 }
 
+/// Whether each L1 cell's crust melts after a collision (`plates/collision_melt`, the plate
+/// model's `Sample::collision_melt`; docs/design/collision-window-split.md): the window of the
+/// collision granites, the granite stocks and the burial of regional metamorphism, which come
+/// after the thrusting (the `collision` regime), not during it. ledger: PLT-735, PLT-736
+fn melt_of(fields: &BTreeMap<String, Field>, n: usize) -> Result<Vec<bool>, CoreError> {
+    Ok(field_of(fields, crate::plates::l1::MELT_FIELD, n)?
+        .iter()
+        .map(|&v| v > 0.5)
+        .collect())
+}
+
 fn field_of<'a>(
     fields: &'a BTreeMap<String, Field>,
     name: &str,
@@ -579,12 +590,13 @@ impl PlatesNow {
 /// The world fields a step reads ([`StructureStage::step_on`]) that the plate step writes anew
 /// (the L1 fields) or does not touch: moved out of the world while the two run side by side, and
 /// put back after, where the plate step wrote none of the name.
-const MOVED: [&str; 18] = [
+const MOVED: [&str; 19] = [
     "plates/heat_flow_mw_m2",
     "regime",
     "plates/thickness_m",
     "plates/orogeny_type",
     "plates/orogeny_age_myr",
+    crate::plates::l1::MELT_FIELD,
     "plates/crust_type",
     "plates/plate_id",
     "plates/flags",
@@ -962,9 +974,8 @@ impl StructureStage {
         let heat = field_of(fields, "plates/heat_flow_mw_m2", n)?;
         let reg = field_of(fields, "regime", n)?;
         let thick = field_of(fields, "plates/thickness_m", n)?;
-        let orogeny = field_of(fields, "plates/orogeny_type", n)?;
-        let orogeny_age = field_of(fields, "plates/orogeny_age_myr", n)?;
         let crust_m = field_of(fields, "plates/crust_type", n)?;
+        let melt = melt_of(fields, n)?;
         let t_mean = fields
             .get("climate/t_mean_c")
             .filter(|f| f.data.len() == n)
@@ -991,11 +1002,9 @@ impl StructureStage {
                     if *count == 0 || crust_m[c] as u8 != CONTINENTAL {
                         return 0.0;
                     }
-                    let collision = reg[c] as u8 == regime::COLLISION
-                        || (orogeny[c] as u8 == OROGENY_HIMALAYAN
-                            && orogeny_age[c].is_finite()
-                            && orogeny_age[c] < 30.0);
-                    let burial = if collision {
+                    // The thickened crust's burial while it is hot: the melt window, which the
+                    // peak of regional metamorphism shares (ledger: RCK-032, PLT-736).
+                    let burial = if melt[c] {
                         (f64::from(thick[c]) / p.reference_crust_m).clamp(1.0, p.max_burial_factor)
                     } else {
                         1.0
@@ -1055,8 +1064,8 @@ impl StructureStage {
             flags: field_of(fields, "plates/flags", n)?,
             convergence: field_of(fields, "plates/convergence_mm_yr", n)?,
             crust_type: crust,
-            regime: reg,
             plate_id,
+            melt: &melt,
         };
         let mut rng = Rng::stream(
             step_seed(self.preset.seed, self.st.done),
@@ -1119,6 +1128,7 @@ impl StructureStage {
                 m_per_block_v: s.m_per_block_v,
                 regime: reg,
                 crust_type: crust,
+                melt: &melt,
                 flags,
                 convergence: field_of(fields, "plates/convergence_mm_yr", n)?,
                 obliquity: field_of(fields, "plates/obliquity_deg", n)?,

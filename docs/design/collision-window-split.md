@@ -1,7 +1,8 @@
 # The collision orogeny's window, split by use: design
 
-Status: **design** (2026-10-29, the coordinator; revised 2026-10-30 after the Graphide review of
-PR #42), being built on the branch `window-split`. For the collision-front lane (STATUS Follow-ups,
+Status: **built** (2026-10-30, the coordinator, branch `window-split`; the design of 2026-10-29
+revised after the Graphide review of PR #42). Ledger PLT-734 to PLT-736; plates.md "The collision
+window split". For the collision-front lane (STATUS Follow-ups,
 "Collision belts at the coast"). The sources are those read for PLT-079's note on 2026-10-29
 (plates.md "Step 20", bibliography `EnglandThompson1984`, `ThompsonEngland1984`, `Hopkinson2017`,
 `Weller2021`, `Rey2001`). Each window below says whether a source gives it or it is the project's
@@ -34,6 +35,7 @@ The regime feeds, in the structure, surface and deposit stages:
 | provinces | `provinces.rs` | an orogen province, OR'd with the province's own window (`orogen_max_age_myr`, 500 Myr), so no change |
 | the measures | `plates/stats.rs`, `measure_coastset.py` | the coast in a collision belt; the regime's share of the land |
 | the timelapse | the keyframe layer `regime` | the collision colour |
+| the surface | `surface/flexure.rs` (an arc's or rift's weak lithosphere, an arc's and hotspot's load), `surface/advect.rs` (a trench) | not the collision regime itself, but the regime below it in `finish_samples`' order: a sample an arc or a trench touches reads as one once its collision regime ends, and the plates read the flexure back (`plates/mod.rs`) |
 
 Folds and thrusts do not read the regime: they read the active collision's footprint
 (`plates/collision_mm_yr`, `structure/deform/emplace.rs: strain`).
@@ -65,8 +67,9 @@ Folds and thrusts do not read the regime: they read the active collision's footp
 2. **The regime is the active orogen.** `regime::COLLISION` while a Himalayan sample was stamped
    this step or the last (`t − orogeny_myr < 1.5 dt`: ages 0 and dt, half a step for the f32
    stamp's rounding). The fault density, the fold-belt traps, the measures and the timelapse read
-   it. The project's reading (no source gives a tail). The V1 numbers do not move (the plates and
-   the terrain do not read the regime); the measures' collision shares fall.
+   it. The project's reading (no source gives a tail). The planet changes a little through the
+   surface (the table above): a sample an arc or a trench touches reads as one sooner, and the
+   flexure feeds the plates. The measures' collision shares fall.
 3. **Melt in its own window.** A plate-side flag, the L1 layer `plates/collision_melt` (1 or 0):
    continental crust whose collision began `collision_melt_after_myr` (20) or more ago and was
    last stamped `collision_melt_end_myr` (80) or less ago. The start is Hopkinson et al.'s lower
@@ -87,8 +90,9 @@ Folds and thrusts do not read the regime: they read the active collision's footp
 
 One 8-run arm on the default, against base31, with the default, `boundary`, `collcoast` and
 `guard` measures and the structure stage's summary: plutons, stocks and metamorphosed volume per
-run. The plates and the terrain are unchanged, so the V1 numbers must match base31's exactly; the
-coastset's collision shares and the margins' collision count fall by definition. Unit tests: the
+run, against base31's same seeds. The V1 numbers move only within the seeds' spread (the
+planet changes through the surface, above); the coastset's collision shares and the margins'
+collision count fall by definition. Unit tests: the
 onset survives renewed stamps, an Andean relabelling and a restamp within the melt window, and a
 restamp after it starts a new one; the melt flag is false at onset + 10 and true at onset + 25
 under continued thickening, true 80 Myr after the last stamp and false at 81.

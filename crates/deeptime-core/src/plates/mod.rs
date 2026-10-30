@@ -1679,7 +1679,9 @@ fn add_limited(world: &mut WorldState, limited: rate::Limited) {
 /// Mature island arcs become continental; uplift rate, heat flow and regime for this step.
 fn finish_samples(st: &mut PlateState, geo: &Geo, z0: &[f32], env: &Env<'_>) {
     let t = env.t_myr;
-    let collision_myr = env.k.collision_orogeny_myr;
+    // A belt is in the collision regime while its stamps go on: stamped this step (age 0) or the
+    // last (age dt); half a step more absorbs the f32 stamp's rounding. ledger: PLT-734
+    let active_myr = 1.5 * env.dt_myr;
     let samples = &st.samples;
     let margin: Vec<bool> = (0..samples.len())
         .into_par_iter()
@@ -1750,7 +1752,8 @@ fn finish_samples(st: &mut PlateState, geo: &Geo, z0: &[f32], env: &Env<'_>) {
             regime::TRENCH
         } else if f & HOTSPOT != 0 {
             regime::HOTSPOT
-        } else if s.orogeny == OROGENY_HIMALAYAN && t - f64::from(s.orogeny_myr) < collision_myr {
+        } else if s.orogeny == OROGENY_HIMALAYAN && t - f64::from(s.orogeny_myr) < active_myr {
+            // The active orogen: stamped this step or the last (ledger: PLT-734).
             regime::COLLISION
         } else if f & ARC != 0 {
             regime::ARC
