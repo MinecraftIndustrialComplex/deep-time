@@ -1082,7 +1082,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: England, P. C., Thompson, A. B. (1984). Pressure-Temperature-Time Paths of Regional Metamorphism I. Heat Transfer during the Evolution of Regions of Thickened Continental Crust. Journal of Petrology 25(4):894-928.
 - DOI or URL: DOI not printed in the copy read; static1.squarespace.com/static/54b9bb6fe4b07b4a7d145b55/t/55186a9fe4b0932ce9d1855c/1427663519956/England_JPet_1984.pdf.
 - Cited as: "England & Thompson 1984" (PLT-079 note, 2026-10-29).
-- Ledger ids: PLT-079 (note).
+- Ledger ids: PLT-079 (note), PLT-736.
 - Access: paywalled; a copy on a third-party site.
 - Library (the project's source library, not distributed): not fetched.
 - Read so far (by the project): full text, 2026-10-29 (a Sonnet research sub-agent). "rapid temperature rises occur within the crust in the first few tens of Myr after thickening" (p. 918); "most of them lie within 50 °C of the maximum temperature attained for one third or more of the total duration of their burial and uplift" (p. 894); "an appropriate time scale for the erosion of orogenic belts lies between 50 and 200 Myr" (p. 901); the thermal perturbations of the upper 50 to 70 km "decay to 1/e of their original values over times of 100 to 200 Myr" (p. 918); the conductive results do not hold once paths pass above the solidus (p. 917).
@@ -1093,7 +1093,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Thompson, A. B., England, P. C. (1984). Pressure-Temperature-Time Paths of Regional Metamorphism II. Their Inference and Interpretation using Mineral Assemblages in Metamorphic Rocks. Journal of Petrology 25:929-955.
 - DOI or URL: 10.1093/petrology/25.4.929 (printed); read from the ETH research collection.
 - Cited as: "Thompson & England 1984" (PLT-079 note, 2026-10-29).
-- Ledger ids: PLT-079 (note).
+- Ledger ids: PLT-079 (note), PLT-735, PLT-736.
 - Access: an institutional repository copy.
 - Library (the project's source library, not distributed): not fetched.
 - Read so far (by the project): full text, 2026-10-29 (a Sonnet research sub-agent). Fig. 8 (p. 951), a 50 km thrust, 20 Myr of heating, then erosion: "Isotherms and extents of partial melting fields are shown at 0 (8a), 20 (8b), 50 (8c), 80 (8d) and 120 (8e) Myr post thrusting"; read by eye, no melt at 0, a small field at 20, a large one at 50, still one at 80, none at 120. Path A spends "130 Myr, out of the 220 Myr, within 100 °C of its peak temperature" (p. 940).
@@ -1104,7 +1104,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Hopkinson, Harris, Warren, Spencer, Roberts, Horstwood, Parrish, EIMF (2017). The identification and significance of pure sediment-derived granites. Earth and Planetary Science Letters 467:57-63.
 - DOI or URL: 10.1016/j.epsl.2017.03.018 (printed); read from nora.nerc.ac.uk/id/eprint/517000.
 - Cited as: "Hopkinson et al. 2017" (PLT-079 note, 2026-10-29).
-- Ledger ids: PLT-079 (note).
+- Ledger ids: PLT-079 (note), PLT-735.
 - Access: an institutional repository copy.
 - Library (the project's source library, not distributed): not fetched.
 - Read so far (by the project): full text, 2026-10-29 (a Sonnet research sub-agent). p. 58: "Thermal models for orogenic evolution require a time period of at least 20 to 30 million yrs between collision and melting for all realistic values of heat production and sedimentary thicknesses and assuming no advective heat source" (after Medvedev & Beaumont 2006, not read); p. 61: "a time lag of 30-40 Myr between collision and widespread melt formation within the upper GHS is entirely consistent with the known thermal characteristics of the source rocks".
@@ -1115,7 +1115,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Weller, Mottram, St-Onge, Möller, Strachan, Rivers, Copley. The metamorphic and magmatic record of collisional orogens. Nature Reviews Earth & Environment (per the repository record; the year from the DOI).
 - DOI or URL: 10.1038/s43017-021-00218-z (from the repository page, not the manuscript); the accepted manuscript at repository.cam.ac.uk.
 - Cited as: "Weller et al. 2021" (PLT-079 note, 2026-10-29).
-- Ledger ids: PLT-079 (note).
+- Ledger ids: PLT-079 (note), PLT-734, PLT-735.
 - Access: an accepted manuscript in an institutional repository.
 - Library (the project's source library, not distributed): not fetched.
 - Read so far (by the project): full text, 2026-10-29 (a Sonnet research sub-agent). The Himalaya: "collision occurred at 50 ± 10 Ma is adopted"; Barrovian M1 about 35 to 32 Ma, sillimanite M2 about 24 to 17 Ma, and "the km-scale ~25-15 Ma Himalayan leucogranite bodies ... with younger leucogranite bodies (to ~8 Ma) recorded in the eastern Himalaya". The Greenland Caledonides: melting c. 440 to 415 Ma about a c. 430 Ma terminal collision, the Internal Zone assembled by c. 400 to 390 Ma, thrusting in the External Zone c. 400 to 380 Ma. Mountain-building after collision on "timescales on the order of 10s of Myr" (PDF pp. 17-18). Page numbers are the manuscript's.

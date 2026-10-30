@@ -283,7 +283,9 @@ fn a_resumed_run_is_the_same_run() {
 // ---- What a geologist would object to (`realism`): property tests on random columns. They hold
 // for any planet: no number of one run is in them.
 
-use crate::plates::state::{CONTINENTAL, OCEANIC, OROGENY_ANDEAN, OROGENY_NONE, regime as reg};
+use crate::plates::state::{
+    CONTINENTAL, OCEANIC, OROGENY_ANDEAN, OROGENY_HIMALAYAN, OROGENY_NONE, regime as reg,
+};
 use crate::structure::columns::{Unit, key};
 use crate::structure::realism::{self, Findings, Limits, Rules};
 use crate::surface::lithology::index;

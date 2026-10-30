@@ -487,7 +487,8 @@ pub(super) fn sample_with(
     let cells = links.len();
     // The deposit engine's inputs and the surface's basement (P1-04): the nearest sample's flags,
     // top rock pool and trench values; the rest interpolated.
-    let extra = |c: usize, interp: &[f64; INTERP]| -> [f32; 14] {
+    let (melt_after, melt_end) = (k.collision_melt_after_myr, k.collision_melt_end_myr);
+    let extra = |c: usize, interp: &[f64; INTERP]| -> [f32; 15] {
         let s = &samples[links[c].nearest as usize];
         if info[c].mode == GAP {
             let age = gap_of(&info[c], links[c].nearest).1;
@@ -505,6 +506,7 @@ pub(super) fn sample_with(
                 0.0,
                 0.0,
                 1.0,
+                0.0,
                 0.0,
             ];
         }
@@ -532,6 +534,7 @@ pub(super) fn sample_with(
             s.shortening_km,
             0.0,
             interp[CRUST_UP] as f32,
+            f32::from(u8::from(s.collision_melt(t, melt_after, melt_end))),
         ]
     };
     // The rock pools, interpolated like the other thicknesses (P1-07's basement columns,
@@ -645,7 +648,7 @@ pub(super) fn sample_with(
         "plates/fold_trend_deg",
         "plates/plate_id",
     ];
-    let extra_names: [&'static str; 14] = [
+    let extra_names: [&'static str; 15] = [
         "plates/flags",
         "plates/top_pool",
         "plates/oxidation",
@@ -674,11 +677,15 @@ pub(super) fn sample_with(
         // (`Sample::crust_uplift_mm_yr`; 0 in gaps): the surface's flexure takes only this as a
         // load. ledger: ISO-091
         CRUST_UPLIFT_FIELD,
+        // 1 where the nearest sample's crust melts after a collision (`Sample::collision_melt`),
+        // 0 elsewhere and in gaps: the structure stage's collision granites, granite stocks and
+        // metamorphic burial (ledger: PLT-735, PLT-736).
+        MELT_FIELD,
     ];
     // Every layer written in one pass over the cells, each block of cells on one thread (P1-19:
     // the cells' values were collected per group, then each layer drawn out of them in a pass of
     // its own, 30 passes over the L1 every step).
-    const FIELDS: usize = 11 + 14 + POOL_FIELDS.len();
+    const FIELDS: usize = 11 + 15 + POOL_FIELDS.len();
     const BLOCK: usize = 1 << 12;
     let mut layers: Vec<Vec<f32>> = (0..FIELDS).map(|_| vec![0.0; cells]).collect();
     let mut blocks: Vec<Vec<&mut [f32]>> = (0..cells.div_ceil(BLOCK))
@@ -775,6 +782,9 @@ pub const GAP_FIELD: &str = "plates/gap";
 
 /// The L1 field of the crust uplift, mm/yr (`Sample::crust_uplift_mm_yr`).
 pub const CRUST_UPLIFT_FIELD: &str = "plates/crust_uplift_mm_yr";
+
+/// The L1 field of the collision's melt window (`Sample::collision_melt`): 1 or 0.
+pub const MELT_FIELD: &str = "plates/collision_melt";
 
 /// The L1 fields holding the rock pools (interpolated), metres, in [`pool`] order
 /// (`plates/pool/<name>_m`; P1-07 builds the basement below the strata log from them).

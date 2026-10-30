@@ -46,6 +46,9 @@ pub struct Inputs<'a> {
     pub m_per_block_v: f64,
     pub regime: &'a [f32],
     pub crust_type: &'a [f32],
+    /// Whether the cell's crust melts after a collision (`plates/collision_melt`):
+    /// the granite stocks' window.
+    pub melt: &'a [bool],
     pub flags: &'a [f32],
     pub convergence: &'a [f32],
     pub obliquity: &'a [f32],
@@ -576,6 +579,8 @@ pub(crate) mod tests {
         pub grid: GridDesc,
         pub regime: Vec<f32>,
         pub crust: Vec<f32>,
+        /// The collision's melt window: its belt.
+        pub melt: Vec<bool>,
         pub flags: Vec<f32>,
         pub convergence: Vec<f32>,
         pub obliquity: Vec<f32>,
@@ -604,6 +609,7 @@ pub(crate) mod tests {
                 grid,
                 regime: vec![f32::from(regime::CRATON); n],
                 crust: vec![f32::from(CONTINENTAL); n],
+                melt: vec![false; n],
                 flags: vec![0.0; n],
                 convergence: vec![0.0; n],
                 obliquity: vec![0.0; n],
@@ -629,6 +635,7 @@ pub(crate) mod tests {
                 // crest at i = 60; the foreland east of it.
                 if (56..64).contains(&i) {
                     p.regime[c] = f32::from(regime::COLLISION);
+                    p.melt[c] = true;
                     p.thickness[c] = 55_000.0;
                     p.trend[c] = 0.0;
                     p.orogen_km[c] = 0.0;
@@ -664,6 +671,7 @@ pub(crate) mod tests {
                 m_per_block_v: self.m_per_block_v,
                 regime: &self.regime,
                 crust_type: &self.crust,
+                melt: &self.melt,
                 flags: &self.flags,
                 convergence: &self.convergence,
                 obliquity: &self.obliquity,
