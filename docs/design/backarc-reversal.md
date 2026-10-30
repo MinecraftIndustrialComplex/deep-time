@@ -1,7 +1,8 @@
 # A new subduction zone behind a narrow overriding block: design
 
-Status: **design** (2026-10-30, the coordinator; Ben: "Design, then build (Recommended)", decisions
-log 2026-10-30), built on the branch `backarc-reversal` behind `tectonics.collision_backarc_reversal`.
+Status: **built** (2026-10-30, the coordinator; Ben: "Design, then build (Recommended)", decisions
+log 2026-10-30) on the branch `backarc-reversal`, behind `tectonics.collision_backarc_reversal`
+(off until its arm); ledger PLT-737, plates.md "A new subduction zone behind the overriding block".
 For the collision-front lane (STATUS Follow-ups, "Collision belts at the coast").
 
 ## Why
@@ -33,7 +34,9 @@ A mirror of transference (PLT-516, `collision::collide`), on the overriding side
    `collision_suture_frac` or more) whose subduction has failed (the jam, `Collision::jam_km`) and
    whose plates have converged by PLT-518's critical convergence (100 km) since.
 2. **The block.** The overriding plate's visible continental crust connected, through its own
-   continental samples, to the overriding samples next to the collision's seeds.
+   continental samples, to its continental samples on this step's front (`Front::edge`, carried to
+   `collide` in `shortening::Fired`). The samples move between resamplings, so the lattice's edges
+   across a plate boundary no longer join neighbours: the front's own edge is the link.
 3. **Its back margin.** The block's samples with an edge to the overriding plate's own visible ocean
    floor that lies farther from the front than they do (x, the distance to the nearest seed): the
    coast behind the block, not a forearc in front of it.
@@ -58,8 +61,14 @@ No new constant: the threshold is PLT-517's, the convergence PLT-518's, the deca
 ## What is the project's reading
 
 Carrying the collision's push to the back margin by the thin sheet's decay (the sheet's solutions
-are for a semi-infinite sheet, and none treats a finite one: PLT-241's note); taking x as the
-distance to the nearest seed; and the tie-break between the two margins.
+are for a semi-infinite sheet, and none treats a finite one: PLT-241's note). The decay on the
+overriding side and none on the incoming side follow the model's own asymmetry: the overriding
+plate's interior deforms as a thin sheet (PLT-652, PLT-733) and the incoming continent is rigid, so
+transference's margin takes the whole push. Taking x as the distance to the nearest front sample;
+the tie-break between the two margins; and transference's threshold behind the block, though Stern
+2004 expects less to suffice there ("polarity reversal INSZ should require less compression than
+transference INSZ" since back-arc lithosphere "should be relatively thin and weak"; he gives no
+number, so the threshold is the conservative one).
 
 ## Measuring it
 
@@ -68,5 +77,8 @@ An 8-run arm with the switch on against base32's seeds 1 to 4 (cached), with the
 belt along the coast, coast with high ground, and the V1 checks. On by default if it is built and
 correct and the guard stays clean (Ben, 2026-10-23), whatever V1 does.
 
-Unit tests: a narrow block reverses where the full half-continent of the same fixture does not; it
-waits short of the convergence, without the jam, with the switch off and on a stall.
+Unit test (`a_narrow_overriding_block_moves_to_the_incoming_plate_behind_a_new_subduction_zone`):
+a narrow block reverses where the full half-continent of the same fixture does not (0.976 of the
+push over 7,319 km against 0.656 over 10,176 km); it waits short of the force or the convergence
+and with the switch off; a stalled collision welds; with transference on, the margin with the
+larger force per metre ruptures.
