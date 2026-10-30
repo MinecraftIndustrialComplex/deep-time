@@ -80,19 +80,6 @@ pub struct StructureParams {
     /// (Vigneresse & Burg 2003), so 0.3 fits an island arc, not a continental arc.
     // ledger: RCK-058 (game choice)
     pub collision_pluton_factor: f64,
-    /// The melt window of a collision ([`crate::structure::collision_melt`]): the collision
-    /// granites, the granite stocks and the thickened crust's metamorphism start this many Myr
-    /// after the collision orogeny's onset (`plates/orogeny_onset_age_myr`). Thermal models need
-    /// "a time period of at least 20 to 30 million yrs between collision and melting" (Hopkinson
-    /// et al. 2017, p. 58); Thompson & England (1984, Fig. 8) show a small melt field 20 Myr
-    /// after a thrust and none at 0.
-    // ledger: RCK-098
-    pub collision_melt_after_myr: f64,
-    /// … and end this many Myr after the last collision stamp (`plates/orogeny_age_myr`): the
-    /// last of Thompson & England's (1984, Fig. 8) panels with a melt field, 80 Myr after the
-    /// thrust (none at 120).
-    // ledger: RCK-099
-    pub collision_melt_end_myr: f64,
     /// Pluton length L (the long horizontal axis), km: [median, min, max] of a lognormal with
     /// `pluton_length_sigma`. Game choice, median 25 km (P1-17; P1-07 had 10): the size of an
     /// intrusive suite such as the Sierra Nevada's Tuolumne, ~1,100 km² (Frontiers in Earth
@@ -176,8 +163,6 @@ impl Default for StructureParams {
             host_window_m: 2000.0,
             pluton_rate_km2_myr: 1.0e-5,
             collision_pluton_factor: 0.3,
-            collision_melt_after_myr: 20.0,
-            collision_melt_end_myr: 80.0,
             pluton_length_km: [25.0, 8.0, 80.0],
             pluton_length_sigma: 0.5,
             pluton_roof_km: [2.0, 6.0],
@@ -240,8 +225,6 @@ impl StructureParams {
             (self.loose_age_myr, "loose_age_myr"),
             (self.pluton_rate_km2_myr, "pluton_rate_km2_myr"),
             (self.collision_pluton_factor, "collision_pluton_factor"),
-            (self.collision_melt_after_myr, "collision_melt_after_myr"),
-            (self.collision_melt_end_myr, "collision_melt_end_myr"),
             (self.pluton_length_sigma, "pluton_length_sigma"),
             (self.fold_belt_km, "fold_belt_km"),
             (self.trap_min_sediment_m, "trap_min_sediment_m"),

@@ -1259,9 +1259,23 @@ pub struct TectonicParams {
     /// Contacts unseen for longer than this are closed, Myr (12 steps at the 2-Myr step).
     /// Ledger PLT-059.
     pub contact_timeout_myr: f64,
-    /// Duration recorded for a collision orogeny, Myr: how long stamped crust stays in the
-    /// collision regime and locked. ledger: PLT-079
+    /// How long stamped collision crust stays locked against being forced under another plate,
+    /// and keeps an arc's uplift from relabelling it Andean, Myr: a stabilizer, not a geologic
+    /// clock (since 2026-10-30 the collision regime is the active orogen, PLT-734, and the melt
+    /// has its own window, `collision_melt_*`). ledger: PLT-079
     pub collision_orogeny_myr: f64,
+    /// The melt window of a collision (`Sample::collision_melt`, the L1 layer
+    /// `plates/collision_melt`): the collision granites, the granite stocks and the thickened
+    /// crust's metamorphism start this many Myr after the collision orogeny's onset. Thermal
+    /// models need "a time period of at least 20 to 30 million yrs between collision and melting"
+    /// (Hopkinson et al. 2017, p. 58); Thompson & England (1984, Fig. 8) show no melt at a
+    /// thrust and a small field 20 Myr after it. ledger: PLT-735
+    pub collision_melt_after_myr: f64,
+    /// … and end this many Myr after the last collision stamp: the last of Thompson & England's
+    /// (1984, Fig. 8) panels with a melt field is 80 Myr after the thrust (none at 120). A stamp
+    /// later than this after the last starts a new collision orogeny (`Sample::stamp_collision`).
+    /// ledger: PLT-736
+    pub collision_melt_end_myr: f64,
     /// Sample L1 every this many steps (0 = only for keyframes and at the end).
     pub l1_every_steps: u32,
     // The force balance (`plates::forces`, docs/design/plate-force-balance.md §3 and §6): every
@@ -1509,6 +1523,8 @@ impl Default for TectonicParams {
             transference: true,          // ledger: PLT-516
             contact_timeout_myr: 24.0,   // ledger: PLT-059
             collision_orogeny_myr: 30.0, // ledger: PLT-079
+            collision_melt_after_myr: 20.0, // ledger: PLT-735
+            collision_melt_end_myr: 80.0, // ledger: PLT-736
             l1_every_steps: 0,
             forsyth_uyeda_balance: false, // ledger: PLT-585 (built 2026-10-25, off)
             plate_speed_scale_mm_yr: 75.0, // ledger: PLT-181
@@ -1957,9 +1973,18 @@ impl PlanetPreset {
         for (v, key) in [
             (k.trench_half_life_myr, "$.tectonics.trench_half_life_myr"),
             (k.contact_timeout_myr, "$.tectonics.contact_timeout_myr"),
+            (
+                k.collision_melt_end_myr,
+                "$.tectonics.collision_melt_end_myr",
+            ),
         ] {
             check(v.is_finite() && v > 0.0, key, "must be positive")?;
         }
+        check(
+            k.collision_melt_after_myr.is_finite() && k.collision_melt_after_myr >= 0.0,
+            "$.tectonics.collision_melt_after_myr",
+            "must be ≥ 0",
+        )?;
         for (v, key) in [
             (k.hotspot_lifetime_myr, "$.tectonics.hotspot_lifetime_myr"),
             (k.continent_elevation_m, "$.tectonics.continent_elevation_m"),

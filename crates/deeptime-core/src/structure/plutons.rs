@@ -10,10 +10,10 @@
 //!   flux of the deposit engine's `arc_magma_flux` (`surface/fields.rs`): 1 where the plate model
 //!   put arc magma this step, × min(1, convergence / 80 mm/yr), × 0.7 on oceanic crust; plus
 //!   `collision_pluton_factor` on continental crust in a collision's melt window (crustal-melt
-//!   granites: from `collision_melt_after_myr` after the orogeny's onset to
-//!   `collision_melt_end_myr` after its last stamp, [`crate::structure::collision_melt`]; until
-//!   2026-10-30 the collision regime's 30 Myr after each stamp, which ended about where the
-//!   sources start them).
+//!   granites: from `tectonics.collision_melt_after_myr` after the orogeny's onset to
+//!   `tectonics.collision_melt_end_myr` after its last stamp, the plate layer
+//!   `plates/collision_melt`; until 2026-10-30 the collision regime's 30 Myr after each stamp,
+//!   which ended about where the sources start them).
 //! - **What.** Continental arcs: granodiorite (0.7), granite (0.2), diorite (0.1); island arcs:
 //!   diorite (0.6), granodiorite (0.4, the class holds tonalite); collision zones: granite. The
 //!   shares are game choices (ledger RCK-064, RCK-065). The qualitative picture is right: the
@@ -168,7 +168,7 @@ pub struct ArcInputs<'a> {
     pub convergence: &'a [f32],
     pub crust_type: &'a [f32],
     pub plate_id: &'a [f32],
-    /// Whether the cell's crust melts after a collision ([`crate::structure::collision_melt`]).
+    /// Whether the cell's crust melts after a collision (`plates/collision_melt`).
     pub melt: &'a [bool],
 }
 

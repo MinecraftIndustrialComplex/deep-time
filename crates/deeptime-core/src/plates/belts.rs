@@ -1022,7 +1022,7 @@ fn stack_front(
                     env.dt_yr,
                     k.collision_upper_stamp_resolvable,
                 ) {
-                    s.stamp_collision(env.t_myr, k.collision_orogeny_myr);
+                    s.stamp_collision(env.t_myr, k.collision_melt_end_myr);
                     s.fold = to_group(rot, tangent(pos[i], side.normal).normalize_or_zero());
                 }
                 continue;
@@ -1037,7 +1037,7 @@ fn stack_front(
         // stacked, not the surface's rise, marks the orogeny (a belt whose root turns to eclogite
         // is still one).
         if airy_dz >= stamp_m {
-            s.stamp_collision(env.t_myr, k.collision_orogeny_myr);
+            s.stamp_collision(env.t_myr, k.collision_melt_end_myr);
             let at = pos[i];
             s.fold = to_group(rot, tangent(at, side.normal).normalize_or_zero());
         }

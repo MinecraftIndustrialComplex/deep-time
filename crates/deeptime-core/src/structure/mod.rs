@@ -55,7 +55,7 @@ use crate::deposits::random::Rng;
 use crate::error::CoreError;
 use crate::params::{PlanetPreset, ScaleParams};
 use crate::plates::l1::POOL_FIELDS;
-use crate::plates::state::{CONTINENTAL, OROGENY_HIMALAYAN, pool, regime};
+use crate::plates::state::{CONTINENTAL, pool, regime};
 use crate::stage::{Stage, StageContext, StageEstimate, from_state, to_state};
 use crate::surface::SurfaceState;
 use crate::surface::grid::Dims;
@@ -374,40 +374,14 @@ pub struct CellSource<'a> {
     p: StructureParams,
 }
 
-/// Whether a column's crust melts after a collision (docs/design/collision-window-split.md):
-/// continental crust of a Himalayan orogeny that began `collision_melt_after_myr` or more ago
-/// (`onset_age`, `plates/orogeny_onset_age_myr`) and was last stamped within
-/// `collision_melt_end_myr` (`orogeny_age`, `plates/orogeny_age_myr`). Thickened crust heats up
-/// for tens of Myr after the thickening and stays hot for tens more (England & Thompson 1984;
-/// Thompson & England 1984, Fig. 8): the collision granites, the granite stocks and the burial
-/// of regional metamorphism come in this window, not while the belt is being thrust (the
-/// `collision` regime, ledger PLT-734). NaN ages (none) melt nothing. ledger: RCK-098, RCK-099
-pub fn collision_melt(
-    p: &StructureParams,
-    crust: f32,
-    orogeny: f32,
-    onset_age: f32,
-    orogeny_age: f32,
-) -> bool {
-    crust as u8 == CONTINENTAL
-        && orogeny as u8 == OROGENY_HIMALAYAN
-        && f64::from(onset_age) >= p.collision_melt_after_myr
-        && f64::from(orogeny_age) <= p.collision_melt_end_myr
-}
-
-/// [`collision_melt`] for every L1 cell, from the plate step's fields.
-fn melt_of(
-    fields: &BTreeMap<String, Field>,
-    p: &StructureParams,
-    n: usize,
-) -> Result<Vec<bool>, CoreError> {
-    let crust = field_of(fields, "plates/crust_type", n)?;
-    let orogeny = field_of(fields, "plates/orogeny_type", n)?;
-    let onset = field_of(fields, crate::plates::l1::ONSET_AGE_FIELD, n)?;
-    let age = field_of(fields, "plates/orogeny_age_myr", n)?;
-    Ok((0..n)
-        .into_par_iter()
-        .map(|c| collision_melt(p, crust[c], orogeny[c], onset[c], age[c]))
+/// Whether each L1 cell's crust melts after a collision (`plates/collision_melt`, the plate
+/// model's `Sample::collision_melt`; docs/design/collision-window-split.md): the window of the
+/// collision granites, the granite stocks and the burial of regional metamorphism, which come
+/// after the thrusting (the `collision` regime), not during it. ledger: PLT-735, PLT-736
+fn melt_of(fields: &BTreeMap<String, Field>, n: usize) -> Result<Vec<bool>, CoreError> {
+    Ok(field_of(fields, crate::plates::l1::MELT_FIELD, n)?
+        .iter()
+        .map(|&v| v > 0.5)
         .collect())
 }
 
@@ -622,7 +596,7 @@ const MOVED: [&str; 19] = [
     "plates/thickness_m",
     "plates/orogeny_type",
     "plates/orogeny_age_myr",
-    crate::plates::l1::ONSET_AGE_FIELD,
+    crate::plates::l1::MELT_FIELD,
     "plates/crust_type",
     "plates/plate_id",
     "plates/flags",
@@ -1001,7 +975,7 @@ impl StructureStage {
         let reg = field_of(fields, "regime", n)?;
         let thick = field_of(fields, "plates/thickness_m", n)?;
         let crust_m = field_of(fields, "plates/crust_type", n)?;
-        let melt = melt_of(fields, &self.p, n)?;
+        let melt = melt_of(fields, n)?;
         let t_mean = fields
             .get("climate/t_mean_c")
             .filter(|f| f.data.len() == n)
@@ -1029,7 +1003,7 @@ impl StructureStage {
                         return 0.0;
                     }
                     // The thickened crust's burial while it is hot: the melt window, which the
-                    // peak of regional metamorphism shares (ledger: RCK-032, RCK-099).
+                    // peak of regional metamorphism shares (ledger: RCK-032, PLT-736).
                     let burial = if melt[c] {
                         (f64::from(thick[c]) / p.reference_crust_m).clamp(1.0, p.max_burial_factor)
                     } else {

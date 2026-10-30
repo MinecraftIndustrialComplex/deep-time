@@ -7160,27 +7160,60 @@ fn a_backarc_sliver_opens_at_earth_s_rates() {
     assert!(vt.abs() <= 160.0, "the trench moves {vt} mm/yr");
 }
 
-/// A collision orogeny's onset (ledger PLT-734): the first stamp sets it, stamps that renew the
-/// orogeny within `collision_orogeny_myr` keep it, and a stamp after that window lapsed, or on a
-/// sample an Andean orogeny took over, starts a new orogeny.
+/// A collision orogeny's onset (ledger PLT-734): the first stamp sets it; stamps within the melt
+/// window's end of the last keep it, after an arc relabelled the sample Andean too; a stamp past
+/// that end starts a new orogeny.
 #[test]
-fn a_collision_orogeny_keeps_its_onset_while_its_stamps_go_on() {
+fn a_collision_orogeny_keeps_its_onset_while_its_crust_is_hot() {
+    let end = TectonicParams::default().collision_melt_end_myr;
+    assert_eq!(end, 80.0);
     let mut s = state::Sample::blank(0);
-    s.stamp_collision(100.0, 30.0);
-    assert_eq!((s.orogeny, s.orogeny_onset_myr), (OROGENY_HIMALAYAN, 100.0));
-    for t in [105.0, 110.0, 135.0] {
-        s.stamp_collision(t, 30.0);
-    }
-    assert_eq!((s.orogeny_onset_myr, s.orogeny_myr), (100.0, 135.0));
-    s.stamp_collision(165.0, 30.0);
+    s.stamp_collision(100.0, end);
     assert_eq!(
-        s.orogeny_onset_myr, 165.0,
-        "30 Myr without a stamp: a new orogeny"
+        (s.orogeny, s.collision_onset_myr),
+        (OROGENY_HIMALAYAN, 100.0)
+    );
+    for t in [105.0, 110.0, 150.0] {
+        s.stamp_collision(t, end);
+    }
+    assert_eq!((s.collision_onset_myr, s.collision_myr), (100.0, 150.0));
+    s.orogeny = OROGENY_ANDEAN;
+    s.orogeny_myr = 190.0;
+    s.stamp_collision(230.0, end);
+    assert_eq!(
+        s.collision_onset_myr, 100.0,
+        "80 Myr after the last stamp: still hot"
+    );
+    s.stamp_collision(311.0, end);
+    assert_eq!(
+        s.collision_onset_myr, 311.0,
+        "81 Myr after it: a new orogeny"
+    );
+}
+
+/// The melt window (ledger PLT-735, PLT-736): continental crust melts from 20 Myr after its
+/// collision began to 80 Myr after its last collision stamp, whatever an arc relabelled it since.
+#[test]
+fn a_collision_melts_from_twenty_myr_after_its_onset_to_eighty_after_its_last_stamp() {
+    let k = TectonicParams::default();
+    let melt = |s: &state::Sample, t: f64| {
+        s.collision_melt(t, k.collision_melt_after_myr, k.collision_melt_end_myr)
+    };
+    let mut s = state::Sample::blank(0);
+    s.kind = CONTINENTAL;
+    assert!(!melt(&s, 100.0), "no collision");
+    for t in [0.0, 5.0, 10.0, 15.0, 20.0, 25.0] {
+        s.stamp_collision(t, k.collision_melt_end_myr);
+    }
+    assert!(
+        !melt(&s, 10.0) && melt(&s, 25.0),
+        "from onset + 20, under thickening"
     );
     s.orogeny = OROGENY_ANDEAN;
-    s.stamp_collision(170.0, 30.0);
-    assert_eq!(
-        s.orogeny_onset_myr, 170.0,
-        "after an Andean orogeny: a new one"
+    assert!(
+        melt(&s, 105.0) && !melt(&s, 106.0),
+        "to 80 Myr after the last stamp"
     );
+    s.kind = OCEANIC;
+    assert!(!melt(&s, 50.0), "continental crust only");
 }
