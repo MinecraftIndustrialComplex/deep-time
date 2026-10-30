@@ -7162,33 +7162,29 @@ fn a_backarc_sliver_opens_at_earth_s_rates() {
 
 /// A collision orogeny's onset (ledger PLT-734): the first stamp sets it; stamps within the melt
 /// window's end of the last keep it, after an arc relabelled the sample Andean too; a stamp past
-/// that end starts a new orogeny.
+/// that end starts a new orogeny. The two times fit the struct's free bytes: a `Sample` stays 144
+/// bytes, since the full 16k preset's estimate fits its 5 GiB cap with about 1 MiB to spare.
 #[test]
 fn a_collision_orogeny_keeps_its_onset_while_its_crust_is_hot() {
+    assert_eq!(std::mem::size_of::<state::Sample>(), 144);
     let end = TectonicParams::default().collision_melt_end_myr;
     assert_eq!(end, 80.0);
     let mut s = state::Sample::blank(0);
-    s.stamp_collision(100.0, end);
-    assert_eq!(
-        (s.orogeny, s.collision_onset_myr),
-        (OROGENY_HIMALAYAN, 100.0)
-    );
-    for t in [105.0, 110.0, 150.0] {
-        s.stamp_collision(t, end);
+    assert_eq!(s.collision_myr(), f64::NEG_INFINITY);
+    s.stamp_collision(-900.0, end);
+    assert_eq!((s.orogeny, s.collision_onset_myr()), (OROGENY_HIMALAYAN, -900.0));
+    // Steps of 1.6 Myr: the last stamp to 2 Myr, the onset exact.
+    for k in 1..=31 {
+        s.stamp_collision(-900.0 + 1.6 * f64::from(k), end);
     }
-    assert_eq!((s.collision_onset_myr, s.collision_myr), (100.0, 150.0));
+    assert_eq!(s.collision_onset_myr(), -900.0);
+    assert!((s.collision_myr() - (-900.0 + 49.6)).abs() <= 2.0, "{}", s.collision_myr());
     s.orogeny = OROGENY_ANDEAN;
-    s.orogeny_myr = 190.0;
-    s.stamp_collision(230.0, end);
-    assert_eq!(
-        s.collision_onset_myr, 100.0,
-        "80 Myr after the last stamp: still hot"
-    );
-    s.stamp_collision(311.0, end);
-    assert_eq!(
-        s.collision_onset_myr, 311.0,
-        "81 Myr after it: a new orogeny"
-    );
+    s.orogeny_myr = -800.0;
+    s.stamp_collision(-772.0, end);
+    assert_eq!(s.collision_onset_myr(), -900.0, "78 Myr after the last stamp: still hot");
+    s.stamp_collision(-690.0, end);
+    assert_eq!(s.collision_onset_myr(), -690.0, "82 Myr after it: a new orogeny");
 }
 
 /// The melt window (ledger PLT-735, PLT-736): continental crust melts from 20 Myr after its
@@ -7201,19 +7197,16 @@ fn a_collision_melts_from_twenty_myr_after_its_onset_to_eighty_after_its_last_st
     };
     let mut s = state::Sample::blank(0);
     s.kind = CONTINENTAL;
-    assert!(!melt(&s, 100.0), "no collision");
-    for t in [0.0, 5.0, 10.0, 15.0, 20.0, 25.0] {
+    assert!(!melt(&s, -100.0), "no collision");
+    // Thickened every 4 Myr from -500: not melting 16 Myr in, melting from 20.
+    let mut seen = Vec::new();
+    for t in [-500.0, -496.0, -492.0, -488.0, -484.0, -480.0, -476.0] {
         s.stamp_collision(t, k.collision_melt_end_myr);
+        seen.push(melt(&s, t));
     }
-    assert!(
-        !melt(&s, 10.0) && melt(&s, 25.0),
-        "from onset + 20, under thickening"
-    );
+    assert_eq!(seen, [false, false, false, false, false, true, true], "from onset + 20");
     s.orogeny = OROGENY_ANDEAN;
-    assert!(
-        melt(&s, 105.0) && !melt(&s, 106.0),
-        "to 80 Myr after the last stamp"
-    );
+    assert!(melt(&s, -396.0) && !melt(&s, -395.0), "to 80 Myr after the last stamp");
     s.kind = OCEANIC;
-    assert!(!melt(&s, 50.0), "continental crust only");
+    assert!(!melt(&s, -450.0), "continental crust only");
 }
