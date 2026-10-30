@@ -7172,19 +7172,48 @@ fn a_collision_orogeny_keeps_its_onset_while_its_crust_is_hot() {
     let mut s = state::Sample::blank(0);
     assert_eq!(s.collision_myr(), f64::NEG_INFINITY);
     s.stamp_collision(-900.0, end);
-    assert_eq!((s.orogeny, s.collision_onset_myr()), (OROGENY_HIMALAYAN, -900.0));
+    assert_eq!(
+        (s.orogeny, s.collision_onset_myr()),
+        (OROGENY_HIMALAYAN, -900.0)
+    );
     // Steps of 1.6 Myr: the last stamp to 2 Myr, the onset exact.
     for k in 1..=31 {
         s.stamp_collision(-900.0 + 1.6 * f64::from(k), end);
     }
     assert_eq!(s.collision_onset_myr(), -900.0);
-    assert!((s.collision_myr() - (-900.0 + 49.6)).abs() <= 2.0, "{}", s.collision_myr());
+    assert!(
+        (s.collision_myr() - (-900.0 + 49.6)).abs() <= 2.0,
+        "{}",
+        s.collision_myr()
+    );
     s.orogeny = OROGENY_ANDEAN;
     s.orogeny_myr = -800.0;
     s.stamp_collision(-772.0, end);
-    assert_eq!(s.collision_onset_myr(), -900.0, "78 Myr after the last stamp: still hot");
+    assert_eq!(
+        s.collision_onset_myr(),
+        -900.0,
+        "78 Myr after the last stamp: still hot"
+    );
     s.stamp_collision(-690.0, end);
-    assert_eq!(s.collision_onset_myr(), -690.0, "82 Myr after it: a new orogeny");
+    assert_eq!(
+        s.collision_onset_myr(),
+        -690.0,
+        "82 Myr after it: a new orogeny"
+    );
+    // Stamped every 50 Myr for 1,500 Myr, past the span's 1,020: one orogeny throughout, its
+    // last stamp in range and its crust melting.
+    let after = TectonicParams::default().collision_melt_after_myr;
+    s.kind = CONTINENTAL;
+    for i in 1..=30 {
+        let t = -690.0 + 50.0 * f64::from(i);
+        s.stamp_collision(t, end);
+        assert!(
+            (s.collision_myr() - t).abs() <= 2.0,
+            "{t}: {}",
+            s.collision_myr()
+        );
+        assert!(s.collision_melt(t, after, end), "{t}");
+    }
 }
 
 /// The melt window (ledger PLT-735, PLT-736): continental crust melts from 20 Myr after its
@@ -7204,9 +7233,16 @@ fn a_collision_melts_from_twenty_myr_after_its_onset_to_eighty_after_its_last_st
         s.stamp_collision(t, k.collision_melt_end_myr);
         seen.push(melt(&s, t));
     }
-    assert_eq!(seen, [false, false, false, false, false, true, true], "from onset + 20");
+    assert_eq!(
+        seen,
+        [false, false, false, false, false, true, true],
+        "from onset + 20"
+    );
     s.orogeny = OROGENY_ANDEAN;
-    assert!(melt(&s, -396.0) && !melt(&s, -395.0), "to 80 Myr after the last stamp");
+    assert!(
+        melt(&s, -396.0) && !melt(&s, -395.0),
+        "to 80 Myr after the last stamp"
+    );
     s.kind = OCEANIC;
     assert!(!melt(&s, -450.0), "continental crust only");
 }

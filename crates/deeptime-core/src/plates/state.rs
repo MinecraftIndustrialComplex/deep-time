@@ -129,7 +129,8 @@ pub struct Sample {
     /// When this sample's current collision orogeny began ([`Sample::collision_onset_myr`]): in
     /// half-Myr steps after −16,384 Myr, 0 where it has had none; and its last collision stamp
     /// ([`Sample::collision_myr`]): in 4-Myr steps after the onset, rounded (±2 Myr), at most 255
-    /// (1,020 Myr). Only a collision's stamp sets them ([`Sample::stamp_collision`]): an arc that
+    /// (1,020 Myr; an orogeny stamped for longer has its onset moved up, which the melt window
+    /// does not see). Only a collision's stamp sets them ([`Sample::stamp_collision`]): an arc that
     /// later relabels the sample Andean (and renews `orogeny_myr`) leaves them, and the melt
     /// window reads them ([`Sample::collision_melt`]). Packed into the 3 bytes the struct's
     /// alignment left free: the full 16k preset's estimate (three copies of every sample) fits
@@ -269,6 +270,14 @@ impl Sample {
         // With no collision before, the last stamp is −∞ and its age +∞.
         if t_myr - self.collision_myr() > melt_end_myr {
             let half = (2.0 * (t_myr - COLLISION_T0_MYR)).round();
+            self.collision_onset = half.clamp(1.0, f64::from(u16::MAX)) as u16;
+        }
+        // A collision orogeny stamped for more than the span's 1,020 Myr: its onset moves up to
+        // keep the last stamp in range. Only `t − onset ≥ collision_melt_after_myr` reads the
+        // onset, which holds for either (PR #43's review).
+        let longest = COLLISION_SPAN_MYR * f64::from(u8::MAX);
+        if t_myr - self.collision_onset_myr() > longest {
+            let half = (2.0 * (t_myr - longest - COLLISION_T0_MYR)).round();
             self.collision_onset = half.clamp(1.0, f64::from(u16::MAX)) as u16;
         }
         // The span from the exact onset, so rounding never accumulates over a belt's stamps.

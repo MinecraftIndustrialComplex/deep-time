@@ -11,8 +11,10 @@
 //! **Temperature** (ledger RCK-028 to RCK-038). A linear geotherm T(z) = T_s + (q / k)·z_eff,
 //! Fourier's law with no heat production or temperature-dependent k, with q the plate model's heat
 //! flow proxy (`plates/heat_flow_mw_m2`, at most `max_heat_flow_mw_m2`), k = `conductivity_w_mk`
-//! and T_s the climate's mean temperature (or `surface_temp_c`). **Regime history** enters through z_eff: under an active
-//! collision (the `collision` regime, or a Himalayan orogeny younger than 30 Myr) the crust is being
+//! and T_s the climate's mean temperature (or `surface_temp_c`). **Regime history** enters through z_eff: in a
+//! collision's melt window (`plates/collision_melt`, ledger PLT-735, PLT-736, RCK-035: while the thickened crust is
+//! hot, from 20 Myr after the collision began to 80 Myr after its last stamp; until 2026-10-30 the `collision`
+//! regime or a Himalayan orogeny younger than 30 Myr) the crust has been
 //! thickened and everything in it is buried with it, so depths scale by the thickening factor
 //! β = clamp(e / e₀, 1, `max_burial_factor`) (homogeneous pure shear; e the crust's thickness,
 //! e₀ `reference_crust_m`). Elsewhere β = 1: burial metamorphism of deep basins with the heat flow
