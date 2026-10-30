@@ -11423,13 +11423,63 @@ up some of the convergence" (Harris 2011): part of the convergence moves behind 
 indented continent thickens depends "mainly upon the degree of lateral confinement, but also upon
 layer rheologies and the dimensions of indented and indenting continents" (Davy & Cobbold 1988). The
 model has no back-arc thrust: the belt and the interior's share stack the crust up to the block's
-far coast. A design for one is the lane's next lead.
+far coast. A design for one is the lane's next lead (built: "A new subduction zone behind the
+overriding block", below, PLT-737).
 
 **Limits.** The melt window's end is the project's reading of one figure for one thrust, applied
 from the last stamp of a belt thickened over many steps. The collision granites' rate per area
 (RCK-058, 0.3 of the arc rate, a game choice) is unchanged, so their total grew with the window:
 against Vigneresse & Burg 2003 (RCK-058's row) the rate already sat above Himalayan leucogranite
 production.
+
+### A new subduction zone behind the overriding block (PLT-737, 2026-10-30)
+
+**Why.** The window split's arm showed the collision high coasts by a belt along the coast to be
+the far coasts of overriding blocks narrower than the belt's reach (above): a collision against a
+continent goes on stacking crust on the overriding plate until it stalls and welds (PLT-246) or its
+incoming continent transfers (PLT-516), and the belt (PLT-241) and the interior's share (PLT-652,
+over L = 2W/π, PLT-733) reach the block's far coast. Earth's narrow upper plates move part of the
+convergence behind the block (Harris 2011, above). Ben chose to design and build that
+(decisions log 2026-10-30, "Design, then build (Recommended)"; design docs/design/backarc-reversal.md).
+
+**The process.** Stern 2004 (the library's full text, read again 2026-10-30) names two induced
+nucleations after a collision: transference, and polarity reversal, which "also follows collision,
+but continued convergence in this case results in a new subduction zone forming behind the
+magmatic arc"; "the new subduction zone nucleates in the originally overriding plate". "The
+geodynamics of INSZ polarity reversal for arcs have not been quantitatively modeled"; he expects
+back-arc lithosphere to be "relatively thin and weak. Consequently, polarity reversal INSZ should
+require less compression than transference INSZ". His example is the Solomon arc after the Ontong
+Java Plateau, an oceanic arc, which PLT-371 already reverses at the contact; the new rule is for an
+overriding plate with continental crust behind its front.
+
+**The rule** (`tectonics.collision_backarc_reversal`, `collision::backarc_block`). In a collision
+of a continent that has not stalled, whose slab is gone (the jam) and whose plates have converged by
+100 km since (PLT-518), as for transference: the block is the overriding plate's visible
+continental crust connected to its continental samples on the front; its back coast the block's
+samples next to their own plate's ocean floor farther from the front than they are. The
+collision's push reaches the back coast as the thin sheet's response does, by e^(−x/L) at the
+distance x behind the front, L = 2W/π (PLT-733); when that push over the coast's length reaches
+PLT-517's 3 × 10^12 N/m × g/g⊕, the block moves to the incoming plate (its groups get twins there,
+the incoming plate carries its momentum, the crust that crossed the front stays under) and the
+collision ends. The overriding plate keeps its ocean floor, which now meets the block's back coast,
+where the force balance and the subduction rules decide what it does. Where transference is due
+too, the margin with the larger force per metre ruptures. No new constant.
+
+**The project's readings.** The decay on the overriding side and none on the incoming side follow
+the model's own asymmetry: the overriding plate's interior deforms as a thin sheet (PLT-652,
+PLT-733), the incoming continent is rigid, so transference's margin takes the whole push. The
+threshold is transference's, though Stern expects less to suffice behind an arc: the conservative
+choice, with no number to put in its place. x to the nearest front sample, and the tie-break.
+
+**The unit test** (`a_narrow_overriding_block_moves_to_the_incoming_plate_behind_a_new_subduction_zone`,
+`belts.rs`): on the two-plate fixture (a front 6,774 km long, L = 4,312 km), a strip 0.05 rad wide
+behind the front passes 0.976 of the push to a back coast 7,319 km long; the whole half-continent
+passes 0.656 to 10,176 km, so the push that just moves the strip leaves the half-continent in place.
+It waits short of the force or the convergence and with the switch off; a stalled collision welds;
+with transference on, the strip's force per metre (1.33 × 10^-7 per newton) beats the incoming
+continent's margin (9.5 × 10^-8), so the block moves.
+
+**Measured.** Pending (arm backarc, 8 runs against base32-s4).
 
 ## Sediment by margin type and the margin's sediment (PLT-660 to PLT-662, 2026-10-25)
 
