@@ -7159,3 +7159,22 @@ fn a_backarc_sliver_opens_at_earth_s_rates() {
     );
     assert!(vt.abs() <= 160.0, "the trench moves {vt} mm/yr");
 }
+
+/// A collision orogeny's onset (ledger PLT-734): the first stamp sets it, stamps that renew the
+/// orogeny within `collision_orogeny_myr` keep it, and a stamp after that window lapsed, or on a
+/// sample an Andean orogeny took over, starts a new orogeny.
+#[test]
+fn a_collision_orogeny_keeps_its_onset_while_its_stamps_go_on() {
+    let mut s = state::Sample::blank(0);
+    s.stamp_collision(100.0, 30.0);
+    assert_eq!((s.orogeny, s.orogeny_onset_myr), (OROGENY_HIMALAYAN, 100.0));
+    for t in [105.0, 110.0, 135.0] {
+        s.stamp_collision(t, 30.0);
+    }
+    assert_eq!((s.orogeny_onset_myr, s.orogeny_myr), (100.0, 135.0));
+    s.stamp_collision(165.0, 30.0);
+    assert_eq!(s.orogeny_onset_myr, 165.0, "30 Myr without a stamp: a new orogeny");
+    s.orogeny = OROGENY_ANDEAN;
+    s.stamp_collision(170.0, 30.0);
+    assert_eq!(s.orogeny_onset_myr, 170.0, "after an Andean orogeny: a new one");
+}

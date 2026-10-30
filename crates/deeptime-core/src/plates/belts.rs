@@ -1022,8 +1022,7 @@ fn stack_front(
                     env.dt_yr,
                     k.collision_upper_stamp_resolvable,
                 ) {
-                    s.orogeny = OROGENY_HIMALAYAN;
-                    s.orogeny_myr = env.t_myr as f32;
+                    s.stamp_collision(env.t_myr, k.collision_orogeny_myr);
                     s.fold = to_group(rot, tangent(pos[i], side.normal).normalize_or_zero());
                 }
                 continue;
@@ -1034,11 +1033,11 @@ fn stack_front(
         out.lifted10 += u32::from(dz > 10.0);
         out.lifted100 += u32::from(dz > 100.0);
         out.emerged += u32::from(z <= sea_m && z + dz > sea_m);
-        // ledger: PLT-247 (the stamp), PLT-079 (the regime it makes). The crust stacked, not the
-        // surface's rise, marks the orogeny (a belt whose root turns to eclogite is still one).
+        // ledger: PLT-247 (the stamp), PLT-734 (the regime it makes, the onset it keeps). The crust
+        // stacked, not the surface's rise, marks the orogeny (a belt whose root turns to eclogite
+        // is still one).
         if airy_dz >= stamp_m {
-            s.orogeny = OROGENY_HIMALAYAN;
-            s.orogeny_myr = env.t_myr as f32;
+            s.stamp_collision(env.t_myr, k.collision_orogeny_myr);
             let at = pos[i];
             s.fold = to_group(rot, tangent(at, side.normal).normalize_or_zero());
         }

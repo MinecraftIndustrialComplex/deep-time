@@ -126,6 +126,11 @@ pub struct Sample {
     pub formed_myr: f32,
     /// When the last orogenic uplift happened here, Myr (a_c = t − this).
     pub orogeny_myr: f32,
+    /// When this sample's current collision orogeny began, Myr ([`Sample::stamp_collision`]);
+    /// −∞ where it has had none. The structure stage's melt window counts from it
+    /// (`plates/orogeny_onset_age_myr`). ledger: PLT-734
+    #[serde(default = "never_myr")]
+    pub orogeny_onset_myr: f32,
     /// r, the local ridge direction (oceanic), a tangent vector in the group frame.
     pub ridge: [f32; 3],
     /// f, the local fold (shortening) direction (continental), a tangent vector in the group frame.
@@ -196,6 +201,10 @@ pub struct Sample {
     pub carrier_lithosphere_km: f32,
 }
 
+fn never_myr() -> f32 {
+    f32::NEG_INFINITY
+}
+
 impl Sample {
     /// A blank oceanic sample.
     pub fn blank(group: u32) -> Sample {
@@ -209,6 +218,7 @@ impl Sample {
             thickness_m: 0.0,
             formed_myr: 0.0,
             orogeny_myr: f32::NEG_INFINITY,
+            orogeny_onset_myr: f32::NEG_INFINITY,
             ridge: [0.0; 3],
             fold: [0.0; 3],
             pools: [0.0; pool::COUNT],
@@ -238,6 +248,21 @@ impl Sample {
 
     pub fn is_continental(&self) -> bool {
         self.kind == CONTINENTAL
+    }
+
+    /// A collision stamps this sample at `t_myr` (the belt, the wedge, the interior's share:
+    /// `belts.rs`, ledger PLT-247): a Himalayan orogeny, renewed now. It is a new orogeny, whose
+    /// onset is now, where the sample was not Himalayan, had no onset, or was last stamped
+    /// `window_myr` (`collision_orogeny_myr`) or more ago; otherwise the onset stays. ledger: PLT-734
+    pub fn stamp_collision(&mut self, t_myr: f64, window_myr: f64) {
+        if self.orogeny != OROGENY_HIMALAYAN
+            || !self.orogeny_onset_myr.is_finite()
+            || t_myr - f64::from(self.orogeny_myr) >= window_myr
+        {
+            self.orogeny_onset_myr = t_myr as f32;
+        }
+        self.orogeny = OROGENY_HIMALAYAN;
+        self.orogeny_myr = t_myr as f32;
     }
 
     /// Ocean floor becomes continental crust (an island arc matured, `finish_samples`; crust
