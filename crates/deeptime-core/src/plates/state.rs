@@ -533,7 +533,8 @@ pub struct Collision {
     pub stalled_since_myr: Option<f64>,
     /// The collision's shortening when its contact's slab was first found broken off, km: the
     /// subduction has failed and from then on the plate pushes the continent (transference,
-    /// `collision::transference_due`; set only with `tectonics.transference`, ledger PLT-516).
+    /// `collision::transference_due`; set only with `tectonics.transference` or
+    /// `tectonics.collision_backarc_reversal`, ledger PLT-516, PLT-737).
     /// Always written: the checkpoint's postcard has no field names, so a skipped field cannot
     /// be read back.
     #[serde(default)]
@@ -729,6 +730,10 @@ pub struct Counters {
     /// Back-arc rifts drawn but not made: the sliver or the rest of the plate under 32 samples.
     #[serde(default)]
     pub backarc_refused: u32,
+    /// Collisions ended by a new subduction zone behind the overriding block: the block moved to
+    /// the incoming plate (`tectonics.collision_backarc_reversal`, ledger PLT-737).
+    #[serde(default)]
+    pub backarc_reversals: u32,
 }
 
 /// A back-arc sliver (`tectonics.backarc_rifting`, ledger PLT-710): plate `plate`, split off

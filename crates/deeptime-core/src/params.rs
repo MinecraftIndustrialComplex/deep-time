@@ -1256,6 +1256,16 @@ pub struct TectonicParams {
     /// On by default since 2026-10-27 (the old-floor stage: arm trans26 against base26-s4).
     /// ledger: PLT-516
     pub transference: bool,
+    /// The mirror of `transference` on the overriding side (Stern 2004's polarity reversal: "a
+    /// new subduction zone forming behind the magmatic arc"): in the same collision, the
+    /// overriding plate's continental block behind the front moves to the incoming plate once the
+    /// collision's push, carried to the block's back coast by the thin sheet's decay over
+    /// L = 2W/π (PLT-733), reaches over the length of that coast against the overriding plate's own
+    /// ocean floor the force that starts a new subduction zone (PLT-517). A narrow block's far
+    /// coast sees most of the push, a wide continent's almost none. Where transference is due
+    /// too, the margin with the larger force per metre ruptures. `collision::backarc_block`.
+    /// ledger: PLT-737
+    pub collision_backarc_reversal: bool,
     /// Contacts unseen for longer than this are closed, Myr (12 steps at the 2-Myr step).
     /// Ledger PLT-059.
     pub contact_timeout_myr: f64,
@@ -1521,6 +1531,7 @@ impl Default for TectonicParams {
             subduction_initiation_offshore: true,     // ledger: PLT-503 (on since 2026-10-23)
             initiation_stress_mpa: 20.0, // ledger: PLT-505 (game-choice; on since 2026-10-23)
             transference: true,          // ledger: PLT-516
+            collision_backarc_reversal: false, // ledger: PLT-737
             contact_timeout_myr: 24.0,   // ledger: PLT-059
             collision_orogeny_myr: 30.0, // ledger: PLT-079
             collision_melt_after_myr: 20.0, // ledger: PLT-735
