@@ -1,7 +1,8 @@
 # The collision orogeny's window, split by use: design
 
-Status: **design** (2026-10-29, the coordinator; revised 2026-10-30 after the Graphide review of
-PR #42), being built on the branch `window-split`. For the collision-front lane (STATUS Follow-ups,
+Status: **built** (2026-10-30, the coordinator, branch `window-split`; the design of 2026-10-29
+revised after the Graphide review of PR #42). Ledger PLT-734 to PLT-736; plates.md "The collision
+window split". For the collision-front lane (STATUS Follow-ups,
 "Collision belts at the coast"). The sources are those read for PLT-079's note on 2026-10-29
 (plates.md "Step 20", bibliography `EnglandThompson1984`, `ThompsonEngland1984`, `Hopkinson2017`,
 `Weller2021`, `Rey2001`). Each window below says whether a source gives it or it is the project's

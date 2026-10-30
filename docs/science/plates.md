@@ -81,7 +81,8 @@ sinking plate standing at the overriding plate's edge and converging, PLT-224):
    erosion wears the belt down. Before the limit (2026-10-03) a collision that never stalled
    piled crust 200-290 km thick on a sliver of a plate and the surface stood 14 km high: the
    spreading runs once a step on the surface, while a fast front stacks kilometres a step.
-4. Belt and wedge are stamped as a collision orogeny (the `collision` regime, PLT-079, PLT-247), and
+4. Belt and wedge are stamped as a collision orogeny (the `collision` regime while the stamps go on,
+   PLT-734, PLT-247; the lock PLT-079; the melt window PLT-735, PLT-736), and
    the stacked rock is the consumed crust's own rock, its sediments metamorphosed (PLT-248).
 5. The surface stage's flexure (`flexure.md`) carries the uplift as a load: the stiff arriving
    plate bends down in front of the weak young wedge into the foreland basin, which the surface

@@ -38,8 +38,10 @@ The structure stage runs each step after the surface stage has laid down or stri
 1. **Heat.** Every continental cell gets a straight-line temperature profile: the climate's mean surface
    temperature (10 degC if none) plus the plate model's surface heat flow divided by a thermal conductivity of
    2.5 W/m/K, times depth. Heat flow above 120 mW/m2 is clamped, so the steepest gradient is 48 degC/km (RCK-028 to RCK-031).
-2. **Burial.** While a cell is in a collision (or has a young Himalayan-type orogen), depths are multiplied by the
-   thickening of its crust relative to 35 km, at most 2 (RCK-032 to RCK-035).
+2. **Burial.** While a cell's crust is in a collision's melt window (from 20 Myr after the collision began to 80 Myr
+   after its last stamp, PLT-735, PLT-736: while the thickened crust is hot), depths are multiplied by the thickening
+   of its crust relative to 35 km, at most 2 (RCK-032 to RCK-035). Until 2026-10-30 this read the collision regime
+   and a Himalayan orogen under 30 Myr old, during the thrusting.
 3. **Metamorphism.** Each layer is tested at the temperature of its mid-depth. If it has reached the formation
    temperature of the next class on its path (shale to slate at 250 degC, phyllite 350, schist 525, gneiss 650;
    limestone to marble, sandstone to quartzite, basalt to greenstone at 300, to amphibolite at 500) it moves up. Classes
@@ -51,7 +53,7 @@ The structure stage runs each step after the surface stage has laid down or stri
    1.2 km on fresh crust are the sheeted dikes, greenstone, and the rest the lavas, basalt (RCK-095); the felsic
    volcanic pool is andesite, the felsic plutonic pool diorite under an active arc and granodiorite elsewhere, the
    metamorphic pool schist. On a continent the pools keep their classes (granite, rhyolite, gneiss and so on).
-5. **Plutons.** Under arcs, and weakly in collision zones, a Poisson number of plutons is emplaced each step. Each is an
+5. **Plutons.** Under arcs, and weakly in a collision's melt window (PLT-735, PLT-736), a Poisson number of plutons is emplaced each step. Each is an
    ellipsoid with a roof 2 to 6 km below the surface, a lognormal length (median 25 km), a width of 0.5 to 1 times that, and a
    thickness from the Cruden-McCaffrey power law. They ride their plate, are unroofed by erosion, and are lost if the oceanic
    crust carrying them is subducted (RCK-056 to RCK-067). A pluton is placed at a random point of its cell, and the grid's
@@ -81,7 +83,7 @@ The structure stage runs each step after the surface stage has laid down or stri
 Geotherm and burial (RCK-028):
 
 T(z) = T_s + (q / k) z beta, with q = min(heat flow, 120 mW/m2), k = 2.5 W/m/K, beta = clamp(crust thickness / 35 km, 1, 2)
-in collisions and 1 elsewhere.
+in a collision's melt window and 1 elsewhere.
 
 Pluton thickness (RCK-061):
 
