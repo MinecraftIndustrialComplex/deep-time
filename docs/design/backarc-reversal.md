@@ -2,7 +2,9 @@
 
 Status: **built** (2026-10-30, the coordinator; Ben: "Design, then build (Recommended)", decisions
 log 2026-10-30) on the branch `backarc-reversal`, behind `tectonics.collision_backarc_reversal`
-(off until its arm); ledger PLT-737, plates.md "A new subduction zone behind the overriding block".
+(on by default since 2026-10-30, arm backarc against base32-s4: the guard clean, about 1.9 reversals
+per 100 Myr); ledger PLT-737, plates.md "A new subduction zone behind the overriding block" (the
+arm's table).
 For the collision-front lane (STATUS Follow-ups, "Collision belts at the coast").
 
 ## Why

@@ -11479,7 +11479,35 @@ It waits short of the force or the convergence and with the switch off; a stalle
 with transference on, the strip's force per metre (1.33 × 10^-7 per newton) beats the incoming
 continent's margin (9.5 × 10^-8), so the block moves.
 
-**Measured.** Pending (arm backarc, 8 runs against base32-s4).
+**Measured** (arm backarc, 8 runs, seeds 1 to 4 of both starts, key f3589be40bd8, against
+base32-s4, base32's same seeds; `pool.sh table` with the default, `guard`, `collcoast` and
+`coastset` measures). On by default from it (Ben's rule of 2026-10-23: the guard is clean).
+
+| measure | base32-s4 | backarc | p |
+|---|---|---|---|
+| reversals behind the block a run | 0 | 16 to 23 (about 1.9 per 100 Myr) | |
+| transferences a run | 15 to 30 | 6 to 15 | |
+| collisions per 100 Myr | 2.35 | 3.90 | 0.021 |
+| coast with high ground (≤ 0.11) | 0.126 | 0.114 | 0.23 |
+| criteria met per run, median | 6 | 6.5 | 0.18 |
+| continental crust under the sea | 0.175 | 0.267 | 0.065 |
+| sea over the datum after 100 Myr / at the end, m | 449 / 430 | 541 / 687 | |
+| largest landmass | 0.165 | 0.121 | 0.28 |
+| land | 0.329 | 0.300 | 0.23 |
+| the guard's worst, m from the sea | 10,291 | 10,518 | 0.33 |
+| collision high coasts: the belt along the coast / ending at it | 0.471 / 0.287 | 0.493 / 0.281 | |
+| high coasts: the collision belt's share / the arc's | 0.385 / 0.357 | 0.399 / 0.458 | |
+
+Earth for the rate: Crameri et al. 2020 count 4 polarity reversals among 13 subduction initiations
+since 104 Ma (PLT-056's row), on the whole planet; the model's 1.9 per 100 Myr are those behind a
+continental block alone. The reversal now ends more continental collisions than transference does,
+and collisions come more often because each ends sooner. What it costs: collisions that end sooner
+stack less crust, so more continental crust stays near the normal column and floods (under the sea
+0.267, the sea 687 m over the datum at the end). What it does not do: the collision high coasts by
+a belt along the coast are as common a share as before, and the arc's share of the high coasts rose:
+the block's back coast becomes the new subduction zone and grows an arc, so a high coast there is
+now an arc's, as on Earth behind a reversal. The next lead for coast with high ground is not this
+rule.
 
 ## Sediment by margin type and the margin's sediment (PLT-660 to PLT-662, 2026-10-25)
 
