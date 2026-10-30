@@ -539,12 +539,14 @@ pub fn step_collision(
 }
 
 /// A contact whose transfer or weld may fire this step ([`advance`]): its index, the terrane's
-/// seeds, and whether the collision has stalled long enough to weld.
+/// seeds, whether the collision has stalled long enough to weld, and the overriding plate's edge
+/// samples on this step's front ([`Front::edge`]; empty without a front this step).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Fired {
     pub contact: usize,
     pub seeds: Vec<u32>,
     pub stalled: bool,
+    pub front: Vec<u32>,
 }
 
 /// Advances every contact's collision state by this step. Returns this step's fronts (by contact
@@ -584,8 +586,9 @@ pub fn advance(
     // Transference (ledger PLT-516): a collision's subduction has failed once its contact has no
     // slab left (it broke off, PLT-184, or never grew); from the step that is first seen the
     // plate pushes the continent, and the shortening since counts towards the critical
-    // convergence (`collision::transference_due`). The slabs are those of the last balance.
-    if env.k.transference {
+    // convergence (`collision::transference_due`), as it does for the reversal behind the
+    // overriding block (ledger PLT-737). The slabs are those of the last balance.
+    if env.k.transference || env.k.collision_backarc_reversal {
         let live: std::collections::BTreeSet<(u32, u32)> = state
             .slabs
             .iter()
@@ -624,6 +627,7 @@ pub fn advance(
                 contact: k,
                 seeds: list,
                 stalled,
+                front: fronts.get(&k).map(|f| f.edge.clone()).unwrap_or_default(),
             });
         }
     }
@@ -1387,7 +1391,7 @@ mod tests {
         let per_step = fx.front(&st, 1).unwrap().convergence_mm_yr() * 2.0;
         let need = (threshold / per_step).ceil() as u64;
         assert!(need >= 2, "the threshold takes more than one step");
-        let at_front = fx.front(&st, 1).unwrap().crust;
+        let (at_front, edge) = fx.front(&st, 1).map(|f| (f.crust, f.edge)).unwrap();
         // Seeds from the overlap (`subduction::resolve`): one sample at the front, one elsewhere.
         let extra = (0..N as u32).find(|j| !at_front.contains(j)).unwrap();
         let seeds = || BTreeMap::from([(0usize, vec![extra, at_front[0]])]);
@@ -1419,7 +1423,8 @@ mod tests {
             vec![Fired {
                 contact: 0,
                 seeds: at_front.clone(),
-                stalled: false
+                stalled: false,
+                front: edge.clone(),
             }]
         );
         let shortening = st.contacts[0].collision.as_ref().unwrap().shortening_km;

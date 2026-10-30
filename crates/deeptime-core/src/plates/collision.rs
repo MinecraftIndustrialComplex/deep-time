@@ -23,7 +23,13 @@
 //!   collision has not stalled also moves alone, once its subduction has failed (the contact's
 //!   slab is gone), its plate has gone on converging on it by the critical convergence since, and
 //!   the collision's push on it over its margin against its own plate's ocean floor is enough to
-//!   start a new subduction zone there ([`transference_due`]).
+//!   start a new subduction zone there ([`transference_due`]);
+//! - with `tectonics.collision_backarc_reversal` (Stern 2004's polarity reversal; ledger
+//!   PLT-737), in the same collision the overriding plate's continental block behind the front
+//!   moves to the incoming plate instead, once the push carried to the block's back coast reaches
+//!   that force there ([`backarc_block`]): a new subduction zone behind the block, where the
+//!   overriding plate's own ocean floor meets it. Where both are due, the margin with the larger
+//!   force per metre ruptures.
 //!
 //! No uplift is applied here: the belt is built while the collision lasts. (Until tasks 3 and 4
 //! a collision raised everything within up to 2,000 km of the contact by one surge in the step it
@@ -43,7 +49,7 @@ use super::Env;
 use super::dynamics::{CollisionRec, Footprint};
 use super::events::{self, COLLISION, OROGENY_PHASE, PLATE_DEATH, TERRANE_ACCRETION};
 use super::forces::G_EARTH;
-use super::geometry::{Geo, coast_split};
+use super::geometry::{Geo, Tree, coast_split};
 use super::kinematics::cap_speed;
 use super::state::{CONTINENTAL, Group, HIDDEN, PlateState};
 use crate::error::CoreError;
@@ -76,6 +82,118 @@ pub fn transference_due(push_n: f64, margin_m: f64, since_jam_km: f64, g_scale: 
         && push_n / margin_m >= TRANSFERENCE_FORCE_N_M * g_scale
 }
 
+/// The overriding block behind a collision front, its back coast and the collision's push there
+/// ([`backarc_block`]; ledger PLT-737).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Backarc {
+    /// The block's samples, sorted.
+    pub block: Vec<u32>,
+    /// The push that reaches the back coast, N: the collision's, times the mean of e^(−x/L)
+    /// over the coast.
+    pub push_n: f64,
+    /// The back coast's length, m.
+    pub coast_m: f64,
+}
+
+/// The overriding block behind a collision front and the push that reaches its back coast, where
+/// a new subduction zone would start ([`transference_due`] decides whether it does; ledger
+/// PLT-737: the mirror of transference on the overriding side, Stern 2004's polarity reversal, "a
+/// new subduction zone forming behind the magmatic arc"). None without a block or a back coast.
+///
+/// The block is plate `over`'s visible continental crust connected to its continental samples
+/// on the front (`front`, [`super::shortening::Front::edge`]); its back coast the block's samples
+/// next to visible ocean floor of their own plate and rigid group that lies farther from the front
+/// than they do (x, the great-circle distance to the nearest front sample), so a forearc in front
+/// of the block is not part of it. The collision's push (`push_n`, N) reaches the back coast as the
+/// thin sheet's response does, by e^(−x/L) with L = 2W/π for a front `front_km` (W) long
+/// (PLT-733's length), averaged over the coast.
+pub fn backarc_block(
+    state: &PlateState,
+    geo: &Geo,
+    pos: &[DVec3],
+    env: &Env,
+    over: u32,
+    front: &[u32],
+    front_km: f64,
+    push_n: f64,
+) -> Option<Backarc> {
+    if front.is_empty() {
+        return None;
+    }
+    let norm = env.norm;
+    let plate_of = |i: usize| state.groups[state.samples[i].group as usize].plate;
+    let crust = |i: usize| {
+        let s = &state.samples[i];
+        plate_of(i) == over && s.kind == CONTINENTAL && !s.is_hidden()
+    };
+    let n = state.samples.len();
+    let mut in_block = vec![false; n];
+    let mut stack: Vec<u32> = front
+        .iter()
+        .copied()
+        .filter(|&i| crust(i as usize))
+        .collect();
+    for &i in &stack {
+        in_block[i as usize] = true;
+    }
+    let mut block = Vec::new();
+    while let Some(v) = stack.pop() {
+        block.push(v);
+        for (u, _) in geo.edges(v) {
+            if !in_block[u as usize] && crust(u as usize) {
+                in_block[u as usize] = true;
+                stack.push(u);
+            }
+        }
+    }
+    if block.is_empty() {
+        return None;
+    }
+    block.sort_unstable();
+    let mut on_front = vec![false; n];
+    for &i in front {
+        on_front[i as usize] = true;
+    }
+    let edge = Tree::over(pos, |i| on_front[i]);
+    // Great-circle distance behind the front, km (the tree's squared chord to an angle).
+    let behind_km = |i: u32| {
+        edge.nearest(pos[i as usize])
+            .map_or(0.0, |(_, d2)| norm.km(2.0 * (0.5 * d2.sqrt()).min(1.0).asin()))
+    };
+    let reach_km = super::belts::sheet_reach_km(front_km); // ledger: PLT-733
+    let (mut coast, mut decay) = (0_usize, 0.0);
+    for &i in &block {
+        let g = state.samples[i as usize].group;
+        let ocean: Vec<u32> = geo
+            .edges(i)
+            .map(|(u, _)| u)
+            .filter(|&u| {
+                let o = &state.samples[u as usize];
+                plate_of(u as usize) == over
+                    && o.group == g
+                    && o.kind != CONTINENTAL
+                    && !o.is_hidden()
+            })
+            .collect();
+        if ocean.is_empty() {
+            continue;
+        }
+        let x = behind_km(i);
+        if ocean.iter().any(|&u| behind_km(u) > x) {
+            coast += 1;
+            decay += (-x / reach_km).exp();
+        }
+    }
+    if coast == 0 {
+        return None;
+    }
+    Some(Backarc {
+        block,
+        push_n: push_n * decay / coast as f64,
+        coast_m: norm.km(coast as f64 * norm.spacing_rad()) * 1000.0,
+    })
+}
+
 /// What a collision did.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Collided {
@@ -96,7 +214,8 @@ pub struct Collided {
 /// or under the overriding plate, when it is due (see the module docs): `stalled` says whether
 /// its convergence has stayed below `weld_speed_mm_yr` for `weld_after_myr`; `push_n` is the
 /// collision's plastic resistance this step, N (`forces::Answer::collision_n`), which
-/// transference reads.
+/// transference and the reversal behind the overriding block read; `front` is the overriding
+/// plate's edge on this step's front, which the reversal reads ([`backarc_block`]).
 #[allow(clippy::too_many_arguments)]
 pub fn collide(
     state: &mut PlateState,
@@ -106,6 +225,7 @@ pub fn collide(
     env: &Env,
     k: usize,
     seeds: &[u32],
+    front: &[u32],
     stalled: bool,
     push_n: Option<f64>,
 ) -> Result<Collided, CoreError> {
@@ -133,7 +253,8 @@ pub fn collide(
     // Transference (ledger PLT-516): a pushed continent may go alone once its subduction has
     // failed and its plate has converged on it by the critical convergence since (the
     // shortening since the jam, km, and the push, N); the force is judged on the whole terrane.
-    let pushed = if p.transference && !stalled {
+    // The reversal behind the overriding block waits for the same (ledger PLT-737).
+    let pushed = if (p.transference || p.collision_backarc_reversal) && !stalled {
         state.contacts[k]
             .collision
             .as_ref()
@@ -177,47 +298,90 @@ pub fn collide(
     let area_km2 = terrane.len() as f64 * norm.sample_area_km2();
     let mut suture = welds(terrane.len());
     let mut transferred = false;
+    // The overriding block, when it moves to the incoming plate (ledger PLT-737).
+    let mut reversed: Option<Vec<u32>> = None;
     if suture && !stalled {
         let Some((since_km, push)) = pushed else {
             return Ok(deferred);
         };
         // The continent's margin against its own plate's ocean floor: where the new subduction
-        // zone would start.
-        let margin = terrane
-            .iter()
-            .filter(|&&i| {
-                !state.samples[i as usize].is_hidden()
-                    && geo.edges(i).any(|(u, _)| {
-                        let o = &state.samples[u as usize];
-                        plate_of(u as usize) == under && o.kind != CONTINENTAL && !o.is_hidden()
+        // zone would start (the force per metre there, when it starts one).
+        let ahead = p
+            .transference
+            .then(|| {
+                let margin = terrane
+                    .iter()
+                    .filter(|&&i| {
+                        !state.samples[i as usize].is_hidden()
+                            && geo.edges(i).any(|(u, _)| {
+                                let o = &state.samples[u as usize];
+                                plate_of(u as usize) == under
+                                    && o.kind != CONTINENTAL
+                                    && !o.is_hidden()
+                            })
                     })
+                    .count();
+                let margin_m = norm.km(margin as f64 * norm.spacing_rad()) * 1000.0;
+                transference_due(push, margin_m, since_km, env.gravity / G_EARTH)
+                    .then(|| push / margin_m)
             })
-            .count();
-        let margin_m = norm.km(margin as f64 * norm.spacing_rad()) * 1000.0;
-        if !transference_due(push, margin_m, since_km, env.gravity / G_EARTH) {
-            return Ok(deferred);
+            .flatten();
+        // Behind the overriding block: the other side's new subduction zone.
+        let behind = p
+            .collision_backarc_reversal
+            .then(|| {
+                let front_km = state.contacts[k].collision.as_ref().map_or(0.0, |c| c.front_km);
+                backarc_block(state, geo, pos, env, over, front, front_km, push)
+            })
+            .flatten()
+            .filter(|b| transference_due(b.push_n, b.coast_m, since_km, env.gravity / G_EARTH))
+            .map(|b| (b.block, b.push_n / b.coast_m));
+        match (ahead, behind) {
+            (None, None) => return Ok(deferred),
+            (Some(a), Some((block, b))) if b > a => reversed = Some(block),
+            (None, Some((block, _))) => reversed = Some(block),
+            _ => transferred = true,
         }
         suture = false;
-        transferred = true;
     }
+    // What moves, from which plate to which: the terrane to the overriding plate, or with the
+    // reversal the overriding block to the incoming plate.
+    let (moving, from, to) = match &reversed {
+        Some(block) => (block.as_slice(), over, under),
+        None => (terrane.as_slice(), under, over),
+    };
+    let in_block: Vec<bool> = reversed.as_ref().map_or_else(Vec::new, |block| {
+        let mut m = vec![false; n];
+        for &i in block {
+            m[i as usize] = true;
+        }
+        m
+    });
+    let moves = |i: usize| {
+        if reversed.is_some() {
+            in_block[i]
+        } else {
+            in_terrane[i]
+        }
+    };
     let over_samples = f64::from(state.plates[over as usize].samples.max(1));
     let under_samples = f64::from(state.plates[under as usize].samples.max(1));
-    let q = terrane
+    let q = moving
         .iter()
         .map(|&i| pos[i as usize])
         .sum::<DVec3>()
         .normalize_or(DVec3::from_array(state.contacts[k].centroid));
 
-    // The terrane's coasts whose ocean stays behind on the subducting plate (none with a suture).
+    // The coasts of what moves whose ocean stays behind on its plate (none with a suture).
     let split_coast = if suture {
         0
     } else {
         coast_split(
             geo,
             state,
-            &terrane,
-            |i| plate_of(i) == under,
-            |i| u32::from(in_terrane[i]),
+            moving,
+            |i| plate_of(i) == from,
+            |i| u32::from(moves(i)),
         )
     };
     let omega_u = DVec3::from_array(state.plates[under as usize].omega);
@@ -230,7 +394,7 @@ pub fn collide(
     let (keep, die) = if suture && under_samples > over_samples {
         (under, over)
     } else {
-        (over, under)
+        (to, from)
     };
     // The terrane's crust that crossed the front during the collision (`stacked`, under the
     // overriding plate) was stacked into the belt or went down with the slab when it crossed
@@ -250,9 +414,9 @@ pub fn collide(
             }
         }
     } else {
-        // Transfer: each of the terrane's groups gets a twin in the receiving plate.
+        // Transfer: each of the moving crust's groups gets a twin in the receiving plate.
         let mut twin: BTreeMap<u32, u32> = BTreeMap::new();
-        let moving: Vec<u32> = terrane
+        let moving: Vec<u32> = moving
             .iter()
             .copied()
             .filter(|&i| !state.samples[i as usize].stacked)
@@ -261,7 +425,7 @@ pub fn collide(
             let g = state.samples[i as usize].group;
             let new = *twin.entry(g).or_insert_with(|| {
                 let rot = state.groups[g as usize].rot;
-                state.groups.push(Group { plate: over, rot });
+                state.groups.push(Group { plate: to, rot });
                 (state.groups.len() - 1) as u32
             });
             let s = &mut state.samples[i as usize];
@@ -273,12 +437,15 @@ pub fn collide(
         }
     }
 
-    // The receiving plate carries the terrane's momentum (with a weld, the whole plate's).
+    // The receiving plate carries the moving crust's momentum (with a weld, the whole plate's).
     // ledger: PLT-080.
     let merged = if suture {
         (omega_o * over_samples + omega_u * under_samples) / (over_samples + under_samples)
+    } else if reversed.is_some() {
+        let t = moving.len() as f64;
+        (omega_u * under_samples + omega_o * t) / (under_samples + t)
     } else {
-        let t = terrane.len() as f64;
+        let t = moving.len() as f64;
         (omega_o * over_samples + omega_u * t) / (over_samples + t)
     };
     state.plates[keep as usize].omega =
@@ -306,18 +473,21 @@ pub fn collide(
         state.counters.accretions += 1;
         None
     } else if frac < p.collision_min_frac {
+        let moved_km2 = moving.len() as f64 * norm.sample_area_km2();
         let e = events::event(world, t_myr, TERRANE_ACCRETION, q)
-            .magnitude(frac as f32)
-            .param("from_plate", i64::from(under))
-            .param("to_plate", i64::from(over))
-            .param("area_km2", planet_area)
-            .param("samples", terrane.len() as i64)
+            .magnitude((moved_km2 / state.a0_km2) as f32)
+            .param("from_plate", i64::from(from))
+            .param("to_plate", i64::from(to))
+            .param("area_km2", norm.planet_area_km2(moved_km2))
+            .param("samples", moving.len() as i64)
             .param("uplift_m", belt.uplift_m)
             .param("coast_split_km", coast_km)
             .param("sutured", i64::from(suture))
             .caused_by(onset);
         let e = if transferred {
             e.param("transference", 1_i64)
+        } else if reversed.is_some() {
+            e.param("backarc_reversal", 1_i64)
         } else {
             e
         };
@@ -341,24 +511,29 @@ pub fn collide(
             .caused_by(onset);
         let e = if transferred {
             e.param("transference", 1_i64)
+        } else if reversed.is_some() {
+            e.param("backarc_reversal", 1_i64)
         } else {
             e
         };
         let collision = world.emit(e)?;
+        // What joined another plate: the terrane, or with the reversal the overriding block.
+        let moved_km2 = moving.len() as f64 * norm.sample_area_km2();
         let e = events::event(world, t_myr, TERRANE_ACCRETION, q)
-            .magnitude((area_km2 / state.a0_km2) as f32)
-            .param("from_plate", i64::from(under))
-            .param("to_plate", i64::from(over))
-            .param("area_km2", planet_area)
-            .param("samples", terrane.len() as i64)
+            .magnitude((moved_km2 / state.a0_km2) as f32)
+            .param("from_plate", i64::from(from))
+            .param("to_plate", i64::from(to))
+            .param("area_km2", norm.planet_area_km2(moved_km2))
+            .param("samples", moving.len() as i64)
             .caused_by(collision);
         world.emit(e)?;
-        // The orogeny lasted the collision: from its onset to now.
+        // The orogeny lasted the collision: from its onset to now, on the plate its belt is on.
+        let belt_plate = if reversed.is_some() { under } else { over };
         let e = events::event(world, collision_onset_myr, OROGENY_PHASE, centroid)
             .until(t_myr * 1.0e6)
             .magnitude((belt.peak_height_m / 1000.0) as f32)
             .param("orogeny", "himalayan")
-            .param("plate", i64::from(over))
+            .param("plate", i64::from(belt_plate))
             .param("uplift_m", belt.uplift_m)
             .param("belt_height_m", belt.peak_height_m)
             .caused_by(collision);
@@ -371,6 +546,9 @@ pub fn collide(
     // `collision_suture_frac` or more) that did not suture: without it every such one welds.
     if transferred {
         state.counters.transferences += 1;
+    }
+    if reversed.is_some() {
+        state.counters.backarc_reversals += 1;
     }
     if suture {
         let at = DVec3::from_array(state.plates[die as usize].centroid);

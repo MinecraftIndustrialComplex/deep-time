@@ -1449,7 +1449,7 @@ fn upper_applies(k: &crate::params::TectonicParams) -> bool {
 /// al. 2016's 4w/π for a Newtonian sheet driven by cos(πy / 2w)), at n = 1, the sheet law's own
 /// (ε̇ = F / (4 η L), PLT-414). Earth's n of 3 or more (England & Houseman 1986) would shorten it
 /// by √n. ledger: PLT-733
-fn sheet_reach_km(width_km: f64) -> f64 {
+pub(super) fn sheet_reach_km(width_km: f64) -> f64 {
     2.0 / std::f64::consts::PI * width_km
 }
 
@@ -3449,13 +3449,13 @@ mod tests {
             .collect();
         let env = fx.env(1);
         let not_yet = crate::plates::collision::collide(
-            &mut st, &mut world, &fx.geo, &pos, &env, 0, &seeds, false, None,
+            &mut st, &mut world, &fx.geo, &pos, &env, 0, &seeds, &[], false, None,
         )
         .unwrap();
         assert!(not_yet.deferred && !not_yet.sutured);
         assert!(st.plates.iter().all(|p| p.alive) && st.contacts[0].collision.is_some());
         let done = crate::plates::collision::collide(
-            &mut st, &mut world, &fx.geo, &pos, &env, 0, &seeds, true, None,
+            &mut st, &mut world, &fx.geo, &pos, &env, 0, &seeds, &[], true, None,
         )
         .unwrap();
         assert!(done.sutured && !done.deferred);
@@ -3560,7 +3560,7 @@ mod tests {
         };
         let run =
             |fx: &Fixture, st: &mut PlateState, world: &mut crate::world::WorldState, push| {
-                collide(st, world, &fx.geo, &pos, &fx.env(3), 0, &seeds, false, push).unwrap()
+                collide(st, world, &fx.geo, &pos, &fx.env(3), 0, &seeds, &[], false, push).unwrap()
             };
 
         // Short of the critical convergence, or of the force, or with no push recorded: it waits.
@@ -3583,6 +3583,7 @@ mod tests {
             &fx.env(3),
             0,
             &seeds,
+            &[],
             true,
             Some(enough),
         )
@@ -3607,6 +3608,184 @@ mod tests {
         for &i in &ocean {
             assert_eq!(st.plate_of(i as usize), 1, "{i} stayed with its plate");
         }
+    }
+
+    /// The reversal behind the overriding block (ledger PLT-737): in a collision whose slab is
+    /// gone and whose plates have converged by the critical convergence since, a narrow
+    /// overriding block moves to the incoming plate once the push that reaches its back coast
+    /// (the thin sheet's decay, PLT-733) is the force that starts a new subduction zone there
+    /// (PLT-517); its plate keeps its ocean floor. The same push leaves the fixture's whole
+    /// half-continent, whose far coast lies farther behind the front, in place. It waits short of
+    /// the force or the convergence and with the switch off; a stalled collision still welds;
+    /// where transference is due too, the margin with the larger force per metre ruptures.
+    #[test]
+    fn a_narrow_overriding_block_moves_to_the_incoming_plate_behind_a_new_subduction_zone() {
+        use crate::plates::collision::{
+            TRANSFERENCE_FORCE_N_M, TRANSFERENCE_KM, backarc_block, collide, transference_due,
+        };
+        let mut fx = Fixture::new();
+        fx.preset.tectonics.transference = false;
+        fx.preset.tectonics.collision_backarc_reversal = true;
+        // The overriding plate's continent: the cap's half (x < 0), or a strip of it 0.05 wide
+        // behind the front, the rest of the plate ocean floor. The slab is gone and the plates
+        // have converged by the critical convergence since.
+        let setup = |fx: &Fixture, narrow: bool| {
+            let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
+            if narrow {
+                for (i, p) in fx.geo.points().iter().enumerate() {
+                    if p.x < -0.05 {
+                        let mut s = Sample::blank(0);
+                        s.elevation_m = -4000.0;
+                        st.samples[i] = s;
+                    }
+                }
+            }
+            fx.step(&mut st, 1, None);
+            let col = st.contacts[0].collision.as_mut().expect("a collision");
+            col.jam_km = Some(col.shortening_km - TRANSFERENCE_KM);
+            let pos = positions(&st, &fx.geo);
+            let tree = Tree::over(&pos, |_| true);
+            let edge = shortening::fronts(&st, &fx.geo, &pos, &tree, &fx.env(3))
+                .remove(&0)
+                .expect("a front")
+                .edge;
+            (st, pos, edge)
+        };
+        let crust_of = |st: &PlateState, plate: u32| -> Vec<u32> {
+            (0..N as u32)
+                .filter(|&i| {
+                    st.plate_of(i as usize) == plate && st.samples[i as usize].is_continental()
+                })
+                .collect()
+        };
+        let (mut st, pos, edge) = setup(&fx, true);
+        let front_km = st.contacts[0].collision.as_ref().unwrap().front_km;
+        let reach_km = sheet_reach_km(front_km);
+        // The block is the strip, and its back coast lies within the strip's width of the front:
+        // most of the push reaches it.
+        let block = crust_of(&st, 0);
+        let narrow = backarc_block(&st, &fx.geo, &pos, &fx.env(3), 0, &edge, front_km, 1.0)
+            .expect("a back coast");
+        assert_eq!(narrow.block, block);
+        let near = (-fx.norm.km(0.07) / reach_km).exp();
+        assert!(narrow.push_n > near && narrow.push_n <= 1.0, "{narrow:?}");
+        assert!(narrow.coast_m > 0.5 * front_km * 1000.0, "{narrow:?}");
+        let enough = TRANSFERENCE_FORCE_N_M * narrow.coast_m / narrow.push_n * 1.01;
+
+        // The whole half-continent's far coast sees less of the push, over a longer coast: the
+        // same push leaves it in place.
+        let mut world = crate::world::WorldState::new(1, 16_384, 0.0);
+        let (mut wide_st, wide_pos, wide_edge) = setup(&fx, false);
+        let wide = backarc_block(
+            &wide_st,
+            &fx.geo,
+            &wide_pos,
+            &fx.env(3),
+            0,
+            &wide_edge,
+            front_km,
+            1.0,
+        )
+        .expect("a back coast");
+        assert!(wide.push_n < narrow.push_n, "{wide:?} {narrow:?}");
+        assert!(!transference_due(enough * wide.push_n, wide.coast_m, TRANSFERENCE_KM, 1.0));
+        let terrane = crust_of(&wide_st, 1);
+        let seeds: Vec<u32> = terrane.iter().copied().take(5).collect();
+        let kept = collide(
+            &mut wide_st,
+            &mut world,
+            &fx.geo,
+            &wide_pos,
+            &fx.env(3),
+            0,
+            &seeds,
+            &wide_edge,
+            false,
+            Some(enough),
+        )
+        .unwrap();
+        assert!(kept.deferred);
+        assert_eq!(wide_st.counters.backarc_reversals, 0);
+
+        let terrane = crust_of(&st, 1);
+        let seeds: Vec<u32> = terrane.iter().copied().take(5).collect();
+        let ocean: Vec<u32> = (0..N as u32)
+            .filter(|&i| st.plate_of(i as usize) == 0 && !st.samples[i as usize].is_continental())
+            .collect();
+        let run = |fx: &Fixture, st: &mut PlateState, world: &mut crate::world::WorldState,
+                   stalled: bool,
+                   push: f64| {
+            collide(st, world, &fx.geo, &pos, &fx.env(3), 0, &seeds, &edge, stalled, Some(push))
+                .unwrap()
+        };
+        // Short of the force or of the critical convergence: it waits.
+        assert!(run(&fx, &mut st, &mut world, false, enough / 1.02).deferred);
+        let jam = st.contacts[0].collision.as_ref().unwrap().jam_km;
+        st.contacts[0].collision.as_mut().unwrap().jam_km = jam.map(|j| j + 1.0);
+        assert!(run(&fx, &mut st, &mut world, false, enough).deferred);
+        st.contacts[0].collision.as_mut().unwrap().jam_km = jam;
+        // With the switch off it waits for the stall, whatever the push.
+        fx.preset.tectonics.collision_backarc_reversal = false;
+        assert!(run(&fx, &mut st, &mut world, false, enough * 100.0).deferred);
+        fx.preset.tectonics.collision_backarc_reversal = true;
+        // A stalled collision still welds the plates (PLT-246).
+        let mut stalled = st.clone();
+        assert!(run(&fx, &mut stalled, &mut world, true, enough).sutured);
+        assert_eq!(stalled.counters.backarc_reversals, 0);
+
+        // With transference on too, and a push that starts no zone behind the incoming
+        // continent, the block still moves.
+        fx.preset.tectonics.transference = true;
+        // (The terrane's margin against its own plate's ocean floor, as `collide` counts it.)
+        let margin = terrane
+            .iter()
+            .filter(|&&i| {
+                !st.samples[i as usize].is_hidden()
+                    && fx.geo.edges(i).any(|(u, _)| {
+                        let o = &st.samples[u as usize];
+                        st.plate_of(u as usize) == 1 && !o.is_continental() && !o.is_hidden()
+                    })
+            })
+            .count();
+        let margin_m = fx.norm.km(margin as f64 * fx.norm.spacing_rad()) * 1000.0;
+        assert!(!transference_due(enough, margin_m, TRANSFERENCE_KM, 1.0));
+        // Where both are due, the larger force per metre wins.
+        let both = enough * 1000.0;
+        let mut twice = st.clone();
+        let done = run(&fx, &mut twice, &mut world, false, both);
+        assert!(!done.deferred && !done.sutured);
+        let behind_wins = narrow.push_n / narrow.coast_m > 1.0 / margin_m;
+        assert_eq!(
+            (twice.counters.backarc_reversals, twice.counters.transferences),
+            if behind_wins { (1, 0) } else { (0, 1) }
+        );
+
+        // Enough behind the block: it moves to the incoming plate, which carries its momentum;
+        // the overriding plate keeps its ocean floor, the incoming plate its continent.
+        let omega = |st: &PlateState, p: usize| DVec3::from_array(st.plates[p].omega);
+        let (o0, o1) = (omega(&st, 0), omega(&st, 1));
+        let n1 = f64::from(st.plates[1].samples.max(1));
+        let done = run(&fx, &mut st, &mut world, false, enough);
+        assert!(!done.deferred && !done.sutured && done.moved);
+        assert!(st.plates.iter().all(|p| p.alive));
+        assert!(st.contacts[0].collision.is_none());
+        assert_eq!(
+            (st.counters.backarc_reversals, st.counters.transferences, st.counters.sutures),
+            (1, 0, 0)
+        );
+        for &i in &block {
+            assert_eq!(st.plate_of(i as usize), 1, "{i} moved with the block");
+        }
+        for &i in &ocean {
+            assert_eq!(st.plate_of(i as usize), 0, "{i} stayed with its plate");
+        }
+        for &i in terrane.iter().filter(|&&i| !st.samples[i as usize].stacked) {
+            assert_eq!(st.plate_of(i as usize), 1, "{i} stayed with its plate");
+        }
+        assert_eq!(omega(&st, 0), o0);
+        let t = block.len() as f64;
+        let merged = (o1 * n1 + o0 * t) / (n1 + t);
+        assert!((omega(&st, 1) - merged).length() <= 1e-9 * o1.length());
     }
 
     /// Only continental crust takes the belt's stack (ledger PLT-290): the overriding plate's
@@ -3683,7 +3862,7 @@ mod tests {
                 .collect();
             let env = fx.env(1);
             let done = crate::plates::collision::collide(
-                &mut st, &mut world, &fx.geo, &pos, &env, 0, &seeds, true, None,
+                &mut st, &mut world, &fx.geo, &pos, &env, 0, &seeds, &[], true, None,
             )
             .unwrap();
             assert_eq!(done.sutured, weld);
