@@ -320,6 +320,10 @@ public final class LakeGameTests {
                 lakeCells, playaCells, frozen.size(), frozenRead, frozenWarm, open.size(), openRead, openCold, salt.size(), saltRead, overhung, onSpring, openedColumns,
                 saltBlock == null ? "none" : BuiltInRegistries.BLOCK.getKey(saltBlock.getBlock()), underFlow, springs, ringRead, ringWrong,
                 ringUnderFlow, ringOpened, ice.threshold(), wrong, flowDetail, detail);
+        // The opened columns are a few cave mouths, not the flats: a carve-out that sets apart more than a quarter
+        // of what it read would hide the rule (Graphide's review of PR #41).
+        helper.assertTrue(openedColumns * 4 <= saltRead && ringOpened * 4 <= ringRead, "opened through the salt: "
+                + openedColumns + " of " + saltRead + " flat columns, " + ringOpened + " of " + ringRead + " ring columns");
         helper.assertTrue(wrong == 0, wrong + " columns break the lake-ice or salt rule:" + detail);
         helper.succeed();
     }

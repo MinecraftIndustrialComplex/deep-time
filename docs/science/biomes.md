@@ -1244,8 +1244,10 @@ help (tried and reverted the same day): the test's ground under the redwood's wo
 top at 64, a block set on the salt first, so no log stood on salt itself; and the MIC columns were not built on at
 all: air from the bake's top at y 65 down to the breccia at 62 at two pairs of columns by the springs, no
 structure's piece there (the test asked `getStructureWithPieceAt`), so the ground was opened through the salt after
-the surface stage, as a carver's mouth is. The test now counts such a column apart (ground more than a block under
-the bake's top less the salt's depth: no flat's surface left to read), as it does water and lava flows over the flat. As with the swamp beside a salt flat (BIO-178), the biome gives way: the rule file `deeptime:salt_flat`
+the surface stage, as a carver's mouth is. The test now counts such a column apart (its ground at or under the salt's bottom, the bake's top
+less the salt's depth: no flat's surface left to read), as it does water and lava flows over the flat, and fails
+when it sets apart more than a quarter of the columns it read (of the flats, or of the springs' rings): a
+carve-out that large would hide the rule, not a few cave mouths. As with the swamp beside a salt flat (BIO-178), the biome gives way: the rule file `deeptime:salt_flat`
 gives a playa column a member of `#deeptime:salt_flat`, vanilla's desert (no trees; its cactus and dead bushes
 need sand) or Biomes O' Plenty's cold desert (no tree feature; a TerraBlender region of Biomes O' Plenty's has no
 desert, so the rule had no candidate there and the redwood came back on one of two runs), in any pack whose source can place one, after Expanded Ecosphere's salt lakes where that file is
