@@ -1231,6 +1231,32 @@ alike): the water bake changed 68 of its own nodes beside its 190 playa cells, a
 then passes standalone and with MIC: 24 playa columns read, every one salt (calcite), 2 of them under a neighbour's
 canopy, none wrong.
 
+## A salt flat in any pack (2026-10-29, BIO-199)
+
+Only Expanded Ecosphere's rules gave a playa a biome of its own (its salt lakes, BIO-120). With any other set the
+flat took the climate's biome, and where that was a forest its trees and features stood on the salt. The gate on
+master 649baf54 found it on that commit's test planet: `lakeIceAndSaltFollowTheClimate` met Biomes O' Plenty's
+`redwood_wood` over the salt by a spring at (-430, 144) in `biomesoplenty:redwood_forest` (TerraBlender), and
+with MIC the same columns' ground three blocks under the bake's top, the crater breccia (`createmetallurgy:slag_block`,
+MIC's `impact_breccia`) at the surface, in `minecraft:forest`. The bake there: playa 1 block, Köppen class 14, top
+y 64 and 65. A guard on `WorldGenRegion.setBlock` refusing logs on the salt and solid blocks in its place did not
+help (tried and reverted the same day): the test's ground under the redwood's wood stood at y 65 over the bake's
+top at 64, a block set on the salt first, so no log stood on salt itself; and the MIC columns were not built on at
+all: air from the bake's top at y 65 down to the breccia at 62 at two pairs of columns by the springs, no
+structure's piece there (the test asked `getStructureWithPieceAt`), so the ground was opened through the salt after
+the surface stage, as a carver's mouth is. The test now counts such a column apart (its ground at or under the salt's bottom, the bake's top
+less the salt's depth: no flat's surface left to read), as it does water and lava flows over the flat, and fails
+when it sets apart more than a quarter of the columns it read (of the flats, or of the springs' rings): a
+carve-out that large would hide the rule, not a few cave mouths. As with the swamp beside a salt flat (BIO-178), the biome gives way: the rule file `deeptime:salt_flat`
+gives a playa column a member of `#deeptime:salt_flat`, vanilla's desert (no trees; its cactus and dead bushes
+need sand) or Biomes O' Plenty's cold desert (no tree feature; a TerraBlender region of Biomes O' Plenty's has no
+desert, so the rule had no candidate there and the redwood came back on one of two runs), in any pack whose source can place one, after Expanded Ecosphere's salt lakes where that file is
+active (its id sorts first). A biome query reads at the centre of its 4 x 4 cell, and on that planet the centre of the redwoods' cell, (-430, 146),
+lay a block off the flat whose edge columns at z 144 and 145 held salt, so the rule never ran there and the
+redwoods stood on both TerraBlender runs that followed; the playa condition now holds a cell when any of its columns is
+salt (Expanded Ecosphere's salt lakes with it). A game-choice; a salt crust growing no tree is HYD-180's reading,
+from memory.
+
 ## Land on a delta plain (2026-10-23, BIO-185)
 
 A delta plain (rivers-and-lakes.md, "Deltas and distributaries") is laid by the bake's water part, after the climate

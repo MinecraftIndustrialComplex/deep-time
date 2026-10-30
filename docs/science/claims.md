@@ -22,7 +22,7 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | [AMP](ledger/AMP.md) | the amplifier | 84 | 1 | 8 | 1 | 0 | 2 | 63 | 9 | 0 | 0 | 0 |
 | [BAK](ledger/BAK.md) | the bake, satellite view | 57 | 2 | 0 | 0 | 0 | 1 | 49 | 5 | 0 | 0 | 0 |
-| [BIO](ledger/BIO.md) | Köppen classes and biomes | 176 | 25 | 3 | 5 | 3 | 1 | 137 | 2 | 0 | 0 | 1 |
+| [BIO](ledger/BIO.md) | Köppen classes and biomes | 177 | 25 | 3 | 5 | 3 | 1 | 138 | 2 | 0 | 0 | 1 |
 | [CHK](ledger/CHK.md) | plate-check target ranges | 60 | 19 | 3 | 1 | 7 | 0 | 12 | 18 | 3 | 1 | 0 |
 | [CLM](ledger/CLM.md) | climate physics | 185 | 34 | 32 | 6 | 3 | 20 | 39 | 51 | 112 | 1 | 16 |
 | [CRE](ledger/CRE.md) | core engine: plate geometry, noise, plate state, deformation lattice | 35 | 0 | 8 | 0 | 0 | 0 | 0 | 27 | 1 | 0 | 0 |
@@ -51,7 +51,7 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [STR](ledger/STR.md) | strata, traps, hosts | 53 | 1 | 0 | 0 | 1 | 2 | 49 | 0 | 0 | 0 | 4 |
 | [VOL](ledger/VOL.md) | volcanoes | 110 | 7 | 0 | 3 | 3 | 2 | 71 | 24 | 0 | 0 | 0 |
 | [YNG](ledger/YNG.md) | the young landscape | 21 | 0 | 0 | 0 | 0 | 1 | 11 | 9 | 0 | 0 | 2 |
-| **all** | | **2,984** | **428** | **347** | **67** | **132** | **85** | **1,418** | **507** | **326** | **11** | **274** |
+| **all** | | **2,985** | **428** | **347** | **67** | **132** | **85** | **1,419** | **507** | **326** | **11** | **274** |
 
 72 rows are `verified` (counted from the ledger files after WP-2 merged WP-15/16 and the plate-check boundary mix, 2026-10-02, WP-13a, the volcano decisions and WP-8): PLT-213 and PLT-218 (plate-check boundary mix and arc heights), ISO-041, ISO-042
 and ISO-048 (the flexure agent), MAG-028 and MAG-029 (WP-2), one GEO row and thirteen HNT rows (WP-15, WP-16, WP-2 and the volcano decisions),
