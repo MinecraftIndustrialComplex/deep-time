@@ -134,6 +134,18 @@ public final class LakeGameTests {
         return b.toString();
     }
 
+    /**
+     * Whether something opened column (x, z) through its salt: its ground lies at or under the salt's bottom (the
+     * bake's terrain top less the salt's depth), so no flat's surface is left to read (a carver's mouth on the flat;
+     * 649baf54's test planet with MIC: air from the bake's top at y 64 and 65 down to the crater breccia at 62, at two
+     * pairs of columns by its springs), as water or the ice cover over it are not.
+     */
+    private static boolean opened(WorldDataTerrain w, RasterSampler playa, Ground gr, int x, int z) {
+        double v = playa.nearest(x, z);
+        int n = Double.isNaN(v) ? 0 : (int) Math.round(v);
+        return gr.y() <= (int) Math.floor(w.height(x, z)) - n;
+    }
+
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 4800)
     public static void lakeIceAndSaltFollowTheClimate(GameTestHelper helper) {
         ServerLevel level = helper.getLevel().getServer().getLevel(GameTestSupport.TEST_PLANET_REAL);
@@ -206,7 +218,7 @@ public final class LakeGameTests {
         }
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         StringBuilder detail = new StringBuilder();
-        int wrong = 0, frozenWarm = 0, openCold = 0, frozenRead = 0, openRead = 0, saltRead = 0, overhung = 0, underFlow = 0;
+        int wrong = 0, frozenWarm = 0, openCold = 0, frozenRead = 0, openRead = 0, saltRead = 0, overhung = 0, underFlow = 0, openedColumns = 0;
         StringBuilder flowDetail = new StringBuilder();
         for (Spot s : frozen) {
             BlockState top = level.getChunk(s.x() >> 4, s.z() >> 4).getBlockState(pos.set(s.x(), s.top(), s.z()));
@@ -246,6 +258,10 @@ public final class LakeGameTests {
                 underFlow++;   // a lava flow over the flat
                 continue;
             }
+            if (!bad.isEmpty() && opened(w, playa, gr, s.x(), s.z())) {
+                openedColumns++;   // opened through its salt: no flat's surface to read
+                continue;
+            }
             if (!bad.isEmpty()) {
                 wrong++;
                 detail.append(' ').append(bad).append('(').append(s.x()).append(',').append(gr.y()).append(',').append(s.z()).append(' ')
@@ -255,7 +271,7 @@ public final class LakeGameTests {
         // Round every hot spring by a playa, the flat it does not claim is salt too: no role biome comes within
         // VolcanicBiomes.PLAYA_MARGIN of a playa (BIO-165; before it, Biomes O' Plenty's hot springs dug ponds into the
         // flat and ringed them with thermal calcite, which the sparse grid above found only where it happened to fall).
-        int springs = 0, ringRead = 0, ringWrong = 0, ringUnderFlow = 0;
+        int springs = 0, ringRead = 0, ringWrong = 0, ringUnderFlow = 0, ringOpened = 0;
         for (Geothermal.Site site : geo.sites()) {
             if (springs >= MOST)
                 break;
@@ -286,19 +302,28 @@ public final class LakeGameTests {
                                 .append(site.x()).append(',').append(site.z()).append(')');
                     continue;   // a lava flow over the flat beside the spring
                 }
+                if (opened(w, playa, gr, c[0], c[1])) {
+                    ringOpened++;   // opened through its salt: no flat's surface to read
+                    continue;
+                }
                 if (ringWrong++ < 12)
                     detail.append(" spring-ring:").append(bad).append('(').append(c[0]).append(',').append(gr.y()).append(',').append(c[1])
                             .append(' ').append(biome(level, c[0], gr.y(), c[1])).append(" spring ").append(site.kind()).append('@')
-                            .append(site.x()).append(',').append(site.z()).append(')');
+                            .append(site.x()).append(',').append(site.z())
+                            .append(column(level, playa, c[0], gr.y() + 4, c[1])).append(')');
             }
         }
         wrong += ringWrong;
         DeepTime.LOGGER.info("[gametest] lakeIceAndSaltFollowTheClimate lakeCells={} playaCells={} frozenLakeColumns={} (iceRead={} inWarmBiome={}) "
-                        + "openLakeColumns={} (waterRead={} inColdBiome={}) playaColumns={} (saltRead={} underCanopy={} onSpring={} salt={}) "
-                        + "underFlow={} springsOnPlaya={} (ringRead={} ringWrong={} ringUnderFlow={}) threshold={} wrong={}{}{}",
-                lakeCells, playaCells, frozen.size(), frozenRead, frozenWarm, open.size(), openRead, openCold, salt.size(), saltRead, overhung, onSpring,
+                        + "openLakeColumns={} (waterRead={} inColdBiome={}) playaColumns={} (saltRead={} underCanopy={} onSpring={} opened={} salt={}) "
+                        + "underFlow={} springsOnPlaya={} (ringRead={} ringWrong={} ringUnderFlow={} ringOpened={}) threshold={} wrong={}{}{}",
+                lakeCells, playaCells, frozen.size(), frozenRead, frozenWarm, open.size(), openRead, openCold, salt.size(), saltRead, overhung, onSpring, openedColumns,
                 saltBlock == null ? "none" : BuiltInRegistries.BLOCK.getKey(saltBlock.getBlock()), underFlow, springs, ringRead, ringWrong,
-                ringUnderFlow, ice.threshold(), wrong, flowDetail, detail);
+                ringUnderFlow, ringOpened, ice.threshold(), wrong, flowDetail, detail);
+        // The opened columns are a few cave mouths, not the flats: a carve-out that sets apart more than a quarter
+        // of what it read would hide the rule (Graphide's review of PR #41).
+        helper.assertTrue(openedColumns * 4 <= saltRead && ringOpened * 4 <= ringRead, "opened through the salt: "
+                + openedColumns + " of " + saltRead + " flat columns, " + ringOpened + " of " + ringRead + " ring columns");
         helper.assertTrue(wrong == 0, wrong + " columns break the lake-ice or salt rule:" + detail);
         helper.succeed();
     }
