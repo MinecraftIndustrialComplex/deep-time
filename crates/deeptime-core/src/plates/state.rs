@@ -126,14 +126,19 @@ pub struct Sample {
     pub formed_myr: f32,
     /// When the last orogenic uplift happened here, Myr (a_c = t − this).
     pub orogeny_myr: f32,
-    /// When this sample's current collision orogeny began, and its last collision stamp, Myr
-    /// ([`Sample::stamp_collision`]; −∞: none). Only a collision's stamp sets them: an arc that
+    /// When this sample's current collision orogeny began ([`Sample::collision_onset_myr`]): in
+    /// half-Myr steps after −16,384 Myr, 0 where it has had none; and its last collision stamp
+    /// ([`Sample::collision_myr`]): in 4-Myr steps after the onset, rounded (±2 Myr), at most 255
+    /// (1,020 Myr). Only a collision's stamp sets them ([`Sample::stamp_collision`]): an arc that
     /// later relabels the sample Andean (and renews `orogeny_myr`) leaves them, and the melt
-    /// window reads them ([`Sample::collision_melt`]). ledger: PLT-734
-    #[serde(default = "never_myr")]
-    pub collision_onset_myr: f32,
-    #[serde(default = "never_myr")]
-    pub collision_myr: f32,
+    /// window reads them ([`Sample::collision_melt`]). Packed into the 3 bytes the struct's
+    /// alignment left free: the full 16k preset's estimate (three copies of every sample) fits
+    /// its 5 GiB cap with about 1 MiB to spare (`surface::young`'s estimate test), so a `Sample`
+    /// cannot grow. ledger: PLT-734
+    #[serde(default)]
+    pub collision_onset: u16,
+    #[serde(default)]
+    pub collision_span: u8,
     /// r, the local ridge direction (oceanic), a tangent vector in the group frame.
     pub ridge: [f32; 3],
     /// f, the local fold (shortening) direction (continental), a tangent vector in the group frame.
@@ -204,9 +209,10 @@ pub struct Sample {
     pub carrier_lithosphere_km: f32,
 }
 
-fn never_myr() -> f32 {
-    f32::NEG_INFINITY
-}
+/// The packed collision times' origin, Myr (world time runs from minus the history's length to
+/// 0), and the step of the last stamp after the onset, Myr ([`Sample::collision_onset`]).
+const COLLISION_T0_MYR: f64 = -16_384.0;
+const COLLISION_SPAN_MYR: f64 = 4.0;
 
 impl Sample {
     /// A blank oceanic sample.
@@ -221,8 +227,8 @@ impl Sample {
             thickness_m: 0.0,
             formed_myr: 0.0,
             orogeny_myr: f32::NEG_INFINITY,
-            collision_onset_myr: f32::NEG_INFINITY,
-            collision_myr: f32::NEG_INFINITY,
+            collision_onset: 0,
+            collision_span: 0,
             ridge: [0.0; 3],
             fold: [0.0; 3],
             pools: [0.0; pool::COUNT],
@@ -260,13 +266,30 @@ impl Sample {
     /// than `melt_end_myr` (`collision_melt_end_myr`) ago: crust still hot from a collision that
     /// is thickened again goes on melting. ledger: PLT-734
     pub fn stamp_collision(&mut self, t_myr: f64, melt_end_myr: f64) {
-        // With no collision before, `collision_myr` is −∞ and the age +∞.
-        if t_myr - f64::from(self.collision_myr) > melt_end_myr {
-            self.collision_onset_myr = t_myr as f32;
+        // With no collision before, the last stamp is −∞ and its age +∞.
+        if t_myr - self.collision_myr() > melt_end_myr {
+            let half = (2.0 * (t_myr - COLLISION_T0_MYR)).round();
+            self.collision_onset = half.clamp(1.0, f64::from(u16::MAX)) as u16;
         }
-        self.collision_myr = t_myr as f32;
+        // The span from the exact onset, so rounding never accumulates over a belt's stamps.
+        let span = (t_myr - self.collision_onset_myr()) / COLLISION_SPAN_MYR;
+        self.collision_span = span.round().clamp(0.0, f64::from(u8::MAX)) as u8;
         self.orogeny = OROGENY_HIMALAYAN;
         self.orogeny_myr = t_myr as f32;
+    }
+
+    /// When the current collision orogeny began, Myr (−∞: none).
+    pub fn collision_onset_myr(&self) -> f64 {
+        if self.collision_onset == 0 {
+            f64::NEG_INFINITY
+        } else {
+            COLLISION_T0_MYR + 0.5 * f64::from(self.collision_onset)
+        }
+    }
+
+    /// The last collision stamp, Myr, to ±2 Myr (−∞: none).
+    pub fn collision_myr(&self) -> f64 {
+        self.collision_onset_myr() + COLLISION_SPAN_MYR * f64::from(self.collision_span)
     }
 
     /// Whether this sample's crust melts after a collision at `t_myr`: continental, its
@@ -279,8 +302,8 @@ impl Sample {
     /// ledger: PLT-735, PLT-736
     pub fn collision_melt(&self, t_myr: f64, after_myr: f64, end_myr: f64) -> bool {
         self.kind == CONTINENTAL
-            && t_myr - f64::from(self.collision_onset_myr) >= after_myr
-            && t_myr - f64::from(self.collision_myr) <= end_myr
+            && t_myr - self.collision_onset_myr() >= after_myr
+            && t_myr - self.collision_myr() <= end_myr
     }
 
     /// Ocean floor becomes continental crust (an island arc matured, `finish_samples`; crust
