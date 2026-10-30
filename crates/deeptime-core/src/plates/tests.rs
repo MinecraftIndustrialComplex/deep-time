@@ -7173,8 +7173,14 @@ fn a_collision_orogeny_keeps_its_onset_while_its_stamps_go_on() {
     }
     assert_eq!((s.orogeny_onset_myr, s.orogeny_myr), (100.0, 135.0));
     s.stamp_collision(165.0, 30.0);
-    assert_eq!(s.orogeny_onset_myr, 165.0, "30 Myr without a stamp: a new orogeny");
+    assert_eq!(
+        s.orogeny_onset_myr, 165.0,
+        "30 Myr without a stamp: a new orogeny"
+    );
     s.orogeny = OROGENY_ANDEAN;
     s.stamp_collision(170.0, 30.0);
-    assert_eq!(s.orogeny_onset_myr, 170.0, "after an Andean orogeny: a new one");
+    assert_eq!(
+        s.orogeny_onset_myr, 170.0,
+        "after an Andean orogeny: a new one"
+    );
 }

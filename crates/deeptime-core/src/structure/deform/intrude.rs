@@ -175,11 +175,7 @@ pub fn emplace(
         let s = strain(x, c, sp);
         // A collision belt's magmatism does not follow the convergence (it outlasts it: the melt
         // window runs `collision_melt_end_myr` past the last stamp, ledger RCK-099).
-        let shortening = if x.melt[c] {
-            1.0
-        } else {
-            s.shortening
-        };
+        let shortening = if x.melt[c] { 1.0 } else { s.shortening };
         let v = [if orogen(c) { shortening } else { 0.0 }, s.extension];
         for k in 0..2 {
             total[k] += v[k] * area;
