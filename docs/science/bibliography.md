@@ -4728,7 +4728,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Willett, S., Beaumont, C., Fullsack, P. (1993). Mechanical model for the tectonics of doubly vergent compressional orogens. Geology 21(4):371-374.
 - DOI or URL: 10.1130/0091-7613(1993)021<0371:MMFTTO>2.3.CO;2 (not printed in the copy read; from a search result, and doi.org resolves it to the article's page); read from a copy at cinty-lee.squarespace.com/s/Geology-1993-Willett-371-4.pdf (an offprint, not the publisher's copy).
 - Cited as: "Willett et al. 1993" (STATUS.md's collision-front row, 2026-10-29).
-- Ledger ids: PLT-730 (2026-10-29).
+- Ledger ids: PLT-730 (2026-10-29). PLT-241 (second note, 2026-10-30: read again by a Sonnet research sub-agent; p. 372: the retro-wedge "is steeper and corresponds to the maximum permissible taper angle (Dahlen, 1984)").
 - Access: paywalled; an open copy as above.
 - Library (the project's source library, not distributed): not fetched.
 - Substitute: the copy above.
@@ -4740,13 +4740,85 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Naylor, M., Sinclair, H. D. (2008). Pro- vs. retro-foreland basins. Basin Research 20:285-303.
 - DOI or URL: not recorded; the Edinburgh preprint, pure.ed.ac.uk/ws/files/10949660/PDF_Pro_Vs_Retro.pdf (page numbers below are the preprint's).
 - Cited as: "Naylor & Sinclair 2008" (STATUS.md's collision-front row, 2026-10-29).
-- Ledger ids: PLT-730, PLT-731 (2026-10-29).
+- Ledger ids: PLT-730, PLT-731 (2026-10-29). PLT-241 (second note, 2026-10-30: read again; p. 9, the 115 and 69 km wedges of a 3 km orogen at their assumed angles; p. 20: "The width of both basins decreases as the mountain belt grows ... the width of the basins stabilises with time").
 - Access: paywalled; the preprint is open.
 - Library (the project's source library, not distributed): not fetched.
 - Substitute: the preprint.
 - Read so far (by the project): full text, 2026-10-29 (a Sonnet research sub-agent). pp. 8-9: with "typical surface angles of α pro = 1.5°, α retro = 2.5°" a 3 km high orogen has "a pro-wedge 115 km wide and a retro-wedge 69 km wide" (their assumed angles, not Willett's results; the pro-wedge then holds about 62 % of the cross-section, the sub-agent's arithmetic). p. 15: models show "a retro-ward shift in the topographic maximum with respect to the subduction point (Willett et al., 1993; Naylor et al., 2005)"; p. 21: "more mass is stored in the pro-wedge than the retro-wedge".
 - Read in this pass: full text (2026-10-29).
 - Reference check: correct.
+
+### Willett1999
+- Reference: Willett (1999). Journal of Geophysical Research 104:28957 (title not recorded by the read).
+- DOI or URL: not recorded by the read.
+- Cited as: "Willett 1999" (PLT-241's second note, 2026-10-30).
+- Ledger ids: PLT-241 (second note, 2026-10-30).
+- Access: a full text was read (the copy's origin not recorded).
+- Library (the project's source library, not distributed): not fetched.
+- Substitute: none recorded.
+- Read so far (by the project): full text, 2026-10-30 (a Sonnet research sub-agent). p. 28,960: "in the early stages of development, ... the wedge above the overriding plate (retrowedge) is steeper with a taper angle at the maximum critical taper". No width scaling given.
+- Read in this pass: full text (2026-10-30, a Sonnet research sub-agent).
+- Reference check: author, year, journal, volume and first page as the agent printed them; the title to complete.
+
+### SinclairEtAl2005
+- Reference: Sinclair et al. (2005). American Journal of Science 305:369-406 (title and full author list not recorded by the read).
+- DOI or URL: not recorded by the read.
+- Cited as: "Sinclair et al. 2005" (PLT-241's second note, 2026-10-30).
+- Ledger ids: PLT-241 (second note, 2026-10-30).
+- Access: a full text was read (the copy's origin not recorded).
+- Library (the project's source library, not distributed): not fetched.
+- Substitute: none recorded.
+- Read so far (by the project): full text, 2026-10-30 (a Sonnet research sub-agent). p. 396: "as the wedge grows it forces accretion of material onto the retro-wedge which decreases in slope (Stage 3)"; with erosion, p. 400: "The retro-wedge remains static for the bulk of the time"; the Pyrenees, p. 372: an orogen "approximately 150 km wide" with "at least 165 km of shortening"; p. 386: the retro-wedge (Sub-Pyrenees) a "narrow strip of deformed foreland basin sediments".
+- Read in this pass: full text (2026-10-30, a Sonnet research sub-agent).
+- Reference check: first author, year, journal, volume and pages as the agent printed them; the title and authors to complete.
+
+### RoeWhippleFletcher2008
+- Reference: Roe, Whipple, Fletcher (2008). American Journal of Science 308:815-842 (title and initials not recorded by the read).
+- DOI or URL: not recorded by the read.
+- Cited as: "Roe, Whipple & Fletcher 2008" (PLT-241's second note, 2026-10-30).
+- Ledger ids: PLT-241 (second note, 2026-10-30).
+- Access: a full text was read (the copy's origin not recorded).
+- Library (the project's source library, not distributed): not fetched.
+- Substitute: none recorded.
+- Read so far (by the project): full text, 2026-10-30 (a Sonnet research sub-agent). p. 823: "a pro-wedge with a shallow topographic taper angle of 2° and a retro-wedge with a steeper topographic taper angle of 6°, similar to what is seen in Taiwan"; the Fig. 3 caption: this makes "the pro-wedge width about 75% of the total width"; p. 829, eq. 26: "Lp tan αp = Lr tan αr".
+- Read in this pass: full text (2026-10-30, a Sonnet research sub-agent).
+- Reference check: surnames, year, journal, volume and pages as the agent printed them; the title and initials to complete.
+
+### HarrisAudleyCharles1987
+- Reference: Harris, Audley-Charles (1987). Memoir of the Geological Society of China 9:45-61 (title and initials not recorded by the read; printed December 1987, the copy's file name says 1991).
+- DOI or URL: not recorded by the read.
+- Cited as: "Harris & Audley-Charles 1987" (PLT-241's second note, 2026-10-30).
+- Ledger ids: PLT-241 (second note, 2026-10-30).
+- Access: a full text was read (the copy's origin not recorded).
+- Library (the project's source library, not distributed): not fetched.
+- Substitute: none recorded.
+- Read so far (by the project): full text, 2026-10-30 (a Sonnet research sub-agent). Table 1: width of the collision zone, Taiwan 100-120 km, Timor 150-200 km; maximum elevation 4,000 m and 3,000 m. p. 50: the Wetar thrust process "may have started 3 Ma ago, is less developed".
+- Read in this pass: full text (2026-10-30, a Sonnet research sub-agent).
+- Reference check: surnames, year, venue, volume and pages as the agent printed them; the title and initials to complete.
+
+### AbersMcCaffrey1994
+- Reference: Abers, McCaffrey (1994). Tectonics 13:227-245 (title and initials not recorded by the read).
+- DOI or URL: not recorded by the read.
+- Cited as: "Abers & McCaffrey 1994" (PLT-241's second note, 2026-10-30).
+- Ledger ids: PLT-241 (second note, 2026-10-30).
+- Access: a full text was read (the copy's origin not recorded).
+- Library (the project's source library, not distributed): not fetched.
+- Substitute: none recorded.
+- Read so far (by the project): full text, 2026-10-30 (a Sonnet research sub-agent; the copy's OCR spacing repaired). "the 2-4 km high Finisterre-Huon (FH) ranges follow the north coast, an accreting island arc terrane"; "The onset of the FH collision has been dated at ~3-4 Ma". That the FH block is the upper plate is the agent's reading, not a quote.
+- Read in this pass: full text (2026-10-30, a Sonnet research sub-agent).
+- Reference check: surnames, year, journal, volume and pages as the agent printed them; the title and initials to complete.
+
+### RamseyEtAl2007
+- Reference: Ramsey et al. (2007). Geophysical Journal International 170:1357 (title and full author list not recorded by the read).
+- DOI or URL: not recorded by the read.
+- Cited as: "Ramsey et al. 2007" (PLT-241's second note, 2026-10-30).
+- Ledger ids: PLT-241 (second note, 2026-10-30).
+- Access: a full text was read (the copy's origin not recorded).
+- Library (the project's source library, not distributed): not fetched.
+- Substitute: none recorded.
+- Read so far (by the project): full text, 2026-10-30 (a Sonnet research sub-agent). pp. 1358-59: Taiwan "levels out at peak elevations of around 4 km"; "Offshore to the east, the flank of the orogen descends a further 5 km".
+- Read in this pass: full text (2026-10-30, a Sonnet research sub-agent).
+- Reference check: first author, year, journal, volume and first page as the agent printed them; the title and authors to complete.
 
 ### Simoes2007
 - Reference: Simoes, M., et al. (2007). Mountain building in Taiwan (the title's subtitle and the full author list not recorded by the read). Journal of Geophysical Research 112, B11405.
