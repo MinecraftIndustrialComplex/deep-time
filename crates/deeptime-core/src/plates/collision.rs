@@ -107,6 +107,7 @@ pub struct Backarc {
 /// of the block is not part of it. The collision's push (`push_n`, N) reaches the back coast as the
 /// thin sheet's response does, by e^(−x/L) with L = 2W/π for a front `front_km` (W) long
 /// (PLT-733's length), averaged over the coast.
+#[allow(clippy::too_many_arguments)]
 pub fn backarc_block(
     state: &PlateState,
     geo: &Geo,
@@ -157,8 +158,9 @@ pub fn backarc_block(
     let edge = Tree::over(pos, |i| on_front[i]);
     // Great-circle distance behind the front, km (the tree's squared chord to an angle).
     let behind_km = |i: u32| {
-        edge.nearest(pos[i as usize])
-            .map_or(0.0, |(_, d2)| norm.km(2.0 * (0.5 * d2.sqrt()).min(1.0).asin()))
+        edge.nearest(pos[i as usize]).map_or(0.0, |(_, d2)| {
+            norm.km(2.0 * (0.5 * d2.sqrt()).min(1.0).asin())
+        })
     };
     let reach_km = super::belts::sheet_reach_km(front_km); // ledger: PLT-733
     let (mut coast, mut decay) = (0_usize, 0.0);
@@ -330,7 +332,10 @@ pub fn collide(
         let behind = p
             .collision_backarc_reversal
             .then(|| {
-                let front_km = state.contacts[k].collision.as_ref().map_or(0.0, |c| c.front_km);
+                let front_km = state.contacts[k]
+                    .collision
+                    .as_ref()
+                    .map_or(0.0, |c| c.front_km);
                 backarc_block(state, geo, pos, env, over, front, front_km, push)
             })
             .flatten()
