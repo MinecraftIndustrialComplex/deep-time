@@ -216,7 +216,10 @@ align with earth by introducing extremely weird forcing functions").
   the review of record since 2026-10-27 (PR #13; the review switch had been off on Graphide's side, so PRs #2 to
   #11 carry `gr check` results instead). Where the app posts nothing, run Graphide's review from the CLI,
   `gr check --branch <branch>` (the checks a PR gets; mind that its `main` can lag master, which inflates its
-  changed functions), and record its result on the PR. Land: `tools/dev/merge-branch.sh <head sha> "summary"` and push master, which marks the PR merged.
+  changed functions), and record its result on the PR. **Wait at most 15 minutes** (Ben, 2026-10-30: "Don't hold
+  yourself on graphide reviews again if they take longer than 15 mins"; decisions log 2026-10-30): a review that
+  has not come, or came incomplete, 15 minutes after the push or the request does not hold the landing; say so on
+  the PR, land, and answer findings that arrive later on a follow-up branch. Land: `tools/dev/merge-branch.sh <head sha> "summary"` and push master, which marks the PR merged.
   A lane pushes its branch and reports; the coordinator opens the PR, waits for the review and lands it.
   Record what the review caught and missed for Ben (he wants feedback on Graphide's reviews). Catch up a
   behind checkout with `git merge --ff-only --autostash origin/master`.
