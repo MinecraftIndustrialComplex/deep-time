@@ -1,0 +1,11 @@
+{
+ "_comment": "A salt flat for any pack (the coordinator, 2026-10-29, the gate on 649baf54): a playa (the hydrology's salt flat, baked layer 'playa' > 0) takes a barren biome, a member of the tag deeptime:salt_flat (vanilla's desert; Biomes O' Plenty's cold desert, treeless, for a TerraBlender region of its own without the desert), chosen among by the pack's own climate search, so no forest's features stand on its salt: on that test planet a playa by a spring lay under a forest's biome, and Biomes O' Plenty's redwoods set their wood on it (TerraBlender) and a feature of the MIC set dug through its crust. A salt crust grows no tree (HYD-180, from-memory). Expanded Ecosphere's own salt lakes (expanded_ecosphere.json, salt_lakes, BIO-120) come first, its file's id sorting before this one. BIO-199 (game-choice). FORMAT.md 'Biome rules'.",
+ "requires": ["#deeptime:salt_flat"],
+ "rules": [
+  {
+   "id": "salt_flat",
+   "playa": true,
+   "biomes": ["#deeptime:salt_flat"]
+  }
+ ]
+}
