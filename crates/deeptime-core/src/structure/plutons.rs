@@ -9,8 +9,11 @@
 //!   `pluton_rate_km2_myr` · Δt, placed with probability ∝ intensity · area. Intensity is the arc
 //!   flux of the deposit engine's `arc_magma_flux` (`surface/fields.rs`): 1 where the plate model
 //!   put arc magma this step, × min(1, convergence / 80 mm/yr), × 0.7 on oceanic crust; plus
-//!   `collision_pluton_factor` on continental crust in the collision regime (crustal-melt
-//!   granites).
+//!   `collision_pluton_factor` on continental crust in a collision's melt window (crustal-melt
+//!   granites: from `collision_melt_after_myr` after the orogeny's onset to
+//!   `collision_melt_end_myr` after its last stamp, [`crate::structure::collision_melt`]; until
+//!   2026-10-30 the collision regime's 30 Myr after each stamp, which ended about where the
+//!   sources start them).
 //! - **What.** Continental arcs: granodiorite (0.7), granite (0.2), diorite (0.1); island arcs:
 //!   diorite (0.6), granodiorite (0.4, the class holds tonalite); collision zones: granite. The
 //!   shares are game choices (ledger RCK-064, RCK-065). The qualitative picture is right: the
@@ -76,7 +79,7 @@ use crate::deposits::random::Rng;
 #[cfg(test)]
 use crate::params::ScaleParams;
 use crate::plates::kinematics::rotation;
-use crate::plates::state::{ARC, CONTINENTAL, regime};
+use crate::plates::state::{ARC, CONTINENTAL};
 use crate::sphere::{Around, BlockFrame};
 use crate::surface::lithology::{index, table};
 use crate::surface::volcanoes::for_cells;
@@ -164,8 +167,9 @@ pub struct ArcInputs<'a> {
     pub flags: &'a [f32],
     pub convergence: &'a [f32],
     pub crust_type: &'a [f32],
-    pub regime: &'a [f32],
     pub plate_id: &'a [f32],
+    /// Whether the cell's crust melts after a collision ([`crate::structure::collision_melt`]).
+    pub melt: &'a [bool],
 }
 
 /// The emplacement intensity of cell `c` (0–1). The 80 mm/yr convergence scale and the 0.7 for
@@ -178,7 +182,7 @@ pub fn intensity(x: &ArcInputs<'_>, c: usize, p: &StructureParams) -> f64 {
     } else {
         0.0
     };
-    let collision = if cont && x.regime[c] as u8 == regime::COLLISION {
+    let collision = if cont && x.melt[c] {
         p.collision_pluton_factor
     } else {
         0.0
@@ -1032,14 +1036,14 @@ mod tests {
         let flags = vec![f32::from(ARC); n];
         let convergence = vec![80.0f32; n];
         let crust = vec![f32::from(CONTINENTAL); n];
-        let regime_f = vec![0.0f32; n];
+        let melt = vec![false; n];
         let plate = vec![0.0f32; n];
         let x = ArcInputs {
             flags: &flags,
             convergence: &convergence,
             crust_type: &crust,
-            regime: &regime_f,
             plate_id: &plate,
+            melt: &melt,
         };
         let p = StructureParams {
             pluton_rate_km2_myr: 1.0e-4,
@@ -1586,14 +1590,14 @@ mod tests {
         let flags = vec![f32::from(ARC); n];
         let convergence = vec![80.0f32; n];
         let crust = vec![f32::from(CONTINENTAL); n];
-        let regime_f = vec![0.0f32; n];
+        let melt = vec![false; n];
         let plate = vec![0.0f32; n];
         let x = ArcInputs {
             flags: &flags,
             convergence: &convergence,
             crust_type: &crust,
-            regime: &regime_f,
             plate_id: &plate,
+            melt: &melt,
         };
         let p = StructureParams {
             pluton_rate_km2_myr: 1.0e-4,

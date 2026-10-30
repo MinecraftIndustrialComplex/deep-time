@@ -163,21 +163,19 @@ pub fn emplace(
     let km_to_blocks = 1000.0 / x.m_per_block_h * p.size;
     let side_km = r * x.m_per_block_h / 1000.0;
     let area = side_km * side_km;
-    // Stocks rise where the crust is being thickened or fed by an arc (not in the foreland);
-    // dykes where a continent is being pulled apart.
+    // Stocks rise where thickened crust melts after a collision or an arc feeds the crust (not
+    // in the foreland); dykes where a continent is being pulled apart.
     let orogen = |c: usize| {
         x.crust_type[c] as u8 == CONTINENTAL
-            && (x.regime[c] as u8 == regime::COLLISION
-                || x.regime[c] as u8 == regime::ARC
-                || x.flags[c] as u32 as u8 & ARC != 0)
+            && (x.melt[c] || x.regime[c] as u8 == regime::ARC || x.flags[c] as u32 as u8 & ARC != 0)
     };
     let mut cum = [Vec::with_capacity(n), Vec::with_capacity(n)];
     let mut total = [0.0f64; 2];
     for c in 0..n {
         let s = strain(x, c, sp);
-        // A collision belt's magmatism does not follow the convergence (it outlasts it: the
-        // collision regime stays for `collision_orogeny_myr` after the last uplift).
-        let shortening = if x.regime[c] as u8 == regime::COLLISION {
+        // A collision belt's magmatism does not follow the convergence (it outlasts it: the melt
+        // window runs `collision_melt_end_myr` past the last stamp, ledger RCK-099).
+        let shortening = if x.melt[c] {
             1.0
         } else {
             s.shortening
@@ -234,7 +232,7 @@ pub fn emplace(
                 // Its own floor: as thick as a pluton of its outline.
                 f.base = (stock_thickness_m(along_m, across_m) / x.m_per_block_v) as f32;
                 // ledger: DEF-045
-                f.rock = if x.regime[c] as u8 == regime::COLLISION {
+                f.rock = if x.melt[c] {
                     index("granite")
                 } else if u[2] < 0.5 {
                     index("granodiorite")

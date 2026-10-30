@@ -770,3 +770,22 @@ fn the_stage_never_panics_however_dense_the_structures() {
         "the longest history met was {longest}: not past one Noddy history"
     );
 }
+
+/// The melt window (ledger RCK-098, RCK-099): crust thickened by a collision melts from 20 Myr
+/// after the orogeny's onset to 80 Myr after its last stamp, only where it is continental and
+/// Himalayan.
+#[test]
+fn a_collision_melts_from_twenty_myr_after_its_onset_to_eighty_after_its_last_stamp() {
+    use crate::plates::state::{CONTINENTAL, OCEANIC, OROGENY_ANDEAN, OROGENY_HIMALAYAN};
+    let p = StructureParams::default();
+    let (cont, him) = (f32::from(CONTINENTAL), f32::from(OROGENY_HIMALAYAN));
+    // Stamped every step since the onset: not yet at 10 Myr, at 25.
+    assert!(!collision_melt(&p, cont, him, 10.0, 0.0));
+    assert!(collision_melt(&p, cont, him, 25.0, 0.0));
+    // The stamps stopped 80 Myr ago, and 81.
+    assert!(collision_melt(&p, cont, him, 120.0, 80.0));
+    assert!(!collision_melt(&p, cont, him, 121.0, 81.0));
+    assert!(!collision_melt(&p, f32::from(OCEANIC), him, 25.0, 0.0));
+    assert!(!collision_melt(&p, cont, f32::from(OROGENY_ANDEAN), 25.0, 0.0));
+    assert!(!collision_melt(&p, cont, him, f32::NAN, 0.0));
+}
