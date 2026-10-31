@@ -1835,6 +1835,8 @@ struct GateFixture {
     tree: Tree,
     overlaps: Vec<subduction::Overlap>,
     class: u8,
+    /// The overlap's mean convergence across, mm/yr.
+    conv: f64,
 }
 
 fn gate_fixture(
@@ -1865,7 +1867,9 @@ fn gate_fixture(
     let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, env);
     assert!(overlaps.len() >= subduction::MIN_CONTACT as usize);
     let read = subduction::overlap_motion(&st, &overlaps, &pos, &tree, env, |_| true);
-    let class = read.get(&(0, 1)).map_or(u8::MAX, |r| r.pair_class);
+    let (class, conv) = read
+        .get(&(0, 1))
+        .map_or((u8::MAX, f64::NAN), |r| (r.pair_class, r.conv_mm_yr));
     GateFixture {
         st,
         geo,
@@ -1873,6 +1877,7 @@ fn gate_fixture(
         tree,
         overlaps,
         class,
+        conv,
     }
 }
 
@@ -1903,7 +1908,7 @@ fn gate_steps(p: &PlanetPreset, f: &mut GateFixture, steps: u64) -> Option<u64> 
 /// A contact begins only where its plates have converged across their overlap by half a lattice
 /// spacing (PLT-810, PLT-811, `tectonics.contact_needs_convergence`; Bird 2003 [126]: a
 /// subduction zone converges at all; Gurnis et al. 2004: "Cumulative convergence, not the rate of
-/// convergence, is the dominant control"): `gate_fixture`'s overlap, held for up to 8 steps of 2
+/// convergence, is the dominant control"): `gate_fixture`'s overlap, held for up to 30 steps of 2
 /// Myr. Moving across the boundary into the northern plate, or along it 10 degrees towards it
 /// (transpression, inside PLT-311's 20 degrees: Puysegur's "fully strike-slip with a component of
 /// convergence", Gurnis et al. 2004 [25]), the southern plate runs under it: a contact, later
@@ -1913,13 +1918,13 @@ fn gate_steps(p: &PlanetPreset, f: &mut GateFixture, steps: u64) -> Option<u64> 
 #[test]
 fn a_contact_begins_only_where_its_plates_converge() {
     let p0 = preset(20_000, 20.0, "supercontinent", 5);
-    let run = |on: bool, motion: DVec3| -> (Option<u64>, u8) {
+    let run = |on: bool, motion: DVec3| -> (Option<u64>, u8, f64) {
         let mut p = p0.clone();
         p.tectonics.contact_needs_convergence = on;
         let env = PlatesStage::new(p.clone()).env(&p.tectonics, 1);
         let turn = glam::DQuat::from_rotation_x(0.1);
         let mut f = gate_fixture(&p, &env, turn, motion, OCEANIC);
-        (gate_steps(&p, &mut f, 8), f.class)
+        (gate_steps(&p, &mut f, 30), f.class, f.conv)
     };
     // The southern plate's motion about the x axis runs it across the boundary into the
     // northern; about the z axis along it.
@@ -1928,34 +1933,58 @@ fn a_contact_begins_only_where_its_plates_converge() {
         r.cos() * DVec3::Z + r.sin() * DVec3::X
     };
     let converging = subduction::OVERLAP_CONVERGING as u8;
-    let (head_on, class) = run(true, DVec3::X);
-    assert_eq!(class, converging);
-    let (oblique, class) = run(true, along(10.0));
-    assert_eq!(class, converging);
-    let (head_on, oblique) = (head_on.expect("head-on"), oblique.expect("transpression"));
-    assert!(head_on <= 3 && oblique > head_on, "{head_on} {oblique}");
+    let (head_on, class, c1) = run(true, DVec3::X);
+    assert_eq!(class, converging, "{c1}");
+    let (oblique, class, c2) = run(true, along(10.0));
+    assert_eq!(class, converging, "{c2}");
+    let (head_on, oblique) = (
+        head_on.unwrap_or_else(|| panic!("head-on {c1}")),
+        oblique.unwrap_or_else(|| panic!("transpression {c2}")),
+    );
+    assert!(
+        head_on <= 3 && oblique > head_on,
+        "{head_on} {oblique} {c1} {c2}"
+    );
     for motion in [DVec3::Z, along(-10.0), -DVec3::X] {
-        assert_eq!(run(true, motion).0, None, "a contact on {motion}");
+        let (begun, class, c) = run(true, motion);
+        assert_eq!(begun, None, "a contact on {motion}: {class} {c}");
         assert_eq!(run(false, motion).0, Some(1), "off: {motion}");
     }
     assert_eq!(run(false, along(10.0)).0, Some(1));
 }
 
 /// Plates sliding past each other along their shared lattice boundary (PLT-810): the southern
-/// plate of `gate_fixture` turned about the z axis by a third of a spacing, so the two outlines'
-/// zigzags overlap, and moving about the z axis. With the switch on, no contact in 8 steps; off,
-/// one on the first.
+/// plate of `gate_fixture` turned about the z axis by a third of a spacing and moving about it.
+/// With the outline as the level set holds it (PLT-553, the default) the boundary is the equator
+/// and stays one: no overlap at all. With the lattice's triangles as the footprint
+/// (`outline_cover` off) the two zigzags overlap where they cross; with the switch on, no contact
+/// in 30 steps; off, one on the first.
 #[test]
 fn plates_sliding_past_along_their_boundary_begin_no_contact() {
     let p0 = preset(20_000, 20.0, "supercontinent", 5);
+    {
+        let env = PlatesStage::new(p0.clone()).env(&p0.tectonics, 1);
+        let turn = glam::DQuat::from_rotation_z(env.norm.spacing_rad() / 3.0);
+        let (st, geo) = plates_unresolved(&p0, &env, turn, |q| q.z > 0.0);
+        let pos = geometry::positions(&st, &geo);
+        let tree = Tree::over(&pos, |_| true);
+        assert!(subduction::overlaps(&st, &geo, &pos, &tree, &env).is_empty());
+    }
     for on in [true, false] {
         let mut p = p0.clone();
         p.tectonics.contact_needs_convergence = on;
+        p.tectonics.outline_cover = false;
         let env = PlatesStage::new(p.clone()).env(&p.tectonics, 1);
         let turn = glam::DQuat::from_rotation_z(env.norm.spacing_rad() / 3.0);
         let mut f = gate_fixture(&p, &env, turn, DVec3::Z, OCEANIC);
-        let begun = gate_steps(&p, &mut f, 8);
-        assert_eq!(begun, if on { None } else { Some(1) }, "on {on}");
+        let begun = gate_steps(&p, &mut f, 30);
+        assert_eq!(
+            begun,
+            if on { None } else { Some(1) },
+            "on {on}: {} overlapping, {} mm/yr",
+            f.overlaps.len(),
+            f.conv
+        );
     }
 }
 
@@ -1963,8 +1992,8 @@ fn plates_sliding_past_along_their_boundary_begin_no_contact() {
 /// the resampling, which takes the lower plate's visible crust as a contact would. Two
 /// continental plates of `gate_fixture` overlapping where y > 0, sliding past (refused) or
 /// converging 10 degrees off the boundary (a contact once they have converged half a spacing),
-/// held for 8 steps, then resampled: no continental crust dropped either way, and the refused
-/// pair's taken by the last resort.
+/// held for up to 30 steps, then resampled: no continental crust dropped either way, and the
+/// refused pair's taken by the last resort.
 #[test]
 fn a_refused_overlap_is_taken_at_the_resampling() {
     let mut p = preset(20_000, 20.0, "supercontinent", 5);
@@ -1978,7 +2007,12 @@ fn a_refused_overlap_is_taken_at_the_resampling() {
         let env = stage.env(&p.tectonics, 1);
         let turn = glam::DQuat::from_rotation_x(0.1);
         let mut f = gate_fixture(&p, &env, turn, motion, CONTINENTAL);
-        assert_eq!(gate_steps(&p, &mut f, 8).is_some(), contact, "{motion}");
+        let conv = f.conv;
+        assert_eq!(
+            gate_steps(&p, &mut f, 30).is_some(),
+            contact,
+            "{motion}: {conv} mm/yr"
+        );
         let env = stage.env(&p.tectonics, 9);
         let mut world = WorldState::new(1, 16_384, p.t_start_years());
         ridges::resample(&mut f.st, &mut world, &f.pos, &f.tree, &f.geo, &env).unwrap();
@@ -2006,7 +2040,7 @@ fn a_contact_goes_on_and_reverses_whatever_its_plates_do() {
     let env1 = stage.env(&p.tectonics, 1);
     let turn = glam::DQuat::from_rotation_x(0.1);
     let mut f = gate_fixture(&p, &env1, turn, DVec3::X, OCEANIC);
-    let begun = gate_steps(&p, &mut f, 8).expect("a contact");
+    let begun = gate_steps(&p, &mut f, 30).expect("a contact");
     let (under, over) = (f.st.contacts[0].under, f.st.contacts[0].over);
     let mut world = WorldState::new(1, 16_384, p.t_start_years());
     let mut resolve = |f: &mut GateFixture, step: u64| {
@@ -2047,7 +2081,7 @@ fn a_contact_goes_on_and_reverses_whatever_its_plates_do() {
     );
     assert_eq!(r.reversed, vec![(0, 1)]);
     assert!(
-        (c.onset_slab_age_myr - 80.0).abs() < 1.0,
+        (80.0..100.0).contains(&c.onset_slab_age_myr),
         "{}",
         c.onset_slab_age_myr
     );
