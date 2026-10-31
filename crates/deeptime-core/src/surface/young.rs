@@ -382,8 +382,8 @@ fn route_lakes(
     s: &RouteInput<'_>,
     h: &[f64],
     base_z: &[f64],
-    kind: &mut Vec<u8>,
-    filled: &mut Vec<f64>,
+    kind: &mut [u8],
+    filled: &mut [f64],
     rt: &mut routing::Routing,
     area: &mut Vec<f64>,
 ) -> Option<Vec<lakes::LakeOutflow>> {
@@ -394,19 +394,12 @@ fn route_lakes(
     routing::stack(d, kind, rt);
     routing::accumulate(d, rt, s.weight, area);
     let (runoff, loss) = s.water?;
-    let lv = lakes::water_levels(
-        d,
-        h,
-        filled,
-        kind,
-        rt,
-        s.sea,
-        s.hydro.lake_balance,
-        &|c| lakes::CellWater {
+    let lv = lakes::water_levels(d, h, filled, kind, rt, s.sea, s.hydro.lake_balance, &|c| {
+        lakes::CellWater {
             runoff_m_yr: f64::from(runoff[c]),
             loss_m_yr: f64::from(loss[c]),
-        },
-    );
+        }
+    });
     if let Some(pass) = closed::pass_shares(n, &lv.outflow) {
         routing::accumulate_passing(d, rt, s.weight, &pass, area);
     }
@@ -1646,9 +1639,16 @@ mod tests {
         let base_z = vec![0.0; n];
         let (mut kind, mut filled) = (vec![LAND; n], vec![0.0; n]);
         let (mut rt, mut area) = (routing::Routing::default(), Vec::new());
-        let mut outflow =
-            route_lakes(&input, &z, &base_z, &mut kind, &mut filled, &mut rt, &mut area)
-                .expect("the lakes' water was given");
+        let mut outflow = route_lakes(
+            &input,
+            &z,
+            &base_z,
+            &mut kind,
+            &mut filled,
+            &mut rt,
+            &mut area,
+        )
+        .expect("the lakes' water was given");
         assert_eq!(outflow.len(), 1, "{outflow:?}");
         assert_eq!(outflow[0].share, 0.0, "the arid basin is closed");
         let mut plain = Vec::new();
@@ -1705,12 +1705,18 @@ mod tests {
         let dammed = solve_lakes(&step, None, &mut closed_area)[spill] - z[spill];
         // The step's solve opens the basin, and is then the plain accumulation's.
         let opened = solve_lakes(&step, Some(&mut outflow), &mut area)[spill] - z[spill];
-        assert!(closed::pass_shares(n, &outflow).is_none(), "every lake passes all");
+        assert!(
+            closed::pass_shares(n, &outflow).is_none(),
+            "every lake passes all"
+        );
         assert_eq!(area, plain, "the area passed on is the plain one");
         let mut open_area = plain.clone();
         let open = solve_lakes(&step, None, &mut open_area)[spill] - z[spill];
         eprintln!("the spill's rise: dammed {dammed:.1} m, opened {opened:.1} m, open {open:.1} m");
-        assert!(dammed > 50.0, "closed, the overflow dams the spill: {dammed}");
+        assert!(
+            dammed > 50.0,
+            "closed, the overflow dams the spill: {dammed}"
+        );
         assert!((opened - open).abs() < 1.0e-6, "{opened} against {open}");
         assert!(opened < 0.25 * dammed, "{opened} against {dammed}");
     }
