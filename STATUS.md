@@ -152,6 +152,112 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 
 ## Build log
 
+### 2026-10-31: What wears the plateaus, measured on cached runs; lakes that pass on what their water balance leaves, built, on by default since 2026-10-31 (`surface.closed_basins`, ERO-217 to ERO-220) (the plateau lane, worktree agent-a4e92fd13092b08b0, branch `plateau-drainage` on origin/collision-orogen 0e8a5ac9; not merged)
+
+- **Why.** The orogen lane's O4 (docs/design/collision-orogen.md): Tibet-class high ground forms and is gone 100 Myr
+  later, its flat top wearing at 109 to 129 m/Myr though arid or polar; the follow-up "High plateaus still wear too
+  fast" (κ alone and S_c's scale already tried). Design: docs/design/plateau-drainage.md; science page:
+  erosion-and-sediment.md "Internally drained basins".
+- **Measured, no simulation** (`tools/review/plateau/`: bands.py, cohort.py, climate.py, closed.py, wear.sh, gate.sh;
+  VM, `tools/remote/mac.sh -- tools/remote/detach.sh start plateau-wear --kind light bash tools/review/plateau/wear.sh
+  orogcum=<folder> base34=<folder>`; outputs in /data/ban/deeptime-runs/plateau/) on base34 (122e4803cded/cd665cef, 24
+  runs) and orog-cum (f2d6412d801f/d3261b0a, 8). The flat high ground's gross lowering: stream power without the cut
+  0.37, the critical slope's cut 0.32 to 0.34, diffusion 0.21 to 0.24, ice 0.06 to 0.07 (net 137.8 and 134.3 m/Myr).
+  "Flat" is classed at the step's start, so its cut follows the receiver's lowering in the same solve: stream power
+  through the plateau's drainage, with the cut it drives, is 0.69 to 0.71 of the wear. Below 0 °C without ice: 0.004
+  and 0.029 of it (the cold part is under the climate's ice). 0.34 and 0.54 of it drains into a depression at a run's
+  end, all of which spill (ERO-080). After its collision a plateau's crust goes 0.57 (above 3 km) to 0.69 (above 4 km)
+  to the plates' collapse and flow (in proportion, read from the maps' rock pools), 0.31 to 0.43 to the surface's top.
+  The plateaus' own wear is 1 to 2 % of the land's mean lowering (40.1 and 37.1 m/Myr; 3.86 and 3.03 km³/yr to the sea,
+  Earth-normalized): not the continent-wide excess the crust-budget lane found.
+- **Sources** (one Sonnet research sub-agent; what each read is in bibliography.md): full texts of Garcia-Castellanos
+  2006 and 2007 (a lake's outflow and the closed-lake balance), Strecker et al. 2009, Bookhagen & Strecker 2012, Hetzel
+  et al. 2011, Wang et al. 2020 and Strobl et al. 2012 (the accepted manuscript); Langbein 1961 pp. 3-6, 12-13 and Table
+  1; Blodgett et al. 1997 (an archived preprint) sections 1.2, 3.1 to 3.3; Garcia-Castellanos et al. 2003 in parts;
+  Sobel et al. 2003 in full (paragraphs [1] to [66], from the Wayback Machine's copy of Wiley's full-text page); Lal
+  et al. 2003 and Richardson et al. 2019 abstracts only.
+- **Built** (behind `surface.closed_basins`, off at first and on by default since 2026-10-31, branch
+  `plateau-drainage-on`; c4fd3e38, d8cdbea2): the stream power's drainage area leaves each
+  lake's exit at the share of its inflow its balance lets out (Garcia-Castellanos 2006, eq. 2; ERO-218), none from a lake
+  that cannot fill to its spill (ERO-217); the balance is the flexure's (ISO-126) on the bake's budget. `lakes.rs`
+  records each lake's outflow, `routing::accumulate_passing`, `surface/closed.rs`; the erosion bands split the flat high
+  ground by closed, dry and frozen water (`flatc`, `flatd`, `flatf`) and the surface line counts the closed lakes
+  (ERO-220, measurement only). Tests: three in `surface::closed`, and the controlled plateau (ERO-219: an arid interior
+  behind its rim 3.8 m/Myr spilling, 0.5 closed; the flank 121.2 and 111.7; a humid interior 129.9 and 134.7). Gate
+  (VM, `gate.sh full` on c4fd3e38): fmt and clippy clean, deeptime-core 1,150 passed, 12 ignored.
+- **Ledger**: ERO-217 and ERO-218 `verified`, ERO-219 and ERO-220 `game-choice`; claims.md recounted (ERO 198 rows; PLT
+  375, the orogen lane's PLT-740 counted). Bibliography: Sobel2003, Strecker2009 and BookhagenStrecker2012 completed;
+  ten new entries.
+- **The arm** (queued by the coordinator: plat-cb0 on e751b2344693/5e8a748c, the two orogen `--set`s and
+  `surface.closed_basins=true`, 8 runs, against orog-cum; the alias check was identical). Reads on the VM:
+  `tools/review/plateau/wear.sh platcb0=<folder> orogcum=<folder>` (now with series.py and hiseries.py), `recal.sh`,
+  `closedshare.py`; design "The arm".
+  - **Not the plateau fix.** The flat high ground wears at 141.4 against 134.3 m/Myr. Its stream-power share is 0.372
+    against 0.366. Its parts:
+    - draining to a closed basin (0.30): 52.8 m/Myr, 0.47 of it diffusion;
+    - dry (0.22): 37.6 m/Myr;
+    - frozen (0.67 over the run): 140.8 m/Myr.
+
+    Against Hetzel 2011's 11 to 16 m/Myr catchments and Lal 2003's under 30, the closed part wears 3 to 5 times too
+    fast. Land above 3 and 4 km over time, and the cohorts' top, are within spread.
+  - **What it does do:**
+    - drains 0.13 of the land into closed basins (Earth 20 %);
+    - leaves K's calibration intact (regions of 100 to 1,500 m relief within 2 %; the flattest 8.3 against 8.9
+      m/Myr);
+    - costs 3.7 s of 445.
+  - **The guard's worst,** 10.5 against 9.9 km, is a one-step transient past every snapshot. The standing deep side is
+    unchanged; the high side and the largest one-step rise are 0.2 to 0.5 km higher. It is under the Challenger Deep,
+    0.044 of the bound. The guard does not record its side.
+  - **The belt shape** (collcoast `geom_round`, 0.256 against 0.075) is a final-frame read on a changed population: the
+    end frame's collision land is 0.025 against 0.013.
+  - **Contradicts this entry's measurement above.** "Below 0 °C without ice: 0.004 and 0.029" was the runs' final
+    frame. Over the run, 0.67 of the flat high ground is below 0 °C.
+- **Next.** Verdict: `surface.closed_basins` default-on (built, tested, sound on the pool, replaces ERO-080's
+  spill-everything). Flip it in the batch after collision-orogen-on, with the 24-run base. The next plateau law is the
+  surface's runoff from the bake's budget (`HydroParams::budget`: rain share HYD-036, degree-day melt HYD-037,
+  biotemperature PET HYD-029, HYD-030, HYD-035) in place of `surface/climate.rs`'s PET 0 below 0 °C (ERO-010). Its arm
+  reads K's regions' table again rather than retuning K.
+- **The review and its fixes** (an Opus reviewer on bc28bbc3, the law on by default; branch `plateau-drainage-on`,
+  199c51b1 and after; docs/design/plateau-drainage.md "The review"). The young landscape now routes with the law on L2
+  (L1's budget upsampled), so the world's rivers keep the history's closed basins; a basin its sediment fills opens
+  (`closed::open_filled`, the step solved again with its area passed on: before, the sediment past a closed lake's room
+  settled on its one-cell spill and dammed it; the test basin's spill rose 660 m closed, cut 186 m opened); a lake's
+  exit is only where its water leaves the lake for good (no share squared over its own shoals); the plateau test's
+  humid lake now spills (20 mm a year net loss; at 0.1 m it was closed) and the humid interior's net is 129.8 m/Myr with
+  its balance, against 129.9 spilling; four new tests; a log warning when `hydro.lake_balance` is off. Docs: Sobel et
+  al. 2003 was read in full (the line above said abstracts only), Langbein 1961's pages, ERO-080's note, a stray
+  abstract line in Richardson2019's entry.
+- **The arm after the fixes** (`pool.sh run plat-cb1 --seeds 1,2,3,4 +DEEPTIME_CRUST_BUDGET=1
+  +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`, key 6c199eaeaab7 at 5a8082ff, argkey cd665cef, 8 runs; read against
+  plat-cb0, orog-cum and small-terrane, the nearest plate control; the design's "The arm after the fixes").
+  - The guard is clean: worst 10,504 m against small-terrane's 10,154 (p 0.38), 0 steps beyond one relief.
+  - No V1 number beyond the spread (coast with high ground 0.102, p 0.13).
+  - The ground draining to a closed basin wears at 30.6 m/Myr against plat-cb0's 52.8 (the runs' ranges apart; stream
+    power 3.8 against 24.6).
+  - 0.101 of the land drains to closed basins (0.127). R3 opens 4.8e4 filled lake-substeps a run (the closed and the
+    part-passing lakes together); the counts are taken after R3, and the part-passing lakes fell from 6.3e4 to 1.7e4 a
+    run, about the number opened, while the closed ones fell only from 3.6e4 to 2.7e4: the drop is R3's (the overfill
+    fix), not the false exits' (corrected in the second review fixes below).
+  - K is intact (all land 38.3 against 38.1 m/Myr). The flat high ground still wears at 124 m/Myr, frozen 0.62 of it.
+  - plat-cb0's larger guard worst and rounder belts are the plates' changes, not the law's (small-terrane gives the
+    same).
+  - Not in these numbers: the young step (the pool stops before it); it has a test holding a closed basin since the
+    second review (next bullet). Also `tools/review/plateau/words.py` (the summaries' words per run).
+- **The second review's fixes** (a re-review of d19ada78; branch `plateau-drainage-on`, merged with master 47eab448;
+  docs/design/plateau-drainage.md "The second review").
+  - A downstream lake in a chain could still dam its own spill: `closed::open_until_stable` opens, accumulates again
+    and solves again until no lake opens (at most the number of lakes), in the surface, the young stage and the plateau
+    test. The chain test sets the lower basin's room between its supplies (2.561e9 and 2.700e9 m3): one round leaves it
+    closed and its spill rises 69.3 m; the loop opens both and the spill falls 236 m.
+  - The arm's lake counts: the drop in part-passing lakes (6.3e4 to 1.7e4) is about the 4.8e4 R3 opened, not the false
+    exits'; closed lakes fell only 0.8e4 (corrected in the entry above and in the design doc).
+  - The Sobel 2003 [26] "overtop the range" quote is removed from `closed.rs`, the design and ERO-217: it is in no
+    printed record (the bibliography's [26] is a different sentence); R3 rests on Garcia-Castellanos 2006 pp. 284-285.
+  - The young step's routing and solve are `route_lakes` and `solve_lakes` (the same code moved out of `lem`), with
+    `the_young_step_routes_a_closed_basin_and_opens_one_its_sediment_fills`. A lake's exit walk goes on through a lake
+    at the same level, with a test. `Totals` lake counts documented; the young estimate adds the 8 B a cell of the
+    lakes' water (`OWN_BYTES_PER_L2_CELL` 348; the test's holds by arithmetic, not measured again).
+  - Gate on e6b52023 (VM): fmt and clippy clean, workspace 1,458 passed, 0 failed, 13 ignored.
 ### 2026-10-31 (sixteenth entry): PR #50 landed (the orogen's two wedges and retro plateau on, a heat-flow fix); Graphide's free reviews used up, Opus review agents in its place; the instances and the gate on 43e73883; the VM disk; the lanes' verdicts (the coordinator, session 88bb1af2-7722-4f74-9e04-4e8b8af667a9, inline)
 
 - **PR #50 landed** (merge 43e73883): `collision_two_wedges` (PLT-730, PLT-731) and `collision_retro_plateau` (PLT-740) on by default (the coordinator's call, decisions log 2026-10-31), and a heat-flow fix found by the flip's test run: the rate guard's second pass after the resampling spread continental rock onto 2 to 7 Myr old floor, PLT-662 labelled it continental after the step set its heat flow, and the final pass (PLT-469) only raised values, so a young floor's 300 mW/m² baked onto continental crust; `make_continental` now clears heat flow and the final pass gives such a sample the continental law (`plates::continental_heat_flow`). On master's switches before the fix, 6 of 24 planets (the proxy) and 1 of 24 (the thermal state) baked a continental cell over 200.1 at the final frame. Also recorded: with the thermal state on, the continental law over a young floor's thin lithosphere has no ceiling (lithosphere-thermal-state.md, Open questions).

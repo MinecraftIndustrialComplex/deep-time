@@ -10112,31 +10112,125 @@ named. Copies kept outside the repository only (temporary).
 - Read so far (by the project): full text, 2026-10-31 (page numbers the preprint's). p. 3: "These models also predict that plateaus grow outward by tectonic thickening and accretion of adjacent crust in the transition zone between the plateau and the surrounding foreland"; pp. 3-4: weak mid- to lower crust cannot maintain long-wavelength topography, "and therefore plateaus flatten like pancake batter", while the flanking transition zones "laterally support (like bookends) the plateau".
 
 ### BookhagenStrecker2012
-- Reference: Bookhagen and Strecker (2012). Earth and Planetary Science Letters 327-328:97-110 (the title not recorded by the read: to complete from the copy).
+- Reference: Bookhagen, B., Strecker, M. R. (2012). Spatiotemporal trends in erosion rates across a pronounced rainfall gradient: Examples from the southern Central Andes. Earth and Planetary Science Letters 327-328:97-110.
 - DOI or URL: read at https://bodobookhagen.github.io/pdf/bookhagen12_central_Andes_erosion_rates.pdf
 - Cited as: "Bookhagen & Strecker 2012".
-- Ledger ids: none yet (design and plates.md "The collision orogen": a reference line for plateau wear, ERO-174's lead).
+- Ledger ids: none (design and plates.md "The collision orogen": a reference line for plateau wear, ERO-174's lead; docs/design/plateau-drainage.md and erosion-and-sediment.md "Internally drained basins", 2026-10-31).
 - Access: open (the author's copy).
 - Library: not kept.
-- Read so far (by the project): full text, 2026-10-31. pp. 103-104: erosion rates "of basins immediately to the east of the Altiplano-Puna Plateau drainage divide are similar (0.02 ± 0.01 mm/yr, n = 5) to erosion rates on the internally drained plateau (0.02 ± 0.0004 mm/yr, n = 1)"; 0.50 ± 0.3 mm/yr on the wet, steep eastern orographic barriers.
+- Read so far (by the project): full text, 2026-10-31. pp. 103-104: erosion rates "of basins immediately to the east of the Altiplano-Puna Plateau drainage divide are similar (0.02 ± 0.01 mm/yr, n = 5) to erosion rates on the internally drained plateau (0.02 ± 0.0004 mm/yr, n = 1)"; 0.50 ± 0.3 mm/yr on the wet, steep eastern orographic barriers. Again in full by a Sonnet research sub-agent of the plateau lane, 2026-10-31: p. 97, "This relation indicates that erosion rates (ER) scale with ER ~ SSP^1.4 on cosmogenic-nuclide time scales"; p. 103, "Erosion rates increase to 0.50 +/- 0.3 mm/yr (n = 15) at the steep east-facing orographic barriers, where mean annual rainfall rates are up to 2 m/yr"; the one internally drained plateau sample is STR-18 (Salinas Grandes, Table 1: 18 km2, mean elevation 3.88 km, 0.11 m/yr rainfall, 21 um/yr); p. 102, "We do not account for evapotranspiration, seasonal snowmelt, and groundwater loss"; the Fig. 4 label reads ± 0.004 against the text's ± 0.0004.
 
 ### Strecker2009
-- Reference: Strecker et al. (2009). Geology 37(7):643-646 (title and full author list not recorded by the read).
+- Reference: Strecker, M. R., Alonso, R., Bookhagen, B., Carrapa, B., Coutand, I., Hain, M. P., Hilley, G. E., Mortimer, E., Schoenbohm, L., Sobel, E. R. (2009). Does the topographic distribution of the central Andean Puna Plateau result from climatic or geodynamic processes? Geology 37(7):643-646.
 - DOI or URL: 10.1130/G25545A.1; read at https://bodobookhagen.github.io/pdf/strecker09_topography_andes.pdf
 - Cited as: "Strecker et al. 2009".
-- Ledger ids: none yet (the design's lead for plateau wear).
+- Ledger ids: none (the orogen design's lead for plateau wear; docs/design/plateau-drainage.md, 2026-10-31).
 - Access: open (an author's copy).
 - Library: not kept.
 - Read so far (by the project): full text, 2026-10-31. pp. 644-645: "the low internal plateau relief appears to result from the long-term climatic evolution of the plateau margin, which involves the creation and sustenance of an effective orographic barrier promoting internal drainage and protracted aridity ... the low internal relief reflects basin isolation from the foreland base level as erosional efficiency decreases in the arid plateau"; p. 644: the plateau interior's peak-to-basin relief "<0.7 km".
 
 ### Sobel2003
-- Reference: Sobel, Hilley and Strecker (2003). Formation of internally drained contractional basins by aridity-limited bedrock incision (the title as the lane's request named it). Journal of Geophysical Research 108(B7):2344.
-- DOI or URL: 10.1029/2002JB001883; the abstract from https://api.openalex.org/works/doi:10.1029/2002JB001883
+- Reference: Sobel, E. R., Hilley, G. E., Strecker, M. R. (2003). Formation of internally drained contractional basins by aridity-limited bedrock incision. Journal of Geophysical Research 108(B7):2344.
+- DOI or URL: 10.1029/2002JB001883; the abstract from https://api.openalex.org/works/doi:10.1029/2002JB001883; the full text from the Wayback Machine's capture (20250626205207) of Wiley's page, https://web.archive.org/web/2022/https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2002JB001883 (the live page returns 403)
 - Cited as: "Sobel, Hilley & Strecker 2003".
-- Ledger ids: none yet (the design's lead for plateau wear).
+- Ledger ids: ERO-217.
+- Access: paywalled; an archived copy of the publisher's page.
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31: "Low internal relief, aridity, and internal drainage characterize the Puna-Altiplano Plateau and the Tibetan Plateau and the Tarim basin"; "We hypothesize that these large, internally drained areas persist indefinitely when uplift overwhelms the fluvial systems and defeats the channel network"; "Most coupled tectonic-landscape development models prevent the development of internal drainage and so may overestimate the voracity of erosion in regimes that favor internal drainage, profoundly influencing predicted orogenic growth patterns". Full text (paragraphs [1] to [66], the equations from their images) by a Sonnet research sub-agent of the plateau lane, 2026-10-31: [26], "Internal drainage results when an integrated fluvial system is defeated by an uplifted barrier"; [60], "Channels connected to closed basins must eventually aggrade as the basin fills and base level continually rises"; [62], "where internally drained basins persist ... mass storage in the arid interior of the orogen prevents a steady state condition from developing"; [58], "arid areas in close proximity to large orographic gradients may represent transitional parts of the landscape in which efficient headward erosion allows external drainage to extend into the low-precipitation highlands"; [24], the low-relief internally drained region's boundary "approximately coincides with the 400 mm/yr isohyet". Their criterion (eq. 13) is the defeat of a river by an uplifting barrier, precipitation entering only through K and the transport coefficient; the paper has no lake balance (the agent's reading). The agent notes that the printed exponent on So in eq. 13 does not follow from eqs. 8 and 12.
+
+## Internally drained basins and plateau wear (ERO-217 to ERO-220), added 2026-10-31
+
+The plateau lane's sources (docs/design/plateau-drainage.md, erosion-and-sediment.md "Internally drained basins"). All read by one Sonnet research sub-agent on 2026-10-31, quotes machine-checked against the text it extracted; downloads kept outside the repository. Not fetched: Mason, Guzkowska, Rapley & Street-Perrott 1994 (Climatic Change 27:161-197, paywalled, no open copy) and Mifflin & Wheat 1979 (Nevada Bureau of Mines).
+
+### GarciaCastellanos2007
+- Reference: Garcia-Castellanos, D. (2007). The role of climate during high plateau formation. Insights from numerical experiments. Earth and Planetary Science Letters 257:372-390.
+- DOI or URL: 10.1016/j.epsl.2007.02.039; read from the author's publications page, https://sites.google.com/site/daniggcc/publications
+- Cited as: "Garcia-Castellanos 2007".
+- Ledger ids: ERO-217, ERO-218.
+- Access: an author's copy.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. p. 387, eq. 12: "In absence of significant underground flow, the level of a closed lake is determined by the water balance between precipitation and evaporation, which in a steady state situation can be written as P . Wcb = E . Wcl", P "represents only to the component collected as surface runoff"; "If the lake water level reaches the outlet, drainage becomes open and outlet incision leads to the integration of the lake into the drainage network (drainage capture). During capture, the output discharge of the lake is P . Wb - E . Wl"; "Previous computer models of long-term surface transport did not account for evaporation"; p. 380: "Closed drainage (or endorheism) implies that, although some precipitation occurs in the highlands, its effect in terms of mass removal from the orogen is null", "in M1 most of the eroded rock is trapped within the orogen"; p. 383 (Fig. 8 caption): "a high plateau develops only for precipitation values lower than evaporation, i.e., P < 800 mm/yr"; Table 1, p. 377: reference lake evaporation E0 = 1300 mm/yr. The agent notes the M3 values differ between the p. 382 text and the Fig. 7 caption.
+
+### GarciaCastellanos2006
+- Reference: Garcia-Castellanos, D. (2006). Long-term evolution of tectonic lakes: Climatic controls on the development of internally drained basins. Geological Society of America Special Paper 398:283-294.
+- DOI or URL: 10.1130/2006.2398(17); read from the author's publications page
+- Cited as: "Garcia-Castellanos 2006".
+- Ledger ids: ERO-217, ERO-218, ERO-219.
+- Access: an author's copy.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. pp. 285-286, eq. 2: "the water discharge leaving a lake is determined by the water balance between precipitation and evaporation, which for a steady-state water flow can be written as Qw(x = 0) = P . lb - E . ll"; "By definition, for a closed lake Qw(x = 0) = 0"; p. 283: "the evaporation rate at the lake surface is revealed as a key factor triggering drainage closure (endorheism) and significant lake life extension by preventing outlet erosion"; p. 285: "Even before drainage closure is reached by tectonic uplift, evaporation reduces water discharge across the uplifting area, limiting the erosion rates"; p. 288: "internal drainage only develops if the lake surface becomes large enough to evaporate the water discharge collected by the lake", and "the sediment delivered to the lake displaces its shore, so the lake's altitude must increase to preserve a length sufficient to evaporate the collected water"; pp. 284-285: "either a climate change to wetter climatic conditions, or the sediment overfill of the lake (both inducing lake level rise) or a basin capture undertaken by an adjacent river can trigger drainage opening"; p. 284: Lake Titicaca's "evaporation rate of 1100 mm/yr". The agent reads the printed "P/E = ll/lb < 0" as a typo for "< 1", and notes the Fig. 2 caption's times differ from the text's.
+
+### GarciaCastellanos2003
+- Reference: Garcia-Castellanos, D., et al. (2003). Interplay between tectonics, climate, and fluvial transport during the Cenozoic evolution of the Ebro Basin (NE Iberia). Journal of Geophysical Research 108(B7):2347.
+- DOI or URL: 10.1029/2002JB002073; read from the author's publications page
+- Cited as: "Garcia-Castellanos et al. 2003".
+- Ledger ids: none (a reference line in docs/design/plateau-drainage.md).
+- Access: an author's copy.
+- Library: not kept.
+- Read so far (by the project): the abstract, introduction, Table 1, the model description and paragraphs [12], [21] and [38], 2026-10-31. [2], p. 8-1: "Endorheic basins occupy 20% of the Earth's land surface but they collect only about 2% of global river runoff, showing that they develop mostly under arid conditions"; [38]: the closed lake's area is a third of its catchment at 1300 mm/yr of evaporation and 400 mm/yr of precipitation.
+
+### Langbein1961
+- Reference: Langbein, W. B. (1961). Salinity and Hydrology of Closed Lakes. U.S. Geological Survey Professional Paper 412.
+- DOI or URL: https://pubs.usgs.gov/pp/0412/report.pdf
+- Cited as: "Langbein 1961".
+- Ledger ids: ERO-217, ERO-219.
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): pp. 3-6, 12-13 and Table 1, 2026-10-31 (the equations from the page images). p. 3: "The one universal control on the existence of closed lakes is evaporation"; p. 4: "The balance is expressed by the equation I + P A_L = E' A_L where I is inflow from the tributary area ... P is precipitation on the lake surface ... A_L is area of the lake ... and E' is gross evaporation rate from the lake"; p. 13: "at hydrologic equilibrium r A_T = E A_L"; Table 1, p. 18: net evaporation of closed lakes, ft/yr, Great Salt Lake 2.7, Pyramid 3.7, Owens 5.0, Dead Sea 4.8, Aral 2.6, Caspian 2.8, Lake Van 2.0, Urmia 2.5, Lake Eyre 7.0.
+
+### Blodgett1997
+- Reference: Blodgett, T. A., Lenters, J. D., Isacks, B. L. (1997). Constraints on the origin of paleolake expansions in the central Andes. Earth Interactions 1(1).
+- DOI or URL: the authors' preprint, https://web.archive.org/web/2016id_/http://www.geo.cornell.edu/geology/eos/lake/laketext.pdf
+- Cited as: "Blodgett et al. 1997".
+- Ledger ids: none (a reference line for lake evaporation on the Altiplano).
+- Access: an archived preprint (no journal pages).
+- Library: not kept.
+- Read so far (by the project): sections 1.2 and 3.1 to 3.3 and Table 3, 2026-10-31. Section 3.1: the closed Altiplano's steady state "Pbas = Ew aw + El (1 - aw) = Ebas"; section 3.2: "The modern Lake Titicaca evaporation rate of Ew = 1270 mm/yr is calculated from the evaporation model"; section 1.2: the Titicaca-Uyuni-Coipasa-Poopo basin is 198,000 km2.
+
+### WangLakes2020
+- Reference: Wang et al. (2020). Quantifying the evaporation amounts of 75 high-elevation large dimictic lakes on the Tibetan Plateau. Science Advances 6(26):eaay8558.
+- DOI or URL: 10.1126/sciadv.aay8558; Europe PMC PMC7319769
+- Cited as: "Wang et al. 2020".
+- Ledger ids: none (a reference line: the model's lake evaporation against the plateau's).
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): full text, the results sections, 2026-10-31: "the average Eo (ranging from 350 to 1200 mm) and Ea (ranging from 650 to 1300 mm) are approximately 865 and 1000 mm, respectively" (Ea annual, with the winter's sublimation).
+
+### Hetzel2011
+- Reference: Hetzel, R., et al. (2011). Peneplain formation in southern Tibet predates the India-Asia collision and plateau uplift. Geology 39(10):983-986.
+- DOI or URL: 10.1130/G32069.1; read at http://www.sediment.uni-goettingen.de/thermochron/dunkl/zips/Hetzel-et-al-2011.pdf
+- Cited as: "Hetzel et al. 2011".
+- Ledger ids: none (a reference line for plateau wear beside ERO-174).
+- Access: an author's copy.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. p. 983: "low local and catchment-wide erosion rates of 6-11 m/m.y. and 11-16 m/m.y., respectively, which were derived from cosmogenic 10Be concentrations in bedrock, grus, and stream sediment"; p. 984: "All samples except one yield local erosion rates of only 6-8 m/m.y."; Table 2, p. 985: local 6.44 to 10.54, catchment-wide 10.66 to 16.29 m/m.y.
+
+### Strobl2012
+- Reference: Strobl, M., et al. (2012). Landscape evolution of a bedrock peneplain on the southern Tibetan Plateau revealed by in situ-produced cosmogenic 10Be and 21Ne. Geomorphology 153-154:192-204.
+- DOI or URL: 10.1016/j.geomorph.2012.02.024; the accepted manuscript at https://gfzpublic.gfz.de/rest/items/item_244902_1/component/file_244901/content?download=true
+- Cited as: "Strobl et al. 2012".
+- Ledger ids: none (a reference line for plateau wear).
+- Access: the accepted manuscript (no journal pages).
+- Library: not kept.
+- Read so far (by the project): full text of the manuscript, 2026-10-31. Abstract: local denudation rates "cluster between 5 and 11 m Ma-1 (mean = 8.1 m Ma-1)", small catchments "9 to 16 m Ma-1 (mean = 11.8 m Ma-1)"; section 5.3: "As the peneplain region belongs to the internally drained part of the plateau (Fig. 1), the sediment produced cannot leave the interior of the plateau"; section 2: "The climate in this region is cold and arid with a mean annual temperature of 0 C and an annual precipitation of ~300 mm".
+
+### Lal2003
+- Reference: Lal, D., Harris, N. B. W., Sharma, K. K., Gu, Z., Ding, L., Liu, T., Dong, W., Caffee, M. W., Jull, A. J. T. (2003). Erosion history of the Tibetan Plateau since the last interglacial: constraints from the first studies of cosmogenic 10Be from Tibetan bedrock. Earth and Planetary Science Letters 217:33-42.
+- DOI or URL: 10.1016/S0012-821X(03)00600-9; the abstract from a Wayback capture of https://oro.open.ac.uk/4074/
+- Cited as: "Lal et al. 2003".
+- Ledger ids: none (a reference line).
 - Access: paywalled; the abstract only.
 - Library: not kept.
-- Read so far (by the project): the abstract, 2026-10-31: "Low internal relief, aridity, and internal drainage characterize the Puna-Altiplano Plateau and the Tibetan Plateau and the Tarim basin"; "We hypothesize that these large, internally drained areas persist indefinitely when uplift overwhelms the fluvial systems and defeats the channel network"; "Most coupled tectonic-landscape development models prevent the development of internal drainage and so may overestimate the voracity of erosion in regimes that favor internal drainage, profoundly influencing predicted orogenic growth patterns".
+- Read so far (by the project): the abstract, 2026-10-31: "low erosion rates of <30 mm/ka in southern and central Tibet during the last interglacial-glacial cycle that contrast strongly with unusually rapid erosion rates (60-2000 mm/ka) for Kunlun in northern Tibet during the Holocene".
+
+### Richardson2019
+- Reference: Richardson, P. W., Perron, J. T., Schurr, N. D. (2019). Influences of climate and life on hillslope sediment transport. Geology 47(5):423-426.
+- DOI or URL: 10.1130/G45305.1; the abstract from https://api.openalex.org/works/doi:10.1130/G45305.1
+- Cited as: "Richardson, Perron & Schurr 2019".
+- Ledger ids: none (a lead left open in docs/design/plateau-drainage.md).
+- Access: paywalled; the abstract only.
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31: "The compilation reveals an overall trend in which D increases strongly with increasing moisture among relatively dry sites and less strongly with increasing moisture among relatively wet sites".
 
 ### Armijo1986
 - Reference: Armijo, Tapponnier, Mercier and Han (1986). Quaternary extension in southern Tibet: Field observations and tectonic implications. Journal of Geophysical Research 91(B14):13803-13872 (the initials not recorded by the read).
