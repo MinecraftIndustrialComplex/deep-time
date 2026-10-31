@@ -392,6 +392,53 @@ runs, the arms' 8):
 regions at 500 m and more inside their lines, the young stage and the amplifier on the same rule. It replaces MOI-067's PET for the
 stream power's runoff on frozen ground, as the bake did on 2026-10-01.
 
+## The re-review and its fixes (2026-10-31, at 5e04e9f4)
+
+An Opus re-review of the fix delta (703464c1..5e04e9f4), the flip and the merge found no wiring or determinism bug.
+Its findings, most severe first, and what was done:
+
+1. **The thaw dropped the mean.** With the months as given, `Climate::thaw`'s frost branch integrated a sinusoid
+   centred between the two months and never read the mean. On a lopsided year the biotemperature fell under the mean
+   (P 600, mean 4, months 10 and -6 °C: 3.63 °C) and jumped where the coldest month crossed 0 °C (4.00 against 5.00 °C,
+   -12 % runoff for 0.01 °C); Verkhoyansk gave 2.65 against Holdridge's 3.05. The bake had done the same since
+   2026-10-01. Fixed in this PR, bake included (the coordinator's call: the history's stream power, closed basins and
+   flexure lakes take it by default): Holdridge's own method on the twelve months where the stage wrote them, else the
+   sinusoid about the mean from the warmest month ("The two rules"). Tests: Verkhoyansk 3.05 °C by the twelve months
+   (to 1e-9) and 2.70 by the sinusoid; lopsided years both sides of a coldest month of 0 °C by both methods; a sweep
+   never under max(mean, 0) (`the_biotemperature_is_continuous_and_never_under_the_mean`).
+2. **The arms' base.** rb-months and rb1 ran on b20d0e3d's code, which did not have PR #54's hotspot cone budget; base35
+   has it. Only rb1 against rb-months is clean. Armed again on the merged head: rb2 (the branch's default) and rb2-off
+   (`surface.runoff_budget=false`: the months' and the thaw's correction alone), against base35-s4.
+3. **K's regions** lie inside Montgomery & Brandon's lines at 500 m of relief and more only; at 100 and 250 m they lie
+   above both, as on the base. Corrected here, in STATUS, on the science page and in the decisions log.
+4. **A lone month field.** `climate::months` returns both months or neither (with the twelve when all twelve are
+   there), for the surface and both young callers.
+5. **The wiring test stopped at the helpers.** `one_surface_step_takes_the_budget_s_weight` runs one step of the
+   coupled pipeline with the switch on and reads the step's own measurement: the stream power used a weight of 0.711
+   over the land against the snapshot's own 0.826.
+6. **Stale docs.** closed.rs's two runoffs (by default the same budget but for ERO-011's floor), MOI-067 (the
+   snapshot's PET now serves the switch-off path, the snapshot's aridity and the measurement), this page's master
+   (0a3ada8c), the full gates ("The checks"), ERO-217's reach (ground whose year reaches below freezing, not cold
+   ground only).
+7. **The weathering kernel** keeps a law of its own, named in "The rule".
+
+**What the thaw moves in the bake.** The biomes do not read it: their humidity is the climate stage's own aridity
+(Thornthwaite, `climate/aridity`), and `hydro::Climate::aridity` feeds only the lakes' aridity in the water's stats.
+The bake reads the thaw through its water: the lakes' balance, the playas, and the wetlands BIO-178 clears beside the
+playas. Measured on the bake test planet (`bake::tests::small_planet(100)`), from 20,000 random land columns at their
+ground, with the climate API's months (a diagnostic run once, not kept):
+- 0.56 of the columns have frost under one rule or the other;
+- the twelve months' biotemperature against the old centred sinusoid: a mean change of 0.22 °C (at most 2.0), more
+  than 0.1 °C on 0.48 of the columns; the old rule stood under the mean on 0.010 of them; the sinusoid about the mean
+  against the centred one: 0.10 °C, more than 0.1 °C on 0.36;
+- the budget's runoff: +5.0 mm on a mean of 233.8 (+2.1 %), more than 5 % on 0.27 of the columns.
+
+Through the whole pipeline the test planet is another planet after its 100 Myr, because the history's stream power,
+lakes and flexure read the thaw at every step, and a 100-Myr history parts at any change: land cells on L2 26,754
+against 24,635, Köppen classes moved on 0.09 of the land cells, lakes 0 against 16 (30,321 km²), playas 69 against
+507 km² (the bake test's print of its biomes and water, before and after). These are not the thaw's own effect on the
+biomes.
+
 ## The continents' export: the erosion law or the plates' uplift (2026-10-31, a diagnosis)
 
 The crust-budget lane (branch `trench-input`, docs/design/crust-budget.md, plates.md "The trenches' input split by
