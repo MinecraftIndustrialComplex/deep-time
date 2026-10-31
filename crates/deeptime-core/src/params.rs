@@ -998,7 +998,9 @@ pub struct TectonicParams {
     /// ledger: PLT-762
     pub trench_pile_in_place: bool,
     /// A contact begins only where its plates converge across their overlap (the oceanic-fronts
-    /// lane, 2026-10-31; off by default): `subduction::resolve` makes a new contact from an
+    /// lane, 2026-10-31; on by default since 2026-10-31, the coordinator's call under Ben's rule
+    /// of 2026-10-23, decisions log: a correctness fix, clean on the arm oo-gate, 8 runs against
+    /// base35-s4): `subduction::resolve` makes a new contact from an
     /// overlap of `MIN_CONTACT` samples or more only where the two plates' relative velocity at
     /// the overlap's centroid converges across the boundary's normal there and is no transform by
     /// Bird 2003's test (PLT-311: within 20 degrees of the boundary, or at rest; Bird calls a
@@ -1615,7 +1617,7 @@ impl Default for TectonicParams {
             island_arc_own_crust: true, // ledger: PLT-760 (built 2026-10-31, on since 2026-10-31)
             collision_arc_magma: true, // ledger: PLT-763 (built 2026-10-31, on since 2026-10-31)
             trench_pile_in_place: true, // ledger: PLT-762 (built 2026-10-31, on since 2026-10-31)
-            contact_needs_convergence: false, // ledger: PLT-810 (built 2026-10-31, off)
+            contact_needs_convergence: true, // ledger: PLT-810 (built 2026-10-31, on since 2026-10-31)
             hotspots_sourced: false, // ledger: PLT-790 (built 2026-10-31, off)
             plume_heads_sourced: false, // ledger: PLT-795 (built 2026-10-31, off)
             volcanic_margins: false, // ledger: PLT-799 (built 2026-10-31, off)
