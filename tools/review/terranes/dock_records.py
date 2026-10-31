@@ -124,7 +124,7 @@ def table(runs):
                 "extent_p10_p90": [float(np.percentile([x["extent"] for x in xs], p)) for p in (10, 90)]
                 if xs else None,
                 "extent_under": {str(e): float(np.mean([x["extent"] <= e for x in xs])) if xs else None
-                                 for e in (150, 220, 270, 300)},
+                                 for e in (150, 220, 270, 300, 350, 400)},
                 "share_crossed_of_reached": q([x["share_x"] for x in xs]),
                 "share_crossed_of_reached_pooled": float(sum(x["area"] for x in xs)
                                                          / max(sum(x["area"] + x["terr"] for x in xs), 1e-9)),
