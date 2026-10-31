@@ -1036,6 +1036,22 @@ pub struct FrontBands {
     /// front that joins a pair whose slab is already long subducts from its first step.
     #[serde(default)]
     pub gain_slab: [[f64; BANDS]; 2],
+    /// Measurement only (the intra-oceanic fronts diagnosis, 2026-10-31), km, the subducting
+    /// fronts by setting: by their arc's age (the contact's `arc_onset_myr`, reset by a reversal),
+    /// in the bands of [`AGE_BANDS_MYR`], and with no arc onset yet (`no_arc`) …
+    #[serde(default)]
+    pub arc_age: [[f64; BANDS]; 2],
+    #[serde(default)]
+    pub no_arc: [f64; 2],
+    /// … and the ocean-ocean subducting front by the ocean left on the subducting side (the
+    /// subducting sample's lattice steps to its own plate's nearest visible continental crust,
+    /// rows: under 500 km, 500 to 1,500, 1,500 to 3,000, more or none), by its contact's age
+    /// (`oo_age_ocean`) and by its arc's age (`oo_arc_ocean`, no arc in the age's first band),
+    /// both in the bands of [`AGE_BANDS_MYR`].
+    #[serde(default)]
+    pub oo_age_ocean: [[f64; BANDS]; 4],
+    #[serde(default)]
+    pub oo_arc_ocean: [[f64; BANDS]; 4],
 }
 
 /// One pair of plates' front in one setting and state this step ([`Mix::pairs`]; measurement
@@ -1096,6 +1112,11 @@ struct FrontRec {
     half: u32,
     pair: usize,
     slab_km: f64,
+    /// Measurement only (FrontBands::arc_age, oo_age_ocean, oo_arc_ocean): the subducting
+    /// side's sample, the contact's age and its arc's age (NaN with no arc onset), Myr.
+    u: u32,
+    contact_age: f64,
+    arc_age: f64,
 }
 
 /// [`Mix`] in half sample spacings, summed over samples.
@@ -1191,14 +1212,15 @@ pub fn boundary_mix(
     // Each active contact's slab length, km, and age, Myr (the bands, measurement only).
     let slab_km: BTreeMap<(u32, u32), f64> =
         st.slabs.iter().map(|s| ((s.under, s.over), s.km)).collect();
-    let contact_of: BTreeMap<(u32, u32), (f64, f64)> = st
+    let contact_of: BTreeMap<(u32, u32), (f64, f64, f64)> = st
         .contacts
         .iter()
         .filter(|c| c.active(env.step))
         .map(|c| {
             let key = (c.under, c.over);
             let km = slab_km.get(&key).copied().unwrap_or(0.0);
-            (key, (km, env.t_myr - c.onset_myr))
+            let arc = c.arc_onset_myr.map_or(f64::NAN, |a| env.t_myr - a);
+            (key, (km, env.t_myr - c.onset_myr, arc))
         })
         .collect();
     let norm = env.norm;
@@ -1292,6 +1314,7 @@ pub fn boundary_mix(
                 side: Side::None,
             }; 16];
             let mut plate_buf = [0u32; 16];
+            let mut idx_buf = [0u32; 16];
             let mut n = 0;
             // The boundary's normal towards each plate met, found once per plate.
             let mut normals: [(u32, DVec3); 4] = [(u32::MAX, DVec3::ZERO); 4];
@@ -1342,6 +1365,7 @@ pub fn boundary_mix(
                     },
                 };
                 plate_buf[n] = pu;
+                idx_buf[n] = u;
                 n += 1;
             }
             if let Some((class, half)) = classify_boundary(sv.kind, &buf[..n]) {
@@ -1356,10 +1380,10 @@ pub fn boundary_mix(
                     _ => None,
                 };
                 let front = setting.zip(front_index(&buf[..n])).map(|(k, f)| {
-                    let (km, age) = contact_of
+                    let (km, age, _) = contact_of
                         .get(&(plate_buf[f], pv))
                         .copied()
-                        .unwrap_or((0.0, 0.0));
+                        .unwrap_or((0.0, 0.0, f64::NAN));
                     (k, f, km, age)
                 });
                 // An incipient front (PLT-610) is no subduction zone yet: a converging boundary
@@ -1388,6 +1412,11 @@ pub fn boundary_mix(
                         half,
                         pair: pairs.get(&(under, pv)).copied().unwrap_or(PAIR_OTHER),
                         slab_km: km,
+                        u: idx_buf[f],
+                        contact_age: age,
+                        arc_age: contact_of
+                            .get(&(under, pv))
+                            .map_or(f64::NAN, |&(_, _, a)| a),
                     });
                     if young {
                         acc.incipient[k] += u64::from(half);
@@ -1438,6 +1467,10 @@ pub fn boundary_mix(
     let mut incipient_normal = [[0u64; BANDS]; 2];
     let mut normal_pair = [[[0u64; BANDS]; BANDS]; 2];
     let mut oo_normal_pair = [[0u64; BANDS]; 3];
+    let mut arc_age = [[0u64; BANDS]; 2];
+    let mut no_arc = [0u64; 2];
+    let mut oo_age_ocean = [[0u64; BANDS]; 4];
+    let mut oo_arc_ocean = [[0u64; BANDS]; 4];
     let mut by_pair: BTreeMap<(u32, u32, u8, bool), (u64, f64)> = BTreeMap::new();
     for r in &recs {
         let h = u64::from(r.half);
@@ -1459,6 +1492,27 @@ pub fn boundary_mix(
         normal_pair[r.setting][b][band_of(mean, &NORMAL_BANDS_MM_YR)] += h;
         if r.setting == 0 {
             oo_normal_pair[r.pair][b] += h;
+        }
+        // Measurement only (the intra-oceanic fronts diagnosis).
+        if r.arc_age.is_nan() {
+            no_arc[r.setting] += h;
+        } else {
+            arc_age[r.setting][band_of(r.arc_age, &AGE_BANDS_MYR)] += h;
+        }
+        if r.setting == 0 {
+            let steps = coast_steps[r.u as usize];
+            let left_km = if steps == u32::MAX {
+                f64::INFINITY
+            } else {
+                f64::from(steps) * spacing_km
+            };
+            let row = [500.0, 1500.0, 3000.0]
+                .iter()
+                .position(|&x| left_km < x)
+                .unwrap_or(3);
+            oo_age_ocean[row][band_of(r.contact_age, &AGE_BANDS_MYR)] += h;
+            let a = if r.arc_age.is_nan() { 0.0 } else { r.arc_age };
+            oo_arc_ocean[row][band_of(a, &AGE_BANDS_MYR)] += h;
         }
     }
     let pairs = by_pair
@@ -1492,6 +1546,10 @@ pub fn boundary_mix(
             incipient_normal: bands(incipient_normal),
             normal_pair: normal_pair.map(|m| m.map(|row| row.map(km))),
             oo_normal_pair: oo_normal_pair.map(|row| row.map(km)),
+            arc_age: bands(arc_age),
+            no_arc: no_arc.map(km),
+            oo_age_ocean: oo_age_ocean.map(|row| row.map(km)),
+            oo_arc_ocean: oo_arc_ocean.map(|row| row.map(km)),
             ..FrontBands::default()
         },
     }
