@@ -193,7 +193,9 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 - **Ledger:** ERO-011, ERO-217, ERO-220, ERO-221, ERO-222, HYD-029, HYD-033, HYD-037, YNG-011 and MOI-067 amended; the
   ERO and HYD headers and claims.md recounted (`tools/review/claims_counts.py --write`).
 - **Gate** (VM, `tools/review/plateau/gate.sh quick`, its filter now with `runoff_budget`; the script made
-  executable): fmt and clippy (core and cli, all targets) clean, the lane's 80 tests passed. The full gate: see below.
+  executable): fmt and clippy (core and cli, all targets) clean, the lane's 80 tests passed. The full gate
+  (`gate.sh full` on b20d0e3d's tree, job rb-fix-full): fmt and workspace clippy clean, `cargo test --workspace` 1,474
+  passed, 0 failed, 13 ignored.
 - **Next.** The two arms on base35-s4 once it exists (the coordinator's message):
   `pool.sh run rb-months --seeds 1,2,3,4` (the branch's default: the months' correction alone) and
   `pool.sh run rb1 --seeds 1,2,3,4 --set surface.runoff_budget=true`, both with `+DEEPTIME_CRUST_BUDGET=1
