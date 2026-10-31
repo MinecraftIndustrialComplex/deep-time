@@ -284,6 +284,103 @@ mod tests {
         }
     }
 
+    /// The bake's budget's runoff, mm/yr, for a climate given by its months.
+    fn budget_runoff_mm(p: f64, t_mean: f64, warm: f64, cold: f64) -> f64 {
+        HydroParams::default()
+            .budget(&Climate {
+                precip_mm: p,
+                t_mean_c: t_mean,
+                t_warm_c: warm,
+                t_cold_c: cold,
+            })
+            .runoff_mm
+    }
+
+    // ledger: ERO-222
+    /// The Mackenzie basin, a permafrost basin of 1.8 million km² (MAGS Water and Energy Budget
+    /// Synthesis, Table 2.1: "Mean annual precipitation: 410mm", "Mean annual
+    /// evapotranspiration: 237mm", "Average monthly temperature: 15 C in the summer and -25 C in
+    /// the winter"; Woo & Thorne 2003, Table 2: mean runoff 169 mm at Arctic Red River). The
+    /// budget's evapotranspiration and runoff are within the 54 mm mean absolute error of Fu's
+    /// curve over 470 catchments (Zhang et al. 2004, abstract); the snapshot's own rule (a mean
+    /// below 0 °C) evaporates nothing and runs off all 410 mm.
+    #[test]
+    fn the_mackenzie_basin_evaporates_as_measured() {
+        let (p, warm, cold) = (410.0, 15.0, -25.0);
+        // The source gives no annual mean: the sinusoid's, the summer's and the winter's midpoint.
+        let t = 0.5 * (warm + cold);
+        let q = budget_runoff_mm(p, t, warm, cold);
+        let et = p - q;
+        eprintln!("Mackenzie: budget runoff {q:.0} mm, ET {et:.0} mm (measured 169 and 237)");
+        assert!((et - 237.0).abs() <= 54.0, "budget ET {et:.0} against 237");
+        assert!((q - 169.0).abs() <= 54.0, "budget runoff {q:.0} against 169");
+        assert!((1000.0 * mean_t_runoff_m_yr(p, t) - p).abs() < 1.0e-9);
+    }
+
+    // ledger: ERO-222
+    /// The McMurdo Dry Valleys, a polar desert (Fountain et al., "Snow in the McMurdo Dry
+    /// Valleys, Antarctica": "Air temperatures average about –17oC with the winter minimum about
+    /// -40oC and the summer maximum a few degrees above freezing"; "In Wright Valley, annual values
+    /// of snowfall have ranged 7 – 11 mm water equivalent ..., most of which is lost to
+    /// sublimation"). With the warmest month anywhere from below freezing up to the summer's
+    /// maximum of a few degrees, the budget sends less than half of the snowfall to the rivers;
+    /// the snapshot's own rule sends all of it.
+    #[test]
+    fn the_dry_valleys_lose_their_snowfall() {
+        for warm in [-5.0, -1.0, 0.0, 1.0, 2.0, 3.0] {
+            for p in [7.0, 11.0] {
+                let q = budget_runoff_mm(p, -17.0, warm, -40.0);
+                assert!(q < 0.5 * p, "warm month {warm} °C, P {p} mm: runoff {q:.2} mm");
+                assert!((1000.0 * mean_t_runoff_m_yr(p, -17.0) - p).abs() < 1.0e-9);
+            }
+        }
+    }
+
+    // ledger: ERO-222, HYD-032
+    /// The Tibetan Plateau's lakes (Biskop et al. 2016, Table 4, the J2000g model on the HAR
+    /// reanalysis, land components, mm/yr: Mapam Yumco P 230, AET 170, runoff 60; Paiku Co 250,
+    /// 180, 70; Tangra Yumco 300, 210, 90; Nam Co 420, 290, 130; §2.1: "The mean annual air
+    /// temperature (MAAT) lies between 0 and −3 ◦C"). The source gives no months, so they are the
+    /// mean ± 8 °C of HYD-032. The budget evaporates part of what the plateau does and the
+    /// snapshot's own rule (MAAT below 0 °C) none: the budget still runs off more than these
+    /// basins (Holdridge's PET has no term for the plateau's sun and wind).
+    #[test]
+    fn the_tibetan_lakes_evaporate_more_than_the_budget() {
+        for (p, aet) in [(230.0, 170.0), (250.0, 180.0), (300.0, 210.0), (420.0, 290.0)] {
+            for t in [0.0, -1.5, -3.0] {
+                let et = p - budget_runoff_mm(p, t, t + 8.0, t - 8.0);
+                eprintln!("Tibet P {p} MAAT {t}: budget ET {et:.0} mm (Biskop {aet})");
+                assert!(et > 0.0 && et < aet, "P {p}, MAAT {t}: budget ET {et:.0}");
+                if t < 0.0 {
+                    assert!((1000.0 * mean_t_runoff_m_yr(p, t) - p).abs() < 1.0e-9);
+                }
+            }
+        }
+    }
+
+    // ledger: ERO-222, HYD-030
+    /// Holdridge's worked example (Life Zone Ecology, p. 24 of the scan: Verkhoyansk's monthly
+    /// means "-50.0, -44.4, -32.2, -15.5, 0, + 12.2, + 13.3, +9.4, + 1.7, -15.5, -37.2 and -47.8",
+    /// "3.050 as a rough mean annual biotemperature", "mean annual precipitation 135 mm"). The
+    /// sinusoidal year between its coldest and warmest month gives a biotemperature within
+    /// 0.5 °C of Holdridge's rough one (the tolerance is the agent's).
+    #[test]
+    fn verkhoyansk_s_biotemperature_is_holdridge_s() {
+        let months = [
+            -50.0, -44.4, -32.2, -15.5, 0.0, 12.2, 13.3, 9.4, 1.7, -15.5, -37.2, -47.8,
+        ];
+        let mean = months.iter().sum::<f64>() / 12.0;
+        let cl = Climate {
+            precip_mm: 135.0,
+            t_mean_c: mean,
+            t_warm_c: 13.3,
+            t_cold_c: -50.0,
+        };
+        let (t_plus, _) = cl.thaw();
+        eprintln!("Verkhoyansk: biotemperature {t_plus:.2} °C (Holdridge 3.05)");
+        assert!((t_plus - 3.05).abs() < 0.5, "biotemperature {t_plus:.2}");
+    }
+
     // ledger: ERO-221, HYD-035
     /// A land below freezing on the year with a thawed summer evaporates in it: it runs off
     /// less than all of P, and more than nothing.
