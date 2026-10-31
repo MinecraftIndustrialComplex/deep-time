@@ -546,9 +546,11 @@ pub struct TectonicParams {
     /// `tan β / (tan α + tan β)` of it). Past
     /// the strength height the crest widens as a plateau on the overriding side. In place of the
     /// wedge capped by the overriding edge's height (PLT-244) and the belt from that edge
-    /// (`collision_belt_taper`). `false` (the default; the pool arm of 2026-10-29 put more
-    /// collision land at the coast, plates.md "Step 20"): those, as before. ledger: PLT-730,
-    /// PLT-731
+    /// (`collision_belt_taper`). On by default since 2026-10-31 (the coordinator's call, under
+    /// Ben's rule of 2026-10-23: physics goes on by default once built and correct; decisions
+    /// log 2026-10-31; the arm orog-cum, plates.md "The collision orogen"). `false`: those, as
+    /// before (the pool arm of 2026-10-29 had put more collision land at the coast, plates.md
+    /// "Step 20"). ledger: PLT-730, PLT-731
     pub collision_two_wedges: bool,
     /// How much steeper the retro-wedge on the overriding plate stands than the pro-wedge, with
     /// `collision_two_wedges`: tan β / tan α, β the retro-wedge's surface slope and α
@@ -562,8 +564,10 @@ pub struct TectonicParams {
     /// orogen turns into a plateau that "grow[s] laterally at constant thickness" with its
     /// growth retro-ward (Vanderhaeghe et al. 2003), "located mostly on the retro-side" (Wolf et
     /// al. 2021). Only what the connected crust cannot hold goes to the no-room rule
-    /// (`collision_noroom_stays`). `false` (the default): the retro flank ends at the belt's
-    /// reach, as before. ledger: PLT-740
+    /// (`collision_noroom_stays`). On by default since 2026-10-31 (the coordinator's call, under
+    /// Ben's rule of 2026-10-23: physics goes on by default once built and correct; decisions
+    /// log 2026-10-31; the arm orog-cum). `false`: the retro flank ends at the belt's reach, as
+    /// before. ledger: PLT-740
     pub collision_retro_plateau: bool,
     /// `true` (the default since 2026-10-26, the suture-loss lane): the crust a collision belt
     /// has no room for stays in the crust. The belt's passes run until its crust is placed or
@@ -775,10 +779,13 @@ pub struct TectonicParams {
     /// The depleted keel under the start's continents, km (at most `thermal_reference_km`); 0 =
     /// no keels (ledger PLT-463).
     pub thermal_keel_km: f64,
-    /// After the step's resampling, every continental sample gets at least its heat-flow law's
-    /// conductive value: crust the rate guard spread onto old sea floor kept the floor's (ledger
-    /// PLT-469). On by default since 2026-10-23 (the coordinator's call: a bookkeeping fix that
-    /// moves no elevation); on with `thermal_state` whatever this says.
+    /// The heat flow's final pass after the step's resampling (ledger PLT-469): crust made
+    /// continental after the step set its heat flow (the rate guard's spread onto ocean floor,
+    /// `collapse::spread`) has none, the floor's having gone with its kind
+    /// (`Sample::make_continental`, since 2026-10-31), and takes its law's full value; every other
+    /// continental sample gets at least its law's conductive value. Off (with `thermal_state` off
+    /// too), such crust keeps no heat flow. On by default since 2026-10-23 (the coordinator's
+    /// call: a bookkeeping fix that moves no elevation); on with `thermal_state` whatever this says.
     pub heat_flow_refresh: bool,
     /// The thickest continental crust, km: a column thicker than this loses the excess from its
     /// bottom to the mantle (continental subduction, a foundering root; `plates/collapse.rs`).
@@ -1297,6 +1304,29 @@ pub struct TectonicParams {
     /// On by default since 2026-10-30 (arm backarc against base32-s4: the guard clean, about 1.9
     /// reversals per 100 Myr). ledger: PLT-737
     pub collision_backarc_reversal: bool,
+    /// `true`: a terrane its slab can drag down whole subducts, stripped of its cover. A collision
+    /// front's terranes go down with the contact's slab when each body at the front has its
+    /// extent across the front (all its area, hidden and visible, over its share of the front's
+    /// length) within the slab's reach against its buoyancy (`shortening::dragged_length_km`: the
+    /// slab's length over 1 + 2.25 T / 30 km, FRC-028 to FRC-030's law), judged as the body
+    /// arrives and kept while it goes down, a body that crust joins judged again by all its
+    /// samples over the share of the front it was judged with (`shortening::docking`); then only the
+    /// supracrustal cover of its crossing crust (sediment, sedimentary and volcanic rock,
+    /// `pools::COVER`) and the crust this collision stacked on it (PLT-400) stay, pool by pool,
+    /// by `collision_stacking_share`, all of it on the overriding plate (no pro-wedge on a
+    /// terrane going down), the plutonic and metamorphic crust under it going down with the slab;
+    /// it does not transfer at `collision_threshold_km`, and its front feeds the slab instead of
+    /// blocking it (FRC-019). A body beyond its reach jams the slab and the front collides as
+    /// before. Tetreault & Buiter 2014: "the force of the subducting slab
+    /// ... can most likely overcome the buoyancy of small crustal units"; accretion adds "slivers
+    /// of thrusted crustal units ... rather than collision and addition of the entire crustal
+    /// thickness"; "only the upper 2–5 km of arc crust" where the arc is on the subducting plate.
+    /// `shortening::advance` classes the front, `belts::stack` strips it; the design
+    /// docs/design/small-terrane-docking.md. On by default since 2026-10-31 (the coordinator's
+    /// call, under Ben's rule of 2026-10-23: physics goes on by default once built and correct;
+    /// decisions log 2026-10-31; its pool arms against orog-cum in PLT-770's row and the design).
+    /// `false`: every terrane collides and transfers as before (PLT-068). ledger: PLT-770, PLT-771
+    pub terrane_docking_cover: bool,
     /// Contacts unseen for longer than this are closed, Myr (12 steps at the 2-Myr step).
     /// Ledger PLT-059.
     pub contact_timeout_myr: f64,
@@ -1439,9 +1469,9 @@ impl Default for TectonicParams {
             collision_restack_whole: true,    // ledger: PLT-400 (game-choice; on since 2026-10-22)
             wedge_slope_deg: 1.5,             // ledger: PLT-192
             collision_belt_taper: true,       // ledger: PLT-600, PLT-601 (on since 2026-10-25)
-            collision_two_wedges: false,      // ledger: PLT-730
+            collision_two_wedges: true,       // ledger: PLT-730 (on since 2026-10-31)
             retro_slope_ratio: 1.55,          // ledger: PLT-731
-            collision_retro_plateau: false,   // ledger: PLT-740
+            collision_retro_plateau: true,    // ledger: PLT-740 (on since 2026-10-31)
             collision_noroom_stays: true,     // ledger: PLT-700 (on since 2026-10-26)
             weld_speed_mm_yr: 2.0,            // ledger: PLT-246 (Bird 2003 [3], since 2026-10-27)
             weld_after_myr: 10.0,             // ledger: PLT-246
@@ -1566,6 +1596,7 @@ impl Default for TectonicParams {
             initiation_stress_mpa: 20.0, // ledger: PLT-505 (game-choice; on since 2026-10-23)
             transference: true,          // ledger: PLT-516
             collision_backarc_reversal: true, // ledger: PLT-737 (on since 2026-10-30)
+            terrane_docking_cover: true, // ledger: PLT-770, PLT-771 (on since 2026-10-31)
             contact_timeout_myr: 24.0,   // ledger: PLT-059
             collision_orogeny_myr: 30.0, // ledger: PLT-079
             collision_melt_after_myr: 20.0, // ledger: PLT-735

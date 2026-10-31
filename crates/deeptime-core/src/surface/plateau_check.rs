@@ -20,9 +20,10 @@
 //! deep-time stage's priority flood routes every closed basin) or ends in a terminal lake. And the
 //! internally drained plateau of `closed.rs` (ERO-217 to ERO-219): the rimmed plateau with a wet
 //! outer flank and an arid interior (the stream power's runoff weight at ERO-011's floor inside
-//! the rim), its interior spilling over the rim as today or, with the lakes' water balance, closed.
-//! And a cold plateau (ERO-221, ERO-222): the interior's runoff weight from the snapshot's own
-//! rule (all of P below 0 °C) against the bake's budget (`surface.runoff_budget`).
+//! the rim), its interior spilling over the rim without the lakes' water balance or, with it,
+//! closed; and a humid interior that fills and spills with the balance. And a cold plateau
+//! (ERO-221, ERO-222): the interior's runoff weight from the snapshot's own rule (all of P below
+//! 0 °C) against the bake's budget (`surface.runoff_budget`).
 //!
 //! `cargo test -p deeptime-core plateau -- --nocapture` prints the table.
 
@@ -75,6 +76,17 @@ const ARID_WATER: lakes::CellWater = lakes::CellWater {
     loss_m_yr: 1.0,
 };
 
+/// A humid interior's: 0.5 m of runoff, a lake losing 20 mm a year net of the rain on it (the rain
+/// on it nearly what it evaporates). The interior's lake covers at least its 864 cells (36 × 24)
+/// up to the rim, so at the outer flank's 0.1 m it would lose 86 cell-m a year against the at most
+/// 62 that the rim's inner ring (124 cells at 0.5 m) feeds it, and close (the closed-basins
+/// review's arithmetic, 2026-10-31). At 20 mm it loses about 17 and spills the rest.
+// ledger: ERO-219
+const HUMID_WATER: lakes::CellWater = lakes::CellWater {
+    runoff_m_yr: 0.5,
+    loss_m_yr: 0.02,
+};
+
 /// Width of the rim range, cells.
 const RIM: i64 = 2; // ledger: ERO-176
 
@@ -121,6 +133,11 @@ fn rimmed(lake: bool) -> Case {
 
 /// Mean gross lowering per process (m/Myr): [interior, edge] × [spl, threshold, diffusion, net].
 fn run(case: &Case) -> [[f64; 4]; 2] {
+    run_lakes(case).0
+}
+
+/// [`run`], and with the water balance what the lakes passed on at the first step.
+fn run_lakes(case: &Case) -> ([[f64; 4]; 2], Vec<lakes::LakeOutflow>) {
     let (w, hh) = (56usize, 44usize);
     let d = Dims::new(w, hh, case.dx, false);
     let n = d.cells();
@@ -203,6 +220,7 @@ fn run(case: &Case) -> [[f64; 4]; 2] {
         vec![0.0; n],
     );
     let mut r = routing::Routing::default();
+    let mut first: Option<Vec<lakes::LakeOutflow>> = None;
     for _ in 0..steps {
         let start = h.clone();
         let mut kind = kind0.clone();
@@ -210,6 +228,7 @@ fn run(case: &Case) -> [[f64; 4]; 2] {
         routing::receivers(&d, &filled, &kind, &mut r);
         routing::stack(&d, &kind, &mut r);
         routing::accumulate(&d, &r, &weight, &mut area);
+        let mut outflow = None;
         if let Some(inner) = case.balance {
             // ledger: ERO-217, ERO-218
             let lv = lakes::water_levels(&d, &h, &filled, &kind, &r, 0.0, true, &|c| {
@@ -218,16 +237,36 @@ fn run(case: &Case) -> [[f64; 4]; 2] {
             if let Some(pass) = closed::pass_shares(n, &lv.outflow) {
                 routing::accumulate_passing(&d, &r, &weight, &pass, &mut area);
             }
+            first.get_or_insert_with(|| lv.outflow.clone());
+            outflow = Some(lv.outflow);
         }
-        let input = spl::SplInput {
-            kind: &kind,
-            h0: &h,
-            filled: &filled,
-            base_z: &base_z,
-            area: &area,
-            kf: &kf,
+        let solve = |area: &[f64], out: &mut [f64], qin: &mut [f64], cut: &mut [f64]| {
+            let input = spl::SplInput {
+                kind: &kind,
+                h0: &h,
+                filled: &filled,
+                base_z: &base_z,
+                area,
+                kf: &kf,
+            };
+            spl::solve_cut(&d, &r, &input, &p, out, qin, Some(cut));
         };
-        spl::solve_cut(&d, &r, &input, &p, &mut out, &mut qin, Some(&mut cut));
+        solve(&area, &mut out, &mut qin, &mut cut);
+        // ledger: ERO-217
+        // A lake its sediment filled passes all its water, as on the surface
+        // (`closed::open_until_stable`).
+        if let Some(outflow) = outflow.as_mut() {
+            let mut state = (&mut out, &mut qin, &mut cut);
+            closed::open_until_stable(
+                outflow,
+                &mut state,
+                |(out, _, _), outflow| closed::open_filled(outflow, out, &filled),
+                |(out, qin, cut), outflow| {
+                    closed::accumulate(&d, &r, &weight, outflow, &mut area);
+                    solve(&area, out, qin, cut);
+                },
+            );
+        }
         for c in 0..n {
             if kind[c] == BASE {
                 continue;
@@ -254,7 +293,7 @@ fn run(case: &Case) -> [[f64; 4]; 2] {
             *v /= area_steps[z] * myr;
         }
     }
-    sums
+    (sums, first.unwrap_or_default())
 }
 
 #[test]
@@ -380,38 +419,73 @@ fn plateau_erosion_by_process_and_scale() {
 
 /// The internally drained plateau (`closed.rs`, ERO-217 to ERO-219): the rimmed plateau behind a
 /// wet outer flank on the presets' law, its interior arid (runoff weight 0.05) or humid (1). An
-/// arid interior that spills over its rim, as the surface routes every lake today, is captured by
-/// the rivers that cut the spill; closed by its water balance (it cannot fill its depression to the
-/// spill), it passes no water, so the spill is cut only from outside and the interior's rock stays
-/// on the plateau ("in M1 most of the eroded rock is trapped within the orogen and at orogenic
-/// scale the effective mass removal is small", Garcia-Castellanos 2007, p. 380). A humid interior
-/// fills and spills less what its lake evaporates, about as before.
+/// arid interior that spills over its rim, as the surface routed every lake without the balance, is
+/// captured by the rivers that cut the spill; closed by its water balance (it cannot fill its
+/// depression to the spill), it passes no water, so the spill is cut only from outside and the
+/// interior's rock stays on the plateau ("in M1 most of the eroded rock is trapped within the
+/// orogen and at orogenic scale the effective mass removal is small", Garcia-Castellanos 2007,
+/// p. 380). A humid interior ([`HUMID_WATER`]) fills and spills less what its lake evaporates,
+/// about as without the balance.
 #[test]
 fn an_arid_plateau_behind_its_rim_keeps_its_rock() {
     let rows = [
-        ("arid interior, spills (today)", plateau_basin(0.05, None)),
+        (
+            "arid interior, spills (no balance)",
+            plateau_basin(0.05, None),
+        ),
         (
             "arid interior, closed by its balance",
             plateau_basin(0.05, Some(ARID_WATER)),
         ),
-        ("humid interior, spills (today)", plateau_basin(1.0, None)),
+        (
+            "humid interior, spills (no balance)",
+            plateau_basin(1.0, None),
+        ),
         (
             "humid interior, with its balance",
-            plateau_basin(1.0, Some(OUTER_WATER)),
+            plateau_basin(1.0, Some(HUMID_WATER)),
         ),
     ];
     eprintln!(
         "m/Myr over 10 Myr: interior spl threshold diffusion net | edge spl threshold diffusion net"
     );
     let mut got = Vec::new();
+    let mut first = Vec::new();
     for (name, case) in &rows {
-        let s = run(case);
+        let (s, lakes) = run_lakes(case);
         eprintln!(
             "{name:38} {:8.1} {:8.1} {:8.1} {:8.1} | {:8.1} {:8.1} {:8.1} {:8.1}",
             s[0][0], s[0][1], s[0][2], s[0][3], s[1][0], s[1][1], s[1][2], s[1][3]
         );
         got.push(s);
+        first.push(lakes);
     }
+    // The interior's lake at the first step: the largest of each run's lakes.
+    let interior = |k: usize| {
+        first[k]
+            .iter()
+            .max_by_key(|l| l.cells)
+            .cloned()
+            .expect("a lake behind the rim")
+    };
+    let (arid, humid) = (interior(1), interior(3));
+    eprintln!(
+        "first step: arid lake {} cells share {:.3}; humid lake {} cells share {:.3}",
+        arid.cells, arid.share, humid.cells, humid.share
+    );
+    assert!(
+        arid.cells >= 864 && humid.cells >= 864,
+        "the interior is one lake"
+    );
+    assert_eq!(
+        arid.share, 0.0,
+        "the arid interior is closed from the first step"
+    );
+    assert!(
+        humid.share > 0.0 && humid.share < 1.0,
+        "the humid interior fills and spills less its lake's loss: {}",
+        humid.share
+    );
     let net = |k: usize, zone: usize| got[k][zone][3];
     // The arid interior's own runoff already slows it far below the humid one's (the 2026-10-16
     // finding: only less runoff slows the plateau) ...
@@ -425,7 +499,8 @@ fn an_arid_plateau_behind_its_rim_keeps_its_rock() {
     assert!(net(1, 0).abs() < 1.0, "the closed interior's net export");
     // The wet outer flank still wears: the law takes only the interior's water off it.
     assert!(net(1, 1) > 0.8 * net(0, 1), "the flank still wears");
-    // A humid interior fills its depression and spills, less what its lake loses: about as before.
+    // A humid interior fills its depression and spills, less what its lake loses: about as
+    // without the balance.
     assert!(
         (net(3, 0) - net(2, 0)).abs() < 0.1 * net(2, 0),
         "a humid interior spills"

@@ -1,10 +1,12 @@
 # The collision orogen as a doubly vergent wedge and its plateau: design
 
-Status: **designed and built behind switches** (2026-10-31, the orogen lane, branch `collision-orogen`; Ben's
+Status: **designed and built; both switches on by default since 2026-10-31** (the coordinator's call, under Ben's
+rule of 2026-10-23, decisions log 2026-10-31; built by the orogen lane, branch `collision-orogen`; Ben's
 order "Freeboard, then orogen (Recommended)", decisions log 2026-10-30). The two wedges (PLT-730, PLT-731) were
 built on 2026-10-29 and kept off; this design reads them again on the freeboard physics (PLT-660, PLT-661, on since
 2026-10-31) and adds one rule, the plateau's retro-ward growth (PLT-740, `tectonics.collision_retro_plateau`).
-Defaults are the coordinator's call on the lane's report. plates.md "The collision orogen (PLT-740)" holds the
+The defaults were the coordinator's call on the lane's report: `collision_two_wedges` and `collision_retro_plateau` are
+on. plates.md "The collision orogen (PLT-740)" holds the
 arms' tables.
 
 **Measured** (2026-10-31): the cumulative arm orog-cum (O1 + O2, 8 runs) against base34-s4 and base34: the guard
@@ -117,8 +119,8 @@ Strecker 2012, pp. 103-104) and southern Tibet's at under 0.01 km/Myr since 12-1
 **O1. The orogen is two critical wedges about the front** (PLT-730, PLT-731, built 2026-10-29). Unchanged. The
 pro-wedge on the incoming plate's samples rides to the front and crosses whole (PLT-400), which stands for a wedge
 that stays at the front while the lower plate passes under it: in the sources the orogen is fixed to S and the retro
-mantle, so its pro-wedge is accreted lower-plate crust that no longer moves with the lower plate. Whether it goes on
-by default is the coordinator's call on the arms (the table above and the cumulative arm).
+mantle, so its pro-wedge is accreted lower-plate crust that no longer moves with the lower plate. It went on
+by default on 2026-10-31, the coordinator's call on the arms (the table above and the cumulative arm).
 
 **O2. Past the strength height the plateau grows retro-ward without a set width** (new, PLT-740,
 `tectonics.collision_retro_plateau`, with O1 only). Today the retro flank is the overriding plate's continental
@@ -127,8 +129,8 @@ strength height, what is left goes to the no-room rule (PLT-700): stacked above 
 profile, nearest the front, where the step's ceiling (PLT-287) and the surface's channel flow (`surface::spread`) move
 it on. With the switch the retro flank reaches as far through the overriding plate's continental crust as the step's
 crust needs: when the fill leaves crust with every sample of the flank at its limit, the flank is searched again to
-twice the reach (through continental samples of the overriding plate only: a plateau grows through its own crust, not
-across a sea), until the crust is placed or the plate's connected continental crust is all taken. The fill is the same
+twice the reach (through continental samples of the overriding plate only: a plateau grows through its own
+continental crust, under the sea or not, never across ocean floor), until the crust is placed or the plate's connected continental crust is all taken. The fill is the same
 bisection (one crest H, `min(h_s, H − d tan β)` on the retro side), so the plateau stands at the strength height with
 its retro edge moving away from the front and the retro flank beyond it at β, and the pro edge stays at the front:
 Vanderhaeghe et al.'s plateau "at constant thickness" growing retro-ward. Only what the whole connected crust cannot
@@ -159,6 +161,11 @@ balance leaves (`surface.closed_basins`, ERO-217, ERO-218).
 - Small terranes (Ben's third item): a fragment under 50 samples still docks for 0 to 2 Myr and is stacked by these
   rules.
 - The lower crust going down with the slab (PLT-654, parked).
+- Structures on the plateau. Its samples are stamped as the collision's orogeny but stay outside the collision's
+  footprint (PLT-260), so the structure stage gives them no collision folds or thrusts: the crust comes to them by the orogen's flow from the front, not by shortening their own upper crust, as along Tibet's eastern margin, uplifted "without significant shortening of the upper crust" (Clark & Royden 2000, p. 703), with "little crustal shortening" since about 4 Ma (Royden et al. 1997, abstract), while the plateau's interior extends east-west (Armijo et al. 1986, abstract: normal faulting "the dominant tectonic regime north of the Himalayas in the last 2 ± 0.5 m.y."; Blisniuk et al. 2001, abstract: graben in central Tibet since at least 13.5 Myr). Vanderhaeghe
+  et al. (2003, p. 40) find "pure shear thickening in the upper crust" of one model's plateau (and "low deformation
+  rates in the upper crust during the later, plateau stage", p. 42); the interior's east-west extension (normal faults,
+  rifts) is not modelled either.
 - The thermal trigger of the plateau (Vanderhaeghe et al. 2003, p. 43: the Moho above 700 °C after about 45 Myr at
   1 cm/yr; Wolf et al. 2021, p. 14): the strength height applies from a collision's onset, as before. Before that
   trigger the sources' wedges thicken without limit (Vanderhaeghe et al. 2003, p. 34), so a trigger would let young
@@ -169,8 +176,11 @@ balance leaves (`surface.closed_basins`, ERO-217, ERO-218).
 
 Unit test (`belts.rs`, `the_retro_plateau_grows_past_the_belt_through_its_own_crust`): with the pro side and the
 retro flank within the belt's reach at the strength height, the switch places the step's crust on the lowland beyond
-`collision_belt_km`, at most at the strength height; a sea strip between two continents of the overriding plate stops
-it; the crust kept is the same as without the switch; off, the no-room rule takes it and nothing beyond the belt
-rises. One cumulative 8-run arm (O1 + O2) against base34-s4 (or
+`collision_belt_km`, at most at the strength height; ocean floor between two continents of the overriding plate stops
+it (the lowland before it stands 20 m under the strength height, so one step's crust reaches it: every sample before
+it rises, nothing on it or across it, and the no-room rule takes the rest); the crust kept is the same as without the
+switch; off, the no-room rule takes it and nothing beyond the belt rises. `an_arc_in_collision_takes_the_crust_on_its_edge_on_the_shipped_path`:
+with the shipped switches, an arc whose incoming continent stands at the strength height puts the step's crust on its
+edge at the front. One cumulative 8-run arm (O1 + O2) against base34-s4 (or
 sedmargin, its physics), with `v1census`, `guard`, `collcoast` and `coastset`, the dock tally and the high ground
 through time. No V1 number is a gate (decisions log 2026-10-23).

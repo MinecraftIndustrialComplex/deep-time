@@ -1,10 +1,13 @@
 # What wears the plateaus, and lakes that pass on what their water balance leaves: design
 
-Status: **measured on cached runs, designed and built behind a switch, off; its arm ran** (2026-10-31, the plateau lane,
-branch `plateau-drainage` on `collision-orogen`). `surface.closed_basins` (`crates/deeptime-core/src/surface/closed.rs`;
+Status: **measured on cached runs, designed and built; on by default since 2026-10-31** (the coordinator's call, decisions log 2026-10-31; its arm ran, 2026-10-31, the plateau lane,
+branch `plateau-drainage` on `collision-orogen`, built and off; branch `plateau-drainage-on`, on by default with the
+review's fixes, R3 and "The review"). `surface.closed_basins` (`crates/deeptime-core/src/surface/closed.rs`;
 ERO-217, ERO-218), with a split of the flat high ground by its water (ERO-220). The controlled plateau is ERO-219. The
 arm plat-cb0 against orog-cum ("The arm"): the law is sound and cheap and gives the planets internally drained land,
-but it does not keep the plateaus; their flat tops wear on frozen ground, whose runoff is the next lead.
+but it does not keep the plateaus; their flat tops wear on frozen ground, whose runoff is the next lead. The arm after
+the review's fixes, plat-cb1 ("The arm after the fixes"), keeps that verdict: the ground draining to closed basins
+wears at 31 m/Myr against 53, and 0.10 of the land drains to them.
 
 ## Why
 
@@ -180,7 +183,8 @@ flexure's water (`lakes::water_levels`, ISO-126, on the bake's budget, HYD-050 a
 sends it against what its surface loses, the open water's evaporation less the rain on it. With `surface.closed_basins`
 the stream power's drainage area (the runoff-weighted area, ERO-010, ERO-082) leaves each lake's exit cells at the share
 of the lake's inflow that flows out, (inflow - loss) / inflow at its spill (Garcia-Castellanos 2006, eq. 2), instead of
-whole (`routing::accumulate_passing`, `closed::pass_shares`).
+whole (`routing::accumulate_passing`, `closed::pass_shares`). An exit is a lake cell whose water leaves the lake for good:
+a lake cell draining onto a shoal of its own lake (ground at the fill, so no lake cell) that drains back in is none.
 
 **R2. A lake that cannot fill to its spill is a closed basin and passes nothing** (ERO-217). Where the inflow does not
 cover the losses of the lake at its spill, the balance holds it below the rim (`lakes.rs`: its level is the shore that
@@ -190,15 +194,31 @@ outside, and the basin's water ends in it.
 Nothing else changes, and what the sources describe follows from the model's own lakes:
 - the depression stays a lake for the solve (`spl.rs`: no incision in it, the sediment kept up to its room, HYD-110), so
   what its ranges shed stays on the plateau's crust and fills it;
-- it opens when its balance fills it to the spill again (a wetter climate; fill that shrinks the depression), or when a
-  river outside cuts its rim below its floor (capture), since every step's flood and balance are new;
+- it opens when a wetter climate's balance fills it to the spill, or when a river outside cuts its rim below its floor
+  (capture), since every step's flood and balance are new, or when its sediment fills it (R3);
 - a humid lake fills and spills less what it evaporates.
+
+**R3. A basin its sediment fills opens** (ERO-217; the review of 2026-10-31). "In closed drainage basins, either a
+climate change to wetter climatic conditions, or the sediment overfill of the lake (both inducing lake level rise) or a
+basin capture undertaken by an adjacent river can trigger drainage opening" (Garcia-Castellanos 2006, pp. 284-285). That
+point rests on this source alone: an earlier draft also quoted Sobel et al. 2003, [26], on the shed material overtopping
+the range, and that sentence is in no printed record of the reading (the bibliography's [26] is a different sentence), so it
+is removed. R2 alone did not do it: HYD-110 raises every lake cell by one share of its depth, so the lake
+keeps its cells, and the balance its losses, until the room is nearly gone, and the sediment past the room left at the
+spill with only the spill's own water (a closed lake passes none), settled there and dammed it; the next step's flood
+found a new closed lake behind it. Now a lake whose exits the solve leaves at the flood's level (its room taken) has no
+room for water either and passes all of it, and the step is solved again with its area passed on, until no lake
+opens (`closed::open_filled`, `closed::open_until_stable`: opening one sends its water and sediment to the lake below
+it): the spill is cut by the basin's water and the sediment goes on down the valley. A shallow pit
+has little room, so a one-cell lake the sediment reaches fills and opens within its step; the surface's lakes are any
+depression the flood fills by more than 1 cm, as the solve's are, where the bake draws only lakes of 1 km² and a block
+deep (what the world shows, not the water).
 
 Simplifications (the agent's): the depression is the solve's lake up to its spill whatever the level of the water in it
 (in the sources the floor between the balance's shore and the spill is the aggrading basin, which at 4.8-km cells and
 2-Myr steps the lake stands for); the share is the bake's budget applied to the surface's runoff-weighted area, two
-runoffs that differ on frozen ground; what a closed lake cannot keep (sediment past its room) still leaves at its exit as
-from any lake; the lakes' evaporation is the bake's 200 + 60 T+ mm a year (HYD-040, HYD-041), about half Tibet's measured
+runoffs that differ on frozen ground; a lake its sediment fills is open for the whole step (it filled within it), and the
+flexure's water over it stays the balance's of the step's start; the lakes' evaporation is the bake's 200 + 60 T+ mm a year (HYD-040, HYD-041), about half Tibet's measured
 1,000 and Titicaca's 1,100 to 1,270, so the model closes fewer high basins than their measured evaporation would (not
 changed: HYD-040 is calibrated on Earth's lakes as a whole).
 
@@ -208,10 +228,10 @@ the presets' law, 10 Myr; m/Myr, interior then edge):
 
 | case | interior: stream power, cut, diffusion, net | edge: stream power, cut, diffusion, net |
 |---|---|---|
-| arid interior (runoff weight 0.05), spills (today) | 2.8, 0.9, 2.3, 3.8 | 115.3, 47.9, 16.7, 121.2 |
+| arid interior (runoff weight 0.05), spills (no balance) | 2.8, 0.9, 2.3, 3.8 | 115.3, 47.9, 16.7, 121.2 |
 | arid interior, closed by its balance | 0.0, 0.0, 0.8, 0.5 | 104.8, 46.8, 14.2, 111.7 |
-| humid interior (weight 1), spills (today) | 126.7, 0.5, 15.2, 129.9 | 264.2, 2.9, 17.2, 266.3 |
-| humid interior, with its balance | 131.5, 0.5, 14.9, 134.7 | 266.9, 2.9, 16.3, 268.9 |
+| humid interior (weight 1), spills (no balance) | 126.7, 0.5, 15.2, 129.9 | 264.2, 2.9, 17.2, 266.3 |
+| humid interior, with its balance (a lake losing 20 mm a year) | 126.6, 0.5, 15.1, 129.8 | 264.3, 2.9, 17.2, 266.3 |
 
 The arid interior already wears slowly on its own runoff (3.8 against 129.9 m/Myr), and closed it sends almost none of
 its rock away (0.5), while the wet flank still wears (111.7 against 121.2); a humid interior spills about as before. On
@@ -229,18 +249,28 @@ balance closes them.
 - Frozen ground's runoff (ERO-010's PET 0 below 0 °C): left here, on a final-frame read (0.004 to 0.029 of the flat high
   ground) that the arm overturned: over the run 0.67 of the flat high ground is below 0 °C and it wears at 141 m/Myr. It
   is the next lead ("The arm").
-- The young landscape (`young.rs`): the L2 refinement of the last step for the game routes as before; the bake's lakes
-  keep HYD-050's balance for the world.
+- The bake's lakes keep HYD-050's balance for the world. The young landscape (`young.rs`, the L2 refinement of the last
+  step for the game) routed as before until the review of 2026-10-31; it now takes the same law on L1's budget upsampled,
+  so the last step no longer cuts the spill of a basin the history kept closed with the whole basin's area.
 - The runoff weight's 5 % floor (ERO-011, uncited): kept, since K was calibrated with it (2026-10-18).
 - No knob, cap or forcing term: the share is each lake's balance on the bake's existing budget.
 
 ## How it is judged
 
 Unit tests: `surface::closed` (an arid basin is closed and passes no water; a humid one spills less its lake's
-evaporation, the share against an independent count; passing everything is the plain accumulation to the bit) and
-`surface::plateau_check::an_arid_plateau_behind_its_rim_keeps_its_rock` (the table above). Gate on the branch (VM,
+evaporation, the share against an independent count; passing everything is the plain accumulation to the bit; and,
+since the review of 2026-10-31, the passing accumulation against its definition with random shares, a lake draining
+over its own shoal with one way out, a chain of two lakes applying each share once, and a 0.5 m deep arid basin a range
+overfills in one step, whose spill rises 660 m closed and is cut 186 m once it opens; since the second review of
+2026-10-31 also a chain whose lower basin the opened upper one's sediment fills, a route through a lake at its own level
+and back, and, in `surface::young`, the young step's routing and solve on a closed basin) and
+`surface::plateau_check::an_arid_plateau_behind_its_rim_keeps_its_rock` (the table above; since the review it also
+checks the first step's lakes: the arid interior's 871-cell lake passes nothing, the humid one 0.69). Gate on the branch (VM,
 `tools/review/plateau/gate.sh full`, on c4fd3e38): fmt and clippy (workspace, all targets) clean, deeptime-core 1,150
-passed and 12 ignored, its integration tests passed.
+passed and 12 ignored, its integration tests passed. At the second review (2026-10-31, on the merge with master 47eab448
+and its fixes, code at e6b52023): `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`
+and `cargo test --workspace --no-fail-fast` on the VM, all clean: deeptime-core 1,174 passed and 12 ignored, the
+workspace 1,458 passed, 0 failed, 13 ignored.
 
 **The arm (one cumulative 8-run arm; to be queued by the coordinator).** On base35-s4 (the next 24-run base, after
 `collision-orogen-on` lands, so with the two orogen switches on by default): merge `origin/master` into this branch,
@@ -379,7 +409,7 @@ collision high coasts whose collision cells within 400 km are round, not elongat
 
 So more of the final high coasts sit on broad collision regions. Not explained here.
 
-**Verdict on default-on: yes.**
+**Verdict on default-on: yes (done 2026-10-31: `surface.closed_basins` is on by default, the coordinator's call, decisions log 2026-10-31).**
 - **The project's rule is met** (CLAUDE.md, decisions log 2026-10-23: physics goes on once built and correct; the rule
   it replaces goes off with it):
   - unit tests against its sources;
@@ -394,3 +424,165 @@ the bake's own budget (`HydroParams::budget`, the closure's balance), in place o
 0 °C. One budget for the rivers and the lakes, no knob. K was calibrated on the surface's runoff (2026-10-18), so that
 arm reads the regions' table again rather than retuning K. Taken up on 2026-10-31 by the runoff lane
 (docs/design/surface-runoff-budget.md: `surface.runoff_budget`, ERO-221, ERO-222).
+
+## The review (2026-10-31, an Opus reviewer) and its fixes (branch `plateau-drainage-on`)
+
+The law on by default (bc28bbc3, merged with small-terrane-on) was reviewed before landing. What it found and what
+changed (199c51b1 and after):
+
+1. **The young landscape ignored the law, and the world is built from it.** `young.rs` routed with the plain
+   accumulation while its uplift is the last L1 step's erosion rate, small at a closed basin's spill since the history no
+   longer cut it; so the final 2-Myr L2 step cut the spill with the whole basin's area, and `young/area_m2` fed that area
+   to the amplifier's drainage prior: the world could show a river leaving a basin the history kept closed. Now the young
+   step routes as the surface does: the lakes' water balance on L2 (`lake_water`: L1's budget, `climate::cell_water` on
+   the climate stage's fields, upsampled), `pass_shares` and `accumulate_passing`, and R3 after its solve.
+2. **A closed lake's overflowing sediment dammed its own spill.** With a share of 0 the spill kept only its own area, so
+   every m³ past the lake's room settled on that one cell (the Yuan deposition G Q / A with a one-cell A), the next
+   step's flood made a new lake behind the raised spill, closed again; HYD-110 shrinks the lake's area only in the last
+   part of its room, so the balance never opened it. R3 (above) opens a lake its sediment fills; the test basin's spill
+   rose 660 m closed and is cut 186 m opened.
+3. **False exits.** A lake cell whose receiver was a shoal of its own lake (ground within 1 cm of the fill) counted as an
+   exit, and the share was applied there and again at the real exit (share squared). An exit is now a lake cell whose
+   path leaves the lake for good.
+4. **The plateau test's humid row was a closed lake** (at the outer flank's 0.1 m its 871-cell lake loses 87 cell-m a
+   year against at most 62 fed). It now loses 20 mm a year (`HUMID_WATER`) and spills 0.69 of its inflow, and the test
+   checks the first step's lakes. New tests: a chain of lakes, a lake with a shoal, an overfilled basin, the passing
+   accumulation against its definition.
+5. **Docs.** Sobel et al. 2003 was read in full by the plateau lane's research sub-agent (paragraphs [1] to [66], the
+   Wayback Machine's copy of Wiley's page; its [26], [58], [60] and [62] are quoted from what it printed); STATUS said
+   abstracts only, now corrected. Langbein 1961 is pp. 3-6, 12-13 and Table 1 of the full text. ERO-080's note now says
+   what changes (the stream power's area only; the routing still spills; it needs `hydro.lake_balance`).
+   Richardson2019's entry had Sobel's abstract line, removed.
+6. **Smaller.** A warning in the run's log when `surface.closed_basins` is on and `hydro.lake_balance` off (every lake
+   stays full: no basin closes). The surface's lakes are any depression filled by more than 1 cm, one cell or more, as
+   the solve's are; the bake draws lakes of 1 km² and a block deep, which is about the world, not the water; a shallow
+   closed pit the sediment reaches fills and opens within its step (closed.rs, "Simplifications"). The 0 °C line of the
+   frozen flat high ground carries `// ledger: ERO-220`; the "spills (today)" labels are "spills (no balance)".
+
+## The second review (2026-10-31) and its fixes (branch `plateau-drainage-on`)
+
+A re-review of the first fixes (d19ada78) found one thing that was wrong in the code, two in the docs and one in a
+source line. What changed:
+
+1. **A downstream lake in a chain could still dam its own spill.** `closed::open_filled` ran once per substep. Opening
+   an upper lake sends its water and its sediment on to the lake below it, so a lower closed lake whose room lay
+   between its supplies before and after the upper opened was filled by the second solve without being opened, and its
+   overflow settled on its spill (the re-reviewer measured 60.6 to 70.9 m of rise). Now `closed::open_until_stable`
+   opens, accumulates the area again and solves again until no lake opens. An opened lake is never a candidate again, so
+   the loop ends within the number of lakes, and that number bounds its rounds. It is the one loop the surface
+   (`surface/mod.rs`), the young stage (`young.rs`, `solve_lakes`) and the plateau test (`plateau_check.rs`) run.
+   - The chain test `a_lower_basin_the_opened_upper_one_fills_is_opened_in_turn` sets the lower basin's floor so its
+     room lies between the two supplies (measured on a basin too deep to fill: 2.561e9 m³ before the upper opens,
+     2.700e9 after, the room 2.631e9). Checked: the lower is not full after the first solve and is full after the second;
+     one round leaves it closed and its spill rises 69.3 m; the loop opens both lakes and the spill falls 236 m.
+2. **Two statements of the arm's table were wrong** (see "What changed" below, corrected): the drop in lakes passing
+   part of their inflow (6.3e4 to 1.7e4 substeps a run) is about the 4.8e4 opened by R3, not the false exits'; and the
+   closed lake-substeps fell only 0.8e4, so R3's lakes were mostly part-passing ones. `filled_lake_steps` counts the
+   closed and the part-passing lakes together, and the three counts are taken after R3 (`Totals` doc comments).
+3. **A Sobel et al. 2003 [26] quote was removed.** "The material shed from the range into the basin may eventually
+   overtop the range and reintegrate the drainage system" stood in `closed.rs`, in R3 above and in ERO-217. It is in no
+   printed record of the reading: the bibliography's Sobel2003 entry gives a different [26] sentence, and `git log -S`
+   finds it only in the commit that added it. R3's source is Garcia-Castellanos 2006, pp. 284-285, alone.
+4. **The young step is tested with a closed basin.** `young.rs` routes and solves through two functions now
+   (`route_lakes`, `solve_lakes`; the same code, moved out of `lem`), and
+   `the_young_step_routes_a_closed_basin_and_opens_one_its_sediment_fills` runs them on the geometry of
+   `closed.rs`'s overfill test: the routing cuts the spill's area by the closed basin's; solved without opening, the
+   spill rises 660 m; the step's solve opens the basin and gives the plain accumulation's result to 1e-6 m (−185.7 m).
+   Without the lakes' water in the routing, or without the opening in the solve, it fails.
+5. **A lake's exit through another lake at its own level.** A depression the shoals at its fill split into two lakes at
+   one level (within 1 cm) could make a false exit: a route from a cell of one into the other and back into the first
+   counted as leaving. The walk now goes on through a lake at the same level (as `spl::lake_links` takes the solve's
+   lakes) and stops at one at another level. `a_route_through_a_lake_at_its_own_level_and_back_is_no_exit`.
+6. **Smaller.**
+   - The `Totals` lake counts' doc comments say what they count.
+   - The young stage's estimate lists the 8 B a cell it holds through the glaciers' step (the lakes' runoff and loss on
+     L2, two `f32`s): `OWN_BYTES_PER_L2_CELL` 340 to 348, the test's holds 951 to 961 MiB (quick) and 3,474 to 3,515
+     (full) by that arithmetic, not measured again.
+   - The gate record below is the branch's at this review.
+
+## The arm after the fixes: plat-cb1 (2026-10-31)
+
+`pool.sh run plat-cb1 --seeds 1,2,3,4 +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps` ran on
+`plateau-drainage-on` at 5a8082ff (key 6c199eaeaab7, argkey cd665cef, 8 runs) with the branch's defaults: closed basins,
+the orogen's two wedges and retro plateau, and the docking cover. The reads are plat-cb0's, plus
+`tools/review/plateau/words.py` for the summary's lake words and timings. They were run against plat-cb0, orog-cum and
+small-terrane (key dcf0d7480ef3, argkey 35ce6e09: the docking cover on the orogen's physics, the nearest plate control).
+
+**What it can and cannot separate.**
+- plat-cb1 differs from plat-cb0 by the review's fixes and by the plates' changes merged with small-terrane-on
+  (c03afd9a): the docking cover (PLT-770), PR #50's review and the continental heat flow for crust made continental late
+  in a step (PLT-469).
+- small-terrane has the docking cover but not the other two, so no cached arm is plat-cb1 without the law. Plate-side
+  rows are read against small-terrane, surface rows against plat-cb0.
+- The pool's runs stop before the young landscape (`young=0.0s/0steps` in the timings), so fix 1 is not in these
+  numbers. The young step has a test with a closed basin since the second review (above).
+
+**The pool's tables (8 runs each; p against orog-cum unless said).**
+- **V1:** land 0.218 (p 0.51), largest landmass 0.083 (p 0.65), crust under the sea 0.577 (p 0.65), land above 2 km
+  0.019 (p 0.38), coast with high ground 0.102 (p 0.13; small-terrane 0.091), land under ice 0.047 (p 0.44). Criteria
+  met: a median 5.5 against 6 (p 0.38). The sea over the datum at the end: 154 m against plat-cb0's 259, orog-cum's 203
+  and small-terrane's 184.
+- **The guard:**
+  - the worst is 10,504 m against small-terrane's 10,154 (p 0.38; against orog-cum p 0.065);
+  - 0 steps beyond one Earth relief;
+  - the plates' peak is 4,566 m against small-terrane's 4,700 (p 0.80).
+
+  So plat-cb0's larger worst and higher peak against orog-cum are not the law's: the plates' changes give the same.
+- **collcoast's "belt not elongated":** 0.147 against small-terrane's 0.170 (p 0.80). plat-cb0's 0.256 is not
+  repeated. The docking cover alone gives this column's rise against orog-cum.
+
+**The closed basins (medians of 8 runs; plat-cb1 | plat-cb0 | orog-cum).**
+
+| read | plat-cb1 | plat-cb0 | orog-cum |
+|---|---|---|---|
+| land draining to a basin that passes nothing, over the run (`closedshare.py`) | 0.101 (0.081 to 0.163) | 0.127 (0.093 to 0.148) | 0 |
+| lake-substeps closed, a run | 2.75e4 | 3.59e4 | |
+| lake-substeps passing part of their inflow | 1.67e4 | 6.34e4 | |
+| lakes opened because their sediment filled them (R3, `filled_lake_steps`) | 4.78e4 | | |
+| flat high ground, net m/Myr (per run) | 123.9 (106 to 177) | 141.4 (114 to 196) | 134.3 (114 to 228) |
+| its stream-power shares, without the cut and the cut | 0.351, 0.334 | 0.372, 0.316 | 0.366, 0.316 |
+| draining to a closed basin: part of the flat, net m/Myr (per run) | 0.26, 30.6 (23 to 42) | 0.30, 52.8 (47 to 84) | |
+| of it stream power, diffusion, ice | 3.8, 23.2, 5.7 | 24.6, 28.5, 9.2 | |
+| dry: part, net | 0.24, 35.3 | 0.22, 37.6 | |
+| frozen: part, net | 0.62, 125.2 | 0.67, 140.8 | |
+| cohorts above 3 km: thinning = plates + top, m/Myr | 100.8 = 47.0 + 53.8 | 105.3 = 47.6 + 57.7 | 112.5 = 58.9 + 53.6 |
+| cohorts above 4 km | 128.5 = 75.7 + 52.8 | 152.5 = 81.0 + 71.5 | 172.1 = 119.5 + 52.6 |
+| land above 2, 3, 4 km, mean over the maps after 100 Myr | 0.0235, 0.0078, 0.0013 | 0.0232, 0.0086, 0.0010 | 0.0245, 0.0091, 0.0012 |
+| the same, the run's largest | 0.060, 0.031, 0.0092 | 0.062, 0.030, 0.0101 | 0.076, 0.040, 0.0085 |
+| to the sea; laid in lakes, km³ a year | 3.41; 0.252 | 3.36; 0.285 | 3.03; 0.242 |
+| regions of 500 m relief or more; 1,000 m or more; all land, m/Myr (`recal.txt`) | 200.9; 379.8; 38.3 | 219.9; 394.2; 37.5 | 218.2; 400.9; 38.1 |
+| the closed step's own time; the surface's, s a run | 3.7; 464 | 3.85; 452 | |
+
+What changed:
+- **The ground draining to a closed basin wears at 31 m/Myr, against 53.** The runs' ranges do not overlap. Its stream
+  power fell from 24.6 to 3.8 m/Myr, and diffusion is now 0.72 of its wear. That is Lal et al. 2003's bound ("<30
+  mm/ka") and 2 to 3 times Hetzel et al. 2011's catchment rates (11 to 16 m/Myr), against 3 to 5 times before. This arm
+  cannot split the fixes from the plates' changes. Those changes are not expected to cut a surface class's stream power
+  six-fold, but that is not shown here.
+- **Less land drains to a closed basin** (0.101 against 0.127, ranges overlapping). Earth: "Endorheic basins occupy
+  20% of the Earth's land surface" (Garcia-Castellanos et al. 2003, p. 8-1).
+- **R3 opened 4.8e4 lake-substeps a run, mostly lakes that passed part of their inflow.**
+  - The counts in the table are taken after R3 (`closed::open_until_stable`), and `filled_lake_steps` counts the closed
+    and the part-passing lakes it opened together.
+  - The lakes passing part of their inflow fell by 4.7e4 substeps a run (6.3e4 to 1.7e4), about the 4.8e4 opened: the
+    drop is R3's, the overfill fix, not the false exits'.
+  - The closed lake-substeps fell by only 0.8e4 (3.6e4 to 2.7e4). So most of the 4.8e4 were lakes that spilled part of
+    their inflow and that the step's sediment filled, not lakes the balance would close.
+  - The false exits' own share of the drop is not separated by this arm.
+
+What did not change:
+- **The plateaus.** The flat high ground as a whole wears at 124 against 141 and 134 m/Myr, within the runs' spread.
+  Its frozen part, 0.62 of it, wears at 125 m/Myr. The high ground's area and the cohorts' thinning are within
+  plat-cb0's and orog-cum's spread. The verdict of "The arm" stands: the law does not keep the plateaus, and their
+  frozen tops are the lead. That lead is the surface's runoff from the bake's budget (`surface.runoff_budget`, ERO-221,
+  branch `surface-runoff-budget`).
+- **K's calibration.** All land erodes at 38.3 m/Myr against 38.1. The regions of 500 and 1,000 m relief or more erode
+  at 0.92 and 0.95 of orog-cum's (Montgomery & Brandon's 210 and 525 for those classes).
+- **The cost.** The closed step takes 3.7 s of the surface's 464 s. The surface is 12 s slower than plat-cb0's: the
+  re-solve after R3 and the plates' changes together, not timed apart.
+
+**Verdict:** the fixes keep the law sound and on by default:
+- the guard is clean against the nearest plate control;
+- K is intact;
+- the belt-shape and guard differences of plat-cb0 are the plates', not the law's;
+- the ground draining to closed basins wears at Lal's bound.
