@@ -331,7 +331,10 @@ fn finish(s: &Session) {
 #[test]
 fn onsets_carry_their_plates_motion_across_the_overlap() {
     let p = preset(8000, 100.0, "scattered_continents", 3);
-    assert!(p.tectonics.contact_needs_convergence, "the gate is on by default");
+    assert!(
+        p.tectonics.contact_needs_convergence,
+        "the gate is on by default"
+    );
     let mut held = 0usize;
     let world = run_stage(&p, |_, _, st| {
         held += st.dynamics.as_ref().map_or(0, |d| d.onset_overlap.len());
@@ -1853,7 +1856,13 @@ fn a_contact_begins_only_where_its_plates_converge() {
         let mut f = gate_fixture(&p, &env, motion);
         let mut world = WorldState::new(1, 16_384, p.t_start_years());
         subduction::resolve(
-            &mut f.st, &mut world, &f.geo, &f.overlaps, &f.pos, &f.tree, &env,
+            &mut f.st,
+            &mut world,
+            &f.geo,
+            &f.overlaps,
+            &f.pos,
+            &f.tree,
+            &env,
         )
         .unwrap();
         if f.st.contacts.is_empty() {
@@ -1907,7 +1916,13 @@ fn a_contact_goes_on_and_reverses_whatever_its_plates_do() {
     let mut f = gate_fixture(&p, &env1, DVec3::X);
     let mut world = WorldState::new(1, 16_384, p.t_start_years());
     subduction::resolve(
-        &mut f.st, &mut world, &f.geo, &f.overlaps, &f.pos, &f.tree, &env1,
+        &mut f.st,
+        &mut world,
+        &f.geo,
+        &f.overlaps,
+        &f.pos,
+        &f.tree,
+        &env1,
     )
     .unwrap();
     assert_eq!(f.st.contacts.len(), 1);
@@ -1916,7 +1931,13 @@ fn a_contact_goes_on_and_reverses_whatever_its_plates_do() {
     let env2 = stage.env(&p.tectonics, 2);
     f.st.plates[1].omega = (-env2.norm.omega_of_speed(50.0) * DVec3::X).to_array();
     subduction::resolve(
-        &mut f.st, &mut world, &f.geo, &f.overlaps, &f.pos, &f.tree, &env2,
+        &mut f.st,
+        &mut world,
+        &f.geo,
+        &f.overlaps,
+        &f.pos,
+        &f.tree,
+        &env2,
     )
     .unwrap();
     let c = &f.st.contacts[0];
@@ -1933,7 +1954,13 @@ fn a_contact_goes_on_and_reverses_whatever_its_plates_do() {
     }
     let env3 = stage.env(&p.tectonics, 3);
     subduction::resolve(
-        &mut f.st, &mut world, &f.geo, &f.overlaps, &f.pos, &f.tree, &env3,
+        &mut f.st,
+        &mut world,
+        &f.geo,
+        &f.overlaps,
+        &f.pos,
+        &f.tree,
+        &env3,
     )
     .unwrap();
     let c = &f.st.contacts[0];
