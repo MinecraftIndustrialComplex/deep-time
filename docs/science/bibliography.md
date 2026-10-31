@@ -7233,7 +7233,7 @@ Stern & Scholl 2010 (the rates, PLT-045 and PLT-285) and Cloos 1993 (the arcs' m
 - Reference: Clift, P. D., Vannucchi, P. and Phipps Morgan, J. (2009). Crustal redistribution, crust-mantle recycling and Phanerozoic evolution of the continental crust. Earth-Science Reviews 97:80-104.
 - DOI or URL: 10.1016/j.earscirev.2009.10.003; repository copy https://hdl.handle.net/2158/375652 (FLORE, Università degli Studi di Firenze)
 - Cited as: "Clift et al. 2009" (comparison for both arc rates).
-- Ledger ids: PLT-045, PLT-285, PLT-401 (2026-10-21: the rifted margins lost in Cenozoic collisions); PLT-666 (2026-10-25: Table 1 checked against Clift & Vannucchi 2004); PLT-668 (2026-10-25: p. 97's pulses at arc extension, the front-loaded arcs' known gap)
+- Ledger ids: PLT-045, PLT-285, PLT-401 (2026-10-21: the rifted margins lost in Cenozoic collisions); PLT-666 (2026-10-25: Table 1 checked against Clift & Vannucchi 2004); PLT-668 (2026-10-25: p. 97's pulses at arc extension, the front-loaded arcs' known gap); PLT-796, PLT-799 (2026-10-31: Table 7's continental LIPs with their intrusives, §7.1's plateaus, §7.2's 1:3, the hotspot lane; see the note "Notes on entries above (2026-10-31, the hotspot lane)")
 - Access: open (accepted manuscript in the repository).
 - Library (the project's source library, not distributed): `Clift2009/Clift2009.pdf`, `Clift2009.txt`, 2026-10-17.
 - Read so far (by the project): full text, 2026-10-17: "oceanic arcs average rates of 125 km3/Ma/km compared to 81 km3/Ma/km for continental arcs" (p. 84); to keep constant crustal volumes "arc magmatism would have to maintain production of around 3.8 km3/a (or 94 km3/Ma/km of trench)"; continental flood basalts "only around 0.12 km3/a"; accreted oceanic plateaus 1.1 km3/a.
@@ -7540,11 +7540,11 @@ The sources behind the ocean crust's own column (build log 2026-10-19 "Crust tem
 ### WhiteMcKenzie1989
 - Reference: White, R. and McKenzie, D. (1989). Magmatism at rift zones: the generation of volcanic continental margins and flood basalts. Journal of Geophysical Research 94(B6):7685-7729.
 - DOI or URL: 10.1029/JB094iB06p07685
-- Cited as: "White & McKenzie 1989" (the thick igneous crust of a volcanic margin's transition).
-- Ledger ids: PLT-294
-- Access: Wiley, not fetched.
+- Cited as: "White & McKenzie 1989" (the thick igneous crust of a volcanic margin's transition; the hotspot lane's heads, hot mantle and volcanic margins).
+- Ledger ids: PLT-294; PLT-795, PLT-797, PLT-798, PLT-799, PLT-111 (note) (2026-10-31, the hotspot lane)
+- Access: Wiley; an open copy at mantleplumes.org (https://www.mantleplumes.org/WebDocuments/White1989.pdf), fetched 2026-10-31.
 - Library: not kept.
-- Read so far (by the project): nothing. Cited from memory (crust templates agent, 2026-10-19): the ocean–continent transition of a volcanic margin is thick igneous crust (seaward-dipping lavas over a high-velocity lower crust of underplated gabbro), thicker than normal ocean crust and thinning to it seaward. No thickness is quoted because none was read. Franke 2013 (above, read in full on 2026-10-04) gives the share of volcanic margins; its accepted manuscript did not answer (HTTP 522) when it was checked again on 2026-10-19.
+- Read so far (by the project): full text, 2026-10-31 (the hotspot lane's research sub-agent, Fig. 3 and Table 2 from the page images; what was read is in the note "Notes on entries above (2026-10-31, the hotspot lane)"). Before that nothing: cited from memory (crust templates agent, 2026-10-19): the ocean–continent transition of a volcanic margin is thick igneous crust (seaward-dipping lavas over a high-velocity lower crust of underplated gabbro), thicker than normal ocean crust and thinning to it seaward. No thickness is quoted because none was read. Franke 2013 (above, read in full on 2026-10-04) gives the share of volcanic margins; its accepted manuscript did not answer (HTTP 522) when it was checked again on 2026-10-19.
 
 ## The present-day nudge's cap and the Köppen floors' noise (CLM-151, CLM-206, BIO-072), added 2026-10-19
 
@@ -10079,7 +10079,7 @@ The continents' crust budget against Stern & Scholl 2010's Table 1, row by row (
 - Reference: Kelemen, P. B. and Holbrook, W. S. (1995). Origin of thick, high-velocity igneous crust along the U.S. East Coast Margin. Journal of Geophysical Research 100(B6):10077-10094.
 - DOI or URL: 10.1029/95JB00924
 - Cited as: "Kelemen & Holbrook 1995" (a volcanic margin's igneous addition, a design note).
-- Ledger ids: none (docs/design/crust-budget.md, 2026-10-31).
+- Ledger ids: PLT-802 (the volcanic margin's width, the hotspot lane, 2026-10-31); docs/design/crust-budget.md.
 - Access: paywalled; the abstract open (OpenAlex).
 - Library: not kept.
 - Read so far (by the project): the abstract, 2026-10-31 (the research sub-agent): "thick (up to 25 km), high seismic velocity (νp of 7.2–7.3 km s−1) crust ... The total volume of igneous rocks in this zone ... may be as much as 2.7 × 10^6 km3"; "extending up to 2000 km along the margin but only for about 80–100 km seaward ... the thermal anomaly and relatively rapid upwelling lasted for only 5–8 m.y." About 1,350 km³ per km of margin (the sub-agent's arithmetic).
@@ -10102,6 +10102,137 @@ The continents' crust budget against Stern & Scholl 2010's Table 1, row by row (
 - Library: not kept.
 - Read so far (by the project): the abstract, 2026-10-31 (the research sub-agent): "Data for 17 arcs give addition rates per kilometer of arc in the range 20 to 40 km³ km−1 Ma−1. From these data we deduce a world‐wide addition rate of 1.65 km³ a−1 after adding other contributions to the formation of the continental crust, e.g., from hot spot volcanism."
 
+## The sources of the hotspot lane (2026-10-31)
+
+Plume tails, plume heads and volcanic rifted margins from sources (build log 2026-10-31, "Hotspot lane"; docs/design/hotspots-lips-margins.md; plates.md "Hotspots, plume heads and volcanic margins from sources (2026-10-31)"; ledger PLT-790 to PLT-802). Everything below was read by one Sonnet research sub-agent, whose report the quotes copy (it marked how it read each source; its own arithmetic is labelled). Downloads were kept in its scratch folder, not in the library. Not obtained: Coffin & Eldholm 1994's table, Bryan & Ernst 2008 (the QUT copy now answers 403), Davies 1988's table, Richards et al. 1989's and Courtillot et al. 1999's full texts, McKenzie & Bickle 1988 (the mantleplumes.org copy is truncated), Menzies et al. 2002's full text, Skogseid 2001, Mutter et al. 1982, Crisp 1984 (only a search tool's rendering of its abstract, not used), Robinson & Eakins 2006, Ernst 2014, Ernst & Youbi 2017, Condie's plume shares.
+
+### Notes on entries above (2026-10-31, the hotspot lane)
+- WhiteMcKenzie1989, now read in full (the mantleplumes.org copy, https://www.mantleplumes.org/WebDocuments/White1989.pdf; Fig. 3 and Table 2 from the page images): abstract, "Mantle plumes generate regions beneath the lithosphere typically 2000 km in diameter with temperatures raised 100-200 °C above normal ... an increase of 100 °C above normal doubles the amount of melt whilst a 200 °C increase can quadruple it", "New continental splits do not always occur above thermal anomalies in the mantle caused by plumes, but when they do, huge quantities of igneous material are added to the continental crust"; conclusion (p. 7721), "Their diameter is typically 1500-2000 km, and the temperature is of the order of 100-150 °C above normal"; "A 1000-km-radius circle, which is the typical extent of the thermal anomaly created by a plume"; p. 7689, the central plume "narrow (150-200 km wide)"; "we infer that the normal asthenosphere potential temperature is 1280 °C"; "the stretching factor of infinity (closely approximated by β = 50 in our calculations)"; Fig. 3 at β = 50 (the sub-agent's reading, ±1 km): about 7 km of melt at 1280 °C, 17 at 1400, 26 at 1480; at β = 2 and 1480 °C, 3 km under 130 km of lithosphere, 7 under 100, 11.5 under 70; p. 7698: "accompanying the extruded basalts ... there is an even greater volume of new underplated or intruded igneous rock in the lower crust"; the central Atlantic and US East Coast margins "did not develop into full-blooded volcanic margins ... There was no mantle plume immediately beneath the site of the oceanic rift"; Table 2 (flood basalts and breakup): North Atlantic spreading 58 to 56 Ma, BTIP 63 to 52; South Atlantic 130 to 117, Paraná 130 to 120; Indian Ocean-Seychelles 64, Deccan 67 to 60; "the peak of igneous activity is coincident with the onset of spreading"; p. 7721-7722: "on average a major igneous province is generated once every 30 m.y.", "If each split produced about 10 million km³ of new igneous crust ... an average of around 0.3 km³/yr", "We estimate the total rate of growth of the continental crust by melt production above rifted regions as 0.4 km³/yr". Ledger ids: PLT-294 (unchanged), PLT-795, PLT-797, PLT-798, PLT-799, PLT-111 (note).
+- Franke2013, read again (the accepted manuscript): White "proposed that an anomalously hot mantle (150-200° above normal) must be present under the rift shortly before continental breakup"; "some volcanic-rifted margins cannot be directly linked to hot-spots, as e.g. the NW Australian margin and the U.S. east coast margin (van Wijk et al., 2001)"; plume impingement "almost at the same time as rifting commences (South Atlantic, Labrador Sea), after 15 Ma of rifting (Central Atlantic), some 70 Ma after the onset of rifting (Indian Ocean) or after as much as 280 Ma of intermittent crustal extension (Norwegian-Greenland Sea)"; the US East Coast's igneous volume "may be as much as 2.7 x 10⁶ km³, larger than the Deccan (Kelemen and Holbrook, 1995)". Ledger ids: PLT-798, PLT-802.
+- Courtillot2003b, now read in full (the mantleplumes.org copy, Table 1 checked against the page image): abstract, "Only seven ('primary') out of 49 hotspots meet criteria aimed at detecting a very deep origin"; the buoyancy criterion "a flux value in excess of 10³ kg s-1 as a minimum for a 'prominent' hotspot", since weaker deep plumes "should have cooled so much that they would not melt beneath old lithosphere"; p. 300: "There are on the order of 40 remaining, non-primary hotspots"; the onset ages "30 Ma for Afar, 60 Ma for Iceland, 65 Ma for Réunion, 80 Ma for Hawaii (subduction), 100 Ma for Easter, 115 Ma for Louisville, and 130 Ma for Tristan"; p. 303: "The tails (stems) of primary plumes tend to last on the order of 130 Ma. Indeed, all plumes born as traps in the last 100 Ma (Ethiopia-Yemen/Afar, Greenland/Iceland, Deccan/Reunion) are still quite active, whereas those born between 100 and 140 Ma may be failing (Ontong-Java/Louisville, Parana-Etendeka/Tristan) and those older than 150 Ma do not in general have an active trace (Karoo, CAMP, Siberia, Emeishan)"; Fig. 4's caption: "There are on the order of 10 primary (deeper) plumes". Ledger ids: PLT-792, PLT-795, PLT-793 (the lid, not modelled).
+- KingAdam2014, read in full (the mantleplumes.org copy, Table 3 checked against the page image): 54 hotspots, "including the 37 considered by Sleep (1990) and the 49 considered by Courtillot et al. (2003)"; "cumulative buoyancy flux of 36.75 Mg s-1 for the Geometrical method, 29.95 Mg s-1 for the MiFil-area method and 23.13 Mg s-1 for the MiFil-volume method", with the Pacific superswell (16.2) and the African (0.7) "53.65 ... 46.85 ... 40.03 Mg s-1"; Davies 1988: 26 swells, 41.3 Mg/s, 1.7 TW; Sleep 1990: 54.9 Mg/s, "the seven hotspots ranked good contributing 16.4 Mg s-1"; Hawaii 4.66 to 7.10 Mg/s by their methods against Sleep's 8.7. Ledger ids: PLT-790, PLT-791.
+- White2006, read again (the UCSB copy): Table 3, the Hawaiian-Emperor chain "averaged over the past 74 Ma", intrusive 5.9 × 10⁶ km³, extrusive 1.1 × 10⁶, I:E 6:1, including underplating; Iceland 4:1 to 8:1, Kerguelen 28:1, the Marquesas, Ninetyeast and Kilauea 2:1; "the I:E ratio is most commonly less than 10:1 with 2-3:1 being the most commonly occurring value, and a median value of 5:1"; its extrusive rows include the Hawaii-Emperor seamounts, 1,080,000 km³ over 73.6 Ma, 1.50E-02 km³/a [Crisp, 1984]. Ledger ids: PLT-046 (unchanged), PLT-794.
+- Clift2009, the published article in the project's source library (`Clift2009/Clift2009.txt`, the Florence repository's deposit with the publisher's pages 80-104; read in full since 2026-10-17, entry above), read again for these values by the lane agent 2026-10-31 after the re-review of d127d3ae pointed at it (the research sub-agent had worked from a partly recovered copy of the authors' manuscript, a truncated Wayback copy, whose values agree): abstract, "continental large igneous provinces (flood basalts) represent construction of only around 0.12 km³/a, even after accounting for their intrusive roots", plateaus "1.1 km³/a" if accreted; §7.2 (p. 97), "many of the extrusive: intrusive ratios lie in the range 1:2 to 1:5. In this study we therefore take a value of 1:3", "a total volume of 7.6x10⁶ km³ of volcanic rock, the total mass potentially emplaced into the crust is ca. 30x10⁶ km³ ... dividing the total by 250 Ma ... 0.12 km³/a"; Table 7 (p. 97), "Estimated total volume with intrusives", km³: Deccan 2,956,972, Siberian 12,200,000, Ethiopia 2,363,892, Paraná 2,720,000, Emeishan 1,200,000, Etendeka 144,000, Columbia River 748,712, Karoo 4,121,877, North Atlantic 4,007,699, total 30,463,152; §7.1: Ontong Java "44.4x10⁶ km³ (Coffin and Eldholm, 1994)", Wallaby "4.2x10⁶ km³ (Schubert and Sandwell, 1989)", the plateaus' "152x10⁶ km³ ... Dividing the total volume by 140 Ma ... 1.1 km³/a"; hotspot magmatism "that is not erupted in a major plateau has little chance of being preserved in the continental crust". Table 8 (p. 97) lists continental LIPs at 0.03, against 0.12 in the text and the abstract; §7.1 is on p. 95. Ledger ids: PLT-796, PLT-799.
+- SternScholl2010, read again (the author copy): the 0.5 AU has no derivation (p. 12, "at all others sites at approximately 0.5 AU"); p. 13: "Additions to the continental crust are also made at volcanic rifted margins that form when continents rift apart", hotspot magmas "dominated by tholeiitic basalts that are added to the crust by underplating and intrusion", "Juvenile crustal growth can also happen by accretion of oceanic plateaux (hotspot products) to arcs and continental crust, as recently occurred where the Ontong-Java Plateau collided with the Solomon arc"; "Hawkesworth and Kemp (2006), who infer a mixture of 8% hotspot and 92% arc". Ledger ids: PLT-799.
+- Bradley2008: the USGS ScienceBase dataset "Shapefiles of ancient and modern passive margins for the world" ("a digital recreation of the work originally published by Bradley (2008)"), read by the research sub-agent: the modern segments' LENGTH_KM sum to 104,840 km (its arithmetic; the paper's 105,000 km, read 2026-10-04). No volcanic share. No ledger id.
+- Courtillot2003a (Courtillot & Renne 2003, the library text, read in WP-2): 16 traps over about 345 Myr, a check on PLT-795 only.
+
+### Sleep1990
+- Reference: Sleep, N. H. (1990). Hotspots and mantle plumes: some phenomenology. Journal of Geophysical Research 95(B5):6715-6736.
+- DOI or URL: 10.1029/JB095iB05p06715; open copy https://www.mantleplumes.org/WebDocuments/Sleep1990.pdf
+- Cited as: "Sleep 1990".
+- Ledger ids: PLT-790, PLT-791, PLT-793, PLT-797.
+- Access: open copy.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent; Table 1 and the equations checked against page images). Abstract: "The buoyancy fluxes range over a factor of 20 with Hawaii, 8.7 Mg s-1, the largest. The buoyancy flux for Iceland is 1.4 Mg s-1 which is similar to the flux of Cape Verde", "The buoyancy fluxes of 37 hotspots are estimated; the global buoyancy flux is 50 Mg s-1", "The excess temperature of both on-ridge and off-ridge hotspots is around the 200°C value inferred from petrology"; eq. 2, B = ρm α ΔT Qp; eq. 3, B ≡ W Ē (ρm − ρw) VL; Hawaii (p. 6719), "the cross-sectional area W Ē is 1430 km2 ... The computed buoyancy flux is 8.7 Mg s-1", "The volume flux Qp is about 300 m3 s-1. In comparison, the flux Qv of magmas implaced in the crust or erupted is about 4 m3 s-1 [Watts and ten Brink, 1989]. The average fraction of plume material which melts Qv/Qp is about 1/10 that of Iceland"; Iceland (p. 6716), 63 m³/s of plume, "The volume flux of magma Qv is 8 m3 s-1"; p. 6730, "The total buoyancy flux is 54.9 Mg s-1"; p. 6732, "The area strongly affected by modern plume heads is typically 1000 km in radius (data from White and McKenzie [1989])", "Only a small fraction of the hotspots are associated with postulated heads", "the ratio of plume material to melt varies by a factor of 10 between Hawaii and Iceland"; Table 1, 37 hotspots (Afar 1.2, Australia East 0.9, Azores 1.1, Baja 0.3, Bermuda 1.1, Bouvet 0.4, Bowie 0.3, Canary 1.0, Cape Verde 1.6, Caroline 1.6, Crozet 0.5, Discovery 0.5, Easter 3.3, Fernando 0.5, Galapagos 1.0, Great Meteor 0.5, Hawaii 8.7, Hoggar 0.9, Iceland 1.4, Juan de Fuca 0.3, Juan Fernandez 1.6, Kerguelen 0.5, Louisville 0.9, Macdonald 3.3, Marqueses 3.3, Martin 0.5, Meteor 0.5, Pitcairn 3.3, Reunion 1.9, St. Helena 0.5, Samoa 1.6, San Felix 1.6, Tahiti 3.3, Tasman Central 0.9, Tasman East 0.9, Tristan 1.7, Yellowstone 1.5; sum 54.9).
+
+### CampbellGriffiths1990
+- Reference: Campbell, I. H. and Griffiths, R. W. (1990). Implications of mantle plume structure for the evolution of flood basalts. Earth and Planetary Science Letters 99:79-93.
+- DOI or URL: 10.1016/0012-821X(90)90072-6; open copy https://www.mantleplumes.org/WebDocuments/Campbell1990.pdf
+- Cited as: "Campbell & Griffiths 1990".
+- Ledger ids: PLT-797, PLT-798, PLT-111 (note).
+- Access: open copy.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent): p. 80, heads of plumes from the core-mantle boundary "are likely to have diameters in the range from 800 to 1200 km by the time they reach the lithosphere"; p. 86, "the plume diameter, before flattening, will be roughly one half the width of the flood basalt provinces, or ~1000 km for the Deccan and Karoo plumes", province widths "between 2000 and 2500 km"; p. 87, "The volume of a plume head, with a diameter of 1000 km, is ~5 x 10⁸ km³. When it flattens beneath the lithosphere it forms a disk ~2000 km in diameter and ~170 km thick", "the volume of melt produced by a starting plume will be ~10⁷ km³"; abstract: the bulk of the magma within 2 to 3 Ma, smaller volumes over a further 5 to 10 Ma, the activity decaying "over a total time of order 20 Ma"; the tail feeds a chain "~200 km wide".
+
+### Ernst2021
+- Reference: Ernst, R. E., Dickson, A. J. and Bekker, A. (eds.) and chapter authors (2021). Large Igneous Provinces: A Driver of Global Environmental and Biotic Changes, chapter 1 (Ernst et al.). AGU Geophysical Monograph 255. Wiley.
+- DOI or URL: 10.1002/9781119507444.ch1
+- Cited as: "Ernst et al. 2021".
+- Ledger ids: PLT-795.
+- Access: open (CC-BY); read from a Wayback copy of the Wiley PDF.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent): "Large igneous provinces are voluminous (> 0.1 Mkm3 (= 106 km3); frequently above 1 Mkm3), mainly mafic (ultramafic) magmatic events of intraplate affinity ... typically emplaced over a short time period (< 5 myr; often < 2 myr) or in multiple short pulses with a maximum duration of a few tens of myr"; "Continental LIPs have occurred on average (but irregularly) every 30 myr throughout the Phanerozoic and Proterozoic. The oceanic LIP record is similar to that of continental LIPs for the past 200 myr"; LIPs "consist of volcanic packages (flood basalts) and a plumbing system of regional dyke swarms ..., sill complexes, layered mafic-ultramafic (M-UM) intrusions, and crustal magmatic underplates". The LIP Commission's HTML of its Table 1.1 (http://www.largeigneousprovinces.org/21apr): 60 entries of 541 Ma or younger (31 continental, 23 oceanic including accreted, 6 silicic; areas, not volumes).
+
+### Kasbohm2021
+- Reference: Kasbohm, J., Schoene, B. and Burgess, S. (2021). Radiometric constraints on the timing, tempo, and effects of large igneous province emplacement. In: AGU Geophysical Monograph 255, chapter 2, pp. 27-82.
+- DOI or URL: 10.1002/9781119507444.ch2
+- Cited as: "Kasbohm et al. 2021".
+- Ledger ids: PLT-796, PLT-799.
+- Access: open (CC-BY); read from a Wayback copy of the Wiley PDF.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent): abstract, "nearly all well-dated LIPs erupted in < 1 Ma, irrespective of tectonic setting"; the Siberian Traps the "largest volume (~3 million km³) Phanerozoic continental magmatic province"; CAMP's original volume ">2-3 x 10⁶ km³"; Karoo-Ferrar "on the order of 2.5 x 10⁶ km³"; Ontong Java "60 million km³ over an area of 2 million km²"; the Caribbean LIP "4.5 million km³"; the Deccan "1-2 million km³"; the North Atlantic, pre-erosion extrusive "~1.8 million km³", with intrusives "between 5 and 10 million km³ (Eldholm & Grue, 1994; White et al., 1987)"; the Columbia River "210,000 km³ of lava". No volume table.
+
+### Geoffroy2005
+- Reference: Geoffroy, L. (2005). Volcanic passive margins. Comptes Rendus Geoscience 337:1395-1408.
+- DOI or URL: 10.1016/j.crte.2005.10.006 (open access)
+- Cited as: "Geoffroy 2005".
+- Ledger ids: none (design notes).
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent): "volcanic passive margins mark continental break-up over a hotter mantle"; "During VPM edification, the rate of magma production is thought to be bracketed between 1 and 10 km³ yr-1"; "During the Phanerozoic, volcanic passive margins are thought to be associated with an average accretion rate of 0.4 km³ yr-1 of new igneous transitional crust [White & McKenzie 1989]"; oceanic crust "may reach up 40 km in thickness in Iceland and along the Greenland-Iceland-Faeroe aseismic ridge"; and, against plume causality, "there are strictly no evidences that a previous lithosphere stretching is a sine qua non condition".
+
+### Davies1988
+- Reference: Davies, G. F. (1988). Ocean bathymetry and mantle convection: 1. Large-scale flow and hotspots. Journal of Geophysical Research 93(B9):10467-10480.
+- DOI or URL: 10.1029/JB093iB09p10467
+- Cited as: "Davies 1988" (a check on Sleep's fluxes).
+- Ledger ids: none.
+- Access: paywalled.
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31 (OpenAlex, the research sub-agent): "By this measure the major Pacific hotspots dominate the Earth's total plume flux, but plumes account for less than 10% of the Earth's total heat flux". His 26 swells and 41.3 Mg/s through Sleep 1990 and King & Adam 2014.
+
+### VanArkLin2004
+- Reference: van Ark, E. and Lin, J. (2004). Time variation in igneous volume flux of the Hawaii-Emperor hot spot seamount chain. Journal of Geophysical Research 109:B11401.
+- DOI or URL: 10.1029/2003JB002949
+- Cited as: "van Ark & Lin 2004" (a check on PLT-793).
+- Ledger ids: PLT-793 (check).
+- Access: paywalled.
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31 (OpenAlex, the research sub-agent): "The highest values of the calculated igneous volume flux along the Hawaiian and Emperor ridges (~8 m3/s) occur at present and at about 20 Ma. The flux was reduced to only 50% of this maximum (~4 m3/s) at 10 Ma".
+
+### VidalBonneville2004
+- Reference: Vidal, V. and Bonneville, A. (2004). Variations of the Hawaiian hot spot activity revealed by variations in the magma production rate. Journal of Geophysical Research 109:B03104.
+- DOI or URL: 10.1029/2003JB002559
+- Cited as: none in the code.
+- Ledger ids: none.
+- Access: paywalled.
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31 (the research sub-agent): "a general increase in amplitude for the last 30 Ma ... and (2) short-wavelength oscillations with a 5 m.y. period"; no rate in the abstract.
+
+### CoffinEldholm1994
+- Reference: Coffin, M. F. and Eldholm, O. (1994). Large igneous provinces: crustal structure, dimensions, and external consequences. Reviews of Geophysics 32(1):1-36.
+- DOI or URL: 10.1029/93RG02508
+- Cited as: "Coffin & Eldholm 1994" (Ontong Java's 44.4 × 10⁶ km³, through Clift et al. 2009).
+- Ledger ids: PLT-796 (through Clift et al.).
+- Access: paywalled; no open copy loaded (Wiley, NORA, Southampton, Figshare and Academia tried by the research sub-agent).
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31: "Crustal thicknesses range from 20 to 40 km, and the lower crust is characterized by high (7.0-7.6 km s-1) compressional wave velocities", "The major part of the North Atlantic volcanic province lies offshore and demonstrates that volcanic passive margins belong in the global LIP inventory", "Deep crustal intrusive companions to continental flood volcanism represent volumetrically significant contributions to the crust". Their table not read.
+
+### RichardsDuncanCourtillot1989
+- Reference: Richards, M. A., Duncan, R. A. and Courtillot, V. E. (1989). Flood basalts and hot-spot tracks: plume heads and tails. Science 246:103-107.
+- DOI or URL: 10.1126/science.246.4926.103
+- Cited as: "Richards et al. 1989".
+- Ledger ids: none.
+- Access: paywalled.
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31 (OpenAlex): "Flood basalts represent plume 'heads' and hot spots represent continuing magmatism associated with the remaining plume conduit or 'tail.'", "Continental rifting is not required, although it commonly follows flood basalt volcanism".
+
+### Courtillot1999
+- Reference: Courtillot, V., Jaupart, C., Manighetti, I., Tapponnier, P. and Besse, J. (1999). On causal links between flood basalts and continental breakup. Earth and Planetary Science Letters 166:177-195.
+- DOI or URL: 10.1016/S0012-821X(98)00282-9
+- Cited as: "Courtillot et al. 1999" (design, what is left).
+- Ledger ids: none.
+- Access: paywalled.
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31 (a science.gov page reproducing the ADS abstract): "Eight major continental flood basalts have been produced over the last 300 Ma"; the Ethiopian traps "erupted in about 1 Myr at 30 Ma. Rifting in the Red Sea and Gulf of Aden, and possibly East African rift started at about the same time", with the same for Greenland and the North Atlantic, the Deccan and the NW Indian Ocean, Paraná and the South Atlantic, Karoo and the SW Indian Ocean, CAMP and the Central Atlantic; "In all cases, an active component (a plume and resulting flood basalt) is a pre-requisite for the breakup of a major oceanic basin. But rifting must be allowed by plate-boundary forces"; "rift propagation (towards the flood basalt area) are common features". The per-case lags and distances (full text) not read.
+
+### Menzies2002
+- Reference: Menzies, M. A., Klemperer, S. L., Ebinger, C. J. and Baker, J. (2002). Characteristics of volcanic rifted margins. Geological Society of America Special Paper 362:1-14.
+- DOI or URL: 10.1130/0-8137-2362-0.1
+- Cited as: "Menzies et al. 2002" (through Franke 2013).
+- Ledger ids: none.
+- Access: paywalled.
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31 (quoted on a TalkOrigins bibliography page): "Of the Atlantic rifted margins, 75% are believed to be volcanic, the cumulative expression of thermotectonic processes over 200 m.y.", a "significant thickness (to 15 km) of juvenile, high-velocity lower crust seaboard of the continental rifted margin"; the LIP Commission's summary of it (http://www.largeigneousprovinces.org/node/24): ">75% of the Atlantic Ocean margins are volcanic rifted margins associated with large igneous provinces/flood basalts".
+
+### Condie1998
+- Reference: Condie, K. C. (1998). Episodic continental growth and supercontinents: a mantle avalanche connection? Earth and Planetary Science Letters 163:97-108.
+- DOI or URL: 10.1016/S0012-821X(98)00178-2
+- Cited as: none in the code.
+- Ledger ids: none.
+- Access: paywalled.
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31 (the Macquarie research portal): episodic growth "may be caused by superevents in the mantle as descending slabs pile up at the 660-km seismic discontinuity and then catastrophically sink into the lower mantle"; no share of the crust from plumes. Condie 2000, 2001 (the book) and 2004 not obtained.
 ### LeatLarter2003
 - Reference: Leat, P. T. and Larter, R. D. (2003). Intra-oceanic subduction systems: introduction. In: Larter, R. D., Leat, P. T. (eds), Intra-Oceanic Subduction Systems: Tectonic and Magmatic Processes. Geological Society, London, Special Publications 219:1-17.
 - DOI or URL: 10.1144/GSL.SP.2003.219.01.01

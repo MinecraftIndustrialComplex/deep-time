@@ -997,6 +997,35 @@ pub struct TectonicParams {
     /// holds under ERO-215's porosity law (536 m). Off, the solid pile is read against 1 km.
     /// ledger: PLT-762
     pub trench_pile_in_place: bool,
+    /// Hotspots from sources (the hotspot lane, 2026-10-31; off by default;
+    /// docs/design/hotspots-lips-margins.md): the plume tails' number, lifetimes and buoyancy
+    /// fluxes from the hotspot catalogues, each tail's magma from its flux, and the heights from
+    /// the model's isostasy (`plates::hotspots::sourced`), in place of `hotspots_initial`,
+    /// `hotspot_births_per_100myr`, `hotspot_lifetime_myr`, `hotspot_uplift_mm_yr`'s rate and the
+    /// volcanic ceilings (PLT-108 to PLT-115, uncited). ledger: PLT-790
+    pub hotspots_sourced: bool,
+    /// Plume heads from sources (the hotspot lane, 2026-10-31; off by default): which new plumes
+    /// start with a head, the large igneous province's volume and the head's radius from the LIP
+    /// record (`plates::hotspots::sourced`), in place of `lip_probability`, `lip_thickness_m` and
+    /// `lip_radius_km` (PLT-117, PLT-118, uncited). ledger: PLT-795
+    pub plume_heads_sourced: bool,
+    /// Volcanic rifted margins (the hotspot lane, 2026-10-31; off by default): new sea floor
+    /// formed beside a continent over a plume head's hot mantle (White & McKenzie 1989's
+    /// condition) takes the igneous crust that mantle melts to, as continental crust over its ocean
+    /// basement (PLT-331), at a resampling (`ridges::volcanic_margin`). Off, every gap point
+    /// is the ocean column (PLT-104). ledger: PLT-799
+    pub volcanic_margins: bool,
+    /// `true`: a hotspot's cones and its tail as one budget (the hotspot lane, 2026-10-31,
+    /// docs/design/hotspot-cone-budget.md): the volcano stage hands the pools at most the tail's
+    /// lavas of the step before for the cones of that hotspot (`Volcano::hotspot`), wherever they
+    /// stand, the rest of a cone relief over rock the plate model already holds, and the tail nets
+    /// what they handed against its own rock (`plates::hotspots`), whatever `hotspots_sourced`
+    /// says. On by default since 2026-10-31 (the coordinator's call, 2026-10-31: a books fix for
+    /// the default, the volcano stage handed the crust 0.50 km³ a year of cone rock no rate
+    /// counted (arm hs-base, 8 runs, base34-s4's physics bit for bit); decisions log
+    /// 2026-10-31). `false`: a hotspot nets the cones on its 150 km kernel only (PLT-286) and the
+    /// rest hand rock no rate made, as before. ledger: PLT-803
+    pub hotspot_cone_budget: bool,
     /// Island-arc crust counts as continental once it is this thick, km: an oceanic sample turns
     /// continental once the arc crust it has built (`arc_oceanic_m`) on top of normal ocean crust
     /// (7 km) reaches it, whatever its height. Cloos (1993): crust thicker than about 15 km is
@@ -1573,6 +1602,10 @@ impl Default for TectonicParams {
             island_arc_own_crust: true, // ledger: PLT-760 (built 2026-10-31, on since 2026-10-31)
             collision_arc_magma: true, // ledger: PLT-763 (built 2026-10-31, on since 2026-10-31)
             trench_pile_in_place: true, // ledger: PLT-762 (built 2026-10-31, on since 2026-10-31)
+            hotspots_sourced: false, // ledger: PLT-790 (built 2026-10-31, off)
+            plume_heads_sourced: false, // ledger: PLT-795 (built 2026-10-31, off)
+            volcanic_margins: false, // ledger: PLT-799 (built 2026-10-31, off)
+            hotspot_cone_budget: true, // ledger: PLT-803 (on since 2026-10-31)
             arc_mature_crust_km: 15.0, // ledger: PLT-047
             cordillera_shortening_mm_yr: 0.0, // ledger: PLT-048
             cordillera_width_km: 120.0,

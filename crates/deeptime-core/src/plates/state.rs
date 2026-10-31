@@ -693,6 +693,35 @@ pub struct Hotspot {
     pub track_km: f64,
     /// Its hotspot_track event was written (it died, or the run ended).
     pub closed: bool,
+    /// With `tectonics.hotspots_sourced` (PLT-790): its buoyancy flux, Mg/s, and the magma its
+    /// tail adds, km³ a year (Earth-normalized); 0 under the preset's uplift rule.
+    #[serde(default)]
+    pub flux_mg_s: f64,
+    #[serde(default)]
+    pub magma_km3_yr: f64,
+    /// The radius its plume head spread to under the lithosphere, km on the model sphere (its
+    /// large igneous province's), 0 without a head (PLT-798).
+    #[serde(default)]
+    pub head_radius_km: f64,
+    /// With `tectonics.hotspot_cone_budget` (PLT-803): its cones' budget and what they handed.
+    #[serde(default)]
+    pub cones: HotspotCones,
+}
+
+/// A hotspot's cones and its tail as one budget (`tectonics.hotspot_cone_budget`, PLT-803), km³
+/// (Earth-normalized). The plate step writes the budget; the volcano stage's next frame hands at
+/// most that for the hotspot's cones and writes what it handed; the plate step after nets it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct HotspotCones {
+    /// The tail's lavas of the last step, which its cones may hand in the next frame (0 for a
+    /// tail that dies before the next step).
+    pub budget_km3: f64,
+    /// What its cones handed the pools, net of calderas, not yet netted: the last frame's and
+    /// what earlier steps carried, of either sign (a step nets it between nothing and its rock;
+    /// a dead tail's leaves as unnetted, `hotspots::CONES_UNNETTED_GLOBAL`).
+    pub handed_km3: f64,
+    /// … of it on continental cells.
+    pub handed_continental_km3: f64,
 }
 
 /// A spreading ridge between two plates, recorded at its ridge_birth event.

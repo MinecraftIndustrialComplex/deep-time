@@ -433,6 +433,72 @@ pub const SEDIMENT_REACHING_TRENCH_OCEANIC_GLOBAL: &str =
 /// resampling, gone down with the slab (the point became new sea floor), km³ (Earth-normalized).
 /// Its sediment is in [`SEDIMENT_SUBDUCTED_GLOBAL`] too. ledger: PLT-542
 pub const SLAB_GLOBAL: &str = "plates/resample_slab_km3";
+/// World globals (`tectonics.volcanic_margins`, PLT-799, only while it is on): the igneous crust
+/// volcanic rifted margins made at resamplings beyond the ocean basement they keep under it
+/// (PLT-331), the continental crust they add, km³ (Earth-normalized), and the gap points that
+/// took it.
+pub const VOLCANIC_MARGIN_GLOBAL: &str = "plates/volcanic_margin_km3";
+pub const VOLCANIC_MARGIN_SAMPLES_GLOBAL: &str = "plates/volcanic_margin_samples";
+
+/// A plume head's hot mantle, as the volcanic margins read it (PLT-799): where it rose (mantle
+/// frame), when, how far it spread under the lithosphere (radians on the model sphere) and how
+/// hot it is above the normal mantle, K.
+#[derive(Clone, Copy, Debug)]
+pub struct HotMantle {
+    pub at: DVec3,
+    pub from_myr: f64,
+    pub radius_rad: f64,
+    pub excess_k: f64,
+}
+
+/// The hot mantle under a point of the mantle frame `at` at `t_myr`: the hottest of `heads`
+/// whose spread covers it while it lasts (`super::hotspots::sourced::HEAD_HOT_MYR` from its
+/// rise), or `None`. ledger: PLT-798
+pub fn hot_mantle_at(heads: &[HotMantle], at: DVec3, t_myr: f64) -> Option<HotMantle> {
+    heads
+        .iter()
+        .filter(|h| {
+            t_myr >= h.from_myr
+                && t_myr <= h.from_myr + super::hotspots::sourced::HEAD_HOT_MYR
+                && at.angle_between(h.at) <= h.radius_rad
+        })
+        .copied()
+        .max_by(|a, b| a.excess_k.total_cmp(&b.excess_k))
+}
+
+/// A volcanic rifted margin's column (PLT-799): the igneous crust mantle `excess_k` hotter than
+/// normal melts to when it rises to the surface under full breakup
+/// (`super::hotspots::sourced::igneous_crust_m`), lavas over intrusions in the share
+/// `super::hotspots::sourced::MARGIN_EXTRUSIVE_SHARE`, on new sea floor whose ocean crust is
+/// the ocean column (PLT-104), over `share` of the point's cell (the rest the ocean column; see
+/// [`margin_share`]). `None` where it is no thicker than the ocean column.
+pub fn volcanic_margin_column(excess_k: f64, share: f64) -> Option<[f32; pool::COUNT]> {
+    let ocean = f64::from(thickness(&oceanic_column()));
+    let h = ocean
+        + share.clamp(0.0, 1.0) * (super::hotspots::sourced::igneous_crust_m(excess_k) - ocean);
+    if h.is_nan() || h <= ocean {
+        return None;
+    }
+    let mut p = [0.0f32; pool::COUNT];
+    let e = super::hotspots::sourced::MARGIN_EXTRUSIVE_SHARE;
+    p[pool::MAFIC_VOLCANIC] = (h * e) as f32;
+    p[pool::MAFIC_PLUTONIC] = (h * (1.0 - e)) as f32;
+    Some(p)
+}
+
+/// The share of a gap point's cell inside a volcanic margin's `width_rad` (PLT-802): a gap point
+/// `d1_rad` from the nearest edge sample along the lattice holds the strip from `d1 − s` to `d1`
+/// seaward of the plate's outline (the outline lies half a spacing `s` beyond the edge sample,
+/// and the point's cell spreads half a spacing either side of it), so the share of it within the
+/// margin's width is the strip's overlap with [0, width] over `s`. Summed over the rows of a
+/// straight margin the shares give the width at any lattice spacing: on the 16k quick planet
+/// (71 km) the first row takes all of its cell and the second a quarter of it for 90 km.
+pub fn margin_share(d1_rad: f64, width_rad: f64, spacing_rad: f64) -> f64 {
+    if spacing_rad.is_nan() || spacing_rad <= 0.0 {
+        return 0.0;
+    }
+    ((d1_rad.min(width_rad) - (d1_rad - spacing_rad).max(0.0)) / spacing_rad).clamp(0.0, 1.0)
+}
 
 /// A pair's frame for the ridge segments: its relative rotation's pole ê and two unit vectors
 /// f̂, ĝ with f̂ × ĝ = ê, and the pair's band offset in [0, 1).
@@ -1038,6 +1104,30 @@ pub fn resample(
             norm.rad(k.ridge_segment_km),
         )
     });
+    // Volcanic rifted margins (PLT-799): the plume heads' hot mantle, and when each pair of
+    // plates began to part (its rift's onset; the gap beside a continent opened after the last
+    // resampling, which filled any older one).
+    let heads: Vec<HotMantle> = if k.volcanic_margins {
+        super::hotspots::hot_mantle(state, env)
+    } else {
+        Vec::new()
+    };
+    let opened: BTreeMap<(u32, u32), f64> = if heads.is_empty() {
+        BTreeMap::new()
+    } else {
+        let ids: BTreeMap<EventId, (u32, u32)> = state
+            .rift_links
+            .iter()
+            .map(|l| (l.event, (l.a, l.b)))
+            .collect();
+        world
+            .events
+            .iter()
+            .filter_map(|e| ids.get(&e.id).map(|&ab| (ab, e.t_start / 1.0e6)))
+            .collect()
+    };
+    let margin_rad = norm.rad(super::hotspots::sourced::MARGIN_WIDTH_KM);
+    let (mut margin_m, mut margin_n) = (0.0f64, 0u64);
     let mut pairs: BTreeMap<(u32, u32), (usize, DVec3)> = BTreeMap::new();
     let mut orphans = Vec::new();
     for i in 0..n {
@@ -1089,6 +1179,48 @@ pub fn resample(
         s.pools = oceanic_column();
         s.thickness_m = thickness(&s.pools);
         s.heat_flow_mw_m2 = ocean_heat_flow(age) as f32;
+        // A volcanic rifted margin (PLT-799): new sea floor of a continent's plate whose cell
+        // reaches into the `MARGIN_WIDTH_KM` strip seaward of its continental outline (PLT-802,
+        // over its cell's share of it), formed over a plume head's hot mantle (White & McKenzie
+        // 1989), is the igneous crust that mantle melts to, continental crust over its ocean
+        // basement (PLT-331). It formed when the pair began to part or later (its
+        // age, α × the time since the last resampling, at most that), where its plate's motion
+        // brings it back to over that time.
+        let share = margin_share(d1, margin_rad, norm.spacing_rad());
+        if !heads.is_empty()
+            && share > 0.0
+            && plate_new[l1 as usize] == p1
+            && samples[l1 as usize].kind == CONTINENTAL
+        {
+            let t_open = p2
+                .and_then(|q| opened.get(&(p1.min(q), p1.max(q))))
+                .copied()
+                .unwrap_or(f64::NEG_INFINITY)
+                .max(state.resample_myr);
+            let t_f = (t - age).max(t_open).min(t);
+            let back = super::kinematics::rotation(omega[p1 as usize], -(t - t_f) * 1.0e6);
+            if let Some(column) = hot_mantle_at(&heads, back * p, t_f)
+                .and_then(|h| volcanic_margin_column(h.excess_k, share))
+            {
+                let added = thickness(&column) - thickness(&s.pools);
+                s.pools = column;
+                s.thickness_m = thickness(&s.pools);
+                s.make_continental();
+                s.regime = regime::PASSIVE_MARGIN;
+                // Its own crust stands on the new floor by Airy, under water (settle.rs takes
+                // the column from there, ledger ISO-078).
+                let wet = if s.elevation_m < 0.0 {
+                    super::settle::WATER_LOADED
+                } else {
+                    1.0
+                };
+                s.elevation_m = (f64::from(s.elevation_m)
+                    + f64::from(added) / super::pools::COLUMN_ISOSTATIC_FACTOR * wet)
+                    .min(k.max_elevation_m) as f32;
+                margin_m += f64::from(s.own_thickness_m());
+                margin_n += 1;
+            }
+        }
         if let Some(p2) = p2 {
             let spread = norm.velocity_mm_yr(omega[p1 as usize] - omega[p2 as usize], p);
             let r = p.cross(spread).normalize_or_zero();
@@ -1101,6 +1233,18 @@ pub fn resample(
         }
         samples[i] = s;
         plate_new[i] = p1;
+    }
+    if k.volcanic_margins {
+        // ledger: PLT-799 (measurement)
+        for (name, v) in [
+            (
+                VOLCANIC_MARGIN_GLOBAL,
+                margin_m * norm.sample_area_km2() / 1000.0,
+            ),
+            (VOLCANIC_MARGIN_SAMPLES_GLOBAL, margin_n as f64),
+        ] {
+            *world.globals.entry(name.to_owned()).or_insert(0.0) += v;
+        }
     }
     for i in orphans {
         // Unreachable gap pockets: the nearest old sample's plate.
