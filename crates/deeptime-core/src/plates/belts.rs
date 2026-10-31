@@ -10,7 +10,11 @@
 //! `s = max(v_n, 0) · δt` (`v_n`: the convergence across the front), so `s · L` of continental
 //! crust (`L`: the front's length) crosses the front. Of its volume `s · L · H` (`H`: the mean
 //! thickness of the incoming crust at the front) the share `collision_stacking_share` stays in
-//! the crust; the rest goes down with the slab. Thickening the crust by `T` raises the ground by
+//! the crust; the rest goes down with the slab. A terrane its slab drags down whole
+//! (`tectonics.terrane_docking_cover`, `Collision::subducting`; ledger PLT-770, PLT-771) keeps
+//! less: of each pool, its cover (sediment, sedimentary and volcanic rock) in full and the share
+//! of the column this collision stacked on it ([`kept_pools`]), all of it on the overriding plate
+//! (no wedge or pro-wedge on a terrane going down). Thickening the crust by `T` raises the ground by
 //! `T / 7.0` (Airy with the crust's mean density, `pools::COLUMN_ISOSTATIC_FACTOR`), less what an
 //! eclogite root pulls down once the column is thick enough (`pools::isostatic_change_m`), so
 //! the step's ground to raise is `share · s · L · H / 7.0` (km² × m). Nothing is created: the
@@ -228,6 +232,10 @@ pub const STAYS_GLOBAL: &str = "plates/collision_noroom_stays_km3";
 /// only; ledger: PLT-601): the toe advancing, so whether the width `collision_belt_km` (PLT-241)
 /// bounds the belt at all. Zero without `collision_belt_taper`.
 pub const TOE_GLOBAL: &str = "plates/collision_taper_toe_km3";
+/// The crust that terranes docking stripped to their cover sent down with the slab instead of
+/// stacking it, km³ Earth-normalized (`tectonics.terrane_docking_cover`, ledger PLT-770; written
+/// only with the switch; measurement only).
+pub const STRIPPED_GLOBAL: &str = "plates/collision_stripped_km3";
 /// With `collision_retro_plateau` (PLT-740): the crust the two wedges' retro plateau took beyond
 /// the belt's reach (`collision_belt_km`), km³ of crust (in [`KEPT_GLOBAL`] too; measurement only,
 /// written only with the switch so a run without it keeps its globals list).
@@ -321,6 +329,12 @@ pub struct Stacked {
     /// The part of `thickness_m` this collision stacked on the incoming crust before it crossed
     /// (its excess over the normal column where this collision stamped it), m (PLT-400).
     pub restack_m: f64,
+    /// The crossing crust's supracrustal cover (`pools::COVER` of its own crust), m, and, where
+    /// the slab drags the terrane down whole (`tectonics.terrane_docking_cover`, PLT-770), the
+    /// share of the crust under the cover that the slab took instead of the belt, km² × m of
+    /// crust (beside PLT-242's own loss; measurement only).
+    pub cover_m: f64,
+    pub stripped_km2_m: f64,
     /// What of the share found no room, km² × m of crust (measurement only): the belt's part
     /// left over with room still in it, with none, and what the ceilings clipped.
     pub sliver_km2_m: f64,
@@ -422,6 +436,9 @@ pub fn stack(
         let col = state.contacts[c].collision.as_ref().expect("in collision");
         let (conv, normal) = (col.convergence_mm_yr, DVec3::from_array(col.normal));
         let sides = read_sides(state, env, f, &fields, sea_m);
+        // ledger: PLT-770. A terrane its slab drags down whole (`shortening::advance` classes
+        // the front, `Collision::subducting`) keeps only its cover; the slab takes the rest.
+        let stripped = env.k.terrane_docking_cover && col.subducting;
         let step = stack_front(
             state,
             geo,
@@ -435,6 +452,7 @@ pub fn stack(
                 normal,
                 shortening_km: col.shortening_km,
                 onset_myr: col.onset_myr,
+                stripped,
             },
             f,
             flexure,
@@ -451,6 +469,7 @@ pub fn stack(
         b.wedge_km = applied.wedge_km;
         b.stacked_km2_m += applied.belt_km2_m + applied.wedge_km2_m;
         b.wedge_km2_m += applied.wedge_km2_m;
+        b.stripped_km2_m += applied.stripped_km2_m;
         b.uplift_m += applied.max_dz_m;
         b.lifted10 = b.lifted10.max(step.lifted10);
         b.lifted100 = b.lifted100.max(step.lifted100);
@@ -618,6 +637,9 @@ struct Side {
     shortening_km: f64,
     /// When the collision began, Myr.
     onset_myr: f64,
+    /// The incoming terrane is one its slab drags down whole, stripped of its cover
+    /// (`tectonics.terrane_docking_cover`, `Collision::subducting`; ledger PLT-770).
+    stripped: bool,
 }
 
 /// One front's stacking, and what the belt's record gains.
@@ -675,11 +697,16 @@ fn stack_front(
     // The wedge's deficit under its profile, with each sample's distance from the front (with
     // two wedges, PLT-730, the pro-wedge is filled with the belt below instead).
     let two = k.collision_two_wedges;
+    // ledger: PLT-771. A terrane going down with its slab (PLT-770) has no wedge or pro-wedge on
+    // it: its cover is offscraped against the overriding plate, which takes all of it (the
+    // retro side, the belt and the overriding edge), so nothing kept rides the terrane down and
+    // crosses the front again.
+    let pro_side = !side.stripped;
     let mut wedge: Vec<(usize, f64, f64)> = Vec::new();
     let mut wedge_km = 0.0f64;
     for &(i, d, _) in &d_under {
         let i = i as usize;
-        if two || !under_ok(i as u32) || samples[i].kind != CONTINENTAL {
+        if two || !pro_side || !under_ok(i as u32) || samples[i].kind != CONTINENTAL {
             continue;
         }
         let d_km = norm.km(d);
@@ -745,15 +772,44 @@ fn stack_front(
         let n = f.crust.len() as f64;
         (a / n, r / n, w / n)
     };
+    // The crossing crust's cover (ledger: PLT-771), of its own crust (the basement apart).
+    let cover_m = if f.crust.is_empty() {
+        0.0
+    } else {
+        f.crust
+            .iter()
+            .map(|&j| super::pools::cover_m(&samples[j as usize].own_pools()))
+            .sum::<f64>()
+            / f.crust.len() as f64
+    };
+    // ledger: PLT-770. A terrane its slab drags down keeps its cover (scraped off at the front)
+    // and the crust this collision stacked on it (PLT-400), pool by pool ([`kept_pools`]); the
+    // slab takes the rest. Otherwise all of it.
+    let restack_share = if thickness_m > 0.0 {
+        (restack_m / thickness_m).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let stripped_pools = side.stripped.then(|| {
+        kept_pools(
+            f.crust.iter().map(|&j| samples[j as usize].own_pools()),
+            restack_share,
+        )
+    });
+    let kept_m = match &stripped_pools {
+        Some(p) => p.iter().sum::<f64>().min(thickness_m),
+        None => thickness_m,
+    };
     // ledger: PLT-242 (the share), PLT-281 (Airy with the crust's mean density). With
     // `collision_restack_whole` the crust this collision stacked crosses whole: it took the share
     // when it first crossed (ledger: PLT-400).
     let rise_km2_m = if k.collision_restack_whole {
-        crossed_km2 * (k.collision_stacking_share * (thickness_m - restack_m) + restack_m)
+        crossed_km2 * (k.collision_stacking_share * (kept_m - restack_m).max(0.0) + restack_m)
             / COLUMN_ISOSTATIC_FACTOR
     } else {
-        k.collision_stacking_share * crossed_km2 * thickness_m / COLUMN_ISOSTATIC_FACTOR
+        k.collision_stacking_share * crossed_km2 * kept_m / COLUMN_ISOSTATIC_FACTOR
     };
+    let stripped_km2_m = k.collision_stacking_share * crossed_km2 * (thickness_m - kept_m);
     // ledger: PLT-652. The overriding plate's interior takes its share of the convergence as
     // distributed shortening (`collision_upper_plate_shortening`, the module docs); the front
     // stacks the rest, in the wedge and the belt as before.
@@ -796,11 +852,26 @@ fn stack_front(
         .max(0.5 * 2.0 / 3.0 * belt_km * f.length_km());
 
     // The rock that stays: the consumed crust's own mix, its sediments buried and metamorphosed.
-    // ledger: PLT-248.
+    // ledger: PLT-248. Docking stripped, what it keeps of each pool (ledger: PLT-771), as the rise
+    // holds it: with `collision_restack_whole` the stacked share r crosses whole and the rest of
+    // the cover at the share s, so the cover's pools weigh s (1 − r) + r against r for the rest.
     let mut mix = [0.0f64; pool::COUNT];
-    for &j in &f.crust {
-        for (m, &x) in mix.iter_mut().zip(samples[j as usize].own_pools().iter()) {
-            *m += f64::from(x.max(0.0));
+    match &stripped_pools {
+        Some(p) => {
+            mix = *p;
+            if k.collision_restack_whole {
+                let s = k.collision_stacking_share;
+                for &c in &super::pools::COVER {
+                    mix[c] *= s * (1.0 - restack_share) + restack_share;
+                }
+            }
+        }
+        None => {
+            for &j in &f.crust {
+                for (m, &x) in mix.iter_mut().zip(samples[j as usize].own_pools().iter()) {
+                    *m += f64::from(x.max(0.0));
+                }
+            }
         }
     }
     mix[pool::METAMORPHIC] += mix[pool::SEDIMENT] + mix[pool::SEDIMENTARY];
@@ -853,7 +924,8 @@ fn stack_front(
             let pro: Vec<(usize, f64)> = d_under
                 .iter()
                 .filter(|&&(i, d, _)| {
-                    under_ok(i)
+                    pro_side
+                        && under_ok(i)
                         && samples[i as usize].kind == CONTINENTAL
                         && norm.km(d) <= wedge_reach_km
                 })
@@ -1059,6 +1131,8 @@ fn stack_front(
             above_m,
             recent_above_m,
             restack_m,
+            cover_m,
+            stripped_km2_m,
             sliver_km2_m,
             capped_km2_m,
             stays_km2_m,
@@ -1403,6 +1477,36 @@ fn fill_taper(
     }
     let toe = (given.iter().sum::<f64>() - full).max(0.0) * area;
     (given, toe)
+}
+
+/// What the crossing crust of a terrane going down with its slab keeps, pool by pool, m (ledger
+/// PLT-770, PLT-771): the mean over the front's crust `cols` (each column's own pools, the
+/// basement apart) of its cover (`pools::COVER`) in full and, of each pool under the cover, the
+/// share `restack` (0 to 1) of the column that this collision stacked on it (PLT-400: the
+/// orogen's own crust, carried back to the front on the terrane, stays as it does when the
+/// terrane collides). The stacked crust's pools are not kept apart from the terrane's, so its
+/// share is taken from each pool alike; its cover is in the cover already. Each pool keeps at
+/// most what it holds, and the sum is the kept thickness.
+fn kept_pools(cols: impl Iterator<Item = [f32; pool::COUNT]>, restack: f64) -> [f64; pool::COUNT] {
+    let mut kept = [0.0f64; pool::COUNT];
+    let mut n = 0usize;
+    for col in cols {
+        n += 1;
+        for (p, (k, &x)) in kept.iter_mut().zip(col.iter()).enumerate() {
+            let x = f64::from(x.max(0.0));
+            *k += if super::pools::COVER.contains(&p) {
+                x
+            } else {
+                restack * x
+            };
+        }
+    }
+    if n > 0 {
+        for k in &mut kept {
+            *k /= n as f64;
+        }
+    }
+    kept
 }
 
 /// One side of a collision orogen for [`fill_two_wedges`]: its samples' distances from the front,
@@ -1789,7 +1893,7 @@ mod tests {
     use crate::plates::normalise::Norm;
     use crate::plates::pools::continental_column;
     use crate::plates::shortening::{self, Fired};
-    use crate::plates::state::{Contact, Group, HIDDEN, Plate, Sample, SlabTrack};
+    use crate::plates::state::{Contact, Docked, Group, HIDDEN, Plate, Sample, SlabTrack};
     use crate::preset::{Preset, PresetBody, with_timeline};
 
     const N: usize = 16_000;
@@ -2300,6 +2404,599 @@ mod tests {
         // The continent's 35.1 km less the 4 km of basement.
         assert!(s.crossed_km2 > 0.0, "{s:?}");
         assert!((s.thickness_m - 31_100.0).abs() < 1.0, "{s:?}");
+    }
+
+    /// The docking tests' planet (`two_plates`, plate 1 coming in at 20 mm/yr): plate 1's
+    /// continental cap made island arcs of 8 km on 7 km of ocean crust (its basement, PLT-331;
+    /// 15 km in all, Cloos 1993's jamming thickness; a sixth of the arc volcanic, PLT-046) at
+    /// -2,000 m where `rows(p)` gives the sample a depth in rows from the front that it lies
+    /// within (`None`, or beyond it: ocean floor), the rows within `hidden` of the front already
+    /// under the overriding plate; and a 700 km slab under the pair when `slab`. The overriding
+    /// plate's cap stays continental at +300 m.
+    fn arc_terrane(
+        fx: &Fixture,
+        rows: impl Fn(DVec3) -> Option<f64>,
+        hidden: f64,
+        slab: bool,
+    ) -> PlateState {
+        use crate::plates::pools::oceanic_column;
+        let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(20.0));
+        let spacing = fx.norm.km(fx.norm.spacing_rad());
+        let pts = fx.geo.points();
+        for (i, s) in st.samples.iter_mut().enumerate() {
+            if s.group != 1 || s.kind != CONTINENTAL {
+                continue;
+            }
+            s.pools = oceanic_column();
+            let x_km = fx.norm.km(pts[i].x.asin());
+            if rows(pts[i]).is_some_and(|r| x_km <= r * spacing) {
+                let arc = 8000.0_f32;
+                s.pools[pool::MAFIC_VOLCANIC] += arc / 6.0 * 2.0 / 3.0;
+                s.pools[pool::FELSIC_VOLCANIC] += arc / 6.0 / 3.0;
+                s.pools[pool::FELSIC_PLUTONIC] += arc * 5.0 / 6.0;
+                s.basement_m = 7000.0;
+                s.elevation_m = -2000.0;
+                if x_km <= hidden * spacing {
+                    s.flags |= HIDDEN;
+                }
+            } else {
+                s.kind = crate::plates::state::OCEANIC;
+                s.elevation_m = -4000.0;
+            }
+            s.thickness_m = s.pools.iter().sum();
+        }
+        if slab {
+            st.slabs.push(SlabTrack {
+                under: 1,
+                over: 0,
+                km: 700.0,
+                blocked_myr: 0.0,
+                idle_myr: 0.0,
+                latent: false,
+            });
+        }
+        st
+    }
+
+    /// Σ crust thickness × area over plate `p`'s visible samples, km² × m.
+    fn crust_on(st: &PlateState, p: u32, area: f64) -> f64 {
+        st.samples
+            .iter()
+            .enumerate()
+            .filter(|(i, s)| st.plate_of(*i) == p && !s.is_hidden())
+            .map(|(_, s)| f64::from(s.thickness_m) * area)
+            .sum()
+    }
+
+    /// A terrane its slab drags down whole subducts stripped of its cover (`terrane_docking_cover`,
+    /// ledger PLT-770, PLT-771): an island arc of 8 km on 7 km of ocean crust (`arc_terrane`) one
+    /// row of samples wide across the front, against a 700 km slab, whose reach is
+    /// 700 / (1 + 2.25 × 15 / 30) = 329 km. Of its crossing crust only its cover stays (its own
+    /// lavas and tuffs, a sixth of the arc: 1.33 km), by PLT-242's share and as the cover's rock,
+    /// all of it on the overriding plate (the two wedges, PLT-730, give a terrane going down no
+    /// pro-wedge: nothing lands on it), the slab takes the rest, and it does not transfer at the
+    /// threshold; the same with `collision_restack_whole` (PLT-400, on by default) and without
+    /// (nothing this collision stacked has reached the front yet). Five rows wide it jams the
+    /// slab: a collision as before, all of it kept, a transfer at the threshold; so with the
+    /// switch off, and on a contact with no slab.
+    #[test]
+    fn a_terrane_its_slab_drags_down_subducts_stripped_of_its_cover() {
+        let run = |docking: bool, rows: f64, slab: bool, hidden: f64, restack: bool| {
+            let mut fx = Fixture::new();
+            // Under the step's 40 km of shortening: the terrane would transfer at once.
+            fx.preset.tectonics.collision_threshold_km = 30.0;
+            fx.preset.tectonics.collision_restack_whole = restack;
+            fx.preset.tectonics.crust_strength_mpa = 2000.0;
+            fx.preset.tectonics.terrane_docking_cover = docking;
+            assert!(fx.preset.tectonics.collision_two_wedges);
+            let mut st = arc_terrane(&fx, |_| Some(rows), hidden, slab);
+            let area = fx.norm.sample_area_km2();
+            let pool_sum = |st: &PlateState, p: usize| -> f64 {
+                st.samples
+                    .iter()
+                    .filter(|s| !s.is_hidden())
+                    .map(|s| f64::from(s.pools[p]) * area)
+                    .sum()
+            };
+            let before = crust_km2_m(&st, area);
+            let incoming0 = crust_on(&st, 1, area);
+            let plutonic0 = pool_sum(&st, pool::FELSIC_PLUTONIC);
+            let (stacked, fired) = fx.step(&mut st, 1, None);
+            let s = stacked[&0].clone();
+            let added = crust_km2_m(&st, area) - before;
+            let on_incoming = crust_on(&st, 1, area) - incoming0;
+            let plutonic = pool_sum(&st, pool::FELSIC_PLUTONIC) - plutonic0;
+            let col = st.contacts[0].collision.as_ref().expect("a collision");
+            let share = fx.preset.tectonics.collision_stacking_share;
+            let subducting = col.subducting;
+            (
+                share,
+                s,
+                added,
+                on_incoming,
+                plutonic,
+                subducting,
+                fired.len(),
+            )
+        };
+        assert!((shortening::dragged_length_km(700.0, 15_000.0) - 329.4).abs() < 0.1);
+        for restack in [true, false] {
+            // One row wide: the slab drags it down, stripped to its cover; no transfer.
+            let (share, s, added, on_incoming, plutonic, subducting, fired) =
+                run(true, 1.0, true, 0.0, restack);
+            assert!(subducting, "{s:?}");
+            assert_eq!(fired, 0, "a terrane going down does not transfer");
+            assert!(s.crossed_km2 > 0.0, "{s:?}");
+            assert!((s.thickness_m - 8_000.0).abs() < 1.0, "{s:?}");
+            assert!((s.cover_m - 8_000.0 / 6.0).abs() < 1.0, "{s:?}");
+            assert_eq!(s.restack_m, 0.0, "{s:?}");
+            let cover = share * s.crossed_km2 * s.cover_m;
+            assert!(
+                (added - cover).abs() < 1e-4 * cover,
+                "restack {restack}: added {added:.4e} for the cover's {cover:.4e}"
+            );
+            assert!(
+                on_incoming.abs() < 1e-9 * cover,
+                "restack {restack}: {on_incoming:.4e} of it on the terrane going down"
+            );
+            let below = share * s.crossed_km2 * (s.thickness_m - s.cover_m);
+            assert!((s.stripped_km2_m - below).abs() < 1e-6 * below, "{s:?}");
+            assert!(
+                plutonic.abs() < 1e-6 * cover,
+                "no plutonic rock stays: {plutonic}"
+            );
+        }
+        // The terrane is read through its crust already under the overriding plate: five rows
+        // with the first hidden still jam the slab.
+        let (_, s, _, _, _, subducting, fired) = run(true, 5.0, true, 1.0, true);
+        assert!(!subducting && fired == 1, "{s:?}");
+        // Five rows wide, the switch off, no slab: a collision as before (its pro-wedge on the
+        // incoming plate).
+        for (docking, rows, slab) in [(true, 5.0, true), (false, 1.0, true), (true, 1.0, false)] {
+            let (share, s, added, on_incoming, plutonic, subducting, fired) =
+                run(docking, rows, slab, 0.0, false);
+            assert!(!subducting, "{docking} {rows} {slab}");
+            assert_eq!(
+                fired, 1,
+                "{docking} {rows} {slab}: it transfers at the threshold"
+            );
+            let whole = share * s.crossed_km2 * s.thickness_m;
+            assert!(
+                (added - whole).abs() < 1e-4 * whole,
+                "{docking} {rows} {slab}: added {added:.4e} for {whole:.4e}"
+            );
+            assert!(on_incoming > 0.0, "{docking} {rows} {slab}: no pro-wedge");
+            assert_eq!(s.stripped_km2_m, 0.0);
+            assert!(plutonic > 0.5 * whole * 5.0 / 6.0, "{plutonic}");
+        }
+    }
+
+    /// The front of the docking tests' planet after one step (`Fixture::step`'s first half), for
+    /// [`shortening::drags_whole`].
+    fn docking_front(fx: &Fixture, st: &mut PlateState) -> shortening::Front {
+        let pos = positions(st, &fx.geo);
+        let tree = Tree::over(&pos, |_| true);
+        st.contacts[0].last_step = 1;
+        let env = fx.env(1);
+        let (mut fronts, _) = shortening::advance(st, &fx.geo, &pos, &tree, &env, BTreeMap::new());
+        fronts.remove(&0).expect("a front")
+    }
+
+    /// The incoming plate's continental samples, hidden or not, of the docking tests' planet.
+    fn terrane_samples(st: &PlateState) -> Vec<usize> {
+        (0..st.samples.len())
+            .filter(|&i| st.plate_of(i) == 1 && st.samples[i].kind == CONTINENTAL)
+            .collect()
+    }
+
+    /// The reach's boundary (ledger PLT-770): a terrane two rows deep (one body), its first row
+    /// already under the overriding plate, goes down with a slab 1 % longer than the one whose
+    /// reach S* = L / (1 + 2.25 T / 30 km) is its extent across the front, all its area (hidden
+    /// and visible) over the front's length, and jams one 1 % shorter. The slab's cap
+    /// (`slab_depth_km`, PLT-184) is lifted so the slab can be that long.
+    #[test]
+    fn the_reach_holds_a_terrane_just_inside_it_and_not_one_just_beyond() {
+        let mut fx = Fixture::new();
+        fx.preset.tectonics.collision_threshold_km = 1.0e9;
+        fx.preset.tectonics.terrane_docking_cover = true;
+        fx.preset.tectonics.slab_depth_km = 1.0e5;
+        let mut st = arc_terrane(&fx, |_| Some(2.0), 1.0, false);
+        let f = docking_front(&fx, &mut st);
+        let area = fx.norm.sample_area_km2();
+        let ours = terrane_samples(&st);
+        assert!(ours.iter().any(|&i| st.samples[i].is_hidden()));
+        let t_m = f64::from(st.samples[ours[0]].thickness_m);
+        assert!((t_m - 15_000.0).abs() < 1.0, "{t_m}");
+        let extent_km = ours.len() as f64 * area / f.length_km();
+        let slab_km = extent_km * (1.0 + 2.25 * t_m / 30_000.0);
+        let back = shortening::dragged_length_km(slab_km, t_m);
+        assert!(
+            (back - extent_km).abs() < 1e-9 * extent_km,
+            "{back} {extent_km}"
+        );
+        let env = fx.env(1);
+        let whole = |km: f64| shortening::drags_whole(&st, &fx.geo, &env, 1, &f, km);
+        let msg = format!("extent {extent_km:.0} km, slab {slab_km:.0} km");
+        assert!(whole(1.01 * slab_km), "{msg}");
+        assert!(!whole(0.99 * slab_km), "{msg}");
+        // Judged going down as it arrived: one body, all its samples, the front's length.
+        let judge = |km: f64, judged: &[Docked], renumbered: bool| {
+            shortening::docking(&st, &fx.geo, &env, 1, &f, km, judged, renumbered)
+        };
+        let arrived = judge(1.01 * slab_km, &[], false).expect("going down");
+        assert_eq!(arrived.len(), 1, "{msg}");
+        let mut members = ours.iter().map(|&i| i as u32).collect::<Vec<_>>();
+        members.sort_unstable();
+        assert_eq!(arrived[0].samples, members, "{msg}");
+        assert!((arrived[0].length_km - f.length_km()).abs() < 1e-9, "{msg}");
+        // Holding no more samples than when judged, it keeps going down past its reach of today.
+        let kept = judge(0.99 * slab_km, &arrived, false).expect("kept going down");
+        assert_eq!(kept, arrived, "{msg}");
+        // A sample joined it (it held one fewer): judged again by all its samples over its judged
+        // share of the front, which a slab 1 % short of the boundary does not reach, but over
+        // twice that share it does: the judged share, not today's front, is what counts.
+        let mut fewer = arrived.clone();
+        fewer[0].samples.pop();
+        assert_eq!(judge(0.99 * slab_km, &fewer, false), None, "{msg}");
+        fewer[0].length_km *= 2.0;
+        let longer = judge(0.99 * slab_km, &fewer, false).expect("over its judged share");
+        assert_eq!(longer[0].length_km, fewer[0].length_km, "{msg}");
+        // A judged body sharing no sample with the front's: a new body, judged afresh.
+        let stranger = vec![Docked {
+            samples: vec![u32::MAX],
+            length_km: 1.0e6,
+        }];
+        assert_eq!(judge(0.99 * slab_km, &stranger, false), None, "{msg}");
+        // A resampling since (the numbering is new): the bodies share the judged length by their
+        // front crust and keep going down while they hold no more samples than the judged did,
+        // or are judged again over those shares.
+        assert!(judge(0.99 * slab_km, &arrived, true).is_some(), "{msg}");
+        assert!(judge(0.99 * slab_km, &fewer, true).is_some(), "{msg}");
+        let mut short = arrived.clone();
+        short[0].samples.truncate(1);
+        assert!(judge(0.99 * slab_km, &short, true).is_none(), "{msg}");
+    }
+
+    /// Each body at a front is judged against its own share of the front (ledger PLT-770): a long
+    /// arc one row deep and, apart from it along the same front, a short fragment three rows deep.
+    /// Pooled, their area over the whole front is within a 700 km slab's reach (329 km under
+    /// 15 km of crust); the fragment alone, its area over its own short stretch of the front, is
+    /// not, and it jams the slab, so the front does not go down; without the fragment it does.
+    #[test]
+    fn each_body_at_a_front_is_judged_on_its_own_share_of_it() {
+        let mut fx = Fixture::new();
+        fx.preset.tectonics.collision_threshold_km = 1.0e9;
+        fx.preset.tectonics.terrane_docking_cover = true;
+        let arc_and_fragment = |p: DVec3| {
+            if p.z >= 0.0 {
+                Some(1.0)
+            } else if p.z <= -0.42 {
+                Some(3.0)
+            } else {
+                None
+            }
+        };
+        let mut st = arc_terrane(&fx, arc_and_fragment, 0.0, true);
+        let f = docking_front(&fx, &mut st);
+        let area = fx.norm.sample_area_km2();
+        let pooled_km = terrane_samples(&st).len() as f64 * area / f.length_km();
+        let reach_km = shortening::dragged_length_km(700.0, 15_000.0);
+        let msg = format!("pooled {pooled_km:.0} km, reach {reach_km:.0} km");
+        assert!(pooled_km < reach_km, "{msg}");
+        let env = fx.env(1);
+        let whole = |st: &PlateState, f: &shortening::Front| {
+            shortening::drags_whole(st, &fx.geo, &env, 1, f, 700.0)
+        };
+        assert!(!whole(&st, &f), "{msg}");
+        let mut st = arc_terrane(&fx, |p| (p.z >= 0.0).then_some(1.0), 0.0, true);
+        let f = docking_front(&fx, &mut st);
+        assert!(whole(&st, &f));
+    }
+
+    /// What a terrane going down keeps, pool by pool (ledger PLT-770, PLT-771): its cover in full
+    /// and, of each pool under it, the share of the column this collision stacked on it
+    /// (PLT-400); every pool keeps at most what it holds, the kept thickness is the cover plus
+    /// that share of the rest (the stacked crust's cover counted once, in the cover), and with
+    /// nothing stacked it is the cover alone.
+    #[test]
+    fn a_terrane_going_down_keeps_its_cover_and_its_stacked_crust_pool_by_pool() {
+        let mut a = [0.0f32; pool::COUNT];
+        a[pool::SEDIMENT] = 500.0;
+        a[pool::FELSIC_VOLCANIC] = 1000.0;
+        a[pool::MAFIC_VOLCANIC] = 1500.0;
+        a[pool::FELSIC_PLUTONIC] = 30_000.0;
+        a[pool::METAMORPHIC] = 7_000.0;
+        let mut b = a;
+        b[pool::SEDIMENTARY] = 1000.0;
+        b[pool::METAMORPHIC] = 3_000.0;
+        let mean = |p: usize| 0.5 * f64::from(a[p] + b[p]);
+        let cover: f64 = crate::plates::pools::COVER.iter().map(|&p| mean(p)).sum();
+        let total: f64 = (0..pool::COUNT).map(mean).sum();
+        for restack in [0.0, 0.25, 1.0] {
+            let kept = kept_pools([a, b].into_iter(), restack);
+            for (p, &k) in kept.iter().enumerate() {
+                assert!(
+                    k <= mean(p) + 1e-9,
+                    "restack {restack}, pool {p}: {k} of {}",
+                    mean(p)
+                );
+                let want = if crate::plates::pools::COVER.contains(&p) {
+                    mean(p)
+                } else {
+                    restack * mean(p)
+                };
+                assert!(
+                    (k - want).abs() < 1e-9,
+                    "restack {restack}, pool {p}: {k}, want {want}"
+                );
+            }
+            let sum: f64 = kept.iter().sum();
+            let want = cover + restack * (total - cover);
+            assert!(
+                (sum - want).abs() < 1e-6,
+                "restack {restack}: {sum}, want {want}"
+            );
+        }
+        assert_eq!(kept_pools(std::iter::empty(), 0.5), [0.0; pool::COUNT]);
+    }
+
+    /// A terrane going down over many steps with the plates moving (ledger PLT-770, PLT-771): the
+    /// arc one row deep of `arc_terrane` on plate 1 coming in at 20 mm/yr, the step's motion, its
+    /// overlaps and their resolution (`subduction::resolve`, which hides what passes under) and
+    /// the stacking, eight times (16 Myr, 320 km of convergence). Every step the front goes down
+    /// and does not transfer, though halfway the collision's shortening and the arc's visible
+    /// rest add up past the reach (the lattice's lag) and at the end the front is its last few
+    /// samples (the judgment at its arrival holds, `shortening::docking`); nothing lands on the
+    /// incoming plate (its visible crust never grows
+    /// in the stacking); all the crust kept is the crossings' cover, on the overriding plate, and
+    /// none of it plutonic; and the arc ends wholly under the overriding plate. Lattice-triangle
+    /// overlaps (`outline_cover` off): the fixture has no outline.
+    #[test]
+    fn a_terrane_going_down_over_many_steps_leaves_its_cover_on_the_overriding_plate() {
+        use crate::plates::{kinematics, subduction};
+        let mut fx = Fixture::new();
+        fx.preset.tectonics.collision_threshold_km = 30.0;
+        fx.preset.tectonics.crust_strength_mpa = 2000.0;
+        fx.preset.tectonics.terrane_docking_cover = true;
+        fx.preset.tectonics.outline_cover = false;
+        let mut st = arc_terrane(&fx, |_| Some(1.0), 0.0, true);
+        let area = fx.norm.sample_area_km2();
+        let share = fx.preset.tectonics.collision_stacking_share;
+        let mut world = crate::world::WorldState::new(1, 16_384, 0.0);
+        let plutonic_over = |st: &PlateState| -> f64 {
+            st.samples
+                .iter()
+                .enumerate()
+                .filter(|(i, s)| st.plate_of(*i) == 0 && !s.is_hidden())
+                .map(|(_, s)| f64::from(s.pools[pool::FELSIC_PLUTONIC]) * area)
+                .sum()
+        };
+        let plutonic0 = plutonic_over(&st);
+        let (mut kept, mut want, mut went_down) = (0.0, 0.0, 0);
+        for step in 1..=8u64 {
+            let env = fx.env(step);
+            kinematics::advance(&mut st, env.dt_yr);
+            let pos = positions(&st, &fx.geo);
+            st.recount(&pos);
+            let tree = Tree::over(&pos, |_| true);
+            let overlaps = subduction::overlaps(&st, &fx.geo, &pos, &tree, &env);
+            let resolved =
+                subduction::resolve(&mut st, &mut world, &fx.geo, &overlaps, &pos, &env).unwrap();
+            let (fronts, fired) =
+                shortening::advance(&mut st, &fx.geo, &pos, &tree, &env, resolved.seeds);
+            let contacts: Vec<_> = st
+                .contacts
+                .iter()
+                .map(|c| {
+                    let col = c.collision.as_ref();
+                    (
+                        c.under,
+                        c.over,
+                        col.map(|x| (x.subducting, x.shortening_km, x.last_step)),
+                    )
+                })
+                .collect();
+            let fronts_at: Vec<_> = fronts
+                .iter()
+                .map(|(c, f)| (*c, f.crust.len(), f.length_km()))
+                .collect();
+            assert!(
+                fired.is_empty(),
+                "step {step}: a transfer; contacts {contacts:?}, fronts {fronts_at:?}, slabs {:?}",
+                st.slabs
+            );
+            let (over0, incoming0) = (crust_on(&st, 0, area), crust_on(&st, 1, area));
+            let stacked = stack(&mut st, &fx.geo, &pos, &env, &fronts, None, 0.0);
+            let on_over = crust_on(&st, 0, area) - over0;
+            let on_incoming = crust_on(&st, 1, area) - incoming0;
+            assert!(
+                on_incoming <= 1e-9 * on_over.abs().max(1.0),
+                "step {step}: {on_incoming:.4e} landed on the incoming plate"
+            );
+            for (c, s) in stacked.iter().filter(|(_, s)| s.thickness_m > 0.0) {
+                let col = st.contacts[*c].collision.as_ref().expect("in collision");
+                assert!(col.subducting, "step {step}: the front jammed, {s:?}");
+                went_down += 1;
+                want += share * s.crossed_km2 * s.cover_m;
+            }
+            kept += on_over;
+        }
+        assert!(went_down >= 3, "the arc went down in {went_down} steps");
+        assert!(
+            (kept - want).abs() <= 1e-3 * want,
+            "kept {kept:.4e} on the overriding plate, the cover's {want:.4e}"
+        );
+        assert!(
+            (plutonic_over(&st) - plutonic0).abs() <= 1e-6 * want,
+            "plutonic rock stayed"
+        );
+        let arc_left = (0..st.samples.len())
+            .filter(|&i| {
+                st.plate_of(i) == 1
+                    && st.samples[i].kind == CONTINENTAL
+                    && !st.samples[i].is_hidden()
+            })
+            .count();
+        assert_eq!(arc_left, 0, "the arc is not all under the overriding plate");
+    }
+
+    /// A terrane going down with crust this collision stacked on it (PLT-400: its column 5 km over
+    /// the normal 35.1 km, stamped by this collision, so `restack_m` is 5 km) keeps, through
+    /// `stack_front`, its cover and the stacked share r of every pool (ledger PLT-770, PLT-771):
+    /// with `collision_restack_whole` (on by default) the crust added is the crossed area times
+    /// s (kept − restack) + restack, kept = cover + r (T − cover), its plutonic rock the crossed
+    /// area times r times the column's plutonic pool (the stacked share crosses whole, the
+    /// plutonic crust under the cover otherwise goes down), and none of it lands on the terrane.
+    /// The slab's cap is lifted so a 40 km crust one row wide is within a 3,000 km slab's reach.
+    #[test]
+    fn a_terrane_going_down_keeps_the_crust_its_collision_stacked_on_it() {
+        let mut fx = Fixture::new();
+        fx.preset.tectonics.collision_threshold_km = 1.0e9;
+        fx.preset.tectonics.crust_strength_mpa = 2000.0;
+        fx.preset.tectonics.terrane_docking_cover = true;
+        fx.preset.tectonics.slab_depth_km = 1.0e5;
+        assert!(fx.preset.tectonics.collision_restack_whole);
+        let mut st = arc_terrane(&fx, |_| Some(1.0), 0.0, true);
+        st.slabs[0].km = 3000.0;
+        let column = continental_column();
+        for s in &mut st.samples {
+            if s.group == 1 && s.kind == CONTINENTAL {
+                s.pools = column;
+                s.pools[pool::METAMORPHIC] += 5000.0;
+                s.basement_m = 0.0;
+                s.thickness_m = s.pools.iter().sum();
+            }
+        }
+        // The collision begins (judged going down), then its own stamp is on the crust at its
+        // front, as a collision stamps the crust it stacks (crust another collision stamped
+        // lately is locked, PLT-224, and makes no front).
+        fx.step(&mut st, 1, None);
+        let onset_myr = st.contacts[0]
+            .collision
+            .as_ref()
+            .expect("a collision")
+            .onset_myr as f32;
+        for s in &mut st.samples {
+            if s.group == 1 && s.kind == CONTINENTAL {
+                s.orogeny = OROGENY_HIMALAYAN;
+                s.orogeny_myr = onset_myr;
+            }
+        }
+        let area = fx.norm.sample_area_km2();
+        let plutonic = |st: &PlateState| -> f64 {
+            st.samples
+                .iter()
+                .filter(|s| !s.is_hidden())
+                .map(|s| f64::from(s.pools[pool::FELSIC_PLUTONIC]) * area)
+                .sum()
+        };
+        let (before, incoming0, plutonic0) = (
+            crust_km2_m(&st, area),
+            crust_on(&st, 1, area),
+            plutonic(&st),
+        );
+        let (stacked, fired) = fx.step(&mut st, 2, None);
+        assert!(fired.is_empty());
+        let col = st.contacts[0].collision.as_ref().expect("a collision");
+        let s = stacked.get(&0).cloned().unwrap_or_else(|| {
+            panic!(
+                "nothing stacked: {:?}",
+                (col.subducting, col.last_step, col.shortening_km)
+            )
+        });
+        assert!(col.subducting, "{s:?}");
+        assert!((s.restack_m - 5000.0).abs() < 1.0, "{s:?}");
+        let r = s.restack_m / s.thickness_m;
+        let kept = s.cover_m + r * (s.thickness_m - s.cover_m);
+        let share = fx.preset.tectonics.collision_stacking_share;
+        let want = s.crossed_km2 * (share * (kept - s.restack_m) + s.restack_m);
+        let added = crust_km2_m(&st, area) - before;
+        assert!(
+            (added - want).abs() < 1e-4 * want,
+            "added {added:.4e}, want {want:.4e}, {s:?}"
+        );
+        let want_plutonic = s.crossed_km2 * r * f64::from(column[pool::FELSIC_PLUTONIC]);
+        let got_plutonic = plutonic(&st) - plutonic0;
+        assert!(
+            (got_plutonic - want_plutonic).abs() < 1e-3 * want_plutonic,
+            "plutonic {got_plutonic:.4e}, want {want_plutonic:.4e}"
+        );
+        let below = share * s.crossed_km2 * (s.thickness_m - kept);
+        assert!((s.stripped_km2_m - below).abs() < 1e-6 * below, "{s:?}");
+        let on_incoming = crust_on(&st, 1, area) - incoming0;
+        assert!(
+            on_incoming.abs() < 1e-9 * want,
+            "{on_incoming:.4e} on the terrane"
+        );
+    }
+
+    /// A front going down feeds its slab and does not break it off (ledger PLT-770, FRC-019): an
+    /// arc one row deep along the whole converging boundary (`arc_terrane` and the ocean floor of
+    /// plate 1 beside it made arc too) on a 600 km slab, through the collision step and the force
+    /// balance (`forces::step`, which grows and breaks off the slabs) for 12 Myr, past the 10 Myr
+    /// of `slab_breakoff_myr`: the slab lengthens by the front's convergence up to
+    /// `slab_depth_km` and is still there. With the switch off the same arc jams it: continental
+    /// crust holds the front, the slab does not lengthen, and it breaks off.
+    #[test]
+    fn a_front_going_down_feeds_its_slab_and_does_not_break_it_off() {
+        let run = |docking: bool| {
+            use crate::plates::pools::oceanic_column;
+            let mut fx = Fixture::new();
+            fx.preset.tectonics.collision_threshold_km = 1.0e9;
+            fx.preset.tectonics.crust_strength_mpa = 2000.0;
+            fx.preset.tectonics.terrane_docking_cover = docking;
+            let mut st = arc_terrane(&fx, |_| Some(1.0), 0.0, true);
+            let spacing = fx.norm.km(fx.norm.spacing_rad());
+            let pts = fx.geo.points();
+            for (i, s) in st.samples.iter_mut().enumerate() {
+                let x_km = fx.norm.km(pts[i].x.asin());
+                if s.group == 1 && s.kind != CONTINENTAL && pts[i].y > 0.0 && x_km <= spacing {
+                    let arc = 8000.0_f32;
+                    s.pools = oceanic_column();
+                    s.pools[pool::MAFIC_VOLCANIC] += arc / 6.0 * 2.0 / 3.0;
+                    s.pools[pool::FELSIC_VOLCANIC] += arc / 6.0 / 3.0;
+                    s.pools[pool::FELSIC_PLUTONIC] += arc * 5.0 / 6.0;
+                    s.kind = CONTINENTAL;
+                    s.basement_m = 7000.0;
+                    s.elevation_m = -2000.0;
+                    s.thickness_m = s.pools.iter().sum();
+                }
+            }
+            st.slabs[0].km = 600.0;
+            let mut kms = Vec::new();
+            for step in 1..=6u64 {
+                let (_, fired) = fx.step(&mut st, step, None);
+                assert!(
+                    fired.is_empty(),
+                    "docking {docking}, step {step}: a transfer"
+                );
+                let col = st.contacts[0].collision.as_ref().expect("a collision");
+                assert_eq!(col.subducting, docking, "step {step}");
+                let pos = positions(&st, &fx.geo);
+                let env = fx.env(step);
+                let _ = crate::plates::forces::step(&mut st, &fx.geo, &pos, &env, DVec3::Z, 0.0);
+                let km = st
+                    .slabs
+                    .iter()
+                    .find(|s| s.under == 1 && s.over == 0)
+                    .map_or(0.0, |s| s.km);
+                kms.push(km);
+            }
+            kms
+        };
+        let down = run(true);
+        assert!(down[0] > 600.0, "the slab was not fed: {down:?}");
+        assert!(down.windows(2).all(|w| w[1] >= w[0]), "{down:?}");
+        let depth = Fixture::new().preset.tectonics.slab_depth_km;
+        assert!((down[5] - depth).abs() < 1e-6, "{down:?}");
+        let jam = run(false);
+        // Jammed, only the ocean floor at the arc's ends feeds it, more slowly, and it breaks off
+        // (a new slab may start from that ocean floor after).
+        assert!(jam[0] < down[0], "jammed {jam:?}, going down {down:?}");
+        assert!(
+            jam[..5].contains(&0.0),
+            "the jammed slab did not break off: {jam:?}"
+        );
     }
 
     /// The crust that stacks is the crust that crossed the front: the volume added is the

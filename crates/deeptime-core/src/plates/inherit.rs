@@ -378,6 +378,9 @@ pub(in crate::plates) mod tests {
             continental_over: 0.0,
             stalled_since_myr: None,
             jam_km: None,
+            subducting: false,
+            docking: Vec::new(),
+            docking_resample: 0,
             belt: Belt::default(),
         }
     }
