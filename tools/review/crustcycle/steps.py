@@ -105,6 +105,12 @@ def main(argv):
           f" {subd / (n * yr):.3f} (on resampling steps {subd_res / (n * yr):.3f}); the four stocks' change under"
           f" resample_blend {blend / (n * yr):+.3f}; blend residual (that + subducted) {(blend + subd_res) / (n * yr):+.4f}"
           f" km^3/yr, {(blend + subd_res) / max(subd_res, 1e-9):+.4f} of the subducted")
+    side = lambda names: sum(sum(r[nm].get("resample_blend", 0.0) for nm in names) for r in res)
+    ocean, cont = side(("d_ov", "d_oh")), side(("d_c",))
+    print(f"  of the residual: the ocean floor's side (hidden and visible floor under resample_blend + subducted)"
+          f" {(ocean + subd_res) / (n * yr):+.4f}, the continental crust's {cont / (n * yr):+.4f} km^3/yr (crust a"
+          f" collision consumed, crust dropped under another plate, the accreted share landing on continents, the"
+          f" blend)")
     trs = [r["stock"]["tr"] for r in body]
     ovs = [r["stock"]["ov"] for r in body]
     print(f"  trench stock mean {sum(trs) / n:.4e} km^3 ({sum(trs) / max(sum(ovs), 1e-9):.4f} of the visible floor's"
