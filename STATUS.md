@@ -153,6 +153,31 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 
 ## Build log
 
+### 2026-10-31: The runoff law's re-review fixes: the year's thaw continuous and never under the mean (Holdridge's twelve months where the climate stage wrote them, else a year about the mean from its warmest month; the bake too), both months or neither, a one-step wiring test, the regions claim corrected (the runoff lane, worktree agent-a4e92fd13092b08b0, branch `surface-runoff-budget`, PR #57; not merged)
+
+- **The re-review** (an Opus reviewer at 5e04e9f4, PR #57's comment): no wiring or determinism bug; seven findings. The
+  coordinator's calls: fix finding 1 in this PR, bake included; findings 3 to 7 too; finding 2 by arming again on the
+  merged head (rb2, rb2-off). Design: docs/design/surface-runoff-budget.md, "The re-review and its fixes".
+- **Finding 1, the thaw** (`hydro::Climate::thaw`): with the months as given its frost branch, a sinusoid centred between
+  the two months, dropped the mean (months 10 and -6 at a mean of 4 C: 3.63 C) and jumped where the coldest month crossed
+  0 C (4.00 against 5.00 C). Now Holdridge's own method on the twelve months where the stage wrote them (its last
+  step: the history's last surface step, the young stage, the bake's monthly layers, whose `Seasons` keep all twelve
+  departures), else a sinusoid about the mean with the warmest month's departure as amplitude; continuous in the months
+  and never under max(mean, 0). Verkhoyansk: 3.05 C by the twelve months (Holdridge's own, to 1e-9), 2.70 by the
+  sinusoid. HYD-030, HYD-031, HYD-033, ERO-217, ERO-221, ERO-222 amended.
+- **What it moves in the bake:** the biomes read it only through the water (their humidity is the climate stage's own
+  aridity; `Climate::aridity` feeds the lakes' stats). On the bake test planet's own climate (20,000 land columns):
+  biotemperature a mean 0.22 C from the centred sinusoid's, over 0.1 C on 0.48 of the columns; runoff +2.1 % (over
+  5 % on 0.27). The full pipeline parts the test planet (land cells on L2 26,754 against 24,635, lakes 0 against 16).
+- **Findings 3 to 7:** K's regions inside Montgomery & Brandon's lines at 500 m of relief and more only, above both
+  under it as on the base (the design, STATUS, the science page, the decisions log); `climate::months` both months or
+  neither for all three callers; `one_surface_step_takes_the_budget_s_weight` (one coupled step: the used weight 0.711
+  against the snapshot's own 0.826 over the land); closed.rs, MOI-067, the design's master and gates; the weathering
+  kernel named. The bake test prints its biomes and water; `gate.sh bake` runs it.
+- **Gate** (VM): `gate.sh quick` on 98ec3b1e (thaw-quick2): fmt and clippy clean, 128 passed, 0 failed.
+  `gate.sh full` on d860c3ad (thaw-full): fmt and workspace clippy clean, `cargo test --workspace` 1,485 passed, 0
+  failed, 13 ignored.
+
 ### 2026-10-31: The runoff law's review fixes: the young stage on the surface's rule, the climate stage's months as given (a correction on master's lakes), a wiring test (the runoff lane, worktree agent-a4e92fd13092b08b0, branch `surface-runoff-budget` with origin/master 8b24e359 merged in; not merged)
 
 - **The review** (an Opus reviewer at a38ab3e9, relayed by the coordinator): land only after fixes, and no default until

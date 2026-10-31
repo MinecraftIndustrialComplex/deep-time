@@ -165,7 +165,8 @@ Gate (VM, `tools/review/plateau/gate.sh full` on da27fa0d): fmt and clippy (work
 1,158 passed and 12 ignored, its integration tests passed. After the review's fixes, the quick gate (`gate.sh quick`):
 fmt and clippy (core and cli, all targets) clean, the lane's 80 tests passed; the cold plateau's weights are unchanged
 (0.600, 0.396 and 0.050; interior net 118.0, 88.0 and 3.8 m/Myr). The full gates: `cargo test --workspace` 1,474
-passed at b20d0e3d (job rb-fix-full), 1,483 at 5dd7ae88 with the flip (job rb-on-full).
+passed at b20d0e3d (job rb-fix-full), 1,483 at 5dd7ae88 with the flip (job rb-on-full), 1,485 at d860c3ad
+after the re-review's fixes (job thaw-full; fmt and workspace clippy clean).
 
 Reading: the budget gets a measured permafrost basin right within the curve's own error, and closes off ground that
 never thaws, where the old rule erred most. It still runs off too much where the plateau's sun and wind evaporate more
