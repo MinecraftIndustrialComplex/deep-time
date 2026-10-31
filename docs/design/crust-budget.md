@@ -1,8 +1,8 @@
 # The continents' crust budget against Stern & Scholl 2010: design
 
-Status: **built behind switches, off; one arm run** (2026-10-31, the crust-budget lane, branch
-`crust-budget`; the coordinator's task after the freeboard landed, PR #49): PLT-760 to PLT-763, the
-arm cb-cum below; section 5 designed only. Ledger PLT-760 onward; plates.md "The crust budget
+Status: **built behind switches, off; traced switch by switch, recommended on** (2026-10-31, the
+crust-budget lane, branch `crust-budget`; the coordinator's task after the freeboard landed, PR #49):
+PLT-760 to PLT-763, the arm cb-cum and the second pass below; section 5 designed only. Ledger PLT-760 onward; plates.md "The crust budget
 against Stern & Scholl 2010, row by row (2026-10-31)" holds the readings and the arm.
 
 ## Why
@@ -56,13 +56,17 @@ The rule: a contact's arc takes its setting at its onset (PLT-669): intra-oceani
 oceanic fronts that step has visible continental crust of the overriding plate within
 `arc_distance_km` (PLT-370's test), stored as `Contact::arc_intra_oceanic`, cleared with the onset at
 a polarity reversal and kept by a split's copies. With the switch on, magma that lands on crust an
-island arc made (`subduction::island_arc_crust`: ocean floor, or continental crust over an ocean
-basement, PLT-331, whose own crystalline crust is at least half the island-arc magma it took) under
-an arc that began intra-oceanic follows the island law (its pulse while young, then 30 × v_n / 86.6),
-its pools, and the island accumulator. A continent's own crust under any arc, and every column under
-an arc that began at a continent, keep the label's law. The column's height still follows its kind
-(Airy on continental crust, the ocean's line on oceanic). The "at least half" is a game-choice line
-(a matured arc's own crust is its arc magma less what eroded, so it holds at any share up to one).
+intra-oceanic arc is built on (`subduction::island_arc_crust`: ocean floor, or continental crust over
+an ocean basement, PLT-331) under an arc that began intra-oceanic follows the island law (its pulse
+while young, then 30 × v_n / 86.6), its pools, and the island accumulator. A continent's own crust
+under any arc, and every column under an arc that began at a continent, keep the label's law. The
+column's height still follows its kind (Airy on continental crust, the ocean's line on oceanic). The
+class is the sources': "IOASs are built on oceanic crust, whereas Andean-type arcs are built on
+pre-existing continental crust" (Stern 2010, p. 8), on basements that include "earlier intra-oceanic
+arcs, accretionary complexes and oceanic plateaux" (Gerya 2011, of Leat & Larter 2003). Until the
+second pass (2026-10-31) the test also asked that the column's own crystalline crust be at most twice
+its island-arc magma, a game-choice line no source gives; it moved 0.04 to 0.05 km³ a year of magma
+and is gone.
 
 Test (written first): `an_intra_oceanic_arc_keeps_the_island_law_on_the_crust_it_made`.
 
@@ -174,6 +178,20 @@ their front at 0.66 of their rate per km. The label-free felsic rock loses 1.18 
 the late half against base34-s4's 1.70. The sea follows the kept crust (169 to 392 m at the end;
 continental crust 0.492 to 0.528 of the planet), which floods the supercontinent planets: criteria
 met median 6.5 to 5 (p 0.041), the crust's net change +0.065 to +0.098, the guard clean.
+
+## The second pass: each switch alone (2026-10-31)
+
+The coordinator asked for each switch shown correct before the three go on by default (plates.md,
+"The switches traced one by one"). One 8-run arm per switch, trace runs that add measurements only
+(the sediment's books every step, the arcs' magma by law, setting and crust), the switches-off
+branch checked bit for bit against base34, and the substrate rule above with its arms cb-760b and
+cb-cum2. Findings: the trench floor's sediment is not thicker on any arm (the first reading took three
+snapshots of a heavy-tailed pile); the sediment's books close the same with and without the
+switches; the continental arcs' magma on island-arc crust comes from arcs begun at a continent (and,
+before the substrate rule, the half line); the sea rises by the continental crust each switch keeps,
+the three adding (+76, +60 and +87 m alone, +223 together); the supercontinents' drowning on cb-cum
+follows from the sea, the coast with high ground does not; on the final code the criteria are 6
+against 6.5 (p 0.35). Verdict: all three correct, on (PLT-760 with the substrate rule).
 
 ## What is left
 
