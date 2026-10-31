@@ -23,6 +23,8 @@ for pair in "$@"; do
         MODE=chain HI=3000 nice -n 19 "$PY" -I tools/review/plateau/cohort.py "$folder"
         nice -n 19 "$PY" -I tools/review/plateau/climate.py "$folder"
         nice -n 19 "$PY" -I tools/review/plateau/closed.py "$folder"
+        nice -n 19 "$PY" -I tools/review/plateau/series.py "$folder"
+        nice -n 19 "$PY" -I tools/review/orogen/hiseries.py "$folder"
     } > "$OUT/wear-$tag.txt" 2> "$OUT/wear-$tag.log"
     echo "done $tag"
 done
