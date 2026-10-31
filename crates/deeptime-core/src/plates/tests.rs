@@ -5004,9 +5004,10 @@ fn island_arcs_front_loaded_pulse_then_mature_rate() {
 /// its ocean basement, 9 km of island-arc crust, PLT-047 and PLT-331), a young arc whose contact
 /// began intra-oceanic adds Stern & Scholl's pulse, 500 × the band, with the switch on, and the
 /// continental arcs' law with it off (the column's label), as it does on the switch with an arc
-/// that began at a continent, or on a continent's own crust whatever the setting. The arc's
-/// setting comes from its onset: an arc begun over ocean floor is intra-oceanic, one begun at a
-/// continent is not, and the intra-oceanic front is measured.
+/// that began at a continent, or on a continent's own crust whatever the setting. The crust's
+/// substrate decides (an ocean basement or not), not its share of arc magma. The arc's setting
+/// comes from its onset: an arc begun over ocean floor is intra-oceanic, one begun at a continent
+/// is not, and the intra-oceanic front is measured.
 #[test]
 fn an_intra_oceanic_arc_keeps_the_island_law_on_the_crust_it_made() {
     // A young arc (4 Myr) on a matured island arc's crust, its contact's setting `io`.
@@ -5067,6 +5068,24 @@ fn an_intra_oceanic_arc_keeps_the_island_law_on_the_crust_it_made() {
     let cont = arc_step(&p, &mut st, &geo, &pos, 1).0;
     assert!(cont.arc_continental_km3 > 0.0);
     assert_eq!(cont.arc_oceanic_km3, 0.0);
+
+    // The substrate decides (Stern 2010: IOASs "are built on oceanic crust"): continental crust
+    // over an ocean basement is crust an intra-oceanic arc builds on, whatever share of it is
+    // island-arc magma; a continent's own crust is not, whatever island-arc magma it took.
+    let mut margin = state::Sample::blank(0);
+    margin.pools = pools::oceanic_column();
+    margin.make_continental();
+    margin.pools[pool::FELSIC_PLUTONIC] += 20_000.0;
+    margin.thickness_m = pools::thickness(&margin.pools);
+    assert!(margin.basement() > 0.0 && margin.arc_oceanic_m == 0.0);
+    assert!(subduction::island_arc_crust(&margin));
+    let mut own = state::Sample::blank(0);
+    own.kind = CONTINENTAL;
+    own.pools = pools::continental_column();
+    own.arc_oceanic_m = 30_000.0;
+    own.thickness_m = pools::thickness(&own.pools);
+    assert!(own.basement() <= 0.0);
+    assert!(!subduction::island_arc_crust(&own));
 
     // The setting at the onset: over ocean floor intra-oceanic, at a continent not.
     for (ocean, io) in [(true, true), (false, false)] {

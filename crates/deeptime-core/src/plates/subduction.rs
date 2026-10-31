@@ -981,12 +981,13 @@ pub const ARC_FRONT_INTRA_OCEANIC_GLOBAL: &str = "plates/arc_front_intra_oceanic
 /// crust: its island-arc magma above its continental-arc magma, and some), so the split reads
 /// against `tools/review/crustcycle/probe.py MODE=arcs`. In order, the continental arcs' law:
 /// on island-arc crust under an arc that began at a continent; on island-arc crust under an arc
-/// that began intra-oceanic where `island_arc_crust` says no (no ocean basement, or the
-/// half line); the same where it says yes (only with `island_arc_own_crust` off: the magma
-/// PLT-760 moves to the island law); on other continental crust; a suture's magma on island-arc
-/// crust; on other crust; then the island arcs' law on continental crust (PLT-760's own); and of
-/// the second, the part with an ocean basement whose half line failed.
-pub const ARC_SPLIT_GLOBALS: [&str; 8] = [
+/// that began intra-oceanic where `island_arc_crust` says no (no ocean basement); the same where
+/// it says yes (only with `island_arc_own_crust` off: the magma PLT-760 moves to the island law);
+/// on other continental crust; a suture's magma on island-arc crust; on other crust; then the
+/// island arcs' law on continental crust (PLT-760's own). (The trace runs of 2026-10-31, before
+/// `island_arc_crust` read the basement alone, had an eighth: of the second, the part with an
+/// ocean basement whose half line failed.)
+pub const ARC_SPLIT_GLOBALS: [&str; 7] = [
     "plates/arc_split_c_io_crust_continent_onset_km3",
     "plates/arc_split_c_io_crust_io_onset_not_island_km3",
     "plates/arc_split_c_io_crust_io_onset_island_km3",
@@ -994,26 +995,20 @@ pub const ARC_SPLIT_GLOBALS: [&str; 8] = [
     "plates/arc_split_suture_io_crust_km3",
     "plates/arc_split_suture_other_crust_km3",
     "plates/arc_split_o_on_continental_km3",
-    "plates/arc_split_c_io_crust_io_onset_half_line_km3",
 ];
 
-/// Crust an island arc made: ocean floor, or continental crust made from ocean floor (an ocean
-/// basement under it, PLT-331) whose own crystalline crust (its crystalline pools less the
-/// basement) is at least half the island-arc magma it received (`arc_oceanic_m`): a matured
-/// island arc (PLT-047), not a continent's own crust, a margin's thinned crust (PLT-661) or
-/// a spread's receiver (PLT-662). ledger: PLT-760
+/// Crust an intra-oceanic arc is built on: ocean floor, or continental crust made from ocean
+/// floor (an ocean basement under it, PLT-331: a matured island arc, PLT-047, a sediment margin,
+/// PLT-661, a spread's receiver, PLT-662), against a continent's own crust (no ocean basement).
+/// Stern 2010 (GSL Spec. Publ. 338, p. 8, read in full by the research sub-agent): "IOASs are
+/// built on oceanic crust, whereas Andean-type arcs are built on pre-existing continental crust";
+/// their basements include "earlier intra-oceanic arcs, accretionary complexes and oceanic
+/// plateaux" (Gerya 2011's account of Leat & Larter 2003). The arc is classed by what it is built
+/// on, not by how much of its crust is arc magma: no source gives such a share (until 2026-10-31
+/// a game-choice line, "own crystalline crust at most twice the island-arc magma", stood here).
+/// ledger: PLT-760
 pub fn island_arc_crust(s: &super::state::Sample) -> bool {
-    if s.kind != CONTINENTAL {
-        return true;
-    }
-    if s.basement() <= 0.0 {
-        return false;
-    }
-    let own = s.own_pools();
-    let crystalline: f32 = own[pool::METAMORPHIC..].iter().sum();
-    // "At least half": the game-choice line between a matured arc's own crust and crust that
-    // only took some island-arc magma (ledger: PLT-760).
-    2.0 * s.arc_oceanic_m >= crystalline
+    s.kind != CONTINENTAL || s.basement() > 0.0
 }
 
 /// Whether arc magma landing on `s` follows the island arcs' law (PLT-045, PLT-668) rather than
@@ -1092,7 +1087,7 @@ pub struct Pull {
     /// (measurement, the island arcs' front by their setting at onset; ledger: PLT-760).
     pub front_intra_oceanic_km_myr: f64,
     /// The arcs' rock by law, setting and crust ([`ARC_SPLIT_GLOBALS`]), km³ (measurement).
-    pub arc_split_km3: [f64; 8],
+    pub arc_split_km3: [f64; 7],
     /// The step's erosive fronts and their forearcs ([`erode_forearcs`]); `None` while the rule is
     /// off.
     pub forearcs: Option<Forearcs>,
@@ -1180,7 +1175,7 @@ struct Effect {
     /// Arc crust a crust-suturing front added, m (ledger: PLT-763).
     suture_m: f64,
     /// Arc crust by law, setting and crust ([`ARC_SPLIT_GLOBALS`]), m (measurement).
-    split_m: [f64; 8],
+    split_m: [f64; 7],
 }
 
 /// The volcanic share of an arc's crust: continental arcs about 1 in 8 (an intrusive to extrusive
@@ -2033,7 +2028,7 @@ pub fn fronts_finish(
             let (mut added_continental, mut added_oceanic, mut cordillera) =
                 (0.0_f64, 0.0_f64, 0.0_f64);
             let mut suture = 0.0_f64;
-            let mut split = [0.0_f64; 8];
+            let mut split = [0.0_f64; 7];
             // Cortial's h(z̃) uplift is the oceanic slab's: where continental crust comes in, the
             // collision belt (`belts.rs`) builds the relief from the crust shortened. Past the
             // slab's ends none, and no folds (`margin_slab_ends`, PLT-562).
@@ -2074,7 +2069,6 @@ pub fn fronts_finish(
                     && s.arc_oceanic_m > 0.0;
                 let io_onset = contacts[src.contact].arc_intra_oceanic;
                 let own_island = island_arc_crust(s);
-                let half_failed = s.kind == CONTINENTAL && s.basement() > 0.0 && !own_island;
                 // By the arc's law: the column's label, or with `island_arc_own_crust` the island
                 // law on the crust an intra-oceanic arc made (ledger: PLT-760).
                 if !plan.island {
@@ -2089,9 +2083,6 @@ pub fn fronts_finish(
                         (false, false, _, _) => 3,
                     };
                     split[slot] += v + p;
-                    if slot == 1 && half_failed {
-                        split[7] += v + p;
-                    }
                     s.pools[pool::FELSIC_PLUTONIC] += p as f32;
                     s.pools[pool::FELSIC_VOLCANIC] += v as f32;
                     s.arc_continental_m += m as f32;
@@ -2186,7 +2177,7 @@ pub fn fronts_finish(
         .collect();
     let (mut arc_continental_m, mut arc_oceanic_m, mut cordillera_m) = (0.0, 0.0, 0.0);
     let mut suture_m = 0.0;
-    let mut split_m = [0.0_f64; 8];
+    let mut split_m = [0.0_f64; 7];
     for e in effects {
         let contact = &mut state.contacts[e.contact];
         contact.max_uplift_mm_yr = contact.max_uplift_mm_yr.max(e.rate_mm_yr);
