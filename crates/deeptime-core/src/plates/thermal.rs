@@ -103,21 +103,41 @@ pub fn moho_km(s: &Sample) -> f64 {
     f64::from(s.pools.iter().sum::<f32>()) / 1000.0
 }
 
-/// A continental column's thermal lithosphere, km: its L, never above its Moho. The crust
-/// conducts its heat up and the convecting mantle's adiabat begins under it, so the base of the
-/// thermal lithosphere lies at or below the base of the crust (the lithosphere is crust and mantle
-/// lithosphere; a back-arc's or a rift's thinning takes the mantle part); the same floor as stage
-/// 3's drop-off "to the Moho" (PLT-477). It bounds the heat-flow law, the conductive flux k T_m / L
-/// of the adiabat through the lid (PLT-467), by the crust's thickness: at most 26 + 3,375 / Moho.
+/// The temperature at the base of a crust that lies on the asthenosphere, °C: "The base of the
+/// crust is at or near asthenosphere (basalt-solidus) temperatures" (Lachenbruch, Sass & Galanis
+/// 1985, p. 6723, the Salton Trough), 1080 °C at its 23.5 km Moho (their Fig. 18); hotter "the
+/// temperature will not be much higher because of the narrow melting interval for basalt" (p.
+/// 6728).
+pub const CRUST_BASE_C: f64 = 1080.0; // ledger: PLT-822
+
+/// The shallowest a continental column's thermal lithosphere reaches, km: where the heat-flow
+/// law's conductive geotherm (T_m at L, linear through the lid, as q_m = B / L reads it) puts the
+/// column's Moho at the crust's basal solidus, z_Moho T_m / T_s. A lithosphere thinned to its
+/// crust (Lachenbruch et al. 1985: "thinned to the crust", the crust "lying directly on
+/// asthenosphere") has its Moho at the solidus, and the law there is their static conductive
+/// value, q_m = (B / T_m) T_s / z_Moho: 141 mW/m² with the crust's 26 over a 23.5 km crust,
+/// against the Imperial Valley's "~140" (q* ≈ 125 reduced).
+// ledger: PLT-820, PLT-822, ISO-138
+pub fn lid_floor_km(moho_km: f64) -> f64 {
+    moho_km.max(0.0) * MANTLE_C / CRUST_BASE_C
+}
+
+/// A continental column's thermal lithosphere, km: its L, never above [`lid_floor_km`]. The
+/// crust conducts its heat up and the convecting mantle's adiabat begins under it, so the base of
+/// the thermal lithosphere lies below the base of the crust (the lithosphere is crust and mantle
+/// lithosphere; a back-arc's or a rift's thinning takes the mantle part; stage 3's drop-off "to
+/// the Moho", PLT-477, the same floor in its own terms), and no deeper into the crust than its
+/// solidus allows. It bounds the heat-flow law (PLT-467) by the crust's thickness: at most
+/// 26 + 2,700 / z_Moho mW/m² before the magmatic terms.
 // ledger: PLT-820
 pub fn continental_l_km(l_km: f64, moho_km: f64) -> f64 {
-    l_km.max(moho_km)
+    l_km.max(lid_floor_km(moho_km))
 }
 
 /// The lithosphere continental crust with no state yet starts from, km: crust made continental
 /// on floor the resampling made in the same step (the rate guard's spread onto a gap point, a
 /// volcanic margin) had no ocean state set; it takes its floor's, 2.32 √(κt) at the floor's
-/// age (PLT-466), never above its Moho (PLT-820), in place of the frame's depth (until
+/// age (PLT-466), never above its lid's floor (PLT-820), in place of the frame's depth (until
 /// 2026-10-31, an old craton's 225 km under a floor days old).
 // ledger: PLT-821
 pub fn unset_continental_l_km(s: &Sample, t_myr: f64) -> f64 {
@@ -125,7 +145,7 @@ pub fn unset_continental_l_km(s: &Sample, t_myr: f64) -> f64 {
     continental_l_km(ocean_km(age), moho_km(s))
 }
 
-/// The lithosphere a continental sample's laws read, km: its own, never above its Moho, or its
+/// The lithosphere a continental sample's laws read, km: its own, never above its lid's floor, or its
 /// floor's where it has none ([`unset_continental_l_km`]).
 // ledger: PLT-820, PLT-821
 pub fn sample_l_km(s: &Sample, t_myr: f64) -> f64 {
@@ -399,7 +419,7 @@ pub fn step(state: &mut PlateState, env: &Env) {
             root_crust_km(k, s),
             dt,
         );
-        // Never above the Moho: an arc's or a rift's heating towards L_hot takes the mantle
+        // Never above the lid's floor: an arc's or a rift's heating towards L_hot takes the mantle
         // lithosphere, not the crust (ledger: PLT-820).
         let l = continental_l_km(l, moho);
         s.lithosphere_km = l as f32;
@@ -410,8 +430,9 @@ pub fn step(state: &mut PlateState, env: &Env) {
 /// Stage 2: a continental column whose crystalline crust the transition thins
 /// to `keep` of what it was (a stretch by β = 1 / `keep`) has its lithosphere and keel thinned by
 /// the same factor, L / β and K / β (McKenzie 1978's uniform stretching of the whole lithosphere,
-/// pure shear), the lithosphere never above the stretched column's Moho (`s` is the column after
-/// its thinning; PLT-820; until 2026-10-31 never under 1 km); a sample with no state keeps none.
+/// pure shear), the lithosphere never above the stretched column's lid floor (`s` is the column
+/// after its thinning; PLT-820; until 2026-10-31 never under 1 km); a sample with no state keeps
+/// none.
 // ledger: PLT-476, PLT-820
 pub fn stretch(s: &mut Sample, keep: f64) {
     if s.kind != CONTINENTAL || s.lithosphere_km <= 0.0 || !(0.0..1.0).contains(&keep) {
