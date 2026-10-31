@@ -11725,17 +11725,27 @@ missing is the small branch: a body the slab can pull down is docked as a collis
 ### The law (`tectonics.terrane_docking_cover`, PLT-770, PLT-771; on by default since 2026-10-31)
 
 Each step, at each collision front whose contact still has a slab of the pair: the slab's reach
-against the incoming crust's buoyancy, S* = L / (1 + 2.25 T / 30 km) (FRC-030's buoyancy of the
-dragged length against the pull of the dense slab left; L the slab's length up to 700 km, PLT-184; T
-the incoming crust's thickness at the front): 215 km under 30 km of crust, 329 km under 15 km. A
-terrane whose extent across the front is within S* goes down with the slab: of its crossing crust
-only the cover (sediment, sedimentary and volcanic rock, PLT-771: 2.5 km of a model island arc of 15
-km, inside the "upper 2–5 km") stays, by PLT-242's share; the rest is counted as
-`plates/collision_stripped_km3`; and it does not transfer at PLT-068's threshold. A larger terrane jams
-and collides as before. The extent condition is the project's reading of Cloos's buoyancy for a body
-of finite size along the slab (Cloos's own result is a thickness), bracketed by Yan et al.'s 150 and
-300 km and conservative (the slab beside a body short along the trench, which would help pull it
-down, is left out).
+against a body's buoyancy, S* = L / (1 + 2.25 T / 30 km) (FRC-030's buoyancy of the dragged length
+against the pull of the dense slab left; L the slab's length up to 700 km, PLT-184; T the body's crust
+thickness at the front): 215 km under 30 km of crust, 329 km under 15 km. Each body at the front is
+judged on its own, its extent across the front being all its area (the part already under the
+overriding plate and the rest) over its share of the front's length; the front goes down when every
+body is within its S*, a body beyond holding the whole front, and keeps that judgment while its
+bodies go down (judged again when crust joins them). Then of the crossing crust only the cover
+(sediment, sedimentary and volcanic rock, PLT-771: 2.5 km of a model island arc of 15 km, inside the
+"upper 2–5 km") and the crust this collision stacked on it stay, pool by pool, by PLT-242's share, all
+of it on the overriding plate (no pro-wedge on a terrane going down: the cover is offscraped against
+the overriding plate, "added onto the accretionary prism"); the rest is counted as
+`plates/collision_stripped_km3`; it does not transfer at PLT-068's threshold, and its front feeds the
+slab instead of blocking it (FRC-019). A larger terrane jams and collides as before. The extent
+condition is the project's reading of Cloos's buoyancy for a body of finite size along the slab
+(Cloos's own result is a thickness). It is not bracketed by Yan et al.: it takes in their 150 km at any
+thickness but passes their 300 km under crust thinner than about 18 km, where they find the slab
+breaks off and subducts flat or the subduction jumps (the model has neither); nor is it conservative
+either way (it leaves out the help of the slab beside a body short along the trench, and takes the
+slab's whole pull with no resistance of the mantle). The pull is not applied at the terrane's own
+front samples (continental front samples resist only): it goes down at the convergence the plates'
+other forces keep.
 
 On base33 the hand-offs within that reach are 0.054 (220 km, continental fragments) to 0.127 (270 km,
 arcs) of those under 50 samples and almost none of the larger, so the law is expected to move the
@@ -11758,7 +11768,11 @@ Scholl's 3.2 km³ a year of additions. No V1 number beyond the seeds' spread: la
 (p 0.19), the largest landmass 0.083 against 0.074 (p 0.33), continental crust under the sea 0.567
 against 0.605 (p 0.16), the coast with high ground 0.091 against 0.067 (p 0.38); collision high coasts on
 landmasses under 0.02 of the land 0.359 against 0.668 (p 0.44). The design's "What the arm showed" has
-the rest.
+the rest. That arm ran the first build, which PR #51's review (2026-10-31) corrected: the two wedges put
+the kept cover on the terrane going down (its pro flank), where it crossed again and was stripped;
+the restacked rock took the cover's mix; two bodies at one front were pooled; the slab broke off
+under a body slower than 10 Myr; and the extent, read each step as the shortening plus the visible
+rest, overshot halfway down by the lattice's lag. The build above is the corrected one.
 
 ## Sediment by margin type and the margin's sediment (PLT-660 to PLT-662, 2026-10-25)
 
