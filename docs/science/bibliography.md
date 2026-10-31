@@ -6542,10 +6542,11 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 - Reference: Stern, R. J. (2010). The anatomy and ontogeny of modern intra-oceanic arc systems. In Kusky, T. M., Zhai, M.-G. and Xiao, W. (eds), The Evolving Continents: Understanding Processes of Continental Growth. Geological Society, London, Special Publications 338:7-34.
 - DOI or URL: 10.1144/SP338.2; author-hosted copy https://earthjay.com/earthquakes/20160729_mariana/stern_2010_anatomy_ontogeny_intraoceanic_arcs.pdf
 - Cited as: "Stern 2010".
-- Ledger ids: PLT-045, PLT-047
+- Ledger ids: PLT-045, PLT-047, PLT-760 (2026-10-31: the class by substrate)
 - Access: paywalled at the publisher; a copy is hosted openly.
 - Library (the project's source library, not distributed): fetched 2026-10-02 (the hosted copy). Text file: `Stern2010/Stern2010.txt` (pdftotext).
 - Read so far (by the project): full text, 2026-10-02. p. 9: "Because crustal thickness typically is reflected in elevation, intra-oceanic arcs are generally mostly below sea level"; Moho "at depths between 25 and 35 km. This is where IOASs are thickest, but is nevertheless significantly thinner than continental crust, which is typically c. 40 km thick. IOAS crust also differs from continental crust in being significantly faster (by 0.5-1.0 km s-1)", i.e. more mafic; the crust "thickens at a rate of several hundred metres per million years"; p. 26: "a crustal thickening rate of c. 500 m Ma-1. When IOAS crust thickens sufficiently to stabilize garnet in the lower crust (greater than c. 30 km thick)...".
+- Read in the crust-budget lane (2026-10-31, an author-site PDF through pdftotext, by a research sub-agent; pages inferred from the extracted text; PLT-760): pp. 7-8, "Arcs can be built on continental or oceanic lithosphere. Here the focus is on those arcs that are built on oceanic crust, which may be called intra-oceanic arc systems (IOASs). These can be distinguished from arcs built on continental crust, also known as 'Andean-type arcs'"; p. 8, "IOASs are built on oceanic crust, whereas Andean-type arcs are built on pre-existing continental crust"; a practical test, "if much of the volcanic front of a given arc system lies below sea level, it can usefully be described as an intra-oceanic arc"; pp. 8-9, de Ronde et al.'s middle class of "transitional or island arcs" is declined because it "requires more information about the nature of crustal substrate than is commonly available". No share of arc magma in the crust is used to class an arc.
 
 ### SternScholl2010
 - Reference: Stern, R. J. and Scholl, D. W. (2010). Yin and yang of continental crust creation and destruction by plate tectonic processes. International Geology Review 52(1):1-31.
@@ -10225,3 +10226,29 @@ Plume tails, plume heads and volcanic rifted margins from sources (build log 202
 - Access: paywalled.
 - Library: not kept.
 - Read so far (by the project): the abstract, 2026-10-31 (the Macquarie research portal): episodic growth "may be caused by superevents in the mantle as descending slabs pile up at the 660-km seismic discontinuity and then catastrophically sink into the lower mantle"; no share of the crust from plumes. Condie 2000, 2001 (the book) and 2004 not obtained.
+### LeatLarter2003
+- Reference: Leat, P. T. and Larter, R. D. (2003). Intra-oceanic subduction systems: introduction. In: Larter, R. D., Leat, P. T. (eds), Intra-Oceanic Subduction Systems: Tectonic and Magmatic Processes. Geological Society, London, Special Publications 219:1-17.
+- DOI or URL: 10.1144/GSL.SP.2003.219.01.01
+- Cited as: "Leat & Larter 2003" (what an intra-oceanic arc is built on, PLT-760).
+- Ledger ids: PLT-760.
+- Access: paywalled; the abstract open (Crossref).
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31 (the research sub-agent): intra-oceanic arcs "occur where overridding plates of subduction zones consist of oceanic rocks, contrasting with arcs built on continental margins".
+
+### Gerya2011
+- Reference: Gerya, T. V. (2011). Intra-oceanic subduction zones. In: Brown, D., Ryan, P. D. (eds), Arc-Continent Collision. Frontiers in Earth Sciences, Springer, pp. 23-51.
+- DOI or URL: 10.1007/978-3-540-88558-0_2
+- Cited as: "Gerya 2011" (its account of Leat & Larter 2003, PLT-760).
+- Ledger ids: PLT-760.
+- Access: paywalled; the introduction read.
+- Library: not kept.
+- Read so far (by the project): the introduction, 2026-10-31 (the research sub-agent): "Only one intra-oceanic arc (the Aleutian arc) is built on normal ocean crust. The others are built on basements comprising a range of oceanic lithologies, including ocean crust formed at back-arc spreading centres, earlier intra-oceanic arcs, accretionary complexes and oceanic plateaux."
+
+### Shillington2004
+- Reference: Shillington, D. J., Van Avendonk, H. J. A., Holbrook, W. S., Kelemen, P. B., Hornbach, M. J. (2004). Composition and structure of the central Aleutian island arc from arc-parallel wide-angle seismic data. Geochemistry, Geophysics, Geosystems 5(10):Q10006.
+- DOI or URL: 10.1029/2004GC000715
+- Cited as: "Shillington et al. 2004" (an island arc's crust is not continental by its thickness, PLT-760).
+- Ledger ids: PLT-760.
+- Access: the abstract open (Crossref).
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31 (the research sub-agent, verbatim through Crossref): the central Aleutian crust, 35-37 km thick, has "more mafic compositions, than average continental crust, implying that significant modifications would be required for this arc to be a suitable building block for continental crust".
