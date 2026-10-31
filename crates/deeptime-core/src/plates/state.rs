@@ -315,10 +315,13 @@ impl Sample {
             && t_myr - self.collision_myr() <= end_myr
     }
 
-    /// Ocean floor becomes continental crust (an island arc matured, `finish_samples`; crust
-    /// stacked onto it, `subduction::resolve` and `collapse::spread`): its own ocean crust, the
-    /// ocean column's 7 km or the mafic rock it has, stays under the crust on top as its
-    /// [`basement_m`](Sample::basement_m). ledger: PLT-331
+    /// Ocean floor becomes continental crust: an island arc matured (`finish_samples`, PLT-047),
+    /// floor as thick as a continent at a contact (`subduction::resolve`, PLT-289), the margin's
+    /// sediment in the transition's zone (`transition::step`, PLT-661), or continental rock a
+    /// spread put on it, at once (PLT-662) or once filled to the normal column (PLT-277;
+    /// `collapse::spread`, from the collapse, the founder and the rate guard, also after the
+    /// step's resampling). Its own ocean crust, the ocean column's 7 km or the mafic rock it has,
+    /// stays under the crust on top as its [`basement_m`](Sample::basement_m). ledger: PLT-331
     ///
     /// Its heat flow was the floor's law's (510 / √t, up to 300 mW/m² on young floor) and goes
     /// with the floor's kind: 0, none, until the continental law sets it, `finish_samples` in the

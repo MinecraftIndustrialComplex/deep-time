@@ -11593,6 +11593,19 @@ the crust-budget lane.
   went to the no-room rule (PLT-700), stacked above the strength height by the belt's profile, nearest the front, and
   moved on by the step's ceiling and the surface's channel flow; on the two-wedge arm that was 0.010 of the kept
   crust, so the rule changes where little crust lands, and only in large collisions.
+- **Structures on the plateau** (2026-10-31, after PR #50's review). The plateau's samples are stamped as the
+  collision's orogeny (the regime, the provinces, the young-orogen weakness) but stay outside the collision's footprint
+  (PLT-260: no convergence, shortening or carrier), so the structure stage gives them no collision folds or thrusts.
+  Their crust comes by the orogen's flow from the front, not by shortening their own upper crust: Tibet's eastern margin
+  was "uplifted without significant shortening of the upper crust along large-magnitude thrust faults" and its
+  thickening is "mainly in the deep crust" (Clark & Royden 2000, p. 703, full text), with "little crustal shortening"
+  there since about 4 Ma (Royden et al. 1997, abstract); the interior extends east-west (Armijo et al. 1986, abstract:
+  normal faulting "the dominant tectonic regime north of the Himalayas in the last 2 ± 0.5 m.y.", extension N96°E;
+  Blisniuk et al. 2001, abstract: graben in central Tibet since at least 13.5 Myr). Against it, Vanderhaeghe et al.
+  2003 find one model's plateau velocity field "indicates pure shear thickening in the upper crust" (p. 40), beside
+  "low deformation rates in the upper crust during the later, plateau stage" (p. 42). Not modelled: the interior's
+  normal faults and rifts, and Clark & Royden's southern margin, "where crustal thickening can be explained by
+  shortening of the upper crust through faulting and folding" (p. 703), which the belt within its reach stands for.
 - **What limits the overriding plate's share** (no new rule). While the crest is under the strength height the
   retro-wedge at the greater taper holds tan α / (tan α + tan β) of an even-ground cross-section, 0.39; a narrow
   overriding block holds what its retro flank reaches before its far coast, which stands at H − w tan β for a block w
@@ -11624,10 +11637,15 @@ the crust-budget lane.
   where it thickens crust that stays under the sea, and their crest stands lower; the coast with high ground is not
   resolved either way.
 - **Tests.** `the_retro_plateau_grows_past_the_belt_through_its_own_crust`: a head-on collision whose pro side and
-  retro flank within the belt's reach stand at the strength height; with the switch the step's crust goes to the
-  lowland beyond the belt, at most at the strength height, nothing across a 400 km sea strip on the same plate rises,
-  the no-room rule takes less, and the crust kept is the same as without it, to 1e-6; off, nothing beyond the belt
-  rises.
+  retro flank within the belt's reach stand at the strength height, and whose overriding lowland stands 20 m under it
+  for 400 km up to a 400 km strip of ocean floor (so that one step's crust reaches the ocean; on 300 m lowland it fills
+  about 120 km); with the switch every sample of that lowland rises, at most to the strength height, nothing on the
+  ocean floor or across it does, the no-room rule (PLT-700) takes the rest, more than none and less than without the
+  switch, and the crust kept is the same as without it, to 1e-6; off, nothing beyond the belt rises. The plateau
+  grows through continental crust under the sea too; it stops at ocean floor. `an_arc_in_collision_takes_the_crust_on_its_edge_on_the_shipped_path`:
+  the shipped switches (two wedges, the plateau, PLT-700) on an arc in collision whose incoming continent already
+  stands at the strength height; no plateau, and the no-room rule puts the step's crust on the arc's edge at the
+  front, all of it kept.
 
 ## How small terranes dock (PLT-770, PLT-771, 2026-10-30)
 

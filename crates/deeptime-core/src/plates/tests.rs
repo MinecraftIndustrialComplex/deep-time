@@ -1077,10 +1077,14 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // seed 8; seed 2 since sediment subduction by margin type and the margin's sediment
     // continental went on by default, PLT-660 to PLT-662, 2026-10-31, when seed 19 no longer
     // welds: the sweep's welding seeds 1 to 4, 6, 11, 12, 15, 16, 18, 20 to 22 and 24, the guard
-    // binding on none, seed 2 the first after seed 1; seed 3 since small terranes docking stripped
-    // of their cover went on by default, PLT-770 and PLT-771, 2026-10-31, when seed 2 no longer
-    // welds: the sweep's welding seeds 3, 5, 6, 8 to 13, 15, 17, 18, 20, 22 and 24, the guard
-    // binding on none, seed 3 the first).
+    // binding on none, seed 2 the first after seed 1; seed 2 kept with the two wedges and the
+    // retro plateau on by default, PLT-730, PLT-731 and PLT-740, 2026-10-31: it still welds (the
+    // sweep's welding seeds 2, 3, 5, 6, 8, 9, 11, 12, 17, 18 and 22), and the weld test above
+    // takes it now too, seed 1 no longer welding, so the two tests share this planet; seed 3
+    // since small terranes docking stripped of their cover went on by default, PLT-770 and
+    // PLT-771, 2026-10-31, when seed 2 no longer welds: the sweep's welding seeds 3, 5, 6, 8 to
+    // 13, 15, 17, 18, 20, 22 and 24, the guard binding on none, seed 3 the first, and the weld
+    // test above takes seed 3 too, so the two tests still share this planet).
     let mut p = preset(8000, 300.0, "scattered_continents", 3);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: the guard asserted below
     // bound under Forsyth & Uyeda's balance on every welding seed of 1 to 24 of this small planet
