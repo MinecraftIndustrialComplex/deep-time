@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //! A rift stretches the continental lithosphere on both its sides before it breaks up
-//! (`tectonics.rift_stretching`, off by default; ledger PLT-781 to PLT-785). The design, the
+//! (`tectonics.rift_stretching`, off by default; ledger PLT-781 to PLT-787). The design, the
 //! sources and the arm are docs/design/continental-extension.md.
 //!
 //! # Why
@@ -38,23 +38,32 @@
 //! are only predicted for thick, hot crust" (Buck 2007, p. 28), and Brun (1999, abstract) has the
 //! same split, necking where "the greatest strength [is] located in the sub-Moho mantle" against
 //! spreading where the strength peaks "at the base of upper brittle crust". The model's test is
-//! the Moho's temperature ([`moho_c`]: the plate model's own geotherm, `thermal::geotherm_share`,
-//! at the base of the column's crust): a side of a rift whose edge columns' Moho stands at
-//! [`WIDE_MOHO_C`], 700 °C, or hotter is wide, else narrow. 700 °C is Rey, Vanderhaeghe & Teyssier
-//! 2001's Moho for a weak, flowing lower crust ("≥700 °C, Sonder et al., 1987; Kaufman and
-//! Royden, 1994", p. 443) and the middle of Wernicke et al. 1987's "~650-750 °C" lower crust that
-//! extension needed to begin (p. 216). On the model's geotherm it puts each of Buck's (1991, his
-//! Fig. 30 as Buck 2007 reprints it) rifts in its mode (the test
-//! `the_moho_test_puts_bucks_rifts_in_their_modes`).
+//! Buck's own map ([`in_wide_band`], PLT-786): his modes against crustal thickness and surface
+//! heat flow (Buck 1991, as Buck 2007's Fig. 30 reprints it), whose wide-rift band runs from a
+//! narrow edge ([`BAND_EDGE`]: about 41.5 km of crust at 74 mW/m², 34 at 83, 28 at 98, 24 at
+//! 110, 20 at 136; read off the plot) to the core-complex field above it, and ends in a tip near
+//! 56 km at about 70 mW/m², under which no wide rift is predicted. The heat flow is the plate
+//! model's own, q = 26 + 3,375 / L (`thermal::conductive_mw_m2`). A side whose edge columns' mean
+//! crust and lithosphere put it in the band or above it is wide, else narrow (the test
+//! `bucks_band_puts_his_rifts_in_their_modes`). On the model's geotherm the band's edge lies at a
+//! Moho of 810 to 910 °C: the fixed 700 °C test it replaced (Rey, Vanderhaeghe & Teyssier 2001,
+//! p. 443) made sides with a Moho of 700 to 840 °C wide that Buck's map has narrow, and the rift
+//! trace found those wide sides thinning the continents up to thousands of km from their rifts
+//! (docs/design/continental-extension.md, "The rift trace").
 //! - A narrow side takes the strain evenly over half the rift's width, the columns within
 //!   L_lith / 2 of the rift (L_lith its edge columns' mean lithosphere): "narrow means about as
 //!   wide as the lithosphere is thick" (Buck et al. 1999, p. 673); "on the order of 100 km wide"
 //!   (Buck 2007, p. 25: the Rhinegraben, Suez, East Africa, Baikal, the Rio Grande).
-//! - A wide side spreads it over its hot columns (each with its own Moho at 700 °C or more) by
-//!   the thin sheet's decay from the rift, e^(−x / L) with L = 2 W / π for a boundary W long
-//!   (England, Houseman & Sonder 1985, as the collision's push, PLT-733), x a column's distance
-//!   from the rift along its own plate's continental crust: the Basin and Range's region of
-//!   normal faulting "as much as 800 km wide" (Buck 2007, p. 25).
+//! - A wide side takes it evenly over its region in the band: the columns of its plate's
+//!   continental crust that are each in the band, reached from the rift through the band
+//!   (PLT-787). Buck's wide rift is "uniform crustal and mantle lithospheric thinning over a
+//!   width greater than the lithospheric thickness" (1991, abstract), made by a zone of pure
+//!   shear as wide as the lithosphere is thick that migrates: "If the force increased the
+//!   extension was taken to migrate. Migration of extension would eventually produce a wide
+//!   rift" (Buck 2007, p. 28). The sources give no speed for the migration, so a step spreads its
+//!   strain over the whole region, which the band bounds: the Basin and Range's region of normal
+//!   faulting is "as much as 800 km wide" (Buck 2007, p. 25). (Until 2026-10-31 the strain fell
+//!   off as e^(−x / L) with L = 2 W / π, the collision's thin sheet, over 4 L.)
 //!
 //! With the thermal state off every side is narrow under `thermal_reference_km`.
 //!
@@ -63,9 +72,13 @@
 //! the same factor (`thermal::stretch`, McKenzie's uniform stretching, PLT-476), its surface down
 //! by the Airy change of what it lost (but not below the Airy height of what it keeps,
 //! `collapse::toward`). A column at the limit takes no share: what the rift's speed asks beyond
-//! the columns that can still thin is break-up, new sea floor. As its crust thins its Moho rises
-//! into colder rock, so a wide rift narrows as it goes on, Buck's "temporal progression from core
-//! complex mode to wide rift mode to narrow rift mode" (abstract).
+//! the columns that can still thin is break-up, new sea floor. As a wide side thins its crust and
+//! lithosphere by the same share its heat flow rises, and it stays in the band until its crust is
+//! about 20 km; as its lithosphere cools the band's edge rises, and under about 70 mW/m² it is
+//! narrow whatever its crust (`a_wide_side_leaves_the_band_as_it_thins_and_cools`): Buck's
+//! "temporal progression from core complex mode to wide rift mode to narrow rift mode" (abstract),
+//! and Hopper & Buck 1996's "During rifting, the crust thins continuously and one would expect
+//! from the mode maps that eventually a transition to narrow rift mode should occur" (p. 20,181).
 //!
 //! The crust a column gives moves into the opening, which is no sample yet: it waits on the pair
 //! ([`PlateState::rift_fill`]) until the next resampling lays it in the gap between the two
@@ -113,10 +126,6 @@ pub const FLOOR_GLOBAL: &str = "plates/rift_floor_km3";
 pub const FALLBACK_GLOBAL: &str = "plates/rift_fallback_km3";
 /// Rift-steps (a pair of plates with a rift in a step) over the run.
 pub const RIFT_STEPS_GLOBAL: &str = "plates/rift_steps";
-
-/// How far a wide rift reaches, in decay lengths: e^(−4) = 0.018 of the strain at the rift.
-// ledger: PLT-782 (game-choice: the search's end)
-const REACH_HALF_WIDTHS: f64 = 4.0;
 
 /// What one step did.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -215,16 +224,46 @@ pub struct LayRecord {
     pub waited: u32,
 }
 
-/// A wide rift's decay length L, km: the thin sheet's for a boundary of length `length_km`,
-/// 2 W / π (`belts::sheet_reach_km`, PLT-733's form with n = 1).
-// ledger: PLT-782
-pub fn wide_length_km(length_km: f64) -> f64 {
-    super::belts::sheet_reach_km(length_km)
+/// The narrow edge of Buck's (1991) wide-rift band, as Buck 2007's Fig. 30 reprints his mode
+/// map (crustal thickness against surface heat flow): (heat flow, mW/m²; the crust from which the
+/// lithosphere is in the wide-rift mode, or the core-complex mode above it, km). Read off the plot
+/// by the research sub-agent (2026-10-31; approximately, about ±1.5 km and ±3 mW/m²): the band
+/// ends in a tip near 56 km at about 70 mW/m², under which no wide rift is predicted; at 136 mW/m²
+/// its edge is at 20 km or less (the plot's edge, held beyond).
+// ledger: PLT-786
+pub const BAND_EDGE: [(f64, f64); 6] = [
+    (70.0, 56.0),
+    (74.0, 41.5),
+    (83.0, 34.0),
+    (98.0, 28.0),
+    (110.0, 24.0),
+    (136.0, 20.0),
+];
+
+/// The crust from which a lithosphere with surface heat flow `q_mw_m2` is in Buck's wide band
+/// ([`BAND_EDGE`], linear between its points), km; None under the band's tip.
+// ledger: PLT-786
+pub fn band_edge_km(q_mw_m2: f64) -> Option<f64> {
+    let (q0, _) = BAND_EDGE[0];
+    if !(q_mw_m2 >= q0) {
+        return None;
+    }
+    for w in BAND_EDGE.windows(2) {
+        let ((qa, ha), (qb, hb)) = (w[0], w[1]);
+        if q_mw_m2 <= qb {
+            return Some(ha + (hb - ha) * (q_mw_m2 - qa) / (qb - qa));
+        }
+    }
+    Some(BAND_EDGE[BAND_EDGE.len() - 1].1)
 }
 
-/// The Moho temperature from which a rift's side is wide, °C (see the module docs).
-// ledger: PLT-782 (Rey, Vanderhaeghe & Teyssier 2001, p. 443; Wernicke et al. 1987, p. 216)
-pub const WIDE_MOHO_C: f64 = 700.0;
+/// Whether a crust `crust_km` thick over a lithosphere `lith_km` deep is in Buck's wide band (or
+/// the core-complex field above it), its heat flow the plate model's own
+/// (`thermal::conductive_mw_m2`, q = 26 + 3,375 / L).
+// ledger: PLT-786, PLT-467
+pub fn in_wide_band(crust_km: f64, lith_km: f64) -> bool {
+    band_edge_km(thermal::conductive_mw_m2(lith_km)).is_some_and(|h| crust_km >= h)
+}
 
 /// The temperature at the base of a crust `crust_km` thick over a lithosphere `lith_km` deep,
 /// °C, on the plate model's geotherm (`thermal::geotherm_share`, T_m at L).
@@ -233,14 +272,23 @@ pub fn moho_c(crust_km: f64, lith_km: f64) -> f64 {
     thermal::MANTLE_C * thermal::geotherm_share(lith_km, crust_km.min(lith_km).max(0.0))
 }
 
-/// A sample's Moho temperature, °C; with no thermal state, `reference_km`'s.
-fn sample_moho_c(s: &Sample, reference_km: f64) -> f64 {
-    let l = if s.lithosphere_km > 0.0 {
+/// A sample's lithosphere, km; with no thermal state, `reference_km`.
+fn sample_lith_km(s: &Sample, reference_km: f64) -> f64 {
+    if s.lithosphere_km > 0.0 {
         f64::from(s.lithosphere_km)
     } else {
         reference_km
-    };
-    moho_c(f64::from(s.thickness_m) / 1000.0, l)
+    }
+}
+
+/// A sample's Moho temperature, °C (the record's; no rule reads it).
+fn sample_moho_c(s: &Sample, reference_km: f64) -> f64 {
+    moho_c(f64::from(s.thickness_m) / 1000.0, sample_lith_km(s, reference_km))
+}
+
+/// Whether a sample is in Buck's wide band ([`in_wide_band`]).
+fn sample_in_band(s: &Sample, reference_km: f64) -> bool {
+    in_wide_band(f64::from(s.thickness_m) / 1000.0, sample_lith_km(s, reference_km))
 }
 
 /// One side of a rift: a sample of plate `plate` on its boundary with `other`, the opening speed
@@ -382,7 +430,6 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Exte
         if !(length_km > 0.0 && speed > 0.0) {
             continue;
         }
-        let l_wide = wide_length_km(length_km);
         let mut record = RiftRecord {
             a,
             b,
@@ -406,7 +453,6 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Exte
                 side.iter().map(|&v| f(&samples[v as usize])).sum::<f64>() / side.len() as f64
             };
             let edge_moho = mean(&|s| sample_moho_c(s, reference));
-            let wide = thermal_on && edge_moho >= WIDE_MOHO_C;
             let lith = mean(&|s| {
                 if thermal_on && s.lithosphere_km > 0.0 {
                     f64::from(s.lithosphere_km)
@@ -414,16 +460,15 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Exte
                     reference
                 }
             });
-            let half = 0.5 * lith;
-            let reach_km = if wide {
-                REACH_HALF_WIDTHS * l_wide
-            } else {
-                half
-            };
+            let crust = mean(&|s| f64::from(s.thickness_m) / 1000.0);
+            let wide = thermal_on && in_wide_band(crust, lith);
+            // A narrow side reaches half its lithosphere from the rift; a wide one its whole
+            // region in the band, through the band (PLT-786, PLT-787).
+            let reach_km = if wide { f64::INFINITY } else { 0.5 * lith };
             let rec = &mut record.sides[k_side];
             rec.mode = if wide { 2 } else { 1 };
             rec.edges = side.len() as u32;
-            rec.crust_km = mean(&|s| f64::from(s.thickness_m) / 1000.0);
+            rec.crust_km = crust;
             rec.lith_km = lith;
             rec.moho_c = edge_moho;
             rec.reach_km = reach_km;
@@ -434,19 +479,25 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Exte
                     && s.kind == CONTINENTAL
                     && !s.is_hidden()
                     && s.flags & TRENCH == 0
+                    && (!wide || sample_in_band(s, reference))
             };
-            for (u, d, _) in dijkstra_sparse(geo, &src, |_, u| on(u), env.norm.rad(reach_km)) {
+            let max_rad = if wide {
+                std::f64::consts::PI
+            } else {
+                env.norm.rad(reach_km)
+            };
+            for (u, d, _) in dijkstra_sparse(geo, &src, |_, u| on(u), max_rad) {
                 let s = &samples[u as usize];
                 let x = env.norm.km(d);
                 let at_limit = least_keep(&s.pools) >= 1.0;
-                let w = if at_limit {
+                // Uniform over the columns that take part (Buck 1991's wide rift: "uniform
+                // crustal and mantle lithospheric thinning over a width greater than the
+                // lithospheric thickness"); on a wide side a column out of the band (an edge
+                // column below the side's mean) takes none.
+                let w = if at_limit || (wide && !sample_in_band(s, reference)) {
                     0.0
-                } else if !wide {
-                    1.0
-                } else if sample_moho_c(s, reference) >= WIDE_MOHO_C {
-                    (-x / l_wide).exp()
                 } else {
-                    0.0
+                    1.0
                 };
                 rec.found += 1;
                 rec.weighted += u32::from(w > 0.0);
@@ -967,12 +1018,14 @@ mod tests {
         assert_eq!(still.samples, planet(&geo, omega_10mm()).samples);
     }
 
-    /// The Moho test on the plate model's geotherm puts each of the rifts in Buck's (1991) Fig. 30
-    /// (as Buck 2007 reprints it; crustal thickness and surface heat flow read off the plot by
-    /// the research sub-agent, approximately) in its mode, the lithosphere from the heat flow by
-    /// the model's own law (`thermal::conductive_mw_m2`, q = 26 + 3,375 / L).
+    /// Buck's band puts each of the rifts on his mode map (Buck 2007's Fig. 30, from Buck 1991;
+    /// crustal thickness and surface heat flow read off the plot by the research sub-agent,
+    /// approximately) in its mode, the lithosphere from the heat flow by the model's own law
+    /// (`thermal::conductive_mw_m2`, q = 26 + 3,375 / L): the Altiplano and Tibet in the
+    /// core-complex field above the band, a wide mode here.
+    // ledger: PLT-786
     #[test]
-    fn the_moho_test_puts_bucks_rifts_in_their_modes() {
+    fn bucks_band_puts_his_rifts_in_their_modes() {
         let lith = |q: f64| thermal::MANTLE_HEAT_MW_M2_KM / (q - thermal::CRUST_HEAT_MW_M2);
         for (name, crust_km, q, wide) in [
             ("northern Basin and Range", 33.0, 90.0, true),
@@ -983,19 +1036,42 @@ mod tests {
             ("northern Red Sea", 30.0, 45.0, false),
             ("southern Rio Grande", 26.0, 87.0, false),
         ] {
-            let t = moho_c(crust_km, lith(q));
-            assert_eq!(t >= WIDE_MOHO_C, wide, "{name}: {t:.0} °C");
+            assert!((thermal::conductive_mw_m2(lith(q)) - q).abs() < 1e-9);
+            assert_eq!(in_wide_band(crust_km, lith(q)), wide, "{name}");
         }
-        // The rift's own thinning narrows it: 35 km of crust over a 60 km lithosphere is wide,
-        // the same lithosphere under 20 km is not.
-        assert!(moho_c(35.0, 60.0) >= WIDE_MOHO_C);
-        assert!(moho_c(20.0, 60.0) < WIDE_MOHO_C);
+        // The band's edge at its points, and nothing under its tip.
+        for (q, h) in BAND_EDGE {
+            assert!((band_edge_km(q).unwrap() - h).abs() < 1e-9);
+        }
+        assert_eq!(band_edge_km(69.9), None);
+        assert!((band_edge_km(90.5).unwrap() - 31.0).abs() < 1e-9);
+        assert_eq!(band_edge_km(200.0), Some(20.0));
+        // On the model's geotherm the band's narrow edge lies at a Moho of 810 to 910 °C from
+        // 74 to 136 mW/m², not at a fixed 700 °C (the test this replaces; ext-cum2's sides with
+        // a Moho of 700 to 840 °C were wide here and are narrow on Buck's map).
+        for &(q, h) in &BAND_EDGE[1..] {
+            let t = moho_c(h, lith(q));
+            assert!((800.0..=910.0).contains(&t), "edge at {q} mW/m²: Moho {t:.0} °C");
+        }
     }
 
-    /// A wide rift's decay length is the thin sheet's for its length, 2 W / π.
+    /// As a wide side thins by pure shear (crust and lithosphere by the same share, its heat flow
+    /// rising, `thermal::stretch`) it stays in the band until its crust is about 20 km, and it
+    /// leaves the band as its lithosphere cools: Hopper & Buck 1996's "During rifting, the crust
+    /// thins continuously and one would expect from the mode maps that eventually a transition to
+    /// narrow rift mode should occur" (p. 20,181).
+    // ledger: PLT-786
     #[test]
-    fn a_wide_rifts_decay_length_is_the_sheets() {
-        assert!((wide_length_km(1000.0) - 2000.0 / std::f64::consts::PI).abs() < 1e-9);
+    fn a_wide_side_leaves_the_band_as_it_thins_and_cools() {
+        let (h, l) = (35.0, thermal::MANTLE_HEAT_MW_M2_KM / (90.0 - thermal::CRUST_HEAT_MW_M2));
+        assert!(in_wide_band(h, l));
+        for keep in [0.9, 0.8, 0.7, 0.6] {
+            assert!(in_wide_band(h * keep, l * keep), "keep {keep}");
+        }
+        assert!(!in_wide_band(h * 0.5, l * 0.5));
+        // Cooled under 70 mW/m² (a lithosphere of 77 km or more) it is narrow whatever its crust.
+        assert!(!in_wide_band(h, 80.0));
+        assert!(!in_wide_band(60.0, 80.0));
     }
 
     /// A weaker side takes more of the opening: plate 1's lithosphere is hot, plate 0's cold.
