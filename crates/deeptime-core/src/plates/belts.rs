@@ -49,8 +49,8 @@
 //!    the metre (the sliver rule above and the strength height's passes): only where it lands
 //!    moves.
 //!
-//!    With `collision_two_wedges` (PLT-730, off: its pool arm put more collision land at the
-//!    coast, plates.md "Step 20") the orogen
+//!    With `collision_two_wedges` (PLT-730, on by default since 2026-10-31; plates.md "Step 20"
+//!    and "The collision orogen") the orogen
 //!    is two wedges about the front instead: a doubly vergent orogen grows as a pro-wedge over
 //!    the lower plate at the lesser critical taper and a retro-wedge over the upper plate at the
 //!    greater, about the point where the lower plate's mantle goes down (Willett, Beaumont &
@@ -65,7 +65,7 @@
 //!    The pro-wedge's crust rides its plate to the front and crosses whole (PLT-400), to be
 //!    stacked again on both sides.
 //!
-//!    With `collision_retro_plateau` too (PLT-740, off; the design
+//!    With `collision_retro_plateau` too (PLT-740, on by default since 2026-10-31; the design
 //!    `docs/design/collision-orogen.md`, O2) that plateau has no set width: when the step's crust
 //!    is not all placed with the retro flank's samples within `collision_belt_km` at their
 //!    limits, the flank is searched again through the overriding plate's continental samples
