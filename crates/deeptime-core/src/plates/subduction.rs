@@ -921,6 +921,20 @@ pub const ISLAND_ARC_BURST_MYR: f64 = 10.0;
 /// years").
 pub const ISLAND_ARC_MATURE_KM3_PER_KM_MYR: f64 = 30.0;
 
+/// Arc magma at crust-suturing subduction zones (`tectonics.collision_arc_magma`), km³ per km of
+/// collision front per Myr: Scholl & von Huene's global arc addition during suturing, 0.2 AU
+/// (2009, abstract: "During collisional suturing at fossil CSSZs, global arc magmatic addition is
+/// estimated at 0.2 AU"), over the global length of collision zones they presume it on, "c. 6000
+/// km" (the same abstract); 0.2 km³/yr / 6,000 km is 33.3 (the agent's arithmetic, as PLT-045's
+/// 100 is Stern & Scholl's 1.5 AU over 14,500 km). Stern & Scholl 2010, Table 1: "Additions at
+/// crust-suturing subduction zones 0.2". ledger: PLT-763
+pub const SUTURE_ARC_AU: f64 = 0.2;
+pub const SUTURE_LENGTH_KM: f64 = 6000.0;
+pub const SUTURE_ARC_KM3_PER_KM_MYR: f64 = SUTURE_ARC_AU * 1.0e6 / SUTURE_LENGTH_KM;
+/// World global: the arc magma crust-suturing fronts added over the run, km³ (Earth-normalized;
+/// with `collision_arc_magma`; measurement, the crust budget's suturing addition). ledger: PLT-763
+pub const ARC_SUTURE_GLOBAL: &str = "plates/arc_suture_km3";
+
 /// An island arc's crust per km of arc per Myr at its reference, and the factor on it, at arc age
 /// `age_myr` (from its contact's `arc_onset_myr`; `None` before the onset) and orthogonal
 /// convergence `v_n_mm_yr`: the rate is their product. Off (`arc_front_loaded`), the one rate
@@ -1022,6 +1036,9 @@ pub struct Pull {
     pub front_oceanic_km_myr: f64,
     /// Crust shortened into cordilleras this step, km³ (moved from behind the ranges).
     pub cordillera_km3: f64,
+    /// Arc crust the crust-suturing fronts added this step, km³ (Earth-normalized; with
+    /// `collision_arc_magma`, ledger PLT-763), in neither arc row above.
+    pub arc_suture_km3: f64,
     /// Oceanic fronts this step weighted by the arcs' convergence factor min(v / v_0, 1), km × Myr,
     /// with v the full relative speed …
     pub front_g_full_km_myr: f64,
@@ -1137,6 +1154,8 @@ struct Effect {
     oceanic_m: f64,
     /// Crust shortened into a cordillera sample, m.
     cordillera_m: f64,
+    /// Arc crust a crust-suturing front added, m (ledger: PLT-763).
+    suture_m: f64,
 }
 
 /// The volcanic share of an arc's crust: continental arcs about 1 in 8 (an intrusive to extrusive
@@ -1162,6 +1181,8 @@ struct Plan {
     weight: f64,
     /// The arc magma follows the island arcs' law (ledger: PLT-760, [`arc_is_island`]).
     island: bool,
+    /// The magma is a crust-suturing front's (`collision_arc_magma`; ledger: PLT-763).
+    suture: bool,
 }
 
 /// Per contact: what its arcs and cordillera add up to this step.
@@ -1616,6 +1637,11 @@ pub fn fronts_finish(
     let mut g_continental_km_myr = [0.0_f64; 2];
     // Subduction erosion's fronts (PLT-441, PLT-442), in the order of the distance field's labels.
     let erosion_rate = k.subduction_erosion_km3_per_km_myr; // ledger: PLT-441
+    // The erosive margin's cover line in rock (ledger: PLT-442, PLT-762).
+    let erosion_cover_m = super::ridges::trench_line_solid_m(
+        k.trench_pile_in_place,
+        k.subduction_erosion_max_sediment_m,
+    );
     let (mut loss_km3, mut loss_continental, mut loss_front) = (Vec::new(), Vec::new(), Vec::new());
     let mut loss_km = Vec::new();
     for (v, b) in boundary.iter().enumerate() {
@@ -1637,7 +1663,7 @@ pub fn fronts_finish(
                 let cover = f64::from(su.pools[pool::SEDIMENT] + su.pools[pool::SEDIMENTARY]);
                 let erosive = su.kind != CONTINENTAL
                     && across >= k.subduction_erosion_min_mm_yr
-                    && cover < k.subduction_erosion_max_sediment_m;
+                    && cover < erosion_cover_m;
                 // At least a sliver of front where the share is 0, so the front is still
                 // marked erosive (its retreat's chance and its volume are then 0).
                 loss_km3.push(if erosive {
@@ -1782,9 +1808,20 @@ pub fn fronts_finish(
             }
             let src = &info[label[i] as usize];
             // Arcs and their ranges are an oceanic slab's: continental crust forced under at a
-            // collision front makes no arc (plate task 8).
+            // collision front makes no arc (plate task 8) …
             if !src.oceanic_slab {
-                return Plan::default();
+                // … unless `collision_arc_magma`: Scholl & von Huene's arc addition during
+                // suturing, over the same band, at any convergence (ledger: PLT-763).
+                if !(k.collision_arc_magma && slab_arc(i) && !src.incipient) {
+                    return Plan::default();
+                }
+                let axis = SUTURE_ARC_KM3_PER_KM_MYR / band_km * 1000.0 * env.dt_myr;
+                return Plan {
+                    magma_m: axis * w_arc_of(norm.km(d), k),
+                    island: arc_is_island(k, contacts[src.contact].arc_intra_oceanic, s),
+                    suture: true,
+                    ..Plan::default()
+                };
             }
             let d_km = norm.km(d);
             let continental = s.kind == CONTINENTAL;
@@ -1880,10 +1917,12 @@ pub fn fronts_finish(
             continue;
         }
         let src = &info[label[i] as usize];
-        if !src.oceanic_slab {
+        // A collision front's samples count only for the magma `collision_arc_magma` gives them
+        // (ledger: PLT-763).
+        if !src.oceanic_slab && !plan.suture {
             continue;
         }
-        if slab_arc(i) && !src.incipient {
+        if src.oceanic_slab && slab_arc(i) && !src.incipient {
             band_weight += w_arc_of(norm.km(dist[i]), k);
         }
         let b = &mut budget[src.contact];
@@ -1968,6 +2007,7 @@ pub fn fronts_finish(
             let continental = s.kind == CONTINENTAL;
             let (mut added_continental, mut added_oceanic, mut cordillera) =
                 (0.0_f64, 0.0_f64, 0.0_f64);
+            let mut suture = 0.0_f64;
             // Cortial's h(z̃) uplift is the oceanic slab's: where continental crust comes in, the
             // collision belt (`belts.rs`) builds the relief from the crust shortened. Past the
             // slab's ends none, and no folds (`margin_slab_ends`, PLT-562).
@@ -2010,7 +2050,11 @@ pub fn fronts_finish(
                     s.pools[pool::FELSIC_PLUTONIC] += p as f32;
                     s.pools[pool::FELSIC_VOLCANIC] += v as f32;
                     s.arc_continental_m += m as f32;
-                    added_continental += v + p;
+                    if plan.suture {
+                        suture += v + p;
+                    } else {
+                        added_continental += v + p;
+                    }
                 } else {
                     let v = m * ISLAND_VOLCANIC_SHARE * qv;
                     let p = m * (1.0 - ISLAND_VOLCANIC_SHARE) * qp;
@@ -2019,7 +2063,11 @@ pub fn fronts_finish(
                     s.pools[pool::FELSIC_PLUTONIC] += p as f32;
                     // The arc's crust counts whole, its cones included, towards its maturity.
                     s.arc_oceanic_m += m as f32;
-                    added_oceanic += v + p;
+                    if plan.suture {
+                        suture += v + p;
+                    } else {
+                        added_oceanic += v + p;
+                    }
                 }
                 let ox = (0.25
                     + 0.5 * (src.slab_age / 150.0).min(1.0)
@@ -2083,10 +2131,12 @@ pub fn fronts_finish(
                 continental_m: added_continental,
                 oceanic_m: added_oceanic,
                 cordillera_m: cordillera,
+                suture_m: suture,
             })
         })
         .collect();
     let (mut arc_continental_m, mut arc_oceanic_m, mut cordillera_m) = (0.0, 0.0, 0.0);
+    let mut suture_m = 0.0;
     for e in effects {
         let contact = &mut state.contacts[e.contact];
         contact.max_uplift_mm_yr = contact.max_uplift_mm_yr.max(e.rate_mm_yr);
@@ -2094,6 +2144,7 @@ pub fn fronts_finish(
         arc_continental_m += e.continental_m;
         arc_oceanic_m += e.oceanic_m;
         cordillera_m += e.cordillera_m;
+        suture_m += e.suture_m;
     }
     let area = norm.sample_area_km2();
     Pull {
@@ -2105,6 +2156,7 @@ pub fn fronts_finish(
         front_continental_km_myr: front_continental,
         front_oceanic_km_myr: front_oceanic,
         cordillera_km3: cordillera_m * area / 1000.0,
+        arc_suture_km3: suture_m * area / 1000.0,
         front_g_full_km_myr: g_full_km_myr,
         front_g_normal_km_myr: g_normal_km_myr,
         front_g_continental_km_myr: g_continental_km_myr,

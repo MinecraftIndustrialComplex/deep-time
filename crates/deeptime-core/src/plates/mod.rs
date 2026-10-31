@@ -645,6 +645,8 @@ impl PlatesStage {
                 pull.arc_cones_km3[0],
             ),
             (subduction::ARC_CONES_OCEANIC_GLOBAL, pull.arc_cones_km3[1]),
+            // ledger: PLT-763
+            (subduction::ARC_SUTURE_GLOBAL, pull.arc_suture_km3),
             (
                 subduction::ARC_FRONT_INTRA_OCEANIC_GLOBAL,
                 pull.front_intra_oceanic_km_myr,

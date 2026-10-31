@@ -5083,6 +5083,64 @@ fn an_intra_oceanic_arc_keeps_the_island_law_on_the_crust_it_made() {
     }
 }
 
+/// Arc magma at crust-suturing fronts (PLT-763): on [`arc_fixture`]'s front with the subducting
+/// plate's crust turned continental (a collision front), the switch off makes no arc; on, the
+/// overriding plate's band takes Scholl & von Huene's 0.2 AU over 6,000 km, 33.3 km³/km/Myr, over
+/// the same band an oceanic slab's arc there has, at any convergence, booked as the suture's and in
+/// neither arc row.
+#[test]
+fn a_collision_front_adds_scholl_and_von_huenes_suture_arc() {
+    let suture = |on: bool, mm_yr: f64| {
+        let (mut p, mut st, geo, pos) = arc_fixture(true, false, 150.0, Some(20.0), mm_yr);
+        p.tectonics.collision_arc_magma = on;
+        for s in st.samples.iter_mut().filter(|s| s.group == 1) {
+            s.kind = CONTINENTAL;
+            s.pools = pools::continental_column();
+            s.elevation_m = 400.0;
+            s.thickness_m = pools::thickness(&s.pools);
+        }
+        arc_step(&p, &mut st, &geo, &pos, 1).0
+    };
+    let off = suture(false, 50.0);
+    assert_eq!(off.arc_suture_km3, 0.0);
+    assert_eq!(off.arc_continental_km3 + off.arc_oceanic_km3, 0.0);
+    let on = suture(true, 50.0);
+    let fast = suture(true, 200.0);
+    // The band an oceanic slab's arc has on the same front.
+    let (p, mut st, geo, pos) = arc_fixture(true, false, 150.0, Some(20.0), 50.0);
+    let arc = arc_step(&p, &mut st, &geo, &pos, 1).0;
+    let want = subduction::SUTURE_ARC_KM3_PER_KM_MYR * arc.arc_band_km_myr;
+    eprintln!(
+        "suture arc, one step: {:.4e} km³ (33.3 × the band {:.4e}), at 200 mm/yr {:.4e}",
+        on.arc_suture_km3, want, fast.arc_suture_km3
+    );
+    assert!((subduction::SUTURE_ARC_KM3_PER_KM_MYR - 33.333_333).abs() < 1e-4);
+    assert!(
+        (on.arc_suture_km3 - want).abs() < 1e-6 * want,
+        "{} km³ against {want}",
+        on.arc_suture_km3
+    );
+    assert_eq!(on.arc_continental_km3 + on.arc_oceanic_km3, 0.0);
+    assert!((fast.arc_suture_km3 - on.arc_suture_km3).abs() < 1e-9 * want);
+}
+
+/// Clift & Vannucchi's trench sediment line in place (PLT-762): 1 km of sediment uncorrected
+/// for porosity holds 536 m of rock under ERO-215's law, so a 700 m solid pile at 50 mm/yr is an
+/// accretionary margin's (0.83 goes down) with the switch and an erosive one's (all of it) without.
+#[test]
+fn the_trench_pile_line_is_read_in_place() {
+    let line = ridges::trench_line_solid_m(true, 1000.0);
+    assert!((line - 535.8).abs() < 1.0, "{line}");
+    assert_eq!(ridges::trench_line_solid_m(false, 1000.0), 1000.0);
+    assert_eq!(ridges::sediment_subducted_share_at(700.0, 50.0, line), 0.83);
+    assert_eq!(
+        ridges::sediment_subducted_share_at(700.0, 50.0, 1000.0),
+        1.0
+    );
+    assert_eq!(ridges::sediment_subducted_share_at(500.0, 50.0, line), 1.0);
+    assert_eq!(ridges::sediment_subducted_share_at(700.0, 80.0, line), 1.0);
+}
+
 /// An arc begins at the first step its contact's slab is past PLT-611's 100 km (PLT-669; the
 /// slab under the arcs' volcanoes lies about 105 km deep on Earth's average, Syracuse & Abers
 /// 2006): over a 90-km slab (incipient) the contact has no onset and no young front; over a

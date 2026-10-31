@@ -96,10 +96,31 @@ pub const ACCRETIONARY_SUBDUCTED: f64 = 0.83;
 /// Marianas, Tonga) is erosive, one fed by a thick fan (the Lesser Antilles) accretes.
 // ledger: PLT-660
 pub fn sediment_subducted_share(pile_m: f64, convergence_mm_yr: f64) -> f64 {
-    if pile_m > ACCRETIONARY_PILE_M && convergence_mm_yr.abs() < ACCRETIONARY_MAX_MM_YR {
+    sediment_subducted_share_at(pile_m, convergence_mm_yr, ACCRETIONARY_PILE_M)
+}
+
+/// [`sediment_subducted_share`] with the accretionary pile's line `line_m`, m of rock: 1 km
+/// (`ACCRETIONARY_PILE_M`), or with `trench_pile_in_place` the rock a 1 km porous column holds
+/// ([`trench_line_solid_m`], PLT-762).
+pub fn sediment_subducted_share_at(pile_m: f64, convergence_mm_yr: f64, line_m: f64) -> f64 {
+    if pile_m > line_m && convergence_mm_yr.abs() < ACCRETIONARY_MAX_MM_YR {
         ACCRETIONARY_SUBDUCTED
     } else {
         1.0
+    }
+}
+
+/// A trench sediment line of Clift & Vannucchi's (2004), `line_m` of sediment at the trench, as
+/// the model's solid pools hold it: with `in_place` the rock in a porous column `line_m` thick
+/// under ERO-215's porosity law (`surface::pelagic::solid_of_in_place_m`; 1 km holds 536 m), else
+/// `line_m` itself. C&V [31]: Table 1's thickness is "the thickness of sediment (uncorrected for
+/// porosity) on the subducting plate at the trench axis", and their accretion criterion is
+/// "trench sediment thicknesses >1 km" (abstract). ledger: PLT-762
+pub fn trench_line_solid_m(in_place: bool, line_m: f64) -> f64 {
+    if in_place {
+        crate::surface::pelagic::solid_of_in_place_m(line_m)
+    } else {
+        line_m
     }
 }
 
@@ -766,6 +787,8 @@ pub fn resample(
     let sediment_share = k.sediment_subduction_share as f32; // ledger: PLT-440
     // By margin type instead of one share (ledger: PLT-660).
     let sourced = k.sediment_subduction_sourced;
+    // The accretionary pile's line in rock (ledger: PLT-660, PLT-762).
+    let pile_line_m = trench_line_solid_m(k.trench_pile_in_place, ACCRETIONARY_PILE_M);
     // How each new sample was blended, for the gap budget (`gap_budget.rs`) when it is on.
     let mut traces: Vec<Option<gap_budget::Trace>> = vec![None; n];
     // The step's limits (`rate.rs`) on the new lattice: a covered sample's ceiling and top are
@@ -861,9 +884,10 @@ pub fn resample(
                                 let share = if sourced {
                                     let pile = u.pools[pool::SEDIMENT].max(0.0)
                                         + u.pools[pool::SEDIMENTARY].max(0.0);
-                                    sediment_subducted_share(
+                                    sediment_subducted_share_at(
                                         f64::from(pile),
                                         super::subduction::orthogonal_convergence_mm_yr(&s),
+                                        pile_line_m,
                                     ) as f32
                                 } else {
                                     sediment_share

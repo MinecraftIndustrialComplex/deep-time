@@ -2,7 +2,10 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 """The continental crust's additions and losses against Stern & Scholl 2010, Table 1.
 
-  python3 tools/review/loss-budget.py <length Myr> <summary.txt> ... [--label NAME]
+  python3 tools/review/loss-budget.py <length Myr> <summary.txt> ... [--label NAME] [--from T]
+
+With --from T (Myr before the end, e.g. -500) the window from T to the end, from the
+cumulative lines printed every 50 Myr (the length is then -T).
 
 Reads each run's crust budget (`DEEPTIME_CRUST_BUDGET=1`: the last `cb_t`, `cb_parts`,
 `cb_moves` and `cb_globals` lines, cumulative over the run) and prints, in km^3 a year over the
@@ -77,18 +80,24 @@ def kv(text):
     return {k: float(v) for k, v in re.findall(r"([A-Za-z0-9_/]+)=" + NUM + r"(?=[\s\]]|$)", text)}
 
 
-def read(path):
+def read(path, since=None):
+    """The last crust-budget lines of a run; with `since` (Myr, e.g. -500) the cumulative lines
+    less those printed at that time (the window from it to the end; `cb_moves`' thicknesses are
+    the run's to then, so the "made continental" rows are approximate in a window)."""
     last = {}
     first_t = None
+    at = {}
     with open(path) as f:
         for line in f:
             m = re.match(r"(cb_t|cb_parts|cb_moves|cb_globals) t=(-?[0-9.]+)", line)
             if not m:
                 continue
             kind, body = m.group(1), line[m.end():]
+            if since is not None and abs(float(m.group(2)) - since) < 1e-6:
+                at[kind] = body
             if kind == "cb_t":
                 d = kv(body)
-                if first_t is None:
+                if first_t is None or (since is not None and abs(float(m.group(2)) - since) < 1e-6):
                     first_t = d
                 last["t"] = d
             elif kind == "cb_parts":
@@ -103,6 +112,22 @@ def read(path):
             else:
                 last["globals"] = kv(body)
     last["first"] = first_t
+    if since is not None and "cb_globals" in at and "globals" in last:
+        g0 = kv(at["cb_globals"])
+        last["globals"] = {k: v - g0.get(k, 0.0) for k, v in last["globals"].items()}
+        p0 = {
+            name: {p: float(x) for p, x in re.findall(r"(\w+):" + NUM, inner)}
+            for name, inner in re.findall(r"(\w+)=\[([^\]]*)\]", at.get("cb_parts", ""))
+        }
+        last["parts"] = {
+            name: {p: x - p0.get(name, {}).get(p, 0.0) for p, x in d.items()}
+            for name, d in last["parts"].items()
+        }
+        m0 = {name: kv(inner) for name, inner in re.findall(r"(\w+)=\[([^\]]*)\]", at.get("cb_moves", ""))}
+        for name, d in last["moves"].items():
+            for key in ("o2c", "c2o", "hide", "surface", "drown", "emerge"):
+                if key in d:
+                    d[key] -= m0.get(name, {}).get(key, 0.0)
     return last
 
 
@@ -124,6 +149,7 @@ def budget(run, length):
     out = {
         "island_arcs": per(g.get("arc_o", 0.0) + g.get("arc_cones_o", 0.0)),
         "continental_arcs": per(g.get("arc_c", 0.0) + g.get("arc_cones_c", 0.0)),
+        "suture_arcs": per(g.get("arc_s", 0.0)),
         "arc_cones": per(g.get("arc_cones_o", nan) + g.get("arc_cones_c", nan)),
         "hotspots": per(g.get("hotspot_magma_c", 0.0) + g.get("hotspot_cones_c", 0.0))
         if split
@@ -182,6 +208,15 @@ def budget(run, length):
     out["band_frac"] = band / fronts if fronts > 0 else nan
     arcs_rock = g.get("arc_o", 0.0) + g.get("arc_c", 0.0) + g.get("arc_cones_o", 0.0) + g.get("arc_cones_c", 0.0)
     out["arc_per_band"] = arcs_rock / band if band > 0 else nan
+    # Per km of the oceanic fronts (front_o + front_c, km x Myr): the trench's input and what goes
+    # down, against Clift et al. 2009's Table 1 (40,225 km: 1,768,761 km3/Myr delivered, 1,648,091
+    # subducted; 44.0 and 41.0 km3/km/Myr) and Stern & Scholl's 25 (Scholl & von Huene 2009 as
+    # they quote it, over ~43,000 km); the erosion per km of erosive front (Clift et al. 2009: 1,331,600
+    # km3/Myr over the 19 erosive margins' 22,925 km, 58.1).
+    out["sed_in_per_km"] = g.get("sed_trench", nan) / fronts if fronts > 0 else nan
+    out["sed_down_per_km"] = g.get("sed_subducted", nan) / fronts if fronts > 0 else nan
+    efront = g.get("forearc_front_c", 0.0) + g.get("forearc_front_o", 0.0)
+    out["erosion_per_km"] = (g.get("forearc_c", 0.0) + g.get("forearc_o", 0.0)) / efront if efront > 0 else nan
     fio = g.get("front_io", nan)
     out["front_io_km"] = fio / length
     out["arc_io_per_km"] = (g.get("arc_o", 0.0) + g.get("arc_cones_o", 0.0)) / fio if fio > 0 else nan
@@ -205,7 +240,7 @@ ROWS = [
     ("additions", None, None),
     ("intra-oceanic (island) arcs", "island_arcs", 1.5),
     ("continental arcs", "continental_arcs", 1.0),
-    ("crust-suturing zones", None, 0.2),
+    ("crust-suturing zones (arc magma at collision fronts, PLT-763)", "suture_arcs", 0.2),
     ("rifts, hotspots, rifted margins (on continental crust)", "hotspots", 0.5),
     ("  model only: the arcs' felsic cones, in both arc rows", "arc_cones", float("nan")),
     ("  model only: hotspots, all (their basalt and cones)", "hotspots_all", float("nan")),
@@ -249,6 +284,9 @@ LENGTHS = [
     ("intra-oceanic arcs' front past incipient, km (PLT-760)", "front_io_km", "{:.0f}"),
     ("island law's rock per km of it, km3/km/Myr", "arc_io_per_km", "{:.1f}"),
     ("cordillera per km of continental front, km3/km/Myr", "cord_per_km", "{:.1f}"),
+    ("trench input per km of front, km3/km/Myr (Clift et al. 2009: 44.0)", "sed_in_per_km", "{:.1f}"),
+    ("sediment subducted per km, km3/km/Myr (Clift 2009: 41.0; S&S: 25)", "sed_down_per_km", "{:.1f}"),
+    ("erosion per km of erosive front, km3/km/Myr (Clift 2009: 58.1)", "erosion_per_km", "{:.1f}"),
     ("arc band / arc fronts (the fronts with an arc, PLT-554)", "band_frac", "{:.3f}"),
     ("arcs' rock per km of band, km3/km/Myr (Earth 2.5 AU / 42,000 km = 60)", "arc_per_band", "{:.1f}"),
     ("mean g, all oceanic fronts, full speed", "g_full", "{:.3f}"),
@@ -283,10 +321,17 @@ def main():
         i = args.index("--label")
         label = args[i + 1]
         del args[i : i + 2]
+    since = None
+    if "--from" in args:
+        i = args.index("--from")
+        since = float(args[i + 1])
+        del args[i : i + 2]
     length = float(args[0])
+    if since is not None:
+        length = -since
     runs = []
     for p in args[1:]:
-        r = read(p)
+        r = read(p, since)
         if "globals" not in r:
             print(f"# {p}: no crust budget", file=sys.stderr)
             continue
