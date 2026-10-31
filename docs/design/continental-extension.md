@@ -321,3 +321,37 @@ base=<ext-base folder>` (the land ledger, the rift totals from `fields/globals.j
 
 If the arm moves something it should not, per-switch arms find which. No V1 number is a gate (decisions log
 2026-10-23).
+
+## The first arm (ext-cum, 2026-10-31): two runs diverged, two fixes
+
+The identity check of the head (81c3104b, key 10fe59b33034) against base35's seed 1 was identical (the world state's
+109 files and `rec.json`): with both switches off this branch is base35's physics.
+
+ext-cum (argkey 0efeeddf) failed in 2 of its first runs: the surface diverged at -782 Myr on supercontinent-2 (a cell
+387 km from the sea) and at -574 Myr on scattered_continents-1 (322 km), past the guard's 237 km. Reading the code
+found two faults, both on the law's side:
+
+1. **A gap could take a stack of crust** (PLT-784). `lay` spread a fill evenly over the gap samples between its
+   pair, with no upper bound. A fill is the crust the opening's columns gave up, about the opening's area times their
+   thickness, so over a gap of the opening's size the even column is about theirs. But a resampling can find fewer gap
+   samples between the pair than the opening holds, and a fill that waited adds up; a few samples then took hundreds
+   of km of crust, at their Airy height, and the surface ran away. **Fix:** a gap sample takes at most the thickness
+   its columns had before they stretched (`RiftFill::source_m`, the crust-weighted mean): the opening's crust is
+   spread, never stacked (McKenzie's pure shear thins, PLT-781). The rest waits for the next resampling while both
+   plates live, else goes to the fallback. Test: `a_resampling_lays_the_fill_as_the_rifts_floor_or_breaks_up` (ten
+   columns' crust over four gap samples: each takes one column, six wait, or go to the fallback when a plate died);
+   the integration test checks the thickest column (49.4 km with the stretching, 51.2 km without, on its 200 Myr run).
+2. **The settling's light-top deficit only grew** (PLT-780). D rose 0.0394 m per metre the surface wore off a column,
+   and nothing but deposition gave it back. On land that keeps its height by thickening (an orogen wearing as fast as
+   it is stacked), the rock that wears off is, over the whole stack, of the column's mean: the crust added brings its
+   own light top. Kept growing, D would have reached 0.0394 times a column's whole erosion over the run: a kilometre
+   and more. **Fix:** crust a plate process adds during the step gives D back at the same rate, down to none
+   (`settle::restore_top`, on the thickness the step's processes add after the surface's feedback); thinning and a
+   surplus (D < 0) are left. Test: `crust_added_brings_its_own_light_top` (a column that wears and thickens 1 km a
+   step for 100 steps keeps no deficit). Measured on the arm by `plates/top_deficit_max_m` and
+   `plates/top_deficit_mean_m`.
+
+The first fault is the likelier cause of the divergence (a run's first 218 Myr, on a supercontinent that is breaking
+up); the second biases the land low over a run. Both are fixed before the arm runs again, as ext-cum2 (the same
+arguments on the fixed head). ext-base (the land ledger's base, both switches off) stands: the fixes act only with
+the switches on.

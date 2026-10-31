@@ -153,6 +153,33 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 
 ## Build log
 
+### 2026-10-31: Continental extension's first arm on base35-s4: identical with the switches off, 2 runs diverged with them on, two fixes, re-armed (the runoff lane, worktree agent-a4e92fd13092b08b0, branch `continental-extension` with origin/master 9d9e4c94 merged in; not merged)
+
+- **The merge:** origin/master 9d9e4c94 (PR #54, base35's master) into the branch (81c3104b); PLT-780 to PLT-785 kept
+  before the hotspot lane's PLT-790 to PLT-804, the PLT header and claims.md recounted, plates.md keeps both sides'
+  sections.
+- **Identity:** the pool's check of 81c3104b (key 10fe59b33034) against base35's seed 1 at 1,000 Myr with the base's
+  environment words: the world state (109 files) and `rec.json` identical. With both switches off the branch is
+  base35's physics.
+- **ext-cum** (argkey 0efeeddf, both switches, the crust and gap budgets): the surface diverged on supercontinent-2 at
+  -782 Myr (a cell 387 km from the sea) and on scattered_continents-1 at -574 Myr (322 km). Two faults, both the law's:
+  - a gap sample took the fill spread evenly with no upper bound, so a gap the resampling found narrower than the
+    opening (or a fill that waited) stacked hundreds of km of crust on a few samples. Fix: at most the stretched
+    columns' own thickness (`RiftFill::source_m`), the rest waits or goes to the fallback (PLT-784);
+  - the light-top deficit only grew with erosion, so land that holds its height by thickening would have sunk by
+    0.0394 times its whole erosion. Fix: crust a plate process adds gives it back (`settle::restore_top`, PLT-780),
+    measured by `plates/top_deficit_max_m` and `plates/top_deficit_mean_m`.
+
+  Tests: `a_resampling_lays_the_fill_as_the_rifts_floor_or_breaks_up` (a gap narrower than its fill),
+  `crust_added_brings_its_own_light_top`, and the integration test's thickest column (49.4 km on, 51.2 km off).
+  Quick gate (`tools/review/extension/gate.sh quick`, now with `rifts_stretching`): the tests passed; the full gate
+  runs.
+- **ext-base** (argkey of the gap budget's words, both switches off): the land ledger's base, 8 runs on 81c3104b; the
+  fixes act only with the switches on, so it stands.
+- **Next:** ext-cum2 (the same arguments on the fixed head) and its identity check, then
+  `pool.sh table --base base35-s4 --arm ext-base --arm ext-cum2` and `tools/review/extension/arm.sh`; then the runoff
+  law's arms (rb-months, rb1) in the same slot. Design: docs/design/continental-extension.md, "The first arm".
+
 ### 2026-10-31: Continental extension, rifts that stretch before they break up (`tectonics.rift_stretching`, PLT-781 to PLT-784), and the settling's light top (`tectonics.settle_top_density`, PLT-780), built and off; what the rate cap trims, measured (PLT-785) (the runoff lane, worktree agent-a4e92fd13092b08b0, branch `continental-extension` on `uplift-trace` 9cbdd3c5; not merged)
 
 - **Read.** What the model does at rifts and break-ups (docs/design/continental-extension.md):
