@@ -17,7 +17,10 @@ import statistics
 import sys
 from pathlib import Path
 
-CLASSES = ["flat", "steep", "z2000", "z3000", "z4000", "z0", "z1000"]
+CLASSES = ["flat", "flatc", "flatd", "flatf", "steep", "z2000", "z3000", "z4000", "z0", "z1000"]
+# The flat high ground split by its water (ERO-220, printed only by the builds that have them): draining to a
+# closed basin (`surface.closed_basins` on), dry (runoff weight at most 0.1), frozen (mean below 0 degC).
+SPLIT = ("flatc", "flatd", "flatf")
 
 
 def parse(summary):
@@ -80,6 +83,13 @@ def main():
         flat = [b["flat"]["net"] for _, b in runs if "flat" in b]
         if flat:
             print(f"  flat net per run: min {min(flat):.1f}, max {max(flat):.1f}")
+        for c in SPLIT:
+            part = [b[c]["share"] / b["flat"]["share"] for _, b in runs if c in b and b["flat"]["share"] > 0]
+            nets = [(r, b[c]["net"], b[c]["share"] / b["flat"]["share"]) for r, b in runs
+                    if c in b and b["flat"]["share"] > 0]
+            if part:
+                print(f"  {c}: median part of the flat high ground {med(part):.3f} (runs with it {len(part)}); per run "
+                      + ", ".join(f"{r} {p:.2f}@{n:.1f}" for r, n, p in nets))
         # The land's mean lowering (the bands' area x time shares times their net), and each class's
         # part of it, run by run, then the median.
         mean, parts = [], {c: [] for c in ("flat", "steep", "z0", "z1000", "z2000", "z3000", "z4000")}
@@ -97,16 +107,23 @@ def main():
         # What the surface sent to the sea and eroded over the run, Earth-normalized km3 a year
         # (the map's km3 x Earth's area over the L1 map's, 1024 x 328 cells of 4.8 km; a 1000-Myr run).
         scale = 5.10e8 / (1024 * 328 * 4.8 * 4.8) / 1.0e9
-        sea, ero = [], []
+        sea, ero, lake, closed = [], [], [], {"closed_lake_steps": [], "partial_lake_steps": [], "closed_km2_myr": []}
         for r, _ in runs:
             for line in open(Path(arm) / r / "summary.txt", errors="replace"):
                 if "surface_final=" in line:
                     kv = dict(t.split("=", 1) for t in line.split() if "=" in t)
                     sea.append(float(kv.get("to_sea_km3", "nan")) * scale)
                     ero.append(float(kv.get("eroded_km3", "nan")) * scale)
+                    lake.append(float(kv.get("lake_km3", "nan")) * scale)
+                    for k in closed:
+                        if k in kv:
+                            closed[k].append(float(kv[k]))
                     break
         if sea:
-            print(f"  to the sea {med(sea):.2f} km3/yr, eroded {med(ero):.2f} km3/yr (Earth-normalized, medians)")
+            print(f"  to the sea {med(sea):.2f} km3/yr, eroded {med(ero):.2f} km3/yr, laid in lakes {med(lake):.3f} "
+                  f"km3/yr (Earth-normalized, medians)")
+        if closed["closed_lake_steps"]:
+            print("  " + ", ".join(f"{k} {med(v):.4g}" for k, v in closed.items() if v) + " (medians)")
 
 
 if __name__ == "__main__":
