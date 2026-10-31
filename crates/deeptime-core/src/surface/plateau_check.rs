@@ -448,11 +448,22 @@ fn a_cold_plateau_runs_off_what_its_summer_leaves() {
     let own = weight(mean_t_runoff_m_yr(p, t));
     let budget = weight(cell_water(&hydro, p, t, half).runoff_m_yr);
     let frozen = weight(cell_water(&hydro, p, -12.0, 8.0).runoff_m_yr);
-    eprintln!("cold plateau interior weights: own {own:.3}, budget {budget:.3}, frozen {frozen:.3}");
+    eprintln!(
+        "cold plateau interior weights: own {own:.3}, budget {budget:.3}, frozen {frozen:.3}"
+    );
     let rows = [
-        ("cold interior, the snapshot's runoff", plateau_basin(own, None)),
-        ("cold interior, the bake's budget", plateau_basin(budget, None)),
-        ("never-thawing interior, the budget", plateau_basin(frozen, None)),
+        (
+            "cold interior, the snapshot's runoff",
+            plateau_basin(own, None),
+        ),
+        (
+            "cold interior, the bake's budget",
+            plateau_basin(budget, None),
+        ),
+        (
+            "never-thawing interior, the budget",
+            plateau_basin(frozen, None),
+        ),
     ];
     eprintln!(
         "m/Myr over 10 Myr: interior spl threshold diffusion net | edge spl threshold diffusion net"
@@ -467,9 +478,18 @@ fn a_cold_plateau_runs_off_what_its_summer_leaves() {
         got.push(s);
     }
     let net = |k: usize| got[k][0][3];
-    assert!((own - 0.6).abs() < 1.0e-6, "all of P runs off: weight {own}");
-    assert!(budget < 0.75 * own, "the summer evaporates: weight {budget}");
+    assert!(
+        (own - 0.6).abs() < 1.0e-6,
+        "all of P runs off: weight {own}"
+    );
+    assert!(
+        budget < 0.75 * own,
+        "the summer evaporates: weight {budget}"
+    );
     assert!(frozen <= 0.05, "nothing runs off: weight {frozen}");
     assert!(net(1) < 0.85 * net(0), "the budget's interior wears less");
-    assert!(net(2) < 0.1 * net(0), "a never-thawing interior barely wears");
+    assert!(
+        net(2) < 0.1 * net(0),
+        "a never-thawing interior barely wears"
+    );
 }
