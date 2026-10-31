@@ -631,9 +631,9 @@ pub fn advance(
                 let f = fronts.get(&k).filter(|_| col.last_step == env.step)?;
                 let judged: &[Docked] = if col.subducting { &col.docking } else { &[] };
                 let renumbered = col.docking_resample != resample;
-                let down = slab_km.get(&(c.under, c.over)).and_then(|&km| {
-                    docking(state, geo, env, c.under, f, km, judged, renumbered)
-                });
+                let down = slab_km
+                    .get(&(c.under, c.over))
+                    .and_then(|&km| docking(state, geo, env, c.under, f, km, judged, renumbered));
                 Some((k, down))
             })
             .collect();
@@ -812,7 +812,11 @@ pub fn docking(
             for (w, b) in was.iter_mut().zip(&bodies) {
                 let share = b.seeds as f64 / seeds.len() as f64;
                 // While all of them hold no more than the judged ones, each keeps on down.
-                let held = if total <= judged_n { b.samples.len() } else { 0 };
+                let held = if total <= judged_n {
+                    b.samples.len()
+                } else {
+                    0
+                };
                 *w = Some((judged_km * share, held));
             }
         }

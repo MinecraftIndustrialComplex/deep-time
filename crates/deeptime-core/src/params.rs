@@ -1291,7 +1291,8 @@ pub struct TectonicParams {
     /// extent across the front (all its area, hidden and visible, over its share of the front's
     /// length) within the slab's reach against its buoyancy (`shortening::dragged_length_km`: the
     /// slab's length over 1 + 2.25 T / 30 km, FRC-028 to FRC-030's law), judged as the body
-    /// arrives and kept while it goes down (`shortening::docking`); then only the
+    /// arrives and kept while it goes down, a body that crust joins judged again by all its
+    /// samples over the share of the front it was judged with (`shortening::docking`); then only the
     /// supracrustal cover of its crossing crust (sediment, sedimentary and volcanic rock,
     /// `pools::COVER`) and the crust this collision stacked on it (PLT-400) stay, pool by pool,
     /// by `collision_stacking_share`, all of it on the overriding plate (no pro-wedge on a

@@ -11731,7 +11731,8 @@ thickness at the front): 215 km under 30 km of crust, 329 km under 15 km. Each b
 judged on its own, its extent across the front being all its area (the part already under the
 overriding plate and the rest) over its share of the front's length; the front goes down when every
 body is within its S*, a body beyond holding the whole front, and keeps that judgment while its
-bodies go down (judged again when crust joins them). Then of the crossing crust only the cover
+bodies go down (each body remembered by its samples; one that crust joins is judged again, alone,
+by all its samples over the share of the front it was judged with). Then of the crossing crust only the cover
 (sediment, sedimentary and volcanic rock, PLT-771: 2.5 km of a model island arc of 15 km, inside the
 "upper 2–5 km") and the crust this collision stacked on it stay, pool by pool, by PLT-242's share, all
 of it on the overriding plate (no pro-wedge on a terrane going down: the cover is offscraped against
