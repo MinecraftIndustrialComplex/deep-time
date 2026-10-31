@@ -238,7 +238,7 @@ the step at which it happened unless stated.
 | `terrane_accretion` | `from_plate`, `to_plate`, `area_km2`, `samples`; without a collision also `uplift_m`, `sutured`, `coast_split_km` (as for `collision`) | area / average initial plate area | its `collision`, or the contact's `subduction_onset` |
 | `orogeny_phase` | `orogeny` (`andean` or `himalayan`), `plate`; Andean: `subducting_plate`, `max_uplift_mm_yr`, `ongoing` (1 when the run ended first); Himalayan: `uplift_m`, `uplifted_samples` | uplift / u_0 (Andean), uplift in km (Himalayan) | `subduction_onset` (Andean), `collision` (Himalayan) |
 | `hotspot_track` | `hotspot`, `plates` (the plates it sat under, e.g. `"3,7,12"`), `track_km`, `uplift_mm_yr`, `ongoing` | strength relative to the preset's | its `large_igneous_province`, if it had a plume head |
-| `large_igneous_province` | `area_km2`, `volume_km3`, `thickness_m`, `plate` | lava pile, km | — |
+| `large_igneous_province` | `area_km2`, `volume_km3`, `thickness_m`, `plate`; with `tectonics.plume_heads_sourced` (PLT-795 to PLT-797) also `radius_km` (the head's spread on the model sphere, which the volcano stage's plateau takes), `volume_km3` then the whole province (the dome and the volcano stage's plateau beyond it) and `thickness_m` its central pile of magma | lava pile, km | — |
 
 - `subduction_onset` is written once a contact has lasted 3 steps while converging at ≥ 10 mm/yr
   over ≥ max(3, n/10,000) samples, and dated to when the contact began; flickers at transform
