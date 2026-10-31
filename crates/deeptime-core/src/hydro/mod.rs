@@ -648,7 +648,13 @@ pub struct HydroParams {
     /// biotemperature, the year's mean of the temperature with the time below freezing counted as
     /// 0 °C), rounded to the surface stage's 60. The land's evapotranspiration (Fu's curve) and
     /// the lakes' evaporation both use it on the year's mean temperature above freezing, so a
-    /// cold land with a warm summer evaporates in that summer.
+    /// cold land with a warm summer evaporates in that summer. Not the bake's alone: the
+    /// deep-time surface reads the same budget for its lakes (the flexure's water by basin,
+    /// ISO-126, and the closed basins, ERO-217) and, with `surface.runoff_budget`, for the stream
+    /// power's runoff (ERO-221), while the climate snapshot's own rule keeps 60 (MOI-067). K was
+    /// calibrated on the snapshot's 60 (ERO-010, 2026-10-18), so with the budget another value
+    /// here moves the history's erosion off that calibration, and the budget and the snapshot
+    /// then differ on frost-free land too.
     pub pet_mm_per_c: f64,
     /// Whether a lake's level follows its water balance (a basin that evaporates more than it
     /// gets holds a smaller lake below its rim, a salt flat or nothing). False: every lake is
@@ -666,7 +672,10 @@ pub struct HydroParams {
     /// year's mean temperature above freezing, times this.
     pub lake_evaporation_factor: f64,
     /// Snow a degree-day above freezing melts, mm (the degree-day factor): where the year has too
-    /// few of them the snow stays, and neither runs off nor feeds a lake.
+    /// few of them the snow stays, and neither runs off nor feeds a lake. Like `pet_mm_per_c`,
+    /// the deep-time surface reads it too (its lakes and, with `surface.runoff_budget`, the
+    /// stream power's runoff on cold land, ERO-221). K's calibration (ERO-010) predates the
+    /// budget, and the budget's arms ran at 4.
     pub snow_melt_mm_per_degree_day: f64,
     /// A lake is ice-covered where the mean annual temperature is below this, °C. The views draw
     /// it so, and the game ices the lake's top block there and keeps it open elsewhere, whatever

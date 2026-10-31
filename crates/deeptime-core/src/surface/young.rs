@@ -9,7 +9,9 @@
 //! priority-flood, D8 routing with runoff-weighted areas passed on through the lakes as their water
 //! balance leaves them (`closed.rs`, with `surface.closed_basins`: a closed basin passes none),
 //! implicit stream power with deposition and a critical slope (`spl.rs`), then hillslope and marine
-//! diffusion. The drainage network
+//! diffusion. The runoff weight is L1's, as the deep-time surface takes it ([`runoff_weights`]:
+//! the snapshot's own runoff, or with `surface.runoff_budget` the bake's budget on the climate
+//! stage's months, the young lakes' own), upsampled. The drainage network
 //! that comes out — exact on L2, with the lakes the flood found — is what the amplifier refines.
 //!
 //! **Time.** The stage adds `myr` million years of erosion at the end of the history without
@@ -340,17 +342,17 @@ fn lake_water(
             .map(|f| &f.data[..])
     };
     let (t, p) = (get(climate::T_FIELD)?, get(climate::P_FIELD)?);
-    let (warm, cold) = (
-        get(crate::climate::field::T_WARM),
-        get(crate::climate::field::T_COLD),
-    );
+    let (warm, cold) = climate::months(world, n1);
+    let month = |m: Option<&[f32]>, c: usize| m.map_or(f64::NAN, |m| f64::from(m[c]));
     let (mut runoff, mut loss): (Vec<f32>, Vec<f32>) = (0..n1)
         .map(|c| {
-            let half = match (warm, cold) {
-                (Some(a), Some(b)) => 0.5 * f64::from(a[c] - b[c]),
-                _ => f64::NAN,
-            };
-            let cw = climate::cell_water(hydro, f64::from(p[c]), f64::from(t[c]), half);
+            let cw = climate::cell_water(
+                hydro,
+                f64::from(p[c]),
+                f64::from(t[c]),
+                month(warm, c),
+                month(cold, c),
+            );
             (cw.runoff_m_yr as f32, cw.loss_m_yr as f32)
         })
         .unzip();
@@ -362,6 +364,48 @@ fn lake_water(
         h *= 2;
     }
     Some((runoff, loss))
+}
+
+// ledger: YNG-011, ERO-010, ERO-011, ERO-221
+/// The stream power's runoff weight on L1's `n1` cells, as the deep-time surface takes it: the
+/// runoff over `surface.runoff_ref_m_yr`, at least 0.05 (ERO-011). The runoff is the snapshot's
+/// own (PET = 60 mm/°C x the mean temperature, 0 below 0 °C: `climate::mean_t_runoff_m_yr`,
+/// MOI-067) or, with `surface.runoff_budget`, the bake's budget on the climate stage's mean,
+/// precipitation and months (`climate::cell_water`, ERO-221), the one the young lakes take
+/// ([`lake_water`]). 1 everywhere without the stage's temperature and precipitation.
+///
+/// Until 2026-10-31 the stage kept the snapshot's rule with the switch on, so a plateau that
+/// never thaws weighed 0.6 here at P 300 mm where L1 weighed it 0.05, and the amplifier's
+/// drainage counted all of P where the bake draws no river (the runoff law's review).
+pub fn runoff_weights(
+    world: &WorldState,
+    sp: &SurfaceParams,
+    hydro: &HydroParams,
+    n1: usize,
+) -> Vec<f32> {
+    let get = |name: &str| {
+        world
+            .fields
+            .get(name)
+            .filter(|f| f.data.len() == n1)
+            .map(|f| &f.data[..])
+    };
+    let (Some(t), Some(p)) = (get(climate::T_FIELD), get(climate::P_FIELD)) else {
+        return vec![1.0; n1];
+    };
+    let (warm, cold) = climate::months(world, n1);
+    let month = |m: Option<&[f32]>, c: usize| m.map_or(f64::NAN, |m| f64::from(m[c]));
+    (0..n1)
+        .map(|c| {
+            let (tc, pc) = (f64::from(t[c]), f64::from(p[c]));
+            let runoff = if sp.runoff_budget {
+                climate::cell_water(hydro, pc, tc, month(warm, c), month(cold, c)).runoff_m_yr
+            } else {
+                climate::mean_t_runoff_m_yr(pc, tc)
+            };
+            (runoff / sp.runoff_ref_m_yr).max(0.05) as f32
+        })
+        .collect()
 }
 
 /// What [`route_lakes`] reads of the step: the grid, the flood method, the sea, the budget, the
@@ -540,17 +584,9 @@ impl YoungStage {
             .cloned()
             .unwrap_or_else(|| vec![0.0; g1.cells()]);
         let class2 = up(&class1, &|v, w, h| resample::upsample2_nearest(v, w, h));
-        let weight1: Vec<f32> = match (field1(climate::T_FIELD), field1(climate::P_FIELD)) {
-            (Some(t), Some(p)) => (0..g1.cells())
-                .map(|c| {
-                    let (tc, pc) = (f64::from(t[c]), f64::from(p[c]));
-                    let e = (60.0 * tc).max(0.0);
-                    let runoff = (pc - climate::fu_et(pc, e)).max(0.0) / 1000.0;
-                    (runoff / self.sp.runoff_ref_m_yr).max(0.05) as f32
-                })
-                .collect(),
-            _ => vec![1.0; g1.cells()],
-        };
+        // ledger: YNG-011, ERO-221
+        let hydro_p = self.preset.hydro.unwrap_or_default();
+        let weight1 = runoff_weights(world, &self.sp, &hydro_p, g1.cells());
         let weight2 = up(&weight1, &resample::upsample2_linear);
         let uplift1: Vec<f32> = match self.p.uplift {
             UpliftMode::Balance => field1(super::field::EROSION)
@@ -1719,5 +1755,92 @@ mod tests {
         );
         assert!((opened - open).abs() < 1.0e-6, "{opened} against {open}");
         assert!(opened < 0.25 * dammed, "{opened} against {dammed}");
+    }
+
+    // ledger: YNG-011, ERO-221, HYD-033
+    /// The young stage weighs its drainage as the deep-time surface does (the runoff law's
+    /// review): with `surface.runoff_budget`, by the bake's budget on L1's months, so a plateau
+    /// that never thaws is at ERO-011's floor here too and the amplifier's drainage counts no
+    /// river the bake does not draw; without it, the snapshot's rule (all of P below a mean of
+    /// 0 °C). The young lakes take the same months as given: the polar desert's year (mean −17,
+    /// months −5 and −40 °C) runs off nothing into them.
+    #[test]
+    fn the_young_weights_follow_the_surface_s_runoff() {
+        let grid = GridDesc::for_planet("L1", 16384, 64).unwrap();
+        let (w1, h1) = (grid.w as usize, grid.h as usize);
+        let n1 = w1 * h1;
+        let climates = [
+            (300.0f32, -12.0f32, -2.0f32, -25.0f32),
+            (300.0, -17.0, -5.0, -40.0),
+            (300.0, -1.5, 6.5, -9.5),
+            (800.0, 15.0, 22.0, 8.0),
+        ];
+        let mut world = WorldState::new(1, 16384, 0.0);
+        for (name, pick) in [
+            (climate::P_FIELD, 0usize),
+            (climate::T_FIELD, 1),
+            (crate::climate::field::T_WARM, 2),
+            (crate::climate::field::T_COLD, 3),
+        ] {
+            let data = (0..n1)
+                .map(|c| {
+                    let (p, t, wm, cd) = climates[(c % w1) % climates.len()];
+                    [p, t, wm, cd][pick]
+                })
+                .collect();
+            world.fields.insert(
+                name.into(),
+                Field {
+                    grid: grid.clone(),
+                    data,
+                },
+            );
+        }
+        let hydro = HydroParams::default();
+        let sp = |budget: bool| SurfaceParams {
+            runoff_budget: budget,
+            ..SurfaceParams::default()
+        };
+        let off = runoff_weights(&world, &sp(false), &hydro, n1);
+        let on = runoff_weights(&world, &sp(true), &hydro, n1);
+        eprintln!("young weights off {:?}, on {:?}", &off[..4], &on[..4]);
+        for c in 0..3 {
+            assert!((off[c] - 0.6).abs() < 1.0e-6, "cell {c}: {}", off[c]);
+        }
+        assert_eq!((on[0], on[1]), (0.05, 0.05));
+        assert!(on[2] > 0.05 && on[2] < 0.9 * off[2], "{}", on[2]);
+        assert!(
+            (on[3] - off[3]).abs() < 1.0e-6,
+            "{} against {}",
+            on[3],
+            off[3]
+        );
+        // The deep-time surface's own weight on the same climate (`surface::runoff_weight`).
+        let d = Dims::new(w1, h1, 4800.0, true);
+        let clim = climate::snapshot(&world, &d, &|_| 0.0, &vec![1000.0; n1], 0.0);
+        for budget in [false, true] {
+            let p = sp(budget);
+            let water = super::super::step_water(&world, &clim, &hydro, &p);
+            let young = runoff_weights(&world, &p, &hydro, n1);
+            for c in 0..4 {
+                let l1 = super::super::runoff_weight(&p, &clim, water.as_deref(), c);
+                assert!(
+                    (young[c] - l1).abs() < 1.0e-6,
+                    "budget {budget}, cell {c}: young {} against L1 {l1}",
+                    young[c]
+                );
+            }
+        }
+        // Without the stage's fields, 1.
+        let bare = WorldState::new(1, 16384, 0.0);
+        assert!(
+            runoff_weights(&bare, &sp(true), &hydro, n1)
+                .iter()
+                .all(|&x| x == 1.0)
+        );
+        // The young lakes' runoff: the months as given.
+        let (runoff, _) = lake_water(&world, &hydro, w1, h1, 0).expect("the stage's fields");
+        assert_eq!(runoff[1], 0.0, "the polar desert's year runs off nothing");
+        assert!(runoff[2] > 0.0);
     }
 }

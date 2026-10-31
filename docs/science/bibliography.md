@@ -10262,6 +10262,26 @@ named. Copies kept outside the repository only (temporary).
 - Library: not kept.
 - Read so far (by the project): the abstract, 2026-10-31: "Low internal relief, aridity, and internal drainage characterize the Puna-Altiplano Plateau and the Tibetan Plateau and the Tarim basin"; "We hypothesize that these large, internally drained areas persist indefinitely when uplift overwhelms the fluvial systems and defeats the channel network"; "Most coupled tectonic-landscape development models prevent the development of internal drainage and so may overestimate the voracity of erosion in regimes that favor internal drainage, profoundly influencing predicted orogenic growth patterns". Full text (paragraphs [1] to [66], the equations from their images) by a Sonnet research sub-agent of the plateau lane, 2026-10-31: [26], "Internal drainage results when an integrated fluvial system is defeated by an uplifted barrier"; [60], "Channels connected to closed basins must eventually aggrade as the basin fills and base level continually rises"; [62], "where internally drained basins persist ... mass storage in the arid interior of the orogen prevents a steady state condition from developing"; [58], "arid areas in close proximity to large orographic gradients may represent transitional parts of the landscape in which efficient headward erosion allows external drainage to extend into the low-precipitation highlands"; [24], the low-relief internally drained region's boundary "approximately coincides with the 400 mm/yr isohyet". Their criterion (eq. 13) is the defeat of a river by an uplifting barrier, precipitation entering only through K and the transport coefficient; the paper has no lake balance (the agent's reading). The agent notes that the printed exponent on So in eq. 13 does not follow from eqs. 8 and 12.
 
+### Armijo1986
+- Reference: Armijo, Tapponnier, Mercier and Han (1986). Quaternary extension in southern Tibet: Field observations and tectonic implications. Journal of Geophysical Research 91(B14):13803-13872 (the initials not recorded by the read).
+- DOI or URL: 10.1029/JB091iB14p13803; the abstract from the Crossref and OpenAlex records.
+- Cited as: "Armijo et al. 1986".
+- Ledger ids: PLT-740 (the plateau's interior extends; not modelled).
+- Access: the abstract only.
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31 (the orogen lane, by a Sonnet sub-agent): "normal faulting has been the dominant tectonic regime north of the Himalayas in the last 2 ± 0.5 m.y."; extensional strains "principally localized within seven regularly spaced rift zones"; "The extension direction is determined to be N96° E ± 7°"; "The rate of Quaternary extension is about 1% m.y.-1 along an 1100-km-long ESE traverse across south Tibet".
+- Reference check: the surnames, title, journal, volume, issue, pages and DOI as the agent printed them from the records; the initials to complete.
+
+### Blisniuk2001
+- Reference: Blisniuk, P. M., Hacker, B. R., Glodny, J., Ratschbacher, L., Bi, S., Wu, Z., McWilliams, M. and Calvert, A. (2001). Normal faulting in central Tibet since at least 13.5 Myr ago. Nature 412(6847):628-632.
+- DOI or URL: 10.1038/35088045 (PMID 11493918); the abstract from the Europe PMC record.
+- Cited as: "Blisniuk et al. 2001".
+- Ledger ids: PLT-740 (the plateau's interior extends; not modelled).
+- Access: paywalled; the abstract only.
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31 (the orogen lane, by a Sonnet sub-agent): "observed east-west thinning of the upper crust"; "we report a minimum age of approximately 13.5 Myr for the onset of graben formation in central Tibet"; "Thinning of the upper crust is most plausibly the result of potential-energy increases resulting from spatially and temporally heterogeneous changes in thermal structure and density distribution within the crust and upper mantle beneath Tibet".
+- Reference check: as the agent printed it from the record.
+
 ## Internally drained basins and plateau wear (ERO-217 to ERO-220), added 2026-10-31
 
 The plateau lane's sources (docs/design/plateau-drainage.md, erosion-and-sediment.md "Internally drained basins"). All read by one Sonnet research sub-agent on 2026-10-31, quotes machine-checked against the text it extracted; downloads kept outside the repository. Not fetched: Mason, Guzkowska, Rapley & Street-Perrott 1994 (Climatic Change 27:161-197, paywalled, no open copy) and Mifflin & Wheat 1979 (Nevada Bureau of Mines).
@@ -10476,22 +10496,3 @@ The runoff lane's sources (docs/design/surface-runoff-budget.md, erosion-and-sed
 - Access: open.
 - Library: not kept.
 - Read so far (by the project): full text, 2026-10-31. Abstract: areal precipitation "548 mm/year in De Geerdalen, 486 mm/year in Endalen/Isdammen and 890 mm/year in Bayelva"; "the best estimates indicate an average annual evaporation of ca. 80 mm/year from glacier-free areas, and no net evaporation from glaciers"; "Annual runoff ranges from 545 mm in Endalen/Isdammen, 539 mm/year in De Geerdalen up to 1050 mm/year in Bayelva". The runoff includes the glaciers' mass loss.
-### Armijo1986
-- Reference: Armijo, Tapponnier, Mercier and Han (1986). Quaternary extension in southern Tibet: Field observations and tectonic implications. Journal of Geophysical Research 91(B14):13803-13872 (the initials not recorded by the read).
-- DOI or URL: 10.1029/JB091iB14p13803; the abstract from the Crossref and OpenAlex records.
-- Cited as: "Armijo et al. 1986".
-- Ledger ids: PLT-740 (the plateau's interior extends; not modelled).
-- Access: the abstract only.
-- Library: not kept.
-- Read so far (by the project): the abstract, 2026-10-31 (the orogen lane, by a Sonnet sub-agent): "normal faulting has been the dominant tectonic regime north of the Himalayas in the last 2 ± 0.5 m.y."; extensional strains "principally localized within seven regularly spaced rift zones"; "The extension direction is determined to be N96° E ± 7°"; "The rate of Quaternary extension is about 1% m.y.-1 along an 1100-km-long ESE traverse across south Tibet".
-- Reference check: the surnames, title, journal, volume, issue, pages and DOI as the agent printed them from the records; the initials to complete.
-
-### Blisniuk2001
-- Reference: Blisniuk, P. M., Hacker, B. R., Glodny, J., Ratschbacher, L., Bi, S., Wu, Z., McWilliams, M. and Calvert, A. (2001). Normal faulting in central Tibet since at least 13.5 Myr ago. Nature 412(6847):628-632.
-- DOI or URL: 10.1038/35088045 (PMID 11493918); the abstract from the Europe PMC record.
-- Cited as: "Blisniuk et al. 2001".
-- Ledger ids: PLT-740 (the plateau's interior extends; not modelled).
-- Access: paywalled; the abstract only.
-- Library: not kept.
-- Read so far (by the project): the abstract, 2026-10-31 (the orogen lane, by a Sonnet sub-agent): "observed east-west thinning of the upper crust"; "we report a minimum age of approximately 13.5 Myr for the onset of graben formation in central Tibet"; "Thinning of the upper crust is most plausibly the result of potential-energy increases resulting from spatially and temporally heterogeneous changes in thermal structure and density distribution within the crust and upper mantle beneath Tibet".
-- Reference check: as the agent printed it from the record.
