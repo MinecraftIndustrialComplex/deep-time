@@ -60,7 +60,7 @@ def run(folder):
         flat = flat_globals(g)
         kept = flat.get(G + "kept_km3")
         if kept:
-            for k in ("wedge_km3", "upper_km3", "noroom_stays_km3", "taper_toe_km3"):
+            for k in ("wedge_km3", "upper_km3", "noroom_stays_km3", "taper_toe_km3", "retro_plateau_km3"):
                 v = flat.get(G + k)
                 if v is not None:
                     out[k.replace("_km3", "") + "_of_kept"] = v / kept
