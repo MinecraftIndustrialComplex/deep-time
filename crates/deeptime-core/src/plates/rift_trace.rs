@@ -196,7 +196,10 @@ mod tests {
         let cells = |s: &str| s.split('\t').count();
         let step = step_row(2.0, 1, &RiftRecord::default());
         assert_eq!(cells(&step), cells(&step_header()));
-        assert_eq!(cells(&step_header()), STEP_FIELDS.len() + 2 * SIDE_FIELDS.len());
+        assert_eq!(
+            cells(&step_header()),
+            STEP_FIELDS.len() + 2 * SIDE_FIELDS.len()
+        );
         let lay = lay_row(2.0, &LayRecord::default());
         assert_eq!(cells(&lay), LAY_FIELDS.len());
         let broke = LayRecord {
