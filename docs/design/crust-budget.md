@@ -232,6 +232,46 @@ Left for later (the review's, not done):
 - PLT-762's test would pass without the switch (it checks the line, not the switch's effect).
 - PLT-761's recording has no test.
 
+## The re-review (PR #53, 2026-10-31)
+
+The re-review of a7c42428, two must-fixes and the follow-ups, on the same branch:
+
+1. The island-arc class did not survive a resampling, both ways. `island_arc_crust` read the
+   column's basement and its island-arc crust against the 8 km line, and `ridges::interpolate`
+   blends the two differently: the arc crust over all three corners, ocean floor included, the
+   basement over the column's own class, the kind from the nearest corner. Leak B: a matured arc's
+   edge column (8.5 km) beside its ocean flank kept its kind and full basement but fell to 6.4 to
+   7.8 km of arc crust (edge weights 0.4 to 0.8), read as a continent's own crust and took the
+   continental law for good. Leak A: a continent's own column beside an accreted arc (about 47 km
+   at the axis after the pulse) took a share of both and passed at a 0.2 weight. Fixed: the class
+   is a mark (`Sample::island_arc_marked`, `MARK_ISLAND_ARC` in the byte that held `stacked`, so a
+   `Sample` stays 144 bytes), set where an ocean column matures under island-arc magma (PLT-047),
+   cleared where it is ocean floor again, and carried through a resampling from the nearest corner
+   as the kind is. Test: `ridges::tests::the_island_arc_class_survives_a_resampling_from_the_nearest_corner`
+   (both leaks through `interpolate`). Measured from now on: `plates/resample_island_class_kept_km2`
+   (the class the blend would have lost, leak B) and `plates/resample_island_class_refused_km2`
+   (would have given, leak A), summed over the resamplings.
+2. The breakoff does not bound PLT-763. `forces::grow_slab` counts block time only while
+   continental crust holds at least half the front; any oceanic front sample regrows the slab
+   (100 km in a few Myr) and the magma resumes, and a mostly oceanic contact never breaks off. The
+   docs that said each collision's suture magma runs at most about 10 Myr (params.rs, the suture
+   front globals, PLT-763, plates.md, item 3 above) now say so; the 0.18 against 0.6 is a
+   hypothesis that `suture_front_on` against `suture_front` tests.
+3. Follow-ups:
+   - Fixed: `fronts_finish` took every continental front sample as a suture front, so a terrane
+     its slab drags down whole (PLT-770, `Collision::subducting`, from master) took suture magma
+     while it went down and counted in both suture-front globals. Such a terrane goes down instead
+     of suturing: no suture magma, no suture front (the test
+     `a_collision_front_adds_scholl_and_von_huenes_suture_arc`).
+   - Fixed (docs): `ARC_SPLIT_GLOBALS`' slot 1; PLT-289 is ocean floor thickened at a contact and
+     turned continental, not "crust stacked to a continent's column"; Gerya's list of
+     intra-oceanic basements also has accretionary complexes and oceanic plateaux, which the rule
+     leaves out (said in `island_arc_crust` and PLT-760); the 0.13 to 0.15 km³ a year of "arc began
+     at a continent" holds the path the first review found, how much of it unmeasured.
+   - Left: `loss-budget.py`'s `suture_per_km` leaves out the suture's cones, which the volcano
+     stage's split books in the arc rows (`Pull::arc_cones_km3`); booking them apart needs a cones
+     global by the suture.
+
 ## What is left
 
 - The hotspots' rewrite with sources (plume births, fluxes, LIP volumes), then the volcanic margins

@@ -971,14 +971,19 @@ pub struct TectonicParams {
     /// Arc magma at collision fronts (the crust-budget lane, 2026-10-31; on by default since
     /// 2026-10-31, the coordinator's call under Ben's rule of 2026-10-23, decisions log): where
     /// the subducting plate's continental crust stands at the front (a crust-suturing subduction
-    /// zone), the overriding plate's arc band goes on taking magma at Scholl & von Huene's
+    /// zone; not a terrane its slab drags down whole, PLT-770, which goes down instead of
+    /// suturing), the overriding plate's arc band goes on taking magma at Scholl & von Huene's
     /// global arc addition during suturing over their long-term suture length, 0.2 AU over
     /// 6,000 km (33.3 km³/km/Myr, `subduction::SUTURE_ARC_KM3_PER_KM_MYR`), with no convergence
     /// factor (game-choice: the source gives a global figure, not a law in the convergence);
     /// off (the model before), a collision front makes no arc. It acts only past incipient, its
-    /// contact's slab at PLT-611's 100 km or more, and `forces::grow_slab` breaks the slab off
-    /// (length 0) once continental crust has held half the front for `slab_breakoff_myr`
-    /// (FRC-019; PLT-184, 10 Myr), so a collision's suture magma lasts at most about that long.
+    /// contact's slab at PLT-611's 100 km or more. That bounds little: `forces::grow_slab` breaks
+    /// the slab off (length 0) only once continental crust has held at least half the contact's
+    /// front for `slab_breakoff_myr` (FRC-019; PLT-184, 10 Myr), any oceanic front sample
+    /// lengthens it again (100 km in a few Myr at tens of mm/yr) and the magma resumes, and a
+    /// contact whose front is mostly oceanic never breaks off. How long it runs per collision is
+    /// measured (`subduction::SUTURE_FRONT_ACTIVE_GLOBAL` against `SUTURE_FRONT_GLOBAL`), not
+    /// bounded.
     /// Its band sets the ARC flag as an arc's does (the heat flow's arc term, PLT-468; the
     /// volcano stage, the plutons and the traps read it). Stern & Scholl 2010's Table 1 books it
     /// as "Additions at crust-suturing subduction zones 0.2" (abstract only: the source is not
