@@ -254,7 +254,7 @@ Crust with no state takes its floor's 2.32 √(κt) at the floor's age, at least
 place of the frame's 225 km. Not a cap: no heat flow is clipped; the lid cannot be thinner than its
 crust allows, and the bound follows from it.
 
-What it changes, by the code (no arm yet): a column of crust thicker than 48 km under an arc's, a
+What it changes, by the code (the arm below): a column of crust thicker than 48 km under an arc's, a
 hotspot's, a subduction zone's or a rift's heating keeps 1.25 times its crust (a 70 km belt 87.5 km,
 not 60: 105 mW/m² with the arc's 40 against 122; its thermal age 37 Myr, not 0, so its thin sheet
 stiffer, η_0 / η 0.55 at τ_s 62.8, ISO-112); floor made continental under more than 14.4 km of rock
@@ -286,6 +286,24 @@ which held for their planets, not for the law; the release-pace test, with the p
 Those columns are not Earth's continental crust of PLT-823's regional maxima (100 to 150): a 7 to 15
 km column on floor a few Myr old is a margin's sediment or an arc's crust on a spreading centre's
 lithosphere, and its heat flow is that lithosphere's.
+
+**The arm (2026-10-31).** `pool.sh run hc-on`, the branch's default (key f2d26e94aec9;
+`earthlike_quick_16k`, 1,000 Myr, seeds 1 to 4 from both starts, the crust budget's record on), against
+base35-s4, medians of 8 with Mann-Whitney p: no guard failure (the worst 10,241 m from the sea against
+10,304, no step beyond 2 Earth reliefs, no cell 5 km over Airy), and no census measure moved at p
+under 0.3. Land 0.211 against 0.216; largest landmass 0.060 against 0.048; coast with high ground
+0.111 against 0.071 (p 0.51; over its 0.11 in 4 runs against 1); criteria met 5, mean 5.00 against
+5.38 (p 0.32). The high coasts shift towards collision belts (coastset: their share 0.750 against
+0.517, the arcs' 0.172 against 0.355), not explained at 8 runs. The heat flow at the final frame
+(the pool's `hfcells`, version 2, against base35-hf: base35's key run again with the heat-flow fields
+kept, its 8 worlds bit-identical to base35-s4's by the state's sha256): median 48.8 mW/m² against
+47.4 (p 0.19), mean 53.7 against 52.6 (0.10); maximum 196.5 against 162.3 (0.013), 406.7 in one run;
+the share of continental cells over 150 mW/m² 0.015 % against 0.004 % (0.050); over 200, 0.0005 to
+0.0023 % in 4 runs and none in any base run (0.032). The tail rises, as the trace above has it:
+crust with no state takes its young floor's lithosphere (PLT-821) where it took 225 km. A cell at
+406.7 is, by the law's arithmetic, a column of at most 7.1 km at its lid's floor or on floor at most
+0.6 Myr old (the cells were not traced: the runs keep no checkpoint), under the 412 the floor allows
+over the ocean's 7 km.
 
 ### The order of the stages
 
