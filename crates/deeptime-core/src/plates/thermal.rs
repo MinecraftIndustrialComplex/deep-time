@@ -145,8 +145,8 @@ pub fn unset_continental_l_km(s: &Sample, t_myr: f64) -> f64 {
     continental_l_km(ocean_km(age), moho_km(s))
 }
 
-/// The lithosphere a continental sample's laws read, km: its own, never above its lid's floor, or its
-/// floor's where it has none ([`unset_continental_l_km`]).
+/// The lithosphere a continental sample's laws read, km: its own, never above its lid's floor,
+/// or its floor's where it has none ([`unset_continental_l_km`]).
 // ledger: PLT-820, PLT-821
 pub fn sample_l_km(s: &Sample, t_myr: f64) -> f64 {
     if s.lithosphere_km > 0.0 {

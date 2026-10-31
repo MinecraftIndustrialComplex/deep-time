@@ -1863,11 +1863,12 @@ fn finish_samples(st: &mut PlateState, geo: &Geo, z0: &[f32], env: &Env<'_>) {
 }
 
 /// A continental sample's heat flow, mW/m², by its law at `t_myr`: with `thermal` (the
-/// lithosphere's state) from its lithosphere's depth, never above its floor under the Moho (PLT-820), its floor's
-/// where it has none (PLT-821), and its arc and hotspot terms (ledger: PLT-467, PLT-468); else the
-/// old proxy, which decays after the last orogeny and adds an arc's, a hotspot's and a divergent
-/// margin's terms (ledger: PLT-137). `finish_samples` sets it on every continental sample; the heat
-/// flow's final pass ([`thermal::refresh_heat_flow`], PLT-469) on crust made continental after that.
+/// lithosphere's state) from its lithosphere's depth, never above its lid's floor under the Moho
+/// (PLT-820), its floor's where it has none (PLT-821), and its arc and hotspot terms (ledger:
+/// PLT-467, PLT-468); else the old proxy, which decays after the last orogeny and adds an arc's, a
+/// hotspot's and a divergent margin's terms (ledger: PLT-137). `finish_samples` sets it on every
+/// continental sample; the heat flow's final pass ([`thermal::refresh_heat_flow`], PLT-469) on
+/// crust made continental after that.
 pub(crate) fn continental_heat_flow(s: &state::Sample, t_myr: f64, thermal: bool) -> f32 {
     let f = s.flags;
     if thermal {
