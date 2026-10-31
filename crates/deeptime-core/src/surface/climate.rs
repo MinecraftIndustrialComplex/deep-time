@@ -24,6 +24,8 @@
 use rayon::prelude::*;
 
 use super::grid::{Dims, box_blur};
+use super::lakes::CellWater;
+use crate::hydro::{Climate, HydroParams};
 use crate::world::WorldState;
 
 /// Field names the climate stage writes (P1-05, `crate::climate::field`) and this module reads.
@@ -169,6 +171,50 @@ pub fn snapshot(
             }
         });
     out
+}
+
+/// One cell's water a year under the bake's budget (`HydroParams::budget`, HYD-035 to HYD-038):
+/// precipitation `precip_mm` (mm/yr), the mean annual temperature `t_c` (°C) and half the range
+/// between the warmest and the coldest month `half_c` (°C; not finite: the ±8 °C of HYD-032).
+/// Its runoff is what the lakes are fed with (ISO-126, ERO-217).
+pub fn cell_water(hydro: &HydroParams, precip_mm: f64, t_c: f64, half_c: f64) -> CellWater {
+    let cl = Climate::of(precip_mm, t_c, t_c + half_c, t_c - half_c);
+    let b = hydro.budget(&cl);
+    CellWater {
+        runoff_m_yr: b.runoff_mm / 1000.0,
+        loss_m_yr: (b.evaporation_mm - b.rain_mm) / 1000.0,
+    }
+}
+
+/// [`cell_water`] for every cell of the step's climate `clim`: the climate stage's seasons
+/// (`climate/t_warm_c`, `climate/t_cold_c`) as departures about the surface's own mean
+/// temperature (HYD-033), none without the stage.
+pub fn water_budget(world: &WorldState, clim: &Snapshot, hydro: &HydroParams) -> Vec<CellWater> {
+    let n = clim.t_c.len();
+    let season = |name: &str| {
+        world
+            .fields
+            .get(name)
+            .filter(|f| f.data.len() == n)
+            .map(|f| &f.data[..])
+    };
+    let warm = season(crate::climate::field::T_WARM);
+    let cold = season(crate::climate::field::T_COLD);
+    (0..n)
+        .into_par_iter()
+        .map(|c| {
+            let half = match (warm, cold) {
+                (Some(w), Some(k)) => 0.5 * f64::from(w[c] - k[c]),
+                _ => f64::NAN,
+            };
+            cell_water(
+                hydro,
+                f64::from(clim.precip_mm[c]),
+                f64::from(clim.t_c[c]),
+                half,
+            )
+        })
+        .collect()
 }
 
 #[cfg(test)]

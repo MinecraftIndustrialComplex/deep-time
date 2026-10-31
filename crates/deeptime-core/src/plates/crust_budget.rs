@@ -144,7 +144,7 @@ pub const EDGES_KM: [f64; 10] = [
 ];
 
 /// The globals each snapshot copies (cumulative over the run, km³ or km² Earth-normalized).
-const GLOBALS: [(&str, &str); 85] = [
+const GLOBALS: [(&str, &str); 87] = [
     ("flow_steps", super::flow::STEPS_GLOBAL),
     ("flow_substeps", super::flow::SUBSTEPS_GLOBAL),
     ("flow_short_myr", super::flow::SHORT_GLOBAL),
@@ -164,6 +164,11 @@ const GLOBALS: [(&str, &str); 85] = [
     ("noroom_clipped", super::belts::CLIPPED_GLOBAL),
     ("noroom_stays", super::belts::STAYS_GLOBAL),
     ("taper_toe", super::belts::TOE_GLOBAL),
+    // Terranes docking stripped to their cover (ledger: PLT-770; zero without the switch).
+    ("stripped", super::belts::STRIPPED_GLOBAL),
+    // The two wedges' retro plateau beyond the belt's reach (ledger: PLT-740; zero without the
+    // switch).
+    ("plateau", super::belts::PLATEAU_GLOBAL),
     // The overriding plate's share (ledger: PLT-652; zero without the switch).
     ("upper", super::belts::UPPER_GLOBAL),
     ("upper_km2", super::belts::UPPER_AREA_GLOBAL),
