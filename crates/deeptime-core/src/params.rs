@@ -967,6 +967,83 @@ pub struct TectonicParams {
     /// the split on intra-oceanic arcs). The young fronts are measured either way (PLT-670).
     /// ledger: PLT-668
     pub arc_front_loaded: bool,
+    /// An intra-oceanic arc keeps the island arcs' law on the crust it made (the crust-budget
+    /// lane, 2026-10-31; on by default since 2026-10-31, the coordinator's call under Ben's rule
+    /// of 2026-10-23: physics goes on by default once built and correct; decisions log
+    /// 2026-10-31): the arc's type is its setting at its onset (none of a continent's own crust
+    /// within `arc_distance_km` of its front when the arc begins: ocean floor and an earlier
+    /// intra-oceanic arc's crust, `subduction::island_arc_crust`, do not count), and on the crust
+    /// an intra-oceanic arc made the island law goes on, whatever the column's label: an island
+    /// arc whose own crust turned its column continental (PLT-047, 8 km of arc crust: under one
+    /// step of the early pulse at the axis) goes on at the island law (`arc_front_loaded`'s
+    /// pulse, then its mature rate) on that crust, and a continent's own crust takes the
+    /// continental law. The substrate is Stern 2010's ("IOASs are built on oceanic crust, whereas
+    /// Andean-type arcs are built on pre-existing continental crust"; their basements include
+    /// earlier intra-oceanic arcs): ocean floor, or continental crust over an ocean basement
+    /// with PLT-047's island-arc crust in it. Off (the model before), the column's label picks
+    /// the law and any continental column within the arc's distance makes the onset continental,
+    /// and a young island arc's pulse ends when its axis turns continental. Stern & Scholl (2010,
+    /// p. 11) give the front-loaded law for the intra-oceanic arcs they list, the
+    /// Izu-Bonin-Mariana among them, whose crust is far thicker than 8 km. ledger: PLT-760
+    pub island_arc_own_crust: bool,
+    /// Arc magma at collision fronts (the crust-budget lane, 2026-10-31; on by default since
+    /// 2026-10-31, the coordinator's call under Ben's rule of 2026-10-23, decisions log): where
+    /// the subducting plate's continental crust stands at the front (a crust-suturing subduction
+    /// zone; not a terrane its slab drags down whole, PLT-770, which goes down instead of
+    /// suturing), the overriding plate's arc band goes on taking magma at Scholl & von Huene's
+    /// global arc addition during suturing over their long-term suture length, 0.2 AU over
+    /// 6,000 km (33.3 km³/km/Myr, `subduction::SUTURE_ARC_KM3_PER_KM_MYR`), with no convergence
+    /// factor (game-choice: the source gives a global figure, not a law in the convergence);
+    /// off (the model before), a collision front makes no arc. It acts only past incipient, its
+    /// contact's slab at PLT-611's 100 km or more. That bounds little: `forces::grow_slab` breaks
+    /// the slab off (length 0) only once continental crust has held at least half the contact's
+    /// front for `slab_breakoff_myr` (FRC-019; PLT-184, 10 Myr), any oceanic front sample
+    /// lengthens it again (100 km in a few Myr at tens of mm/yr) and the magma resumes, and a
+    /// contact whose front is mostly oceanic never breaks off. How long it runs per collision is
+    /// measured (`subduction::SUTURE_FRONT_ACTIVE_GLOBAL` against `SUTURE_FRONT_GLOBAL`), not
+    /// bounded.
+    /// Its band sets the ARC flag as an arc's does (the heat flow's arc term, PLT-468; the
+    /// volcano stage, the plutons and the traps read it). Stern & Scholl 2010's Table 1 books it
+    /// as "Additions at crust-suturing subduction zones 0.2" (abstract only: the source is not
+    /// read in full). ledger: PLT-763
+    pub collision_arc_magma: bool,
+    /// Clift & Vannucchi's (2004) trench sediment line read in place (the crust-budget lane,
+    /// 2026-10-31; on by default since 2026-10-31, the coordinator's call under Ben's rule of
+    /// 2026-10-23, decisions log): their 1 km (PLT-660's accretionary pile, PLT-442's erosive
+    /// margin's cover) is the sediment's thickness at the trench "uncorrected for porosity", and
+    /// the model's pools are solid rock, so the line in rock is the solid a 1 km porous column
+    /// holds under ERO-215's porosity law (536 m). Off, the solid pile is read against 1 km.
+    /// ledger: PLT-762
+    pub trench_pile_in_place: bool,
+    /// Hotspots from sources (the hotspot lane, 2026-10-31; off by default;
+    /// docs/design/hotspots-lips-margins.md): the plume tails' number, lifetimes and buoyancy
+    /// fluxes from the hotspot catalogues, each tail's magma from its flux, and the heights from
+    /// the model's isostasy (`plates::hotspots::sourced`), in place of `hotspots_initial`,
+    /// `hotspot_births_per_100myr`, `hotspot_lifetime_myr`, `hotspot_uplift_mm_yr`'s rate and the
+    /// volcanic ceilings (PLT-108 to PLT-115, uncited). ledger: PLT-790
+    pub hotspots_sourced: bool,
+    /// Plume heads from sources (the hotspot lane, 2026-10-31; off by default): which new plumes
+    /// start with a head, the large igneous province's volume and the head's radius from the LIP
+    /// record (`plates::hotspots::sourced`), in place of `lip_probability`, `lip_thickness_m` and
+    /// `lip_radius_km` (PLT-117, PLT-118, uncited). ledger: PLT-795
+    pub plume_heads_sourced: bool,
+    /// Volcanic rifted margins (the hotspot lane, 2026-10-31; off by default): new sea floor
+    /// formed beside a continent over a plume head's hot mantle (White & McKenzie 1989's
+    /// condition) takes the igneous crust that mantle melts to, as continental crust over its ocean
+    /// basement (PLT-331), at a resampling (`ridges::volcanic_margin`). Off, every gap point
+    /// is the ocean column (PLT-104). ledger: PLT-799
+    pub volcanic_margins: bool,
+    /// `true`: a hotspot's cones and its tail as one budget (the hotspot lane, 2026-10-31,
+    /// docs/design/hotspot-cone-budget.md): the volcano stage hands the pools at most the tail's
+    /// lavas of the step before for the cones of that hotspot (`Volcano::hotspot`), wherever they
+    /// stand, the rest of a cone relief over rock the plate model already holds, and the tail nets
+    /// what they handed against its own rock (`plates::hotspots`), whatever `hotspots_sourced`
+    /// says. On by default since 2026-10-31 (the coordinator's call, 2026-10-31: a books fix for
+    /// the default, the volcano stage handed the crust 0.50 km³ a year of cone rock no rate
+    /// counted (arm hs-base, 8 runs, base34-s4's physics bit for bit); decisions log
+    /// 2026-10-31). `false`: a hotspot nets the cones on its 150 km kernel only (PLT-286) and the
+    /// rest hand rock no rate made, as before. ledger: PLT-803
+    pub hotspot_cone_budget: bool,
     /// Island-arc crust counts as continental once it is this thick, km: an oceanic sample turns
     /// continental once the arc crust it has built (`arc_oceanic_m`) on top of normal ocean crust
     /// (7 km) reaches it, whatever its height. Cloos (1993): crust thicker than about 15 km is
@@ -1542,6 +1619,13 @@ impl Default for TectonicParams {
             island_arc_convergence_ref_mm_yr: 86.6, // ledger: PLT-666
             continental_arc_convergence_ref_mm_yr: 58.6, // ledger: PLT-666
             arc_front_loaded: true, // ledger: PLT-668 (built 2026-10-25, on since 2026-10-26)
+            island_arc_own_crust: true, // ledger: PLT-760 (built 2026-10-31, on since 2026-10-31)
+            collision_arc_magma: true, // ledger: PLT-763 (built 2026-10-31, on since 2026-10-31)
+            trench_pile_in_place: true, // ledger: PLT-762 (built 2026-10-31, on since 2026-10-31)
+            hotspots_sourced: false, // ledger: PLT-790 (built 2026-10-31, off)
+            plume_heads_sourced: false, // ledger: PLT-795 (built 2026-10-31, off)
+            volcanic_margins: false, // ledger: PLT-799 (built 2026-10-31, off)
+            hotspot_cone_budget: true, // ledger: PLT-803 (on since 2026-10-31)
             arc_mature_crust_km: 15.0, // ledger: PLT-047
             cordillera_shortening_mm_yr: 0.0, // ledger: PLT-048
             cordillera_width_km: 120.0,

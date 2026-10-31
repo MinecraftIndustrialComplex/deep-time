@@ -411,8 +411,37 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
         })
         .collect();
 
-    let hotspots: Vec<Hotspot> = (0..k.hotspots_initial)
+    // With `hotspots_sourced` the catalogue's number of tails at the start, each part way
+    // through its life (an age drawn evenly over it, the steady state of a Poisson birth rate),
+    // with its own buoyancy flux (ledger: PLT-790 to PLT-793).
+    let initial = if k.hotspots_sourced {
+        super::hotspots::sourced::COUNT as u32
+    } else {
+        k.hotspots_initial
+    };
+    let hotspots: Vec<Hotspot> = (0..initial)
         .map(|id| {
+            if k.hotspots_sourced {
+                use super::hotspots::sourced;
+                let life = sourced::lifetime_myr(&mut rng);
+                let born = t0 - rng.range(0.0, life);
+                let flux = sourced::flux_mg_s(&mut rng);
+                return Hotspot {
+                    id,
+                    pos: rng.unit_vector().to_array(),
+                    born_myr: born,
+                    dies_myr: (born + life).max(t0 + k.time_step_myr),
+                    uplift_mm_yr: sourced::volcano_uplift_mm_yr(k, flux),
+                    lip_event: None,
+                    plates: Vec::new(),
+                    track_km: 0.0,
+                    closed: false,
+                    flux_mg_s: flux,
+                    magma_km3_yr: flux * sourced::MAGMA_KM3_YR_PER_MG_S,
+                    head_radius_km: 0.0,
+                    cones: Default::default(),
+                };
+            }
             let born = t0 - rng.range(0.0, 50.0);
             let life = rng.range(k.hotspot_lifetime_myr[0], k.hotspot_lifetime_myr[1]);
             Hotspot {
@@ -425,6 +454,10 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
                 plates: Vec::new(),
                 track_km: 0.0,
                 closed: false,
+                flux_mg_s: 0.0,
+                magma_km3_yr: 0.0,
+                head_radius_km: 0.0,
+                cones: Default::default(),
             }
         })
         .collect();
@@ -454,7 +487,7 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
         resample_myr: t0,
         a0_km2: model_area / np as f64,
         counters: Counters {
-            hotspots: k.hotspots_initial,
+            hotspots: initial,
             ..Counters::default()
         },
         slabs: Vec::new(),

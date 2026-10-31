@@ -666,8 +666,30 @@ impl PlatesStage {
             ),
             // ledger: PLT-554 (measurement only)
             (subduction::ARC_BAND_GLOBAL, pull.arc_band_km_myr),
+            // ledger: PLT-761, PLT-760 (measurement only)
+            (
+                subduction::ARC_CONES_CONTINENTAL_GLOBAL,
+                pull.arc_cones_km3[0],
+            ),
+            (subduction::ARC_CONES_OCEANIC_GLOBAL, pull.arc_cones_km3[1]),
+            // ledger: PLT-763
+            (subduction::ARC_SUTURE_GLOBAL, pull.arc_suture_km3),
+            (
+                subduction::ARC_FRONT_INTRA_OCEANIC_GLOBAL,
+                pull.front_intra_oceanic_km_myr,
+            ),
+            (subduction::SUTURE_FRONT_GLOBAL, pull.suture_front_km_myr[0]),
+            (
+                subduction::SUTURE_FRONT_ACTIVE_GLOBAL,
+                pull.suture_front_km_myr[1],
+            ),
         ] {
             *world.globals.entry(name.to_owned()).or_insert(0.0) += x;
+        }
+        // Measurement only (the crust-budget lane's trace of PLT-760; a global whatever the crust
+        // budget, so recording it changes nothing).
+        for (name, x) in subduction::ARC_SPLIT_GLOBALS.iter().zip(pull.arc_split_km3) {
+            *world.globals.entry((*name).to_owned()).or_insert(0.0) += x;
         }
         lap(&mut clock, "fronts");
         cut_trace::mark(st, &cache.geo, "fronts");
@@ -1106,6 +1128,7 @@ impl PlatesStage {
                 b.write_plates(&st.samples, |i| st.plate_of(i), env.t_myr);
                 b.write_ages(&st.samples, env.t_myr);
             }
+            b.end_step(env.t_myr, env.norm.sample_area_km2(), &world.globals);
             if step >= self.total {
                 world.notes.insert(CRUST_BUDGET_NOTE.to_owned(), b.lines());
             }
@@ -1207,9 +1230,13 @@ impl PlatesStage {
     /// The volcano stage's cones (`surface/volcanic_felsic_m`, `surface/volcanic_mafic_m`) join
     /// the pools as felsic and mafic volcanic rock the same way, after the material (plate task
     /// 8: before, a cone was elevation only and its erosion stripped the crust under it).
-    /// Returns, per sample, the cone rock it received (felsic, mafic, m; empty without feedback),
-    /// which the arcs and hotspots count inside their own rates, and, when `flexure` asks, the
-    /// surface's flexure per sample ([`Self::sample_flexure`]), sampled beside the sums.
+    /// The hotspots' cones under the cone budget (`surface/volcanic_hotspot_felsic_m`,
+    /// `surface/volcanic_hotspot_mafic_m`, ledger: PLT-803) join the pools the same way, after the
+    /// rest, but are not returned: their tails net them by hotspot, so no arc nor kernel counts
+    /// them again by place.
+    /// Returns, per sample, the other cones' rock it received (felsic, mafic, m; empty without
+    /// feedback), which the arcs and hotspots count inside their own rates, and, when `flexure`
+    /// asks, the surface's flexure per sample ([`Self::sample_flexure`]), sampled beside the sums.
     fn apply_surface_feedback(
         &mut self,
         st: &mut PlateState,
@@ -1220,6 +1247,14 @@ impl PlatesStage {
         let cone_fields = [
             world.fields.remove(crate::surface::field::VOLCANIC_FELSIC),
             world.fields.remove(crate::surface::field::VOLCANIC_MAFIC),
+        ];
+        let hot_fields = [
+            world
+                .fields
+                .remove(crate::surface::field::VOLCANIC_HOTSPOT_FELSIC),
+            world
+                .fields
+                .remove(crate::surface::field::VOLCANIC_HOTSPOT_MAFIC),
         ];
         let Some(fb) = world.fields.remove(crate::surface::field::FEEDBACK) else {
             return Ok((Vec::new(), None, None));
@@ -1243,6 +1278,9 @@ impl PlatesStage {
             .map(|f| f.data.as_slice());
         let cone_fields: [Option<Field>; 2] =
             cone_fields.map(|f| f.filter(|f| f.data.len() == grid.cells()));
+        let hot_fields: [Option<Field>; 2] =
+            hot_fields.map(|f| f.filter(|f| f.data.len() == grid.cells()));
+        let hot_any = hot_fields.iter().any(Option::is_some);
         let parts: Option<Vec<Field>> = if st.gap_budget.is_some() {
             parts
                 .into_iter()
@@ -1278,6 +1316,7 @@ impl PlatesStage {
             m: f64,
             mz: f64,
             c: [f64; 2],
+            h: [f64; 2],
             wh: f64,
             zh: f64,
         }
@@ -1305,6 +1344,8 @@ impl PlatesStage {
                             .as_ref()
                             .map_or(0.0, |f| f64::from(f.data[c]))
                     });
+                    let hot = [0, 1]
+                        .map(|k| hot_fields[k].as_ref().map_or(0.0, |f| f64::from(f.data[c])));
                     let pc = parts
                         .as_ref()
                         .map(|p| std::array::from_fn::<f64, SP, _>(|k| f64::from(p[k].data[c])));
@@ -1322,6 +1363,10 @@ impl PlatesStage {
                             a.m += w * dm;
                             a.c[0] += w * cone[0];
                             a.c[1] += w * cone[1];
+                            if hot_any {
+                                a.h[0] += w * hot[0];
+                                a.h[1] += w * hot[1];
+                            }
                             if held {
                                 a.wh += w;
                                 if taken {
@@ -1369,13 +1414,13 @@ impl PlatesStage {
             })
             .collect();
         let gravity = env.gravity;
-        let applied: Vec<([f64; 2], f64)> = st
+        let applied: Vec<([f64; 2], [f64; 2], f64)> = st
             .samples
             .par_iter_mut()
             .enumerate()
             .map(|(v, s)| {
                 if wsum(v) <= 0.0 {
-                    return ([0.0; 2], 0.0);
+                    return ([0.0; 2], [0.0; 2], 0.0);
                 }
                 let dm = sums[v].m / wsum(v);
                 if dm < 0.0 {
@@ -1395,10 +1440,22 @@ impl PlatesStage {
                     s.pools[p] += x as f32;
                     got[k] = x;
                 }
+                // The budgeted hotspots' cones, apart (ledger: PLT-803).
+                let mut hot = [0.0f64; 2];
+                if hot_any {
+                    for (k, p) in [pool::FELSIC_VOLCANIC, pool::MAFIC_VOLCANIC]
+                        .into_iter()
+                        .enumerate()
+                    {
+                        let x = (sums[v].h[k] / wsum(v)).max(-f64::from(s.pools[p]));
+                        s.pools[p] += x as f32;
+                        hot[k] = x;
+                    }
+                }
                 let cone_iso = pools::isostatic_change_m(&before, &s.pools, gravity);
                 pools::diagenesis(&mut s.pools, gravity);
                 s.thickness_m = s.pools.iter().sum();
-                (got, cone_iso)
+                (got, hot, cone_iso)
             })
             .collect();
         // The light rock taken off the top or laid on it, for the settling (ledger: PLT-780).
@@ -1418,9 +1475,21 @@ impl PlatesStage {
             .into_iter()
             .enumerate()
         {
-            let km3: f64 = applied.iter().map(|(c, _)| c[k]).sum::<f64>() * area / 1000.0;
+            let km3: f64 = applied.iter().map(|(c, h, _)| c[k] + h[k]).sum::<f64>() * area / 1000.0;
             *world.globals.entry(name.to_owned()).or_insert(0.0) += km3;
         }
+        // Measurement (ledger: PLT-804): of the cones' rock, what continental crust took, so the
+        // crust budget's surface part (booked with erosion) can be read with the cones out.
+        let continental: f64 = applied
+            .iter()
+            .zip(&st.samples)
+            .filter(|(_, s)| s.kind == CONTINENTAL)
+            .map(|((c, h, _), _)| c[0] + c[1] + h[0] + h[1])
+            .sum();
+        *world
+            .globals
+            .entry(CONE_CONTINENTAL_GLOBAL.to_owned())
+            .or_insert(0.0) += continental * area / 1000.0;
         if let Some(gb) = st.gap_budget.as_mut() {
             // By the weight of every cell, as its elevation (ISO-125).
             let mean = |sum: &dyn Fn(usize) -> f64| -> Vec<f64> {
@@ -1443,7 +1512,7 @@ impl PlatesStage {
                 }
             };
             let surface: Vec<Vec<f64>> = (0..SP).map(part).collect();
-            let cone_iso: Vec<f64> = applied.iter().map(|&(_, x)| x).collect();
+            let cone_iso: Vec<f64> = applied.iter().map(|&(_, _, x)| x).collect();
             gb.book_surface(&st.samples, &m, &surface, &cone_iso);
         }
         let applied_dz = coupling.interpolate(mesh, |v| dz[v as usize]);
@@ -1457,7 +1526,7 @@ impl PlatesStage {
         Ok((
             applied
                 .into_iter()
-                .map(|(c, _)| c.map(|x| x.max(0.0)))
+                .map(|(c, _, _)| c.map(|x| x.max(0.0)))
                 .collect(),
             flexure,
             held,
@@ -1551,6 +1620,8 @@ fn flexure_of(links: &[CellLink], tris: &[[u32; 3]], n: usize, field: &Field) ->
 pub const CONE_FELSIC_GLOBAL: &str = "plates/cone_felsic_km3";
 /// … and as mafic volcanic rock (shields, the flood basalts' plateaus), km³.
 pub const CONE_MAFIC_GLOBAL: &str = "plates/cone_mafic_km3";
+/// … and of both, what continental crust took, km³ (measurement; ledger: PLT-804).
+pub const CONE_CONTINENTAL_GLOBAL: &str = "plates/cone_continental_km3";
 
 /// `WorldState::globals`: visible continental sample-steps standing at the elevation cap, and all
 /// visible continental sample-steps.
@@ -1761,7 +1832,7 @@ fn finish_samples(st: &mut PlateState, geo: &Geo, z0: &[f32], env: &Env<'_>) {
     // column's thickness: the plate model keeps crust stacked at resamplings under the oceanic
     // label (`transition.rs`), and that is no arc. Until 2026-10-02 a mature arc also had to
     // stand above sea level that step; most intra-oceanic arcs are submarine (Stern 2010).
-    let mature_m = (env.k.arc_mature_crust_km * 1000.0 - transition::oceanic_m()).max(0.0) as f32;
+    let mature_m = subduction::mature_arc_m(env.k);
     let thermal_heat = env.k.thermal_state;
     let thermal_reference = env.k.thermal_reference_km as f32;
     st.samples.par_iter_mut().enumerate().for_each(|(i, s)| {
@@ -1770,8 +1841,10 @@ fn finish_samples(st: &mut PlateState, geo: &Geo, z0: &[f32], env: &Env<'_>) {
             && s.arc_oceanic_m > 0.0
             && s.arc_oceanic_m >= mature_m
         {
-            // The ocean crust under the arc stays under it, as its basement (ledger: PLT-331).
+            // The ocean crust under the arc stays under it, as its basement (ledger: PLT-331), and
+            // the crust is an island arc's (ledger: PLT-760).
             s.make_continental();
+            s.set_island_arc(true);
             s.flags |= EMERGED;
             if s.orogeny != OROGENY_HIMALAYAN {
                 s.orogeny = OROGENY_ANDEAN;

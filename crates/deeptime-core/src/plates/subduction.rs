@@ -510,6 +510,7 @@ pub fn resolve(
                     reversed: false,
                     carried: false,
                     arc_onset_myr: None,
+                    arc_intra_oceanic: false,
                 });
                 let k = state.contacts.len() - 1;
                 index.insert((lo, hi), k);
@@ -555,7 +556,8 @@ pub fn resolve(
             // Once stacked it stays so while it is under (ledger: PLT-291): the belt counted it
             // when it crossed the front, and a collision that ends (a parting, a transfer, a weld)
             // does not make it crust to accrete again.
-            s.stacked |= own.is_some() && s.kind == CONTINENTAL;
+            let stacked = s.stacked() || (own.is_some() && s.kind == CONTINENTAL);
+            s.set_stacked(stacked);
             if let Some(was) = &was_hidden
                 && s.kind == CONTINENTAL
                 && !was[o.i as usize]
@@ -585,7 +587,8 @@ pub fn resolve(
         }
     }
     for s in &mut state.samples {
-        s.stacked &= s.is_hidden();
+        let stacked = s.stacked() && s.is_hidden();
+        s.set_stacked(stacked);
     }
     // Held ocean floor that turned continental this step (`make_continental` above) is let go:
     // from the next step on it is judged as continental crust.
@@ -676,6 +679,20 @@ fn continent_within(
     steps: u32,
     hidden: impl Fn(usize) -> bool,
 ) -> bool {
+    continent_within_by(state, geo, i, steps, hidden, |s| s.kind == CONTINENTAL)
+}
+
+/// [`continent_within`] with the test of what counts as the continent's crust: the arc's onset
+/// with `island_arc_own_crust` reads a continent's own crust, not crust an intra-oceanic arc made
+/// ([`island_arc_crust`]; ledger: PLT-760).
+fn continent_within_by(
+    state: &PlateState,
+    geo: &Geo,
+    i: u32,
+    steps: u32,
+    hidden: impl Fn(usize) -> bool,
+    continent: impl Fn(&super::state::Sample) -> bool,
+) -> bool {
     let p = state.plate_of(i as usize);
     let mut seen = vec![i];
     let mut frontier = vec![i];
@@ -683,7 +700,7 @@ fn continent_within(
         let mut next = Vec::new();
         for &v in &frontier {
             let s = &state.samples[v as usize];
-            if s.kind == CONTINENTAL && !hidden(v as usize) {
+            if continent(s) && !hidden(v as usize) {
                 return true;
             }
             if depth == steps {
@@ -790,6 +807,7 @@ fn reverse(
     c.andean = false;
     // The new polarity's slab is new: its arc begins when it passes incipient (PLT-669).
     c.arc_onset_myr = None;
+    c.arc_intra_oceanic = false; // ledger: PLT-760
     // A reversal a geologist could map is one of a subduction zone that was confirmed, counted
     // when the new polarity is confirmed in turn (`confirm`; measurement, ledger PLT-514).
     c.reversed = old.onset_event.is_some();
@@ -868,6 +886,11 @@ struct Source {
     /// The front is incipient (PLT-610): its slab has not yet sunk far enough to melt an arc, or
     /// its oceanic slab comes in too slowly for a slab to form (PLT-681).
     incipient: bool,
+    /// Continental crust at the front that is no crust-suturing front: a terrane its contact's
+    /// slab drags down whole (PLT-770, `Collision::subducting`), which goes down instead of
+    /// suturing, so PLT-763's suture magma and the suture fronts leave it out (PR #53's
+    /// re-review).
+    dragged: bool,
 }
 
 /// World global: arc crust added to continental crust over the run, km³ (Earth-normalized).
@@ -919,6 +942,20 @@ pub const ISLAND_ARC_BURST_MYR: f64 = 10.0;
 /// years").
 pub const ISLAND_ARC_MATURE_KM3_PER_KM_MYR: f64 = 30.0;
 
+/// Arc magma at crust-suturing subduction zones (`tectonics.collision_arc_magma`), km³ per km of
+/// collision front per Myr: Scholl & von Huene's global arc addition during suturing, 0.2 AU
+/// (2009, abstract: "During collisional suturing at fossil CSSZs, global arc magmatic addition is
+/// estimated at 0.2 AU"), over the global length of collision zones they presume it on, "c. 6000
+/// km" (the same abstract); 0.2 km³/yr / 6,000 km is 33.3 (the agent's arithmetic, as PLT-045's
+/// 100 is Stern & Scholl's 1.5 AU over 14,500 km). Stern & Scholl 2010, Table 1: "Additions at
+/// crust-suturing subduction zones 0.2". ledger: PLT-763
+pub const SUTURE_ARC_AU: f64 = 0.2;
+pub const SUTURE_LENGTH_KM: f64 = 6000.0;
+pub const SUTURE_ARC_KM3_PER_KM_MYR: f64 = SUTURE_ARC_AU * 1.0e6 / SUTURE_LENGTH_KM;
+/// World global: the arc magma crust-suturing fronts added over the run, km³ (Earth-normalized;
+/// with `collision_arc_magma`; measurement, the crust budget's suturing addition). ledger: PLT-763
+pub const ARC_SUTURE_GLOBAL: &str = "plates/arc_suture_km3";
+
 /// An island arc's crust per km of arc per Myr at its reference, and the factor on it, at arc age
 /// `age_myr` (from its contact's `arc_onset_myr`; `None` before the onset) and orthogonal
 /// convergence `v_n_mm_yr`: the rate is their product. Off (`arc_front_loaded`), the one rate
@@ -950,6 +987,95 @@ pub const ARC_FRONT_STRAIGHT_GLOBAL: &str = "plates/arc_front_straight_km_myr";
 /// ([`Pull::arc_band_km_myr`]; measurement: the arcs' crust is made over this length, against the
 /// straight front above). ledger: PLT-554
 pub const ARC_BAND_GLOBAL: &str = "plates/arc_band_km_myr";
+/// World globals: the felsic cones the arcs counted inside their rates over the run, km³, on the
+/// crust of the continental arcs' law and of the island arcs' ([`Pull::arc_cones_km3`]): with
+/// [`ARC_CONTINENTAL_GLOBAL`] and [`ARC_OCEANIC_GLOBAL`], the arcs' whole rock (measurement;
+/// ledger: PLT-761).
+pub const ARC_CONES_CONTINENTAL_GLOBAL: &str = "plates/arc_cones_continental_km3";
+pub const ARC_CONES_OCEANIC_GLOBAL: &str = "plates/arc_cones_oceanic_km3";
+/// World global: the oceanic fronts past incipient of arcs that began intra-oceanic, km × Myr
+/// ([`Pull::front_intra_oceanic_km_myr`]; measurement; ledger: PLT-760).
+pub const ARC_FRONT_INTRA_OCEANIC_GLOBAL: &str = "plates/arc_front_intra_oceanic_km_myr";
+/// World globals: the collision fronts (the subducting plate's continental crust at the front)
+/// over the run, km × Myr, and of them those past incipient, where PLT-763's suture magma can
+/// act: its contact's slab at PLT-611's 100 km or more. `forces::grow_slab` sets the slab to 0
+/// only once continental crust has held at least half the contact's front for
+/// `slab_breakoff_myr` (FRC-019), and any oceanic front sample lengthens it again, so the
+/// breakoff does not end the suture's arcs: a mostly oceanic contact never breaks off, and the
+/// magma resumes once the slab is back at 100 km. The second over the first is the share of the
+/// collision front where the magma acts (measurement; ledger: PLT-763).
+pub const SUTURE_FRONT_GLOBAL: &str = "plates/suture_front_km_myr";
+pub const SUTURE_FRONT_ACTIVE_GLOBAL: &str = "plates/suture_front_active_km_myr";
+/// World globals: where the arcs' magma went by its law, its arc's setting at onset and the crust
+/// it landed on, km³ of rock over the run (measurement only, the crust-budget lane's trace of
+/// PLT-760). "Island-arc crust" here is PLT-220's test (`dynamics::is_island_arc` on continental
+/// crust: its island-arc magma above its continental-arc magma, and some), so the split reads
+/// against `tools/review/crustcycle/probe.py MODE=arcs`. In order, the continental arcs' law:
+/// on island-arc crust under an arc that began at a continent; on island-arc crust under an arc
+/// that began intra-oceanic where `island_arc_crust` says no (crust not marked as an island arc's:
+/// a continent's own crust that took island-arc magma, and before PR #53's re-review a matured
+/// arc's edge that a resampling blended under the 8 km line, its leak B); the same where it says
+/// yes (only with `island_arc_own_crust` off: the magma PLT-760 moves to the island law);
+/// on other continental crust; a suture's magma on island-arc crust; on other crust; then the
+/// island arcs' law on continental crust (PLT-760's own). (The trace runs of 2026-10-31, before
+/// `island_arc_crust` read the basement alone, had an eighth: of the second, the part with an
+/// ocean basement whose half line failed.)
+pub const ARC_SPLIT_GLOBALS: [&str; 7] = [
+    "plates/arc_split_c_io_crust_continent_onset_km3",
+    "plates/arc_split_c_io_crust_io_onset_not_island_km3",
+    "plates/arc_split_c_io_crust_io_onset_island_km3",
+    "plates/arc_split_c_other_crust_km3",
+    "plates/arc_split_suture_io_crust_km3",
+    "plates/arc_split_suture_other_crust_km3",
+    "plates/arc_split_o_on_continental_km3",
+];
+
+/// Crust an intra-oceanic arc is built on: ocean floor, or an earlier intra-oceanic arc, the
+/// continental crust an island arc made over its ocean floor, against a continent's own crust.
+/// Stern 2010 (GSL Spec. Publ. 338, p. 8, read in full by the research sub-agent): "IOASs are
+/// built on oceanic crust, whereas Andean-type arcs are built on pre-existing continental crust";
+/// their basements include "earlier intra-oceanic arcs, accretionary complexes and oceanic
+/// plateaux" (Gerya 2011's account of Leat & Larter 2003). The rule takes the first and leaves
+/// out the other two: this model has no oceanic plateaux, and its accretionary crust is a
+/// continent's (the trench sediment accreted to the overriding plate). The class is the column's
+/// mark (`Sample::island_arc_marked`): set where an ocean column matured into continental crust
+/// under island-arc magma (PLT-047, its ocean crust its basement, PLT-331), and carried through a
+/// resampling from the nearest corner as the kind is (`ridges::interpolate`). The other columns
+/// with an ocean basement are a continent's crust on ocean floor, not an arc's basement: a
+/// sediment margin (PLT-661, the continents' sediment at a passive margin, where an arc would be
+/// Andean-type), ocean floor thickened at a contact to a continental column's crystalline crust
+/// and turned continental (PLT-289) and a spread's receiver (PLT-662, an orogen's crust); none is
+/// marked. Until the review of PR #53 (2026-10-31) the class was read from the column's basement
+/// and island-arc crust against the 8 km line, which a resampling blends differently (the arc
+/// crust over all three corners, ocean floor included; the basement over the column's own class):
+/// a matured arc's edge beside its ocean flank fell under the line and read as a continent's own
+/// crust, and a continent's own column beside an accreted arc took a share of both and passed.
+/// Before that, a game-choice line ("own crystalline crust at most twice the island-arc magma"),
+/// then any basement. ledger: PLT-760
+pub fn island_arc_crust(s: &super::state::Sample) -> bool {
+    s.kind != CONTINENTAL || s.island_arc_marked()
+}
+
+/// The island-arc crust that turns an ocean column continental, m (PLT-047): `arc_mature_crust_km`
+/// less the ocean's own crust.
+pub fn mature_arc_m(k: &crate::params::TectonicParams) -> f32 {
+    (k.arc_mature_crust_km * 1000.0 - super::transition::oceanic_m()).max(0.0) as f32
+}
+
+/// Whether arc magma landing on `s` follows the island arcs' law (PLT-045, PLT-668) rather than
+/// the continental arcs' (PLT-285): ocean floor always; with `island_arc_own_crust` also the
+/// crust an intra-oceanic arc made ([`island_arc_crust`]) when the contact's arc began
+/// intra-oceanic (`Contact::arc_intra_oceanic`). Stern & Scholl 2010 (p. 11) give the
+/// front-loaded law for the intra-oceanic arcs they list, the Izu-Bonin-Mariana among them,
+/// whose crust is far thicker than the 8 km that turns a column continental here (PLT-047).
+/// ledger: PLT-760
+pub fn arc_is_island(
+    k: &crate::params::TectonicParams,
+    intra_oceanic: bool,
+    s: &super::state::Sample,
+) -> bool {
+    s.kind != CONTINENTAL || (k.island_arc_own_crust && intra_oceanic && island_arc_crust(s))
+}
 /// World global: crust shortened into the arcs' cordilleras over the run, km³ (moved, not made).
 pub const CORDILLERA_GLOBAL: &str = "plates/cordillera_shortened_km3";
 
@@ -977,6 +1103,9 @@ pub struct Pull {
     pub front_oceanic_km_myr: f64,
     /// Crust shortened into cordilleras this step, km³ (moved from behind the ranges).
     pub cordillera_km3: f64,
+    /// Arc crust the crust-suturing fronts added this step, km³ (Earth-normalized; with
+    /// `collision_arc_magma`, ledger PLT-763), in neither arc row above.
+    pub arc_suture_km3: f64,
     /// Oceanic fronts this step weighted by the arcs' convergence factor min(v / v_0, 1), km × Myr,
     /// with v the full relative speed …
     pub front_g_full_km_myr: f64,
@@ -1000,6 +1129,19 @@ pub struct Pull {
     /// the arc (√π · `arc_width_km`); a straight front's band gives its length (measurement;
     /// ledger: PLT-554).
     pub arc_band_km_myr: f64,
+    /// The volcano stage's felsic cones the arcs counted inside their rates this step (their
+    /// extrusive rock, PLT-286), on the crust of the continental arcs' law and of the island
+    /// arcs', km³ (Earth-normalized; measurement: `arc_*_km3` holds the arcs' rock less these).
+    /// ledger: PLT-761
+    pub arc_cones_km3: [f64; 2],
+    /// Oceanic fronts past incipient whose contact's arc began intra-oceanic, km × Myr
+    /// (measurement, the island arcs' front by their setting at onset; ledger: PLT-760).
+    pub front_intra_oceanic_km_myr: f64,
+    /// The collision fronts this step and of them those past incipient, km × Myr
+    /// ([`SUTURE_FRONT_GLOBAL`], [`SUTURE_FRONT_ACTIVE_GLOBAL`]; measurement, PLT-763).
+    pub suture_front_km_myr: [f64; 2],
+    /// The arcs' rock by law, setting and crust ([`ARC_SPLIT_GLOBALS`]), km³ (measurement).
+    pub arc_split_km3: [f64; 7],
     /// The step's erosive fronts and their forearcs ([`erode_forearcs`]); `None` while the rule is
     /// off.
     pub forearcs: Option<Forearcs>,
@@ -1076,12 +1218,18 @@ struct Effect {
     rate_mm_yr: f64,
     /// The sample is continental and rose fast enough for an Andean orogeny.
     andean: bool,
-    /// Arc crust added to a continental sample, m.
+    /// Arc crust added at the continental arcs' law, m: to a continental sample, or with
+    /// `island_arc_own_crust` to continental crust no intra-oceanic arc made (ledger: PLT-760).
     continental_m: f64,
-    /// Arc crust added to an oceanic sample, m.
+    /// Arc crust added at the island arcs' law, m: to an oceanic sample, or with
+    /// `island_arc_own_crust` to the crust an intra-oceanic arc made.
     oceanic_m: f64,
     /// Crust shortened into a cordillera sample, m.
     cordillera_m: f64,
+    /// Arc crust a crust-suturing front added, m (ledger: PLT-763).
+    suture_m: f64,
+    /// Arc crust by law, setting and crust ([`ARC_SPLIT_GLOBALS`]), m (measurement).
+    split_m: [f64; 7],
 }
 
 /// The volcanic share of an arc's crust: continental arcs about 1 in 8 (an intrusive to extrusive
@@ -1105,6 +1253,10 @@ struct Plan {
     /// A source's share of the strain: 1, or with `tectonics.thermal_backstop` its lithosphere's
     /// weakness (`thermal::backstop_weight`, ledger: PLT-470).
     weight: f64,
+    /// The arc magma follows the island arcs' law (ledger: PLT-760, [`arc_is_island`]).
+    island: bool,
+    /// The magma is a crust-suturing front's (`collision_arc_magma`; ledger: PLT-763).
+    suture: bool,
 }
 
 /// Per contact: what its arcs and cordillera add up to this step.
@@ -1113,6 +1265,9 @@ struct Budget {
     volcanic_m: f64,
     plutonic_m: f64,
     cones_m: f64,
+    /// The felsic cones it counts inside its rate, on the crust of the continental arcs' law and
+    /// of the island arcs' (measurement: `plates/arc_cones_*_km3`).
+    cones_by_law_m: [f64; 2],
     demand_m: f64,
     supply_m: f64,
     supply_pools: [f64; pool::COUNT],
@@ -1523,6 +1678,12 @@ pub fn fronts_finish(
     let mut front_normal = [0.0_f64; 2];
     // The same two whose arc is younger than the early pulse (measurement; PLT-670).
     let mut front_young = [0.0_f64; 2];
+    // The arcs begun this step, whether one of their fronts had continental crust within the
+    // arc's distance, and the fronts of intra-oceanic arcs past incipient, km × Myr (ledger:
+    // PLT-760).
+    let mut begun_now = vec![false; state.contacts.len()];
+    let mut continent_at_onset = vec![false; state.contacts.len()];
+    let mut front_intra_oceanic = 0.0_f64;
     let front_km = norm.km(norm.spacing_rad());
     let arc_steps = (k.arc_distance_km / front_km).floor() as u32;
     // A front sample's length of front, km: its share of the straight front with `front_share`
@@ -1535,6 +1696,8 @@ pub fn fronts_finish(
         }
     };
     let mut straight_km_myr = 0.0_f64;
+    // The collision fronts and those past incipient (measurement; PLT-763).
+    let mut suture_front = [0.0_f64; 2];
     for (v, b) in boundary.iter().enumerate() {
         let s = &mut state.samples[v];
         if b.divergent {
@@ -1550,6 +1713,11 @@ pub fn fronts_finish(
     let mut g_continental_km_myr = [0.0_f64; 2];
     // Subduction erosion's fronts (PLT-441, PLT-442), in the order of the distance field's labels.
     let erosion_rate = k.subduction_erosion_km3_per_km_myr; // ledger: PLT-441
+    // The erosive margin's cover line in rock (ledger: PLT-442, PLT-762).
+    let erosion_cover_m = super::ridges::trench_line_solid_m(
+        k.trench_pile_in_place,
+        k.subduction_erosion_max_sediment_m,
+    );
     let (mut loss_km3, mut loss_continental, mut loss_front) = (Vec::new(), Vec::new(), Vec::new());
     let mut loss_km = Vec::new();
     for (v, b) in boundary.iter().enumerate() {
@@ -1571,7 +1739,7 @@ pub fn fronts_finish(
                 let cover = f64::from(su.pools[pool::SEDIMENT] + su.pools[pool::SEDIMENTARY]);
                 let erosive = su.kind != CONTINENTAL
                     && across >= k.subduction_erosion_min_mm_yr
-                    && cover < k.subduction_erosion_max_sediment_m;
+                    && cover < erosion_cover_m;
                 // At least a sliver of front where the share is 0, so the front is still
                 // marked erosive (its retreat's chance and its volume are then 0).
                 loss_km3.push(if erosive {
@@ -1606,6 +1774,11 @@ pub fn fronts_finish(
             } else {
                 0.0
             };
+            let dragged = su.kind == CONTINENTAL
+                && state.contacts[c]
+                    .collision
+                    .as_ref()
+                    .is_some_and(|col| col.subducting);
             info.push(Source {
                 contact: c,
                 rel,
@@ -1617,7 +1790,14 @@ pub fn fronts_finish(
                 sediment: f64::from(su.pools[pool::SEDIMENT]),
                 oceanic_slab: su.kind != CONTINENTAL,
                 incipient: incipient_here,
+                dragged,
             });
+            if su.kind == CONTINENTAL && !dragged {
+                suture_front[0] += len_km * env.dt_myr;
+                if !incipient_here {
+                    suture_front[1] += len_km * env.dt_myr;
+                }
+            }
             // Only an oceanic slab counts as a front that pulls: continental crust at the front
             // is buoyant, and where it comes in the collision resists instead (`forces.rs`).
             // ledger: PLT-251
@@ -1628,19 +1808,56 @@ pub fn fronts_finish(
                     subducting_fronts.push(v as u32);
                     subducting_detail.push((u, normal));
                 }
+                // By the crust the arc stands on, as the boundary mix counts it (ledger: PLT-370).
+                let continent_near = continent_within(state, geo, v as u32, arc_steps, |u| {
+                    state.samples[u].is_hidden()
+                });
+                // The arc's setting at its onset: with `island_arc_own_crust` by a continent's
+                // own crust within the arc's distance, so an arc begun behind an earlier
+                // intra-oceanic arc (a reversal's, PLT-056 and PLT-737) is intra-oceanic as Stern
+                // 2010 counts it (ledger: PLT-760); off, by any continental column, as the
+                // counters read it.
+                let onset_continent = |state: &PlateState| {
+                    if k.island_arc_own_crust {
+                        continent_within_by(
+                            state,
+                            geo,
+                            v as u32,
+                            arc_steps,
+                            |u| state.samples[u].is_hidden(),
+                            |s| s.kind == CONTINENTAL && !island_arc_crust(s),
+                        )
+                    } else {
+                        continent_near
+                    }
+                };
+                let begins =
+                    !incipient_here && (state.contacts[c].arc_onset_myr.is_none() || begun_now[c]);
+                let onset_near = begins && onset_continent(state);
                 // The arc begins at its contact's first oceanic front past incipient (a sample
                 // too slow for a slab is not, PLT-681), and is young until the early pulse ends
-                // (ledger: PLT-669, PLT-670).
+                // (ledger: PLT-669, PLT-670). Its setting is the crust at its fronts that step:
+                // intra-oceanic where none of them has a continent's crust within the arc's
+                // distance (`onset_near`, above; ledger: PLT-760).
                 let arc_young = !incipient_here && {
-                    let onset = *state.contacts[c].arc_onset_myr.get_or_insert(t_myr);
-                    t_myr - onset < ISLAND_ARC_BURST_MYR
+                    let con = &mut state.contacts[c];
+                    if con.arc_onset_myr.is_none() {
+                        con.arc_onset_myr = Some(t_myr);
+                        begun_now[c] = true;
+                    }
+                    if begun_now[c] {
+                        continent_at_onset[c] |= onset_near;
+                    }
+                    t_myr - con.arc_onset_myr.unwrap_or(t_myr) < ISLAND_ARC_BURST_MYR
                 };
                 let young_km_myr = if arc_young { len_km * env.dt_myr } else { 0.0 };
-                // Measurement only: by the crust the arc stands on, as the boundary mix counts it
-                // (ledger: PLT-370).
-                if continent_within(state, geo, v as u32, arc_steps, |u| {
-                    state.samples[u].is_hidden()
-                }) {
+                // Measurement: the front of an intra-oceanic arc, by its setting at its onset
+                // (ledger: PLT-760).
+                if !incipient_here && state.contacts[c].arc_intra_oceanic {
+                    front_intra_oceanic += len_km * env.dt_myr;
+                }
+                // Measurement only (ledger: PLT-370).
+                if continent_near {
                     front_continental += len_km * env.dt_myr;
                     front_normal[0] += len_km * env.dt_myr * across;
                     front_young[0] += young_km_myr;
@@ -1650,6 +1867,12 @@ pub fn fronts_finish(
                     front_young[1] += young_km_myr;
                 }
             }
+        }
+    }
+    // The arcs begun this step take their setting (ledger: PLT-760).
+    for (c, con) in state.contacts.iter_mut().enumerate() {
+        if begun_now[c] {
+            con.arc_intra_oceanic = !continent_at_onset[c];
         }
     }
 
@@ -1695,17 +1918,31 @@ pub fn fronts_finish(
             }
             let src = &info[label[i] as usize];
             // Arcs and their ranges are an oceanic slab's: continental crust forced under at a
-            // collision front makes no arc (plate task 8).
+            // collision front makes no arc (plate task 8) …
             if !src.oceanic_slab {
-                return Plan::default();
+                // … unless `collision_arc_magma`: Scholl & von Huene's arc addition during
+                // suturing, over the same band, at any convergence (ledger: PLT-763).
+                if !(k.collision_arc_magma && slab_arc(i) && !src.incipient && !src.dragged) {
+                    return Plan::default();
+                }
+                let axis = SUTURE_ARC_KM3_PER_KM_MYR / band_km * 1000.0 * env.dt_myr;
+                return Plan {
+                    magma_m: axis * w_arc_of(norm.km(d), k),
+                    island: arc_is_island(k, contacts[src.contact].arc_intra_oceanic, s),
+                    suture: true,
+                    ..Plan::default()
+                };
             }
             let d_km = norm.km(d);
             let continental = s.kind == CONTINENTAL;
+            // The arc's type: the column's label, or with `island_arc_own_crust` the island law
+            // on the crust an intra-oceanic arc made, whatever its label (ledger: PLT-760).
+            let island = arc_is_island(k, contacts[src.contact].arc_intra_oceanic, s);
             // The arc's rate per km is its type's rate at Earth's mean orthogonal convergence of
             // that type's arcs, times v_n over that mean, with no cap: Stern & Scholl's rates are
             // averages over Earth's arcs at Earth's convergences, so scaling them by
             // min(v / 100 mm/yr, 1) counted the convergence twice. ledger: PLT-665, PLT-666
-            let (axis, g) = if continental {
+            let (axis, g) = if !island {
                 (
                     continental_axis_m,
                     src.normal / k.continental_arc_convergence_ref_mm_yr,
@@ -1730,6 +1967,7 @@ pub fn fronts_finish(
             };
             let mut plan = Plan {
                 magma_m,
+                island,
                 ..Plan::default()
             };
             // Past the slab's ends no range and no crust shortened into it (`margin_slab_ends`,
@@ -1789,22 +2027,26 @@ pub fn fronts_finish(
             continue;
         }
         let src = &info[label[i] as usize];
-        if !src.oceanic_slab {
+        // A collision front's samples count only for the magma `collision_arc_magma` gives them
+        // (ledger: PLT-763).
+        if !src.oceanic_slab && !plan.suture {
             continue;
         }
-        if slab_arc(i) && !src.incipient {
+        if src.oceanic_slab && slab_arc(i) && !src.incipient {
             band_weight += w_arc_of(norm.km(dist[i]), k);
         }
         let b = &mut budget[src.contact];
-        let share = if s.kind == CONTINENTAL {
-            CONTINENTAL_VOLCANIC_SHARE
-        } else {
+        // By the arc's law (the column's label unless `island_arc_own_crust`; PLT-760).
+        let share = if plan.island {
             ISLAND_VOLCANIC_SHARE
+        } else {
+            CONTINENTAL_VOLCANIC_SHARE
         };
         b.volcanic_m += share * plan.magma_m;
         b.plutonic_m += (1.0 - share) * plan.magma_m;
         if let Some(c) = cones.get_mut(i) {
             b.cones_m += c[0];
+            b.cones_by_law_m[usize::from(plan.island)] += c[0];
             c[0] = 0.0;
         }
         b.demand_m += plan.demand_m;
@@ -1875,6 +2117,8 @@ pub fn fronts_finish(
             let continental = s.kind == CONTINENTAL;
             let (mut added_continental, mut added_oceanic, mut cordillera) =
                 (0.0_f64, 0.0_f64, 0.0_f64);
+            let mut suture = 0.0_f64;
+            let mut split = [0.0_f64; 7];
             // Cortial's h(z̃) uplift is the oceanic slab's: where continental crust comes in, the
             // collision belt (`belts.rs`) builds the relief from the crust shortened. Past the
             // slab's ends none, and no folds (`margin_slab_ends`, PLT-562).
@@ -1909,13 +2153,34 @@ pub fn fronts_finish(
             let m = plan.magma_m;
             if m > 0.0 {
                 let before_m = s.arc_continental_m + s.arc_oceanic_m;
-                if continental {
+                // Measurement (ARC_SPLIT_GLOBALS): the crust as it was before this magma.
+                let io_crust = s.kind == CONTINENTAL
+                    && s.arc_oceanic_m > s.arc_continental_m
+                    && s.arc_oceanic_m > 0.0;
+                let io_onset = contacts[src.contact].arc_intra_oceanic;
+                let own_island = island_arc_crust(s);
+                // By the arc's law: the column's label, or with `island_arc_own_crust` the island
+                // law on the crust an intra-oceanic arc made (ledger: PLT-760).
+                if !plan.island {
                     let v = m * CONTINENTAL_VOLCANIC_SHARE * qv;
                     let p = m * (1.0 - CONTINENTAL_VOLCANIC_SHARE) * qp;
+                    let slot = match (plan.suture, io_crust, io_onset, own_island) {
+                        (true, true, _, _) => 4,
+                        (true, false, _, _) => 5,
+                        (false, true, false, _) => 0,
+                        (false, true, true, false) => 1,
+                        (false, true, true, true) => 2,
+                        (false, false, _, _) => 3,
+                    };
+                    split[slot] += v + p;
                     s.pools[pool::FELSIC_PLUTONIC] += p as f32;
                     s.pools[pool::FELSIC_VOLCANIC] += v as f32;
                     s.arc_continental_m += m as f32;
-                    added_continental += v + p;
+                    if plan.suture {
+                        suture += v + p;
+                    } else {
+                        added_continental += v + p;
+                    }
                 } else {
                     let v = m * ISLAND_VOLCANIC_SHARE * qv;
                     let p = m * (1.0 - ISLAND_VOLCANIC_SHARE) * qp;
@@ -1924,7 +2189,14 @@ pub fn fronts_finish(
                     s.pools[pool::FELSIC_PLUTONIC] += p as f32;
                     // The arc's crust counts whole, its cones included, towards its maturity.
                     s.arc_oceanic_m += m as f32;
-                    added_oceanic += v + p;
+                    if s.kind == CONTINENTAL && !plan.suture {
+                        split[6] += v + p;
+                    }
+                    if plan.suture {
+                        suture += v + p;
+                    } else {
+                        added_oceanic += v + p;
+                    }
                 }
                 let ox = (0.25
                     + 0.5 * (src.slab_age / 150.0).min(1.0)
@@ -1988,10 +2260,14 @@ pub fn fronts_finish(
                 continental_m: added_continental,
                 oceanic_m: added_oceanic,
                 cordillera_m: cordillera,
+                suture_m: suture,
+                split_m: split,
             })
         })
         .collect();
     let (mut arc_continental_m, mut arc_oceanic_m, mut cordillera_m) = (0.0, 0.0, 0.0);
+    let mut suture_m = 0.0;
+    let mut split_m = [0.0_f64; 7];
     for e in effects {
         let contact = &mut state.contacts[e.contact];
         contact.max_uplift_mm_yr = contact.max_uplift_mm_yr.max(e.rate_mm_yr);
@@ -1999,6 +2275,10 @@ pub fn fronts_finish(
         arc_continental_m += e.continental_m;
         arc_oceanic_m += e.oceanic_m;
         cordillera_m += e.cordillera_m;
+        suture_m += e.suture_m;
+        for (a, b) in split_m.iter_mut().zip(e.split_m) {
+            *a += b;
+        }
     }
     let area = norm.sample_area_km2();
     Pull {
@@ -2010,6 +2290,7 @@ pub fn fronts_finish(
         front_continental_km_myr: front_continental,
         front_oceanic_km_myr: front_oceanic,
         cordillera_km3: cordillera_m * area / 1000.0,
+        arc_suture_km3: suture_m * area / 1000.0,
         front_g_full_km_myr: g_full_km_myr,
         front_g_normal_km_myr: g_normal_km_myr,
         front_g_continental_km_myr: g_continental_km_myr,
@@ -2017,6 +2298,15 @@ pub fn fronts_finish(
         front_normal_km_myr: front_normal,
         front_young_km_myr: front_young,
         arc_band_km_myr: band_weight * area / band_km * env.dt_myr,
+        arc_cones_km3: budget
+            .iter()
+            .fold([0.0; 2], |a, b| {
+                [a[0] + b.cones_by_law_m[0], a[1] + b.cones_by_law_m[1]]
+            })
+            .map(|m| m * area / 1000.0),
+        front_intra_oceanic_km_myr: front_intra_oceanic,
+        suture_front_km_myr: suture_front,
+        arc_split_km3: split_m.map(|m| m * area / 1000.0),
         forearcs: (erosion_rate > 0.0).then_some(Forearcs {
             loss_km3,
             continental: loss_continental,

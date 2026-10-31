@@ -22,6 +22,9 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | the continents census's Earth references and measuring choices (`tools/review/continents_census.py`, section "White patches, drowned continents and coastal high ground", 2026-10-21) | PLT-360 to PLT-363 (4) |
 | [PLT](ledger/PLT.md) | the crust flux into collision fronts: the crust budget's measures and Earth's references (section "The crust flux into collision fronts", 2026-10-21) | PLT-401 (1) |
 | [PLT](ledger/PLT.md) | the trench budget: sediment subduction, subduction erosion and where it acts, the trench's release, the measures and Earth's references (section "The trench budget", 2026-10-22; switches, off by default) | PLT-440 to PLT-444 (5) |
+| [PLT](ledger/PLT.md) | the crust budget against Stern & Scholl 2010, row by row: the island law on an intra-oceanic arc's own crust, the additions measured whole, the trench sediment line in place, arc magma at sutures (section "The crust budget against Stern & Scholl 2010, row by row", 2026-10-31; switches, on by default since 2026-10-31) | PLT-760 to PLT-763 (4) |
+| [PLT](ledger/PLT.md) | hotspots, plume heads and volcanic rifted margins from sources: Sleep's 37 tails, a head every 15 Myr with the record's provinces, the igneous crust at breakup over a head's hot mantle (section "Hotspots, plume heads and volcanic margins from sources", 2026-10-31; switches, off by default) | PLT-790 to PLT-802 (13) |
+| [PLT](ledger/PLT.md) | the cone budget: a hotspot's cones hand the pools at most its tail's lavas, counted by the cone's own hotspot, and the cones' measures (section "Hotspots, plume heads and volcanic margins from sources", subsection "The cone budget", 2026-10-31; on by default since 2026-10-31) | PLT-803 to PLT-804 (2) |
 
 Rows by status (after the ocean–continent transition, 2026-10-04): `verified` 17, `cited-unverified` 46, `from-memory` 4, `abstract-only` 19, `calibrated` 14, `game-choice` 79, `uncited` 42; `pending-rewrite` 151; `not-yet-coded` 8; `merged` (not counted) 33.
 
@@ -12915,6 +12918,803 @@ model reads the subducting floor's age. Test: `law_3_scales_the_incipient_resist
 (`forces.rs`: Case 1 at 30 Myr, the 2.2 factor between the two thicknesses, the ridge below 10 Myr,
 the cap, off as PLT-612; law 2's strength, PLT-517 at 30 Myr and constant off, and its pull, FRC-002
 for a full 80 Myr slab straight across the margin).
+
+## The crust budget against Stern & Scholl 2010, row by row (2026-10-31)
+
+The coordinator's task after the freeboard landed (PR #49, PLT-660 and PLT-661 on by default; Ben:
+"Turn both on now", decisions log 2026-10-31): the continents drain, −1.06 km³ a year over base34's
+24 runs and −1.33 over the late half (the felsic rock, label-free, 12.04 to 9.84 km planet-mean
+over base34's first 8 runs, 18 % of it in 1 Gyr against 6 % on base33). Read what the model makes
+and loses row by row against the sources, find in the code why each row is where it is, and build
+the fixes a source's law asks for (docs/design/crust-budget.md, the design; build log 2026-10-31).
+**Status: the three switches this section builds (`tectonics.island_arc_own_crust`, PLT-760;
+`tectonics.trench_pile_in_place`, PLT-762; `tectonics.collision_arc_magma`, PLT-763) are on by default
+since 2026-10-31**, the coordinator's call under Ben's rule of 2026-10-23 (physics goes on by default
+once built and correct; decisions log 2026-10-31). The base34-s4 rows, the arms cb-760 to cb-cum2 and
+the traces below are read against the model with them off, as they ran; the verdicts at the end say
+what each switch does.
+
+Tools: `tools/review/loss-budget.py` (new rows: the arcs' cones, the hotspots on continental crust,
+the trench input and the one-way slab's share, per-km rates against Clift et al. 2009's Table 1,
+the arc band, the erosion asked and not there; `--from T` for a window, from the cumulative lines
+printed every 50 Myr), `tools/review/crustcycle/probe.py` (the trench pile by its in-place line,
+the arcs' magma by the crust it built). No knob, cap or forcing term moves a row towards Earth.
+
+### The rows (base34-s4, means of 8; base34's late half over 24 runs in brackets)
+
+| Stern & Scholl 2010, Table 1 | model, km³/yr | Earth | why there (the code) |
+|---|---|---|---|
+| intra-oceanic arcs | 1.05 (0.96) | 1.5 | front 25,744 km against 14,500 at 40.9 km³/km/Myr; 0.28 of the oceanic fronts make no arc (incipient, PLT-610 and PLT-681; past the slab's ends, PLT-561: the band is 0.72 of the fronts); v_n at the island fronts 43.6 mm/yr against PLT-666's 86.6, so the mature rate runs at half; the early pulse (PLT-668) stops at the axis within a step (below); the felsic cones the arcs count inside their rate (PLT-286) in neither row before PLT-761 |
+| continental arcs | 0.60 (0.52) | 1.0 | front 29,436 km against 27,500 at 20.4 against the law's 33.1 at v_n 55.5 mm/yr; the same band share and cones |
+| crust-suturing zones | 0 | 0.2 | no rule in base34 (PLT-763 builds one; on by default since 2026-10-31) |
+| rifts, hotspots, volcanic rifted margins | 0.05 (0.05) | 0.5 | the hotspots' own basalt (PLT-108 to PLT-120 uncited, `pending-rewrite`); no magmatic addition at breakup (PLT-294 trades the continental side's crust for ocean crust on the ocean side) |
+| sediment subduction | 2.60 (2.93) | 1.1 (+0.1 at sutures); Clift 2009 1.65 | 2.90 km³ a year reaches the trenches (0.33 of it the one-way slab's, all subducted); 0.25 of the trench samples hold over 1 km of rock and carry 0.9 of the sediment; PLT-660 sends down 0.90 of it |
+| subduction erosion | 0.49 (0.41) | 1.4 (+0.3); Clift 2009 1.33 | erosive fronts 13,395 km against Clift & Vannucchi's 22,925 at PLT-441's 90 ask 1.21; the forearc band holds 0.49 beyond 7 km of crust (`forearc_short` 0.72) |
+| suturing losses | 0.50 (0.58) | 0.7 | PLT-242's share at a crossing crust of 24 km |
+| resampling drops, rate cap (model only) | 0.24 (0.26) | 0 | numerical |
+| net change of the continental volume | −0.98 (−1.33) | about 0 | the flows back: ocean-floor rock accreted at resamplings 1.15, the transition 0.59 |
+
+Per km of trench (loss-budget.py's new rows), against Clift et al. 2009's Table 1 (read in the
+library text; 40,225 km, printed totals 1,768,761 km³/Myr delivered, 1,648,091 subducted, 1,331,600
+eroded): the trenches receive 52.7 km³/km/Myr against Clift's 44.0, and send down 47.1 against 41.0
+(Stern & Scholl's 1.1 AU over ~43,000 km is 25); erosion takes 36.3 per km of erosive front against
+Clift's 58.1. The arcs make 41.5 km³ per km of their band a Myr (39,800 km of band, Stern & Scholl's
+arcs 42,000 km at 60), 48 with the felsic cones.
+
+### What each row is short or long of, and why
+
+**The island arcs' pulse ends at the axis within a step.** PLT-668 gives a young island arc 500
+km³/km/Myr over its band, 4.7 km a Myr at the axis; PLT-047 turns a column continental at 8 km of
+arc crust, so the axis passes it in 1.7 Myr, under one 2-Myr step, and from the next step its magma
+took the continental arcs' law (35 × v_n / 58.6, the label's). The rest of the band followed as each
+column passed 8 km. The early pulse was meant for the arc's first 10 Myr (Stern & Scholl p. 11,
+for the intra-oceanic arcs they list, the Izu-Bonin-Mariana among them, whose crust is far thicker
+than 8 km). On base34-s4's maps (probe.py `MODE=arcs`) the continental crust whose arc magma is
+mostly island-arc magma (PLT-220's test) holds 0.29 of the continental-arc magma the continents
+carry at the end: about that share of the continental arcs' row fell on island-arc crust (the test
+also counts columns a resampling's blend gave some island-arc magma). PLT-760 keeps the island law on the
+crust an intra-oceanic arc made.
+
+**The cones.** The arcs count the volcano stage's felsic cones inside their rate (PLT-286): magma
+less the cones goes in at the arc step, the cones at the surface's feedback, so `arc_c` and `arc_o`
+held the arcs' rock less 0.31 km³ a year of felsic cones (all of them, the silicic centres
+included). PLT-761 books the cones each arc counted, by its law, and loss-budget.py adds them to the
+arc rows; the hotspot row now reads the hotspots' basalt and cones on continental crust.
+
+**Sediment subduction is Clift's per km, on a longer trench.** The 2.4 times Stern & Scholl's 1.1
+looked like the wrong share at accretionary margins: Stern & Scholl (p. 15) write that "large
+accretionary bodies at sediment-dominated margins sequester approximately 70% of all sediments
+entering subduction zones". Its source says the opposite: von Huene & Scholl 1991 (the abstract,
+read by the research sub-agent), "roughly 70% of the incoming trench floor section is subducted
+beneath the frontal accretionary body" at large prisms, 80 % at small and medium ones, all at type
+2 margins. Clift & Vannucchi 2004 count underplating as accretion ([8]) and take the subducted share
+as the delivery less the prism's growth ([38]), and Clift et al. 2009's Table 1 sends 0.93 of the
+delivery down. The model's 0.90 is that share. The difference from Earth is how much reaches the
+trench: 55,180 km of oceanic front (Bird 2003's subduction zones 51,310) at 1.2 times Clift's
+delivery per km (corrected below, "Clift et al. 2009's sediment numbers, in rock": Clift's delivery
+is in place with its pore space, the model's is rock, and in rock the model's trenches take about
+twice Clift's per km). The sources disagree by 1.6 times between themselves (von Huene & Scholl's
+long-term 1.0 km³/yr corrects for "high rates of terrigenous seafloor sedimentation during the past
+30 m.y."). Nothing is changed in the share. The trench's input is the land's export: 3.8 to 4.2 km³
+a year off the continents against Clift et al.'s Cenozoic rivers' 1.8 (their abstract), the surface
+lane's.
+
+One units error: Clift & Vannucchi's 1 km (PLT-660's accretionary pile, PLT-442's erosive cover) is
+"the thickness of sediment (uncorrected for porosity) on the subducting plate at the trench axis"
+([31]), and the model's pile is rock. PLT-762 reads it as the 536 m of rock a 1 km porous column
+holds under ERO-215's law. On base34-s4's maps (probe.py `MODE=trench`, t −500 and −200) 0.69 of the
+trench samples hold under 536 m of rock (0.05 of the sediment), 0.065 hold 536 to 1,000 m (0.04),
+0.25 hold more than 1 km (0.90; median pile 100 m, mean 1.1 to 1.3 km, p90 4.0 to 4.3 km): a small
+change.
+
+**Subduction erosion runs at 0.40 of what it asks** because an intra-oceanic forearc has nothing
+beyond its 7 km of ocean crust to give (PLT-441's floor), and the erosive front is short at the
+planet's convergence (PLT-442's 60 mm/yr; v_n 43.6 at the island fronts). Earth's erosive forearcs
+retreat into the arc (`tectonics.erosion_retreat`, PLT-523, off). A loss: building it would deepen
+the drain, so it is left as a finding.
+
+**The suture's arcs.** Scholl & von Huene 2009 (the abstract): "During collisional suturing at
+fossil CSSZs, global arc magmatic addition is estimated at 0.2 AU", on "c. 6000 km" of collision
+zones. The model's collision fronts made no arc. PLT-763 gives them 0.2 AU over 6,000 km, 33.3
+km³/km/Myr, on the model's 18,411 km of collision front at any time (Stern & Scholl: 6,000
+long-term, 12,000 today; Bird's continental convergent boundary 23,003 km).
+
+**Rifts, hotspots and volcanic margins** have no rate in the sources (Stern & Scholl's 0.5 has no
+derivation; Clift et al. 2009: continental flood basalts 0.12 km³ a year, plateaus 1.1 if every one
+accreted). A volcanic margin adds about 1,350 to 2,500 km³ per km at breakup over 3 to 8 Myr
+(Kelemen & Holbrook 1995, Eldholm & Grue 1994, abstracts), on "the majority of passive continental
+margins" (Franke 2013). Which breakups are volcanic is the mantle's temperature (White & McKenzie
+1989, abstract), the model's plume heads, whose rules are uncited: designed (the design's section
+5), not built.
+
+### The arm cb-cum (PLT-760, PLT-762 and PLT-763 on; 8 runs against base34-s4)
+
+`tools/review/pool/pool.sh run cb-cum --seeds 1,2,3,4 --set tectonics.island_arc_own_crust=true --set
+tectonics.collision_arc_magma=true --set tectonics.trench_pile_in_place=true +DEEPTIME_CRUST_BUDGET=1
++DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps` (branch crust-budget at 33994055, key f8c4afc098b8, argkey
+d8fa0c32), read against base34-s4 (key 122e4803cded, argkey cd665cef). The budget (loss-budget.py,
+means of 8 runs, km³ a year; the late half, `--from -500`, in brackets):
+
+| row | base34-s4 | cb-cum | Stern & Scholl 2010 |
+|---|---|---|---|
+| intra-oceanic arcs (cb-cum with their cones) | 1.05 (0.95) | 1.82 (1.50) | 1.5 |
+| continental arcs (cb-cum with their cones) | 0.60 (0.54) | 0.56 (0.52) | 1.0 |
+| of the two, the arcs' felsic cones (PLT-761) | not recorded | 0.26 (0.23) | |
+| crust-suturing zones | 0 | 0.18 (0.20) | 0.2 |
+| rifts, hotspots, volcanic rifted margins | 0.05 (0.05) | 0.04 (0.04) | 0.5 |
+| sediment subduction | 2.60 (2.82) | 2.60 (2.79) | 1.1 |
+| subduction erosion | 0.49 (0.43) | 0.34 (0.28) | 1.4 |
+| suturing losses | 0.50 (0.55) | 0.54 (0.58) | 0.7 |
+| resampling drops, rate cap | 0.24 (0.26) | 0.26 (0.30) | 0 |
+| net change of the continental volume | −0.98 (−1.14) | −0.18 (−0.54) | about 0 |
+
+The net moves by +0.80, and the rows that moved add to it (this page's sum): the arcs' rock less
+their cones 1.65 to 2.12 (+0.47; the arcs' part of the continental volume 0.65 to 1.26 with the
+suture's magma), the suture's arcs +0.18, subduction erosion −0.15 (the erosive fronts 13,395 to
+10,042 km: with the in-place line a front whose floor carries 536 to 1,000 m of rock is
+accretionary, Clift & Vannucchi's class, and does not erode). The island arcs now make 1.82 against
+Stern & Scholl's 1.5 on 25,311 km of front against their 14,500: 67.7 km³ per km a Myr against
+their 103, 81.1 per km of front past incipient (22,498 km). Sediment subduction is unchanged.
+
+Where the arcs' magma went (probe.py `MODE=arcs`, the end, planet-mean m): the island-arc magma on
+continental crust an island arc made 415 to 956 m, that crust 0.262 to 0.301 of the planet; the
+continental arcs' magma on it 155 to 218 m and on the rest of the continental crust 384 to 311 m.
+So the share of the continental arcs' magma on island-arc crust rose, 0.29 to 0.40: under arcs that
+began at a continent (a docked island arc under a new margin, a contact whose onset saw continental
+crust within `arc_distance_km`) island-arc crust keeps the label's law, as PLT-760 says (confirmed
+by the split in the second pass below). At three snapshots the trench floor seemed to carry more
+sediment on the arm (probe.py `MODE=trench`, t −500 and −200: mean 1.69 and 1.99 km against 1.1 to
+1.3); averaged over every snapshot it does not (the second pass, point 1).
+
+**The drain, label-free.** The freeboard lane's census (`tools/review/freeboard/thinning.py`
+`MODE=census`, the felsic family's pools on every visible sample, planet-mean km): base34-s4 12.042,
+11.533 at −500 Myr, 9.837 at the end; cb-cum 12.042, 12.248, 11.070. Over the late half base34-s4
+loses 1.70 km of it (1.73 km³ a year, Earth-normalized), cb-cum 1.18 (1.20). On base34-s4 the
+sediment and sedimentary rock on the planet grow 0.32 km over the same window (0.33 km³ a year: rock
+the continents shed that stays, 1.12 to 1.36 km of it under the sea), so the felsic rock and the
+sediment together fall 1.40 km³ a year, and the budget's net over the same 8 runs is −1.14; the
+0.26 between them is what the two counts take differently (the census has no mafic pools and counts
+felsic rock on the ocean floor; the budget counts a continental column's every pool and none of the
+ocean floor's). On cb-cum: 1.20, of it 0.24 to sediment, 0.96 against the budget's −0.54. So the
+named drain is the budget's net plus the sediment the planet keeps, and what drives it is the
+sediment subduction row: 2.8 km³ a year in the late half on both arms, fed by the continents'
+export (3.9 to 4.0 off them against Clift et al.'s Cenozoic rivers' 1.8).
+
+**The V1 census** (`pool.sh table`, medians, Mann-Whitney p): land 0.238 to 0.235 (0.88), largest
+landmass 0.097 to 0.062 (0.28), continental crust under the sea 0.527 to 0.551 (0.51), land above 2
+km 0.013 to 0.031 (0.16), coast with high ground 0.064 to 0.104 (0.083), land under ice 0.061 to
+0.041, collisions per 100 Myr 5.00 to 5.20, the crust's net change +0.065 to +0.098 (0.001),
+criteria met median 6.5 to 5 (mean 6.25 to 5.25, p 0.041), the sea 169 to 392 m at the end. The
+continents keep their crust and the sea follows it (traced in the second pass, point 3): continental crust at the end 0.492 to 0.528 of the planet (the budget's row), sediment
+under the sea 1.36 to 1.51 km planet-mean, so the basins hold less and the sea stands 220 m higher. On the supercontinent planets it floods the
+continents (crust under the sea 0.58 to 0.70 on all four, the largest landmass under 0.06 on three);
+the coast with high ground fails on three scattered planets and one supercontinent (0.113 to
+0.177). The coast
+census (`coastset`): coast_hi 0.067 to 0.100 (0.083); the coast in a collision belt 0.089 to 0.106
+and at an arc 0.192 to 0.236, the collision belts' coasts high at 0.610 against 0.564, and 0.776 of
+the high coasts face a flooded continent against 0.684: the higher sea makes more belt edges coasts.
+`collcoast`: the collision regime 0.025 of the land against 0.023, of it within 150 km of the sea
+0.728 against 0.591. The guard: clean (worst 10,098 m against 9,964, p 0.38; no step beyond 2 Earth
+reliefs; no continental cell 5 km over Airy), the plate cells' largest excess over Airy 3,422 against
+2,194 m (p 0.021), the highest plate elevation 4,954 against 4,288 m (p 0.065).
+
+### The switches traced one by one (2026-10-31, the second pass)
+
+Before the three go on by default, the coordinator asked for every result of cb-cum that was
+unexplained or untraced to be traced. The arms: one 8-run arm per switch on key f8c4afc098b8 (cb-760,
+cb-762, cb-763, against base34-s4), and three pairs of trace runs (seed 1, both starts; base, PLT-760,
+all three) on a build that adds measurements only (key 23401ebfd164: the crust budget's sediment
+stocks every step under `DEEPTIME_CRUST_BUDGET_STEPS`, read by `tools/review/crustcycle/steps.py`;
+the arcs' magma by law, setting and crust, loss-budget.py's split rows). Then PLT-760's half line was
+replaced by its sources' class (point 5) and two arms ran on that code (key ab482e63fcf0: cb-760b, and
+cb-cum2 with all three). Two checks that nothing else moved: with every switch off the branch
+reproduces base34's supercontinent-1 bit for bit (every dumped file but globals.json, which holds the
+new measurement globals, and the dynamics record), and the trace build reproduces cb-cum's
+supercontinent-1 the same way.
+
+| (8 runs; medians, p against base34-s4) | base34-s4 | cb-760 | cb-762 | cb-763 | cb-cum | cb-760b | cb-cum2 |
+|---|---|---|---|---|---|---|---|
+| net change of the continental volume, km³/yr | −0.98 | −0.69 | −0.70 | −0.66 | −0.18 | −0.55 | −0.37 |
+| the late half (`--from -500`) | −1.14 | | | | −0.54 | −0.76 | −0.63 |
+| felsic rock lost over the late half, km planet-mean (thinning.py census) | 1.70 | 1.43 | 1.92 | 1.82 | 1.18 | 1.67 | 1.15 |
+| continental crust at the end, share | 0.492 | 0.506 | 0.508 | 0.506 | 0.528 | 0.511 | 0.521 |
+| the sea at the end, m | 169 | 245 | 229 | 256 | 392 | 287 | 348 |
+| criteria met, median (p) | 6.5 | 6 (0.61) | 5.5 (0.17) | 6 (0.47) | 5 (0.041) | 6 (0.61) | 6 (0.35) |
+| coast with high ground (p) | 0.064 | 0.100 (0.88) | 0.094 (0.38) | 0.086 (0.51) | 0.104 (0.083) | 0.089 (0.23) | 0.090 (0.38) |
+| the guard's worst, m; plate cells' largest excess over Airy, m (p) | 9,964; 2,194 | 10,544; 2,429 (0.51) | 10,109; 2,561 (0.28) | 10,344; 2,530 (0.021) | 10,098; 3,422 (0.021) | 9,988; 2,705 (0.028) | 10,219; 2,568 (0.16) |
+
+The guard is clean on every arm (no step beyond two Earth reliefs, no continental cell 5 km over
+Airy).
+
+**1. The trench floor's sediment is not thicker.** The 1.7 to 2.0 km against 1.1 to 1.3 above were
+medians of the runs at three single snapshots of a heavy-tailed pile (p90 4 to 7 km), which swing
+from snapshot to snapshot on base34-s4 itself (590, 1,094 and 1,278 m at −800, −500 and −200).
+Averaged over every snapshot from −950 to −50 Myr, run by run (probe.py `MODE=trenchrun`), the trench
+samples' pile is 1,322 m on base34-s4 and 1,322 on cb-cum (p 0.88), 1,382 on cb-760 (0.44), 1,189 on
+cb-762 (0.16), 1,202 on cb-763 (0.19), 1,334 on cb-cum2 (0.72); their sediment 17.3 m planet-mean
+against 15.9 on cb-cum (0.51), the share over 1 km 0.259 against 0.265 (0.80). No switch thickens
+it, and sediment subduction is 2.4 to 2.7 km³ a year on every arm.
+
+The books, step by step (steps.py on cbt-cum's supercontinent-1, 10⁶ km³ a 2-Myr step):
+
+| t, Myr | sediment on the trench samples | on the hidden floor | laid on the trench samples by the surface | reaching the trenches at the resampling | subducted | the resampling's residual |
+|---|---|---|---|---|---|---|
+| −516 | 2.92 | 4.07 | 1.30 | | | |
+| −510 | 5.38 | 15.91 | 2.07 | | | |
+| −504 | 6.44 | 30.79 | 1.92 | | | |
+| −500 (a resampling) | 0 | 0 | 1.45 | 38.0 | 33.0 | −8.6 |
+
+The trench samples are the incoming floor at its fronts that step: the fronts' flags are cleared and
+set again every step (the budget's `subduction` and `arcs` parts), so their sediment is the floor's
+at the front, plus what the surface lays in the trench (1.1 to 1.4 km³ a year over the run on all six
+trace runs). The floor that goes under is carried hidden (2.6 to 3.1 km³ a year) until a resampling
+(53 to 58 in 1,000 Myr), which sends PLT-660's share down (2.4 to 2.8) and accretes the rest to the
+overriding sample. The resampling's residual (the four sediment stocks' change under
+`resample_blend` plus the subducted) is −0.80 and −0.82 km³ a year on base, −0.89 and −0.90 with
+PLT-760, −0.82 and −0.83 with all three: 0.30 to 0.34 of the subducted on every arm, the ocean
+floor's side −0.14 to −0.21 and the continental crust's −0.62 to −0.70 (crust a collision consumed,
+crust dropped under another plate, the accreted share landing on continents, the blend; the
+continental budget books the first two as suturing losses and drops). The same residual with and
+without the switches: no switch keeps sediment in two places, and PLT-762 adds no stock of its own
+(it compares the solid pile with 536 m instead of 1,000; what it moves is which fronts are erosive
+and accretionary, below). What PLT-762 does is what it says: on cb-762 the
+erosive fronts are 11,070 km against 13,395, subduction erosion 0.37 against 0.49 km³ a year, and
+sediment subduction 2.50 against 2.60 (more margins accretionary).
+
+**2. The continental arcs' magma on island-arc crust.** Where the arcs' magma lands (km³ of rock a
+year; the trace runs, two each, and the final code's arms, eight each; island-arc crust is PLT-220's
+class, continental crust whose island-arc magma exceeds its continental-arc magma, as probe.py
+`MODE=arcs` reads it):
+
+| | base | PLT-760 (half line) | all three (half line) | cb-760b (substrate) | cb-cum2 |
+|---|---|---|---|---|---|
+| continental law on island-arc crust, arc begun at a continent | 0.09 | 0.15 | 0.13 | 0.13 | 0.14 |
+| the same, arc begun intra-oceanic, crust the half line refused | 0.05 | 0.05 | 0.04 | 0 | 0 |
+| the same, arc begun intra-oceanic, crust PLT-760 moves to the island law | 0.10 | 0 | 0 | 0 | 0 |
+| a suture's magma (PLT-763) on island-arc crust | 0 | 0 | 0.06 | 0 | 0.03 |
+| continental law on other continental crust | 0.27 | 0.25 | 0.19 | 0.16 | 0.19 |
+| the island law on continental crust (PLT-760) | 0 | 0.69 | 0.63 | 0.68 | 0.73 |
+
+The guess holds: with PLT-760 on, the continental arcs' magma that reaches island-arc crust comes
+from arcs that began at a continent (0.13 to 0.15 km³ a year), which keep the label's law by the
+rule, plus the half line's 0.04 to 0.05 (gone with the substrate rule) and, under PLT-763, a suture's
+magma (0.03 to 0.06). The stock's share rose (0.29 on base34-s4; 0.42, 0.35, 0.30, 0.40, 0.43 and
+0.44 on cb-760, cb-762, cb-763, cb-cum, cb-760b and cb-cum2) because the class grew and kept what it
+had: the island-arc crust is 0.26 of the planet at the end on base34-s4 and 0.30 to 0.37 with
+PLT-760, since intra-oceanic arcs no longer add continental-law magma that moves a matured arc's
+columns out of the class.
+
+**3. The sea.** Each switch alone raises it, and they add: at the end 169 m on base34-s4, 245, 229
+and 256 with PLT-760, PLT-762 and PLT-763 alone (+76, +60 and +87), 392 with all three (+223). The
+counterfactual seas (m5sea.py, the sea filled on each arm's histograms, Shapley over four factors):
++106 m with PLT-760 (continental area +72, continental heights +12, oceanic heights +27, the water
+−4), +93 with PLT-762 (+72, −1, +26), +112 with PLT-763 (+67, +20, +27), +247 with all three (+171,
++49, +24); on the final code +134 with PLT-760 (+91, +14, +31) and +184 with all three (+142, +42,
++4). The sea follows the continental crust each switch keeps: the continental area at the end 0.492
+on base34-s4 and 0.506 to 0.528 on the arms, the net change of its volume −0.98 against −0.18 to
+−0.70. PLT-760 keeps it by the island arcs' rock (the arcs' rock less their cones 1.95 to 2.04 km³ a
+year against 1.65); PLT-762 by fewer erosive fronts; PLT-763 by the suture's arcs, which also stand
+the collision belts higher (the continental heights).
+
+**4. The criteria.** On cb-cum, against base34-s4's same runs, the checks that fail on the arm and
+pass on the base are: crust under the sea on supercontinent 1 to 4, the largest landmass on
+supercontinent 2 to 4 and scattered 4, land above 2 km and the coast with high ground on scattered 1,
+the coast with high ground on scattered 3, the collisions on scattered 2. With the arm's ground under
+the base's sea (`tools/review/crustcycle/seashift.py`: every height raised by the arm's sea less the
+base's, run by run; a static reading, since interiors follow their sea) the arm's failed checks fall
+from 14 to 6 (base34-s4: 6): every largest landmass, crust under the sea and land above 2 km passes,
+and the coast with high ground still fails on five runs (three scattered planets and two
+supercontinents), the collisions on one. So the supercontinents' drowning follows from point 3; the
+coast with high ground does not (0.064 against 0.104, p 0.083; against base34's 24 runs p 0.12; each
+switch alone 0.086 to 0.100, p 0.23 to 0.88). On cb-cum2, the same switches with the substrate rule,
+the criteria are 6 (p 0.35; against base34's 24 runs 6 against 6, p 0.36), and its failed
+sea-sensitive checks moved to the scattered planets (7, of them 2 at the base's sea): which planets
+drown is the runs' spread; that they drown is the sea's.
+
+**5. PLT-760's half line, against the sources.** The research sub-agent (Stern 2010, full text; Leat
+& Larter 2003 and Shillington et al. 2004, abstracts; Gerya 2011's account of Leat & Larter) found
+no source that gives a share of arc magma, or a thickness, that makes an arc's crust continental.
+The sources class an arc by what it is built on: "IOASs are built on oceanic crust, whereas
+Andean-type arcs are built on pre-existing continental crust" (Stern 2010, p. 8), their basements
+"including ocean crust formed at back-arc spreading centres, earlier intra-oceanic arcs, accretionary
+complexes and oceanic plateaux" (Gerya 2011); the central Aleutians' 35 to 37 km crust is still more
+mafic than continental crust (Shillington et al. 2004). So `subduction::island_arc_crust` now reads
+the substrate alone: ocean floor, or continental crust over an ocean basement (PLT-331), commit
+9a92fe15. The half line had moved 0.04 to 0.05 km³ a year of magma to the continental law.
+(Narrowed after the branch's review, below, "The review's fixes": any basement was too wide, and
+the onset read another test than the law.)
+
+**Verdicts.**
+- PLT-762 (`trench_pile_in_place`): correct, a units fix; it makes no rock and no stock, but on its
+  own it shortens the erosive fronts and lowers sediment subduction by 0.1 km³ a year. On.
+- PLT-763 (`collision_arc_magma`): built as designed, but its 0.18 to 0.19 km³ a year is no match
+  for Stern & Scholl's 0.2 (corrected 2026-10-31 after the branch's review; the first reading said
+  "correct as built"). The design expected about 0.6 km³ a year (33.3 km³/km/Myr on 18,411 km of
+  collision front at any time). The magma needs a front past incipient (`!src.incipient` in
+  `subduction::fronts_finish`): the contact's slab at PLT-611's 100 km or more, and
+  `forces::grow_slab` breaks the slab off (length 0) only once continental crust has held at
+  least half the contact's front for `slab_breakoff_myr` (FRC-019; PLT-184, 10 Myr); any oceanic
+  front sample lengthens it again by the oceanic front's convergence (100 km in a few Myr at tens
+  of mm/yr) and the magma resumes, and a contact whose front is mostly oceanic never breaks off
+  (corrected at PR #53's re-review: an earlier version of this paragraph had each collision's
+  suture magma run at most about 10 Myr). So the breakoff does not bound it, and that the magma
+  acts on about a third of a front three times Scholl & von Huene's 6,000 km (0.18 against 0.6)
+  is a hypothesis, which `suture_front_on` against `suture_front` can now test. 0.18 is not a
+  match. The arcs' front
+  measure now records the collision fronts and those past incipient (`plates/suture_front_km_myr`,
+  `plates/suture_front_active_km_myr`, the crust budget's `suture_front` and `suture_front_on`;
+  `loss-budget.py` prints the per-km rate over the latter), so the next arm reads the rate per km
+  where the magma acts. A lead, not built: the gate is the arcs' (an arc needs a slab to melt), and
+  whether the suture's magma needs an attached slab at all is open (Stern & Scholl, p. 13: "this is
+  mostly crustal reworking"; the juvenile share is what Scholl & von Huene's 0.2 counts), so the
+  breakoff may end it too soon; no rate after a breakoff is in hand. The plate cells' largest excess
+  over Airy rises (2,530 against 2,194 m, p 0.021), inside the guard. The suture magma's band sets
+  the ARC flag as an arc's does, so the collision zones get the arcs' heat flow term (+40 mW/m²,
+  PLT-468) and the volcano stage's, the plutons' and the traps' arc readings. On; its source is an
+  abstract.
+- PLT-760 (`island_arc_own_crust`): correct with the substrate rule (Stern 2010's class). On.
+- All three are on by default since 2026-10-31 (decisions log; the coordinator's call under Ben's rule
+  of 2026-10-23). PLT-763's source is an abstract (Scholl & von Huene 2009), as its ledger row says.
+- Together, on the final code (cb-cum2): the net change of the continental volume −0.98 to −0.37
+  km³ a year (late half −1.14 to −0.63), the felsic rock's late-half loss 1.70 to 1.15 km
+  planet-mean, the sea 169 to 348 m, the criteria 6.5 to 6 (p 0.35), the guard clean. What still
+  drains the continents is sediment subduction (2.95 km³ a year in the late half), fed by the
+  continents' export (4.28 off them in the late half, 4.07 over the whole run, against Clift et
+  al.'s rivers' 1.77; see the next section for what that comparison is): the surface lane's lead.
+
+### Clift et al. 2009's sediment numbers, in rock (2026-10-31, a correction)
+
+The comparisons above put the model's solid rock beside Clift et al. 2009's numbers as if they were
+one kind. Read again in the library text, they are two kinds:
+
+- **The rivers' export, 1.77 km³ a year** (p. 93; the abstract rounds it to 1.8), is the whole
+  export of the continents to the ocean, not the part that reaches trenches: "sediment ... exported
+  to the global ocean from the continents by rivers during the Cenozoic". It is solid rock: the
+  Cenozoic sediment masses of the margins and fans of 14 river systems and orogens, "calculated from
+  the volumes of sedimentary rock using a suitable porosity correction estimate" (Sclater & Christie
+  1980) and corrected for carbonate, then extrapolated to all the continents by area (17 % orogenic,
+  83 % stable). It leaves out what stays on land ("we are only concerned with the volumes of sediment
+  reaching the continental margin that are subductable"). It is a Cenozoic mean: the paper sets it
+  beside Milliman (1997)'s modern 6.5 km³ a year, which it reads as unrepresentative of long periods
+  (a more mountainous Earth since the High Andes and Tibet, rivers still adjusting after the Last
+  Glacial Maximum, agriculture), and beside "the 1.6 km³/a estimated for the sediment flux to the
+  trenches", "suggestive that the total amount of sediment in the oceans should be close to
+  equilibrium".
+- **Table 1's delivery to the trenches, 1,768,761 km³ a Myr** over 40,225 km (44.0 per km; the rows
+  sum to 1,926,202), is each margin's trench sediment thickness times its convergence. Clift &
+  Vannucchi 2004 give that thickness "uncorrected for porosity" ([31]), and Clift et al. 2009 state
+  no porosity correction for Table 1 while they state one for the rivers. This page's reading: the
+  delivery and the subducted 1,648,091 are volumes in place, pore space included.
+
+This page's derivation, not the paper's: with each row's thickness as its delivery rate over its
+convergence and the model's own porosity law (ERO-215, Kominz et al. 2011's ocean-floor sediment,
+the law PLT-762 reads the 1 km line with), the solid share of Table 1's delivery is 0.60 by volume.
+In rock Earth's trenches then take 1.06 to 1.16 km³ a year (the printed total and the rows), 26 to
+29 km³ per km a Myr, and the subducted 1.65 is about 1.0 in rock.
+
+The like-for-like comparisons (the model's pools are rock):
+
+| | the model | Earth |
+|---|---|---|
+| export to the ocean floor, rock, km³/yr (`off the continents by the surface stage`) | 3.82 (base34-s4, whole run), 4.00 (late half); cb-cum2 4.07, 4.28 | 1.77 (Clift et al. 2009, Cenozoic mean); 6.5 modern (Milliman 1997, as Clift et al. quote it) |
+| delivered to the trenches, rock, km³/km/Myr | 52.7 on 55,180 km (base34-s4), 61.0 (cb-cum2's late half) | 26 to 29 on 40,225 km (this page's derivation from Table 1's 44.0 in place) |
+| sediment subducted, rock, km³/yr | 2.60 (base34-s4), 2.72 (cb-cum2) | about 1.0 (this page's derivation from Table 1's 1.65 in place) |
+| the trench-bound share of the export (reaching the trenches over the export) | 0.76 and 0.79 (base34-s4, whole run and late half), 0.75 and 0.78 (cb-cum2) | 0.60 to 0.65 (this page's derivation: 1.06 to 1.16 over 1.77) |
+
+So two findings above are corrected. "Sediment subduction is Clift's per km, on a longer trench":
+in rock the model's trenches take about twice Clift's per km, on a trench 1.37 times as long, so
+about 2.5 times Earth's in all; the share that goes down at the trench (0.90 against 0.93) stands.
+And "the continents' export, 3.8 to 4.2 against 1.8": the model's export is like for like with
+Clift's 1.77 in kind (rock, onto the ocean floor) but not in time (a Cenozoic mean against modern
+loads several times larger), so whether the export itself is high is open until a reference rate is
+chosen; the excess the comparisons fix is at the trenches. The model's trench input is also an upper
+bound for the continents' share: it holds the sediment the ocean floor's own arcs and seamounts shed
+and the one-way slab's 0.33 to 0.38. (In the verdicts above, cb-cum2's export is 4.07 km³ a year
+over the whole run and 4.28 over the late half.)
+
+### The trenches' input split by source and by delivery term (2026-10-31, a diagnosis)
+
+The question: why the model's trenches take about twice Earth's rock per km (above) on a trench
+1.37 times as long. From cached runs and two measurement traces, nothing built: base34-s4's 8 runs,
+and its seed 1 on both starts again with measurement globals (`tools/review/pool/pool.sh run
+ti-base --seeds 1 +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps
++DEEPTIME_CRUST_BUDGET_STEPS=1`, branch trench-input at 8d07ba4d, key cd35f62bf41d, argkey
+daea7fd0; `ti-src` the same at 277e8d94), whose state.json files and rec.json are base34-s4's bit
+for bit (only globals.json differs). The surface stage's `surface/trench_diag/*` globals
+(`surface::TRENCH_DIAG_GLOBALS`) are in its own metric and are read as shares; the plate side's
+books (`DEEPTIME_CRUST_BUDGET_STEPS`, `tools/review/crustcycle/steps.py`,
+`tools/review/loss-budget.py`) are rock, km³ a year, Earth-normalized.
+
+**By delivery term** (`tools/review/crustcycle/trench_terms.py` on base34-s4; Clift et al. 2009's
+Table 1 rows split by the overriding crust by this page, the intra-oceanic ones Mariana,
+Izu-Bonin, South Luzon, Philippine-Mindanao, Tonga, Kermadec, Solomons, South Sandwich, Lesser
+Antilles, Aleutians and Taiwan-North Luzon; solid under ERO-215, this page's derivation; Clift's
+convergence is the full rate):
+
+| fronts | model km³/yr | km of front | per km | v_n mm/yr | pile, km of rock | Clift km | solid km³/yr | solid per km | convergence | solid pile, km |
+|---|---|---|---|---|---|---|---|---|---|---|
+| continental overriding plate | 1.61 | 29,436 | 54.7 | 55.5 | 0.98 | 26,675 | 0.91 | 34.1 | 64 | 0.53 |
+| oceanic overriding plate | 0.97 | 25,744 | 37.6 | 43.6 | 0.86 | 13,550 | 0.25 | 18.4 | 87 | 0.21 |
+| the one-way slab (no front) | 0.33 | | | | | | | | | |
+| all | 2.90 | 55,180 | 52.7 | 50.0 | 1.05 | 40,225 | 1.16 | 28.8 | 72 | 0.40 |
+
+Bird 2003's subduction boundaries: 51,310 km at 53.2 mm/yr across the trench.
+
+- The convergence is not the term: the model's fronts close more slowly than Earth's (50.0 mm/yr
+  across them against Bird's 53.2).
+- The length is a term at the intra-oceanic fronts only: 25,744 km against Clift's 13,550 (Stern
+  & Scholl's 14,500), 1.9 times; the continental margins' fronts are 1.10 times Clift's, and the
+  whole trench 1.08 times Bird's.
+- The pile at the trench (the delivery over v_n) is the term on both kinds: 0.98 km of rock
+  against 0.53 at continental margins (1.85 times), 0.86 against 0.21 at intra-oceanic ones (4.1
+  times, at half Clift's convergence).
+- Of the 1.74 km³ a year above Clift's rows, the continental margins' fronts carry 0.70, the
+  intra-oceanic fronts 0.72 and the one-way slab 0.33. The one-way slab's is floor sediment that
+  goes down with the held crust at resamplings (PLT-542) without a front counting it: part of what
+  goes under, as on Earth, but in no front's class.
+
+**By route** (ti-base, the plate side's books over the run; supercontinent-1, scattered-1):
+
+| km³ a year of rock | supercontinent-1 | scattered-1 |
+|---|---|---|
+| reaching the trenches | 2.65 | 3.08 |
+| laid on the trench samples by the surface stage (`d_tr`'s erosion part) | 1.11 (0.42) | 1.32 (0.43) |
+| carried in on the incoming floor (the rest) | 1.27 (0.48) | 1.43 (0.46) |
+| the one-way slab's | 0.28 (0.11) | 0.33 (0.11) |
+| the surface stage's deposits on the visible ocean floor (`d_ov`'s erosion part) | 3.88 | 4.33 |
+| of them off continental crust (the loss budget's "off the continents by the surface stage", net) | 3.53 | 4.11 |
+| of them on the trench samples | 0.29 | 0.30 |
+
+Besides the one-way slab's tenth, about half of what the trenches take is laid straight onto the
+trench samples and half onto floor the plates then carry in. The floor gets 0.35 and 0.22 more
+than the continents lose: the pelagic rain's volume above the rock it dissolved (at Earth's balance
+0.51 km³ a year of dissolved rock comes back as 0.54 of opal and 0.20 of calcite,
+erosion-and-sediment.md, "The pelagic rain") and the land on oceanic crust (below).
+
+**Where the rivers reach the sea** (ti-base's surface globals): the mouths at subduction-zone
+coasts (a sea cell of the ARC, BACK_ARC or TRENCH regime) take 0.335 and 0.368 of the river load,
+at collisions 0.102 and 0.092, elsewhere (passive margins, rifts, ocean islands) 0.562 and 0.540.
+Milliman & Syvitski 1992 (full text, through the research sub-agent): the large rivers ("nearly
+all of which discharge onto passive margins or marginal seas") and the small rivers of mountainous
+islands and active or collision margins, which "collectively ... may transport similar amounts of
+sediment as do passive margin rivers" (p. 541), with no share stated: about half each. The model's
+0.44 to 0.46 to active and collision coasts is not above it, so the drainage geometry is not the
+excess.
+
+**How the trench cells fill** (the same globals, gross, as shares of the river load): the mouths'
+own fills put 0.091 and 0.103 of the load on TRENCH cells (0.20 of the subduction-zone coasts'
+load), the slope failure 0.33 and 0.34, the submarine diffusion 0.03 and 0.05. The failure brings
+seven tenths of what lands there (Earth's trench floors hold "axial turbidite deposits", von Huene
+& Scholl 1991, p. 306, full text through the research sub-agent). The TRENCH cells' net change,
+0.24 and 0.25, is smaller because the flexure answers the load there; it is not a sediment volume.
+
+**Where the land's erosion happens** (ti-src's surface globals: the gross erosion of the cells
+above the sea at each step's start, by the regime and crust there; supercontinent-1,
+scattered-1): the subduction zone's regimes on continental crust (continental arcs, matured
+island arcs, forearc highs) 0.284 and 0.308, on oceanic crust (island arcs) 0.003 and 0.004, the
+rest of the oceanic crust (ocean islands) 0.011 and 0.007, collisions 0.203 and 0.191, the rest
+of the continents 0.499 and 0.490. The arcs' own erosion is 1.28 to 1.29 times the load that
+reaches the sea at subduction-zone coasts, so those coasts' rivers can be wholly the arcs' and
+forearcs' own: the trench catchments are the arcs, the interiors drain elsewhere, as Milliman &
+Syvitski describe Earth's. The island arcs and ocean islands shed 1.1 to 1.4 % of the land's
+erosion: the sediment at the intra-oceanic fronts is not their own. The pelagic rain is 0.17 to
+0.18 of the river load; 1.0 to 1.2 % of it falls on TRENCH cells (0.4 % of what reaches them), so
+the trenches get the rain only as the floor carries it in. Earth's subducting sediment is about a
+fifth to a quarter non-terrigenous by mass (Rea & Ruff 1996: 79 % terrigenous; Plank & Langmuir
+1998: 76 %).
+
+**The export and the share.** What reaches the trenches is the export times the share of it that
+gets there. Clift et al. 2009 give both of Earth's numbers in one budget (above): the rivers' 1.77
+km³ a year of rock, a Cenozoic mean, and Table 1's delivery, 1.16 in rock by this page's
+derivation, a share of 0.65; they read the two as "close to equilibrium". The model's are 3.82 and
+2.90, a share of 0.76. So the excess, 2.5 times in all, is the export's 2.16 times the share's
+1.17; per km of trench, over a trench 1.37 times as long, 1.8 times. The model's land is Earth's
+size (0.30 of the visible samples above the sea, base34-s4's runs' mean over the run), so its
+land sheds about twice Clift's rock per km² a year.
+
+The other Earth sources spread 3.5 times among themselves (rock or solid, km³ a year; read through
+the research sub-agent): von Huene & Scholl 1991 (full text, p. 308) 1.9 entering 43,500 km of
+margin today, "ocean basin and trench axis deposits"; Plank & Langmuir 1998 (snippets) 0.73
+globally, solid by the sub-agent's inference; Rea & Ruff 1996 (the abstract) 1.4 x 10^15 g a year,
+about 0.55 at 2.5 to 2.65 g/cm³ (this page's arithmetic). Paired with modern rivers (Milliman &
+Syvitski 1992: about 20 billion tons a year, about 7.5 km³ of rock at 2.65 g/cm³, this page's
+arithmetic) the share is 0.25 (von Huene & Scholl) or about a tenth (Rea & Ruff: "an order of
+magnitude more sediment enters the ocean than leaves it via subduction"). Both modern numbers are
+high for a long run: von Huene & Scholl find the Pacific trench wedges perhaps twice their
+pre-glacial thickness and give 1.0 long-term against 1.5 today for what goes down, and Clift et
+al. read the modern rivers as unrepresentative of long periods. The model's numbers are 1,000 Myr
+means, so the long-run pair, Clift's, is the like-for-like one.
+
+**The long run's own check.** The ocean floor's sediment is the supply's integral over the floor's
+age, not a modern rate. On base34-s4's crust-budget maps (`MODE=floor tools/review/crustcycle/probe.py`,
+the snapshots -950 to -50, in place under ERO-215) the ocean younger than 82 Myr holds 514 m
+against GlobSed's 267 (1.9 times), the deep ocean 576 against 404 (1.4 times), the sea's mean
+1,819 against 927 (2.0 times); the margins hold 3,189 against 3,044, where the room fills and the
+rest spills seaward. The floor takes about twice Earth's supply where the floor's age is matched,
+not only at its trenches.
+
+**With the export at Earth's.** Scaling the model's trench input by 1/2.16 leaves, per km of
+front, 17.4 km³ a year at the intra-oceanic fronts against Clift's 18.4 in rock, and 25.3 at the
+continental margins against 34.1: the routing is Earth's or below it. What is then left above
+Clift's rows (1.35 against 1.16 km³ a year) is the intra-oceanic fronts' length, 1.9 times
+Earth's (+0.20), and the one-way slab's floor (+0.15), less the continental margins' (-0.16).
+
+**The lead.** The term that makes the excess is the continents' export: the land sheds 2.2 times
+Clift et al.'s long-run mean of rock to the sea, on an Earth-sized land. It is a rate, not a trench
+law: the drainage and the routes are Earth's in kind, the share that reaches the trenches is
+within a fifth of Clift's (0.76 against 0.65), the share that goes down is Clift's (0.90 against
+0.93), and the convergence is slower than Earth's. It is not a measurement mismatch either, as
+long as the long-run pair is the reference: the floor's stock, which no modern rate enters, holds
+the same twice. Against modern rivers the export would be about half of Earth's and the share
+three times, but both modern numbers are inflated for a long run (above). Which law sets the rate
+is the next question: the erosion laws (the surface stage's efficiency at the model's relief) or
+the uplift they keep pace with (the plates' arcs, collisions and crust made continental). The
+second term is a plate-geometry one: the intra-oceanic fronts are 1.9 times Earth's length
+(25,744 km against Clift's 13,550; Stern & Scholl's 14,500). Nothing is built on this diagnosis.
+
+### The review's fixes (2026-10-31, branch crust-budget-on)
+
+The branch that turns PLT-760, PLT-762 and PLT-763 on had an Opus review. Its findings, confirmed
+in the code, and what changed:
+
+- **PLT-760's two halves read two tests.** The law reads the substrate
+  (`subduction::island_arc_crust`), but the onset's setting read PLT-370's test, any continental
+  column within the arc's distance, matured island arcs included. Behind a matured intra-oceanic
+  arc (a polarity reversal's new arc, PLT-056, or PLT-737's behind the overriding block) a new arc
+  was classed as begun at a continent and took the continental law on old intra-oceanic crust: a
+  path inside the trace's 0.13 to 0.15 km³ a year of "arc began at a continent" (how much of it is
+  unmeasured; the first version of this bullet said all). Stern 2010, as
+  Gerya 2011 gives Leat & Larter 2003, counts arcs built on earlier intra-oceanic arcs as
+  intra-oceanic. With the switch on the onset now reads a continent's own crust
+  (`continent_within_by` with `!island_arc_crust`); off, the old test, so the switch-off path is
+  as before. Test: the onset cases in
+  `an_intra_oceanic_arc_keeps_the_island_law_on_the_crust_it_made` (behind a matured arc
+  intra-oceanic with the switch on, at a continent with it off).
+- **Any basement passed.** A resampling blends the basement over a continental sample's
+  continental corners (`ridges::resample`), so a continent beside an accreted arc takes a share of
+  one; PLT-289's stacked crust and PLT-662's spread rock also keep an ocean basement (PLT-331).
+  The substrate is now ocean floor, or an earlier intra-oceanic arc: continental crust over an
+  ocean basement with PLT-047's island-arc crust in it (`arc_oceanic_m` at the maturity line, the
+  8 km that turned it, `subduction::mature_arc_m`, shared with PLT-047). The cases decided: a
+  matured island arc is an intra-oceanic arc's basement (Stern 2010's "earlier intra-oceanic
+  arcs"); a sediment margin (PLT-661, the continents' sediment on a passive margin's ocean floor),
+  ocean floor thickened at a contact to a continental column's crystalline crust and turned
+  continental (PLT-289) and a spread's receiver (PLT-662, an orogen's crust) are a continent's crust
+  on ocean floor, where an arc is Andean-type ("built
+  on pre-existing continental crust"); a blended trace of a basement on a continent's own crust
+  is no arc. This reads two existing fields and keeps the resampling's basement blend as it is
+  (its other readers, the belts, the transition and the collapse, are unchanged); a `Sample` has
+  no free byte for a substrate flag (144 bytes, the full preset's memory cap). The dropped half
+  line had excluded the PLT-289 and PLT-662 columns too, by their arc magma share; the rule now
+  excludes them by what the crust is.
+- **Where PLT-763 acts.** The suture magma acts past incipient only. The slab breaks off after
+  10 Myr of continental crust on at least half the front, but any oceanic front sample regrows it
+  and the magma resumes, and a mostly oceanic contact never breaks off (the re-review's
+  correction: this bullet first said it runs about a third of the time). The collision fronts and
+  those past incipient are now measured, so the next arm reads the share where it acts and the
+  rate per km there. The 0.18 to 0.19 km³ a year is no evidence of a match.
+- **Small ones.** PLT-762's row and probe.py: 1 km of rock needs 1.62 km in place under ERO-215,
+  not 1.78 (the 536 m line was right). `island_arc_own_crust`'s doc in params.rs now says the
+  substrate rule. PLT-763's "at any convergence" is a game-choice in its row. The suture magma
+  sets ARC flags in collision zones (PLT-763's row). The trace's "PLT-762 moves no rock" now says
+  what it means: it adds no stock, and moves which fronts are erosive. `loss-budget.py --from T`
+  stops with an error when T is not a printed snapshot time (it read the whole run's sums before).
+
+Not yet measured on the pool: the onset and the substrate change which arcs take the island law;
+the next arm on this branch (after master's merge) reads it.
+
+## Hotspots, plume heads and volcanic margins from sources (2026-10-31)
+
+The coordinator's task after the crust budget's row by row reading: the row "rifts, hotspots,
+volcanic rifted margins" made 0.05 km³ a year against Stern & Scholl's 0.5, from hotspot rules
+that rested on nothing (PLT-108 to PLT-120 `uncited`) and no magma at breakup. Give the plumes,
+their heads and the margins a law from sources, build it behind switches, run one cumulative arm.
+The design, what each rule rested on and the sources' numbers: docs/design/hotspots-lips-margins.md;
+the sources and what was read of them: bibliography.md "The sources of the hotspot lane
+(2026-10-31)"; the rows: PLT-790 to PLT-802. No knob, cap or forcing term moves a row towards Earth.
+
+### The rules (all off by default)
+
+- `tectonics.hotspots_sourced` (PLT-790 to PLT-794, PLT-801): Sleep 1990's 37 tails, each with one
+  of his buoyancy fluxes, alive 100 to 150 Myr (Courtillot et al. 2003), born at 37 over the mean
+  life; each makes Hawaii's magma per unit of flux (4 m³/s at 8.7 Mg/s), a seventh lavas (White et
+  al. 2006's 6:1 for the Hawaiian chain), over the 150 km kernel, raised by the model's Airy
+  isostasy; the volcano stage's strength by the flux's rank.
+- `tectonics.plume_heads_sourced` (PLT-795 to PLT-797): a head every 15 Myr (Ernst et al. 2021's
+  continental LIPs every 30 Myr and an oceanic record "similar"), 1,000 km in radius, its province
+  one of the record's (Clift et al. 2009's nine continental LIPs with their roots, three oceanic
+  plateaus), a quarter lavas; the plate model's dome holds 0.514 of it and the volcano stage's
+  plateau the rest, so the world holds the record's volume.
+- `tectonics.volcanic_margins` (PLT-798, PLT-799, PLT-802): a breakup over a head's hot mantle
+  (150 K for 20 Myr, White & McKenzie 1989, Campbell & Griffiths 1990) makes White & McKenzie's
+  igneous crust at full breakup (20.4 km at 150 K) over the 90 km seaward of the outline (Kelemen
+  & Holbrook 1995), continental over its 7 km ocean basement; any other breakup makes none.
+
+Unit tests against the sources' numbers (plates/tests.rs: `the_hotspot_constants_are_their_sources`,
+`a_sourced_tail_adds_its_buoyancy_fluxs_magma`, `a_sourced_plume_head_erupts_a_recorded_province`,
+`a_breakup_over_a_plume_head_makes_a_volcanic_margin`). Switches off, the branch is base34 bit for
+bit: arm hs-off (`pool.sh run hs-off --seeds 1 --starts supercontinent` with the crust-budget
+environment, key f1352cd8eca1) against base34's supercontinent-1: rec.json identical, every dumped
+field identical but globals.json, which differs only by the crust-budget lane's measurement globals.
+
+### The arm hs-cum (the crust-budget switches and the three on; 8 runs)
+
+`tools/review/pool/pool.sh run hs-cum --seeds 1,2,3,4 --set tectonics.island_arc_own_crust=true --set
+tectonics.collision_arc_magma=true --set tectonics.trench_pile_in_place=true --set
+tectonics.hotspots_sourced=true --set tectonics.plume_heads_sourced=true --set
+tectonics.volcanic_margins=true +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`
+(branch hotspot-lip at be0b83f7, key f1352cd8eca1, argkey e501232a), read against base34-s4 (key
+122e4803cded) and cb-cum2 (the crust-budget switches alone on their final code, key ab482e63fcf0).
+The budget (`tools/review/loss-budget.py`, means of 8 runs, km³ a year; the late half, `--from
+-500`, in brackets):
+
+| row | base34-s4 | cb-cum2 | hs-cum | Stern & Scholl 2010 |
+|---|---|---|---|---|
+| intra-oceanic arcs (with their cones) | 1.05 (0.95) | 1.91 (1.67) | 1.65 (1.23) | 1.5 |
+| continental arcs (with their cones) | 0.60 (0.54) | 0.43 (0.39) | 0.40 (0.32) | 1.0 |
+| crust-suturing zones | 0 | 0.18 (0.19) | 0.20 (0.23) | 0.2 |
+| rifts, hotspots, volcanic rifted margins | 0.05 (0.05) | 0.03 (0.04) | 0.91 (1.00) | 0.5 |
+| of it the tails (their basalt and the cones inside their kernel) | | 0.03 | 0.61 (0.70) | |
+| of it the LIPs on continental crust, whole | | | 0.26 (0.25) | |
+| of it volcanic rifted margins | | | 0.04 (0.04) | |
+| sediment subduction | 2.60 (2.82) | 2.72 (2.95) | 2.63 (2.46) | 1.1 |
+| subduction erosion | 0.49 (0.43) | 0.35 (0.29) | 0.26 (0.16) | 1.4 |
+| suturing losses | 0.50 (0.55) | 0.54 (0.59) | 0.56 (0.57) | 0.7 |
+| resampling drops | 0.22 (0.24) | 0.24 (0.27) | 0.40 (0.48) | 0 |
+| net change of the continental volume | −0.98 (−1.14) | −0.37 (−0.63) | +3.11 (+2.82) | about 0 |
+| continental crust at the end, share of the planet | 0.492 | 0.521 | 0.687 | |
+
+The heads: 6.74 per 100 Myr (the design's 6.67), the mean province 9.9 × 10⁶ km³, all LIPs 0.67
+km³ a year whole; 670 volcanic-margin gap points a run. The V1 census (`pool.sh table`, medians,
+Mann-Whitney p against base34-s4): land 0.238 to 0.170 (0.028), largest landmass 0.097 to 0.043
+(0.005), continental crust under the sea 0.527 to 0.755 (< 0.001), land above 2 km 0.013 to 0.007,
+coast with high ground 0.064 to 0.064, land under ice 0.061 to 0.100, collisions per 100 Myr 5.00 to
+7.20 (0.004), the crust's net change +0.065 to +0.259 (< 0.001), criteria met median 6.5 to 4
+(0.002), the sea 174 / 169 m to 948 / 1321 m (after 100 Myr / at the end); against cb-cum2 (6
+criteria, the sea 348 m) the same directions. The guard (`pool.sh measure --arm hs-cum --measures
+guard`): no step beyond 2 Earth reliefs, no continental cell 5 km over Airy; the worst 11,886 m from
+the sea against 9,964 (p < 0.001, the sea 1.1 km higher over the same trenches), the largest fall
+of a cell in a step 11,370 against 6,765 m, the plate cells' largest excess over Airy 2,708 against
+2,194 m (0.10). `collcoast` (measures_boundary.json): collision regime 0.023 of the land, 0.739 of
+it within 150 km of the sea (0.591), collisions the plate check counts 7.72 per 100 Myr (5.50).
+`coastset` (measures_gap4.json): coast_hi 0.064 (0.067), the hotspot coasts 0.045 of the high coasts
+(0), the high coasts facing a flooded continent 0.798 (0.684).
+
+### Why the continents grow: the volcano stage's cones over 37 tails
+
+The named rows add +0.87 km³ a year over cb-cum2; the net moves +3.48. The rest is rock the budget's
+rows do not name:
+
+- **The volcano stage's cones.** The cones the volcano stage hands the pools (PLT-286,
+  `plates/cone_felsic_km3` and `plates/cone_mafic_km3`) are 0.79 km³ a year on cb-cum2 and 5.00 on
+  hs-cum (the mafic 0.31 to 0.47 against 4.08 to 4.66 on two runs read; the stage's own count: 82
+  shields and 112 caldera complexes born in 1,000 Myr against 807 and 1,458 on scattered seed 1).
+  Of them the hotspots' kernels count 0.57 to 0.64 inside their rate, the arcs 0.24 to 0.26, and the
+  LIPs' plateau beyond the dome is about 0.4: the rest, 3.5 to 4.0 km³ a year against 0.3 to 0.5 on cb-cum2
+  (the agent's subtraction on those runs), lies outside every kernel, so nothing nets it against a
+  tail's magma. A shield's radius is set in the game's metres (VOL-022:
+  40 km at the top of its range, over `flank_steepness` 0.5, so 49 to 80 km on the 16k planet, whose
+  radius is 782 km), 400 to 650 km on Earth's sphere (the agent's arithmetic), and its height (3.5 to
+  6.5 km, VOL-021) does not depend on the plume's flux; a tail grows a new one every
+  `hotspot_spacing_km` of track (VOL-007). So with Sleep's 37 tails (about 3 to 8 alive before) the cones'
+  rock, Earth-normalized, is about four times the tails' own sourced magma (0.80 km³ a year).
+- **Where it goes.** The shields stand on ocean floor (silicic centres on continental crust), so the
+  ocean floor thickens, and the rules that turn thick or sediment-laden ocean floor continental take
+  more of it: the crust made continental less its basement (`tools/review/crustcycle/o2c.py`, new)
+  1.25 to 2.14 km³ a year, the transition's −0.25 to +0.32 and PLT-289's buoyant crust at the
+  trenches 0.03 to 0.19. The cones handed to continental crust are booked in the surface stage's part
+  of the budget, with erosion (`apply_surface_feedback`), so loss-budget.py's row "off the continents
+  by the surface stage" falls 4.07 to 2.19 km³ a year with the cones netted inside it.
+- **The sea follows.** The continental crust covers 0.69 of the planet at the end against 0.52, so
+  the ocean basins are smaller and the sea stands 1.3 km over the datum; more of the continents lie
+  under it (0.755), where their rock stays.
+
+The diagnostic arm hs-tails (the crust-budget switches and `hotspots_sourced` alone; seeds 1 and 2,
+4 runs, argkey 2973f3da): the cones 4.92 km³ a year, the tails' row 0.74, the net +2.75 against
+hs-cum's +3.10 on the same four runs, the continental share 0.675, the sea 958 / 1248 m, criteria 4.
+So the tails' cones carry most of it; the heads and the margins add +0.35 on top, about their rows
+(the LIPs 0.28 whole on continental crust, the margins 0.04).
+
+**Verdicts.**
+- `plume_heads_sourced` and `volcanic_margins`: correct as built (their unit tests; 6.74 heads per
+  100 Myr against the design's 6.67; 0.30 to 0.32 km³ a year onto the continents, inside White &
+  McKenzie's 0.3 to 0.4 for melt above rifted regions); measured only beside the sourced tails, since
+  without `hotspots_sourced` the heads' share caps at every one of the preset's 3 births per 100 Myr.
+- `hotspots_sourced`: not on yet. The tails' own magma is Sleep's, but the volcano stage's cones over
+  them are not tied to it: their size is the game's, their number follows the track, and only the
+  part inside the plate model's 150 km kernel counts against the tail. The next step makes a
+  hotspot's cones one budget with its tail: the volcano stage knows each cone's hotspot
+  (`Volcano::hotspot`) and can hand the pools at most the tail's lavas (PLT-794's seventh of PLT-793's
+  magma, Earth-normalized), counted by hotspot, not by the kernel, the rest of the cone standing as
+  relief over rock the plate model already holds. That is a VOL design (VOL-021, VOL-022, PLT-286),
+  then an arm. The lid (design section 5: little melt from a tail under thick lithosphere; Courtillot
+  et al. 2003, White & McKenzie's Fig. 3) is the step after.
+
+### The cone budget (PLT-803, PLT-804; 2026-10-31)
+
+The coordinator's next step: a hotspot's cones and its tail as one budget, after measuring the same
+gap on master's default. docs/design/hotspot-cone-budget.md holds the rule; in short, after each
+plate step a tail that lives through the next leaves its cones that step's lavas to hand (a seventh
+of its rock with `hotspots_sourced`, all of the preset's all-lava rock); the volcano stage hands the
+pools a hotspot's cones' growth at min(1, budget / growth), counted by the cone's own hotspot
+wherever it stands, the cone's relief whole; a caldera of such a cone moves only the rock it holds;
+the tail nets what its cones handed against its own rock and no longer nets its kernel's cones by
+place. `tectonics.hotspot_cone_budget`, on by default since 2026-10-31 (the coordinator's call, decisions
+log 2026-10-31: a books fix for the default). Unit tests:
+`a_budgeted_tail_nets_its_cones_by_their_hotspot` (plates/tests.rs),
+`the_l1_cells_cover_the_model_sphere_and_cones_hand_at_most_their_budget` and, on a 60 Myr pipeline
+with Sleep's tails, `a_hotspots_cones_hand_the_pools_at_most_its_tails_lavas` (volcanoes/tests.rs:
+the tails' rock 5.32 × 10⁷ km³, their cones built at the game's size 5.15 × 10⁸, handed 3.8 × 10⁶,
+the tails' basalt plus what they netted the tails' rock).
+
+**Master's default carries the gap.** Arm hs-base (the branch at a92a07f0, every switch off, key
+b58b6e4506f5, 8 runs): base34-s4 bit for bit (rec.json and every dumped field on all 8 runs; only
+globals.json differs, by the new measurement globals). By `tools/review/crustcycle/cones.py` (new),
+km³ a year, the mean [range] of 8:
+
+| | base34-s4's worlds (hs-base) | hs-budget | hs-cum | hs-cum2 |
+|---|---|---|---|---|
+| the cones' rock handed to the pools | 0.84 [0.72, 0.99] | 0.34 | 5.00 | 0.68 |
+| counted by the arcs | 0.25 | 0.26 | 0.25 | 0.26 |
+| counted by the hotspots (their kernels; with the budget, by hotspot) | 0.06 | 0.03 | 0.60 | 0.05 |
+| the flood basalts' plateaus | 0.02 | 0.02 | 0.33 | 0.34 |
+| counted by nothing | 0.50 [0.39, 0.63] | 0.03 | about 3.8 | 0.03 |
+| the hotspots' cones at full / as handed | 0.64 / 0.64 | 0.69 / 0.03 | | 6.00 / 0.05 |
+| the hotspots' own basalt | 0.049 | 0.042 | 0.94 (the domes in) | 1.06 (the domes in) |
+| the cones handed to continental crust | 0.31 [0.27, 0.37] | 0.24 | | 0.36 |
+
+So on master's default the hotspots' cones hand 0.64 km³ a year, thirteen times the hotspots' own
+basalt, and 0.50 of all the cones counts against no rate (base34's 24 runs: the cones 0.83
+[0.56, 1.08], the same). The cones handed to continental crust, 0.31, sit in the crust budget's
+surface part with erosion: loss-budget.py's "off the continents by the surface stage" reads 3.82
+km³ a year on these worlds, the erosion alone 4.13 (new row "the same with the cones out"). The fix
+is a correctness fix of the default, whatever the hotspot switches say.
+
+**The arms** (key b58b6e4506f5, 8 runs each, the crust-budget environment):
+- hs-budget: the crust-budget lane's three switches and `hotspot_cone_budget` (master's next default
+  and the fix), against cb-cum2. The net change of the continental volume −0.37 to −0.50 km³ a year
+  (late half −0.63 to −0.86), continental crust 0.521 to 0.518 of the planet. V1 (medians, p):
+  land 0.234 to 0.224 (1.0), largest landmass 0.088 to 0.082 (0.96), crust under the sea 0.553 to
+  0.573 (0.96), above 2 km 0.021 to 0.020, coast with high ground 0.090 to 0.065 (0.19), under ice
+  0.065 to 0.084, collisions 5.55 to 5.30, the crust's net change +0.101 to +0.092 (0.80), criteria
+  6 to 6 (mean 5.75 to 6.12, p 0.50), the sea 348 to 307 m. The guard (`pool.sh measure --arm hs-budget --measures guard`): clean, no step beyond 2 Earth reliefs, no continental cell 5 km over Airy (the worst 10,535 m from the sea against 10,219, p 0.038; the plate cells' largest excess over Airy 2,608 against 2,568 m).
+- hs-cum2: the crust-budget switches, the three hotspot switches and the budget, against hs-cum,
+  cb-cum2 and base34-s4. The row "rifts, hotspots, volcanic rifted margins" 0.91 to 0.67 km³ a year
+  (the tails 0.61 to 0.43, the LIPs whole 0.26 to 0.21, the margins 0.04 to 0.03; Stern & Scholl
+  0.5); 6.46 heads per 100 Myr, the mean province 1.08 × 10⁷ km³, 552 margin gap points a run. The
+  net change of the continental volume +3.11 to +0.53 (late half +2.82 to +0.17; cb-cum2 −0.37),
+  continental crust at the end 0.687 to 0.551 (cb-cum2 0.521). V1 against cb-cum2: land 0.234 to
+  0.231 (1.0), largest landmass 0.088 to 0.059 (0.38), crust under the sea 0.553 to 0.587 (0.51),
+  above 2 km 0.021 to 0.018, coast with high ground 0.090 to 0.075 (0.28), under ice 0.065 to 0.102,
+  collisions 5.55 to 6.45 (0.13), the crust's net change +0.101 to +0.131 (0.010), criteria 6 to 4.5
+  (mean 5.75 to 4.88, p 0.12), the sea 348 to 679 m (hs-cum 1,321). The guard: clean, no step beyond 2 Earth reliefs, no continental cell 5 km over Airy; the worst 11,293 m from the higher sea (p < 0.001), the plate cells' largest excess over Airy 3,747 against 2,568 m (p 0.021), the highest plate elevation 4,752 against 4,196 m (0.038). Against base34-s4: `collcoast` (measures_boundary.json) the collision regime 0.019 of the land, 0.578 of it within 150 km of the sea (0.591), collisions the plate check counts 6.83 per 100 Myr (5.50, p 0.021); `coastset` (measures_gap4.json) coast_hi 0.070 (0.067, p 0.57), the rifted margins 0.161 of the high coasts (0.042: the volcanic margins' first rows stand high), the hotspot coasts 0.035 (0), the high coasts facing a flooded continent 0.692 (0.684).
+
+**Verdicts.** `hotspot_cone_budget`: correct (its tests; on master's next default it removes the
+0.45 km³ a year of rock no rate made and moves no V1 number, p ≥ 0.19). On, whatever the hotspot
+switches say: on by default since 2026-10-31 (the coordinator's call; the three hotspot switches stay
+off until the lid). With it, the sourced tails and heads no longer flood the planets, but the
+continents still gain (+0.53 km³ a year, the sea 679 m, the criteria 4.5): the tails put 0.43 km³ a
+year on continental crust, nearly Stern & Scholl's whole row, because Hawaii's melt per unit of
+flux applies under every lid. The lid (Courtillot et al. 2003: weak plumes "would not melt beneath
+old lithosphere"; White & McKenzie's Fig. 3) is the sourced step before `hotspots_sourced` goes on.
+
+**The review's fixes** (an Opus review of 4d9ea6f5, 2026-10-31; docs/design/hotspot-cone-budget.md
+section 6). The arcs run before the hotspots and net every felsic cone within `subduction_distance_km` of a
+front (800 km in every shipped preset; an oceanic slab's or a suture's), a hotspot's silicic centres
+and ignimbrites included, so under the budget a
+continental hotspot's near a front was netted by the arc and by its tail (on hs-budget 0.004 to
+0.007 km³ a year, about a fifth of what the tails netted by id, the reviewer's reading): the budgeted
+hotspots' cones now reach the plate model apart (`surface/volcanic_hotspot_felsic_m`,
+`surface/volcanic_hotspot_mafic_m`), into the pools as any cone's rock and counted by no arc nor
+kernel by place. The tail nets its cones between nothing and the step's rock and carries the rest of
+either sign (a negative pending had been netted uncapped, cleared on a step with no rock and dropped
+at a tail's death); a dead tail's record leaves it as unnetted (`plates/hotspot_cones_unnetted_km3`).
+A cone whose growth held no cell no longer backs rock its hotspot's other cones handed. New tests:
+`a_budgeted_hotspots_cones_join_the_pools_but_no_rate_by_place` (plates/tests.rs) and
+`two_hotspots_cones_hand_and_take_back_each_their_own_share` (volcanoes/tests.rs); the sourced tail's
+test now on a planet whose kernel holds several samples, its netting exact, and the volcanic margin's
+test checks each gap point's thickness against its share. The arms above predate the fixes; the
+default without the budget is unchanged.
 
 ## Rifts stretch before they break up, and the settling's light top (PLT-780 to PLT-785, 2026-10-31)
 
