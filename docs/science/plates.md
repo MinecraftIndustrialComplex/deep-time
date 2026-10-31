@@ -24,6 +24,7 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | the trench budget: sediment subduction, subduction erosion and where it acts, the trench's release, the measures and Earth's references (section "The trench budget", 2026-10-22; switches, off by default) | PLT-440 to PLT-444 (5) |
 | [PLT](ledger/PLT.md) | the crust budget against Stern & Scholl 2010, row by row: the island law on an intra-oceanic arc's own crust, the additions measured whole, the trench sediment line in place, arc magma at sutures (section "The crust budget against Stern & Scholl 2010, row by row", 2026-10-31; switches, off by default) | PLT-760 to PLT-763 (4) |
 | [PLT](ledger/PLT.md) | hotspots, plume heads and volcanic rifted margins from sources: Sleep's 37 tails, a head every 15 Myr with the record's provinces, the igneous crust at breakup over a head's hot mantle (section "Hotspots, plume heads and volcanic margins from sources", 2026-10-31; switches, off by default) | PLT-790 to PLT-802 (13) |
+| [PLT](ledger/PLT.md) | the cone budget: a hotspot's cones hand the pools at most its tail's lavas, counted by the cone's own hotspot, and the cones' measures (section "Hotspots, plume heads and volcanic margins from sources", subsection "The cone budget", 2026-10-31; a switch, off by default) | PLT-803 to PLT-804 (2) |
 
 Rows by status (after the ocean–continent transition, 2026-10-04): `verified` 17, `cited-unverified` 46, `from-memory` 4, `abstract-only` 19, `calibrated` 14, `game-choice` 79, `uncited` 42; `pending-rewrite` 151; `not-yet-coded` 8; `merged` (not counted) 33.
 
@@ -13214,3 +13215,69 @@ So the tails' cones carry most of it; the heads and the margins add +0.35 on top
   relief over rock the plate model already holds. That is a VOL design (VOL-021, VOL-022, PLT-286),
   then an arm. The lid (design section 5: little melt from a tail under thick lithosphere; Courtillot
   et al. 2003, White & McKenzie's Fig. 3) is the step after.
+
+### The cone budget (PLT-803, PLT-804; 2026-10-31)
+
+The coordinator's next step: a hotspot's cones and its tail as one budget, after measuring the same
+gap on master's default. docs/design/hotspot-cone-budget.md holds the rule; in short, after each
+plate step a tail that lives through the next leaves its cones that step's lavas to hand (a seventh
+of its rock with `hotspots_sourced`, all of the preset's all-lava rock); the volcano stage hands the
+pools a hotspot's cones' growth at min(1, budget / growth), counted by the cone's own hotspot
+wherever it stands, the cone's relief whole; a caldera of such a cone moves only the rock it holds;
+the tail nets what its cones handed against its own rock and no longer nets its kernel's cones by
+place. `tectonics.hotspot_cone_budget`, off by default. Unit tests:
+`a_budgeted_tail_nets_its_cones_by_their_hotspot` (plates/tests.rs),
+`the_l1_cells_cover_the_model_sphere_and_cones_hand_at_most_their_budget` and, on a 60 Myr pipeline
+with Sleep's tails, `a_hotspots_cones_hand_the_pools_at_most_its_tails_lavas` (volcanoes/tests.rs:
+the tails' rock 5.32 × 10⁷ km³, their cones built at the game's size 5.15 × 10⁸, handed 3.8 × 10⁶,
+the tails' basalt plus what they netted the tails' rock).
+
+**Master's default carries the gap.** Arm hs-base (the branch at a92a07f0, every switch off, key
+b58b6e4506f5, 8 runs): base34-s4 bit for bit (rec.json and every dumped field on all 8 runs; only
+globals.json differs, by the new measurement globals). By `tools/review/crustcycle/cones.py` (new),
+km³ a year, the mean [range] of 8:
+
+| | base34-s4's worlds (hs-base) | hs-budget | hs-cum | hs-cum2 |
+|---|---|---|---|---|
+| the cones' rock handed to the pools | 0.84 [0.72, 0.99] | 0.34 | 5.00 | 0.68 |
+| counted by the arcs | 0.25 | 0.26 | 0.25 | 0.26 |
+| counted by the hotspots (their kernels; with the budget, by hotspot) | 0.06 | 0.03 | 0.60 | 0.05 |
+| the flood basalts' plateaus | 0.02 | 0.02 | 0.33 | 0.34 |
+| counted by nothing | 0.50 [0.39, 0.63] | 0.03 | about 3.8 | 0.03 |
+| the hotspots' cones at full / as handed | 0.64 / 0.64 | 0.69 / 0.03 | | 6.00 / 0.05 |
+| the hotspots' own basalt | 0.049 | 0.042 | 0.94 (the domes in) | 1.06 (the domes in) |
+| the cones handed to continental crust | 0.31 [0.27, 0.37] | 0.24 | | 0.36 |
+
+So on master's default the hotspots' cones hand 0.64 km³ a year, thirteen times the hotspots' own
+basalt, and 0.50 of all the cones counts against no rate (base34's 24 runs: the cones 0.83
+[0.56, 1.08], the same). The cones handed to continental crust, 0.31, sit in the crust budget's
+surface part with erosion: loss-budget.py's "off the continents by the surface stage" reads 3.82
+km³ a year on these worlds, the erosion alone 4.13 (new row "the same with the cones out"). The fix
+is a correctness fix of the default, whatever the hotspot switches say.
+
+**The arms** (key b58b6e4506f5, 8 runs each, the crust-budget environment):
+- hs-budget: the crust-budget lane's three switches and `hotspot_cone_budget` (master's next default
+  and the fix), against cb-cum2. The net change of the continental volume −0.37 to −0.50 km³ a year
+  (late half −0.63 to −0.86), continental crust 0.521 to 0.518 of the planet. V1 (medians, p):
+  land 0.234 to 0.224 (1.0), largest landmass 0.088 to 0.082 (0.96), crust under the sea 0.553 to
+  0.573 (0.96), above 2 km 0.021 to 0.020, coast with high ground 0.090 to 0.065 (0.19), under ice
+  0.065 to 0.084, collisions 5.55 to 5.30, the crust's net change +0.101 to +0.092 (0.80), criteria
+  6 to 6 (mean 5.75 to 6.12, p 0.50), the sea 348 to 307 m. The guard (`pool.sh measure --arm hs-budget --measures guard`): clean, no step beyond 2 Earth reliefs, no continental cell 5 km over Airy (the worst 10,535 m from the sea against 10,219, p 0.038; the plate cells' largest excess over Airy 2,608 against 2,568 m).
+- hs-cum2: the crust-budget switches, the three hotspot switches and the budget, against hs-cum,
+  cb-cum2 and base34-s4. The row "rifts, hotspots, volcanic rifted margins" 0.91 to 0.67 km³ a year
+  (the tails 0.61 to 0.43, the LIPs whole 0.26 to 0.21, the margins 0.04 to 0.03; Stern & Scholl
+  0.5); 6.46 heads per 100 Myr, the mean province 1.08 × 10⁷ km³, 552 margin gap points a run. The
+  net change of the continental volume +3.11 to +0.53 (late half +2.82 to +0.17; cb-cum2 −0.37),
+  continental crust at the end 0.687 to 0.551 (cb-cum2 0.521). V1 against cb-cum2: land 0.234 to
+  0.231 (1.0), largest landmass 0.088 to 0.059 (0.38), crust under the sea 0.553 to 0.587 (0.51),
+  above 2 km 0.021 to 0.018, coast with high ground 0.090 to 0.075 (0.28), under ice 0.065 to 0.102,
+  collisions 5.55 to 6.45 (0.13), the crust's net change +0.101 to +0.131 (0.010), criteria 6 to 4.5
+  (mean 5.75 to 4.88, p 0.12), the sea 348 to 679 m (hs-cum 1,321). The guard: clean, no step beyond 2 Earth reliefs, no continental cell 5 km over Airy; the worst 11,293 m from the higher sea (p < 0.001), the plate cells' largest excess over Airy 3,747 against 2,568 m (p 0.021), the highest plate elevation 4,752 against 4,196 m (0.038). Against base34-s4: `collcoast` (measures_boundary.json) the collision regime 0.019 of the land, 0.578 of it within 150 km of the sea (0.591), collisions the plate check counts 6.83 per 100 Myr (5.50, p 0.021); `coastset` (measures_gap4.json) coast_hi 0.070 (0.067, p 0.57), the rifted margins 0.161 of the high coasts (0.042: the volcanic margins' first rows stand high), the hotspot coasts 0.035 (0), the high coasts facing a flooded continent 0.692 (0.684).
+
+**Verdicts.** `hotspot_cone_budget`: correct (its tests; on master's next default it removes the
+0.45 km³ a year of rock no rate made and moves no V1 number, p ≥ 0.19). On, whatever the hotspot
+switches say. With it, the sourced tails and heads no longer flood the planets, but the
+continents still gain (+0.53 km³ a year, the sea 679 m, the criteria 4.5): the tails put 0.43 km³ a
+year on continental crust, nearly Stern & Scholl's whole row, because Hawaii's melt per unit of
+flux applies under every lid. The lid (Courtillot et al. 2003: weak plumes "would not melt beneath
+old lithosphere"; White & McKenzie's Fig. 3) is the sourced step before `hotspots_sourced` goes on.

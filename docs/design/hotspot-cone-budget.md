@@ -29,18 +29,20 @@ What lies outside the kernel counts against nothing. Measured on cached runs
 |---|---|---|---|---|---|---|---|
 | base34 (master f80d75a8, 24 runs) | 0.83 (0.56 to 1.08) | 0.52 | | | 0.02 | | 0.048 |
 | base34's worlds, measured (cbt-base, 2 runs; hs-off, 1) | 0.82 | 0.53 | 0.23 | 0.06 | 0.02 | 0.50 (0.46 to 0.54) | 0.055 |
+| base34-s4's worlds with PLT-804 (hs-base, 8 runs, after the build) | 0.84 (0.72 to 0.99) | 0.53 | 0.25 | 0.06 | 0.02 | 0.50 (0.39 to 0.63) | 0.049 |
 | cb-cum2 (8 runs) | 0.79 | 0.46 | 0.27 | 0.06 | 0.02 | 0.45 (0.30 to 0.53) | 0.043 |
 | hs-cum (8 runs, Sleep's 37 tails) | 5.00 | 4.4 | 0.25 | 0.60 | 0.33 | about 3.8 | 0.94 (the LIP domes in) |
 
-(base34's runs predate the arcs' and hotspots' cone globals, PLT-761; cbt-base and hs-off are
-base34's worlds bit for bit with them.) So master's default hands about 0.5 km³ a year of rock no
+(base34's runs predate the arcs' and hotspots' cone globals, PLT-761; cbt-base, hs-off and hs-base
+are base34's worlds bit for bit with them.) So master's default hands about 0.5 km³ a year of rock no
 rate made, ten times the hotspots' own basalt and as much as Stern & Scholl's whole row for rifts,
 hotspots and volcanic margins; nearly all of it mafic, so shields, which only hotspots build (the
 felsic cones the arcs did not count are at most 0.06). The cones handed to continental crust are
 booked in the surface stage's part of the crust budget, with erosion (`apply_surface_feedback`), so
-loss-budget.py's row "off the continents by the surface stage" (3.82 on cbt-base) nets them: at
-least the counted 0.17 to 0.19 (the arcs' 0.16 to 0.18, the hotspots' 0.01), plus the continental
-part of the uncounted, which no global recorded before PLT-804.
+loss-budget.py's row "off the continents by the surface stage" nets them: on base34-s4's worlds
+(hs-base) the cones handed to continental crust are 0.31 km³ a year (0.27 to 0.37), the row reads
+3.82 and the erosion alone 4.13. The hotspots' cones alone hand 0.64 km³ a year there (PLT-804's
+volcano-stage global), thirteen times the hotspots' own basalt (0.049).
 
 ## 2. The rule (`tectonics.hotspot_cone_budget`, PLT-803)
 
@@ -99,5 +101,17 @@ fix), the flood basalts' plateaus (a province's record volume, PLT-796), the isl
 
 ## 5. The arms
 
-In plates.md "Hotspots, plume heads and volcanic margins from sources (2026-10-31)", the second
-part ("The cone budget").
+In plates.md "Hotspots, plume heads and volcanic margins from sources (2026-10-31)", the
+subsection "The cone budget". Key b58b6e4506f5 (a92a07f0), 8 runs each:
+
+- hs-base (every switch off): base34-s4 bit for bit; the cones hand 0.84 km³ a year, 0.50 counted
+  by nothing, the hotspots' cones 0.64 against their own basalt 0.049; 0.31 on continental crust
+  (the surface stage's row 3.82, the erosion alone 4.13).
+- hs-budget (the crust-budget switches and the budget, against cb-cum2): the cones handed 0.79 to
+  0.34, the uncounted 0.45 to 0.03; the net change of the continental volume −0.37 to −0.50 km³ a
+  year; no V1 number moves (p ≥ 0.19), criteria 6 to 6, the sea 348 to 307 m; the guard clean.
+- hs-cum2 (with the three hotspot switches, against hs-cum): the hotspots' cones 6.00 at full, 0.05
+  handed; the net +3.11 to +0.53, the sea 1,321 to 679 m, criteria 4 to 4.5 (cb-cum2 6); the guard
+  clean. The tails still put 0.43 km³ a year on continental crust: the lid is next.
+
+Verdict: on by default, whatever the hotspot switches say (a correctness fix of master's default).
