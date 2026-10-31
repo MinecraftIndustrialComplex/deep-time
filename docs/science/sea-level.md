@@ -815,7 +815,10 @@ at which it turned ocean floor continental. The interiors made from ocean floor 
 3.4 km on average) end at 40.0 km and +467 m, at that column's +525 m. On sedmargin the sea stays
 under 210 m, the room column is 36.3 km, and the interiors erode down to the sea: 35-40 km becomes
 30-35 km because base level moved 518 m (3.6 km of crust at 7.0 m a metre), and the interiors
-stand 90 to 160 m over the sea on both arms. On sedsub the sea falls through the run and the interiors
+stand 90 to 160 m over the sea on both arms. It holds run by run: those interiors end at 37.6 to 38.8
+km on every base33-s4 run and 32.7 to 34.0 km on every sedmargin run, 10 to 380 m over their own sea,
+and the column at the sea follows each run's sea (sedmargin's scattered_continents-1, a sea 20 m
+over the datum: 31.4 km against T_n + 7 (S − z_0) = 31.6). On sedsub the sea falls through the run and the interiors
 lag it: as thin as sedmargin's but 372 m over their sea. This is Airy isostasy with erosion and
 deposition to base level, laws the model had: base33's thick interiors were its high sea's.
 
