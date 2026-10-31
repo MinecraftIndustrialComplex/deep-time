@@ -716,7 +716,9 @@ pub struct HotspotCones {
     /// The tail's lavas of the last step, which its cones may hand in the next frame (0 for a
     /// tail that dies before the next step).
     pub budget_km3: f64,
-    /// What its cones handed the pools in the last frame, net of calderas, not yet netted.
+    /// What its cones handed the pools, net of calderas, not yet netted: the last frame's and
+    /// what earlier steps carried, of either sign (a step nets it between nothing and its rock;
+    /// a dead tail's leaves as unnetted, `hotspots::CONES_UNNETTED_GLOBAL`).
     pub handed_km3: f64,
     /// … of it on continental cells.
     pub handed_continental_km3: f64,
