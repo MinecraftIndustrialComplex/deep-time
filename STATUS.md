@@ -217,6 +217,16 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
   surface's runoff from the bake's budget (`HydroParams::budget`: rain share HYD-036, degree-day melt HYD-037,
   biotemperature PET HYD-029, HYD-030, HYD-035) in place of `surface/climate.rs`'s PET 0 below 0 °C (ERO-010). Its arm
   reads K's regions' table again rather than retuning K.
+- **The review and its fixes** (an Opus reviewer on bc28bbc3, the law on by default; branch `plateau-drainage-on`,
+  199c51b1 and after; docs/design/plateau-drainage.md "The review"). The young landscape now routes with the law on L2
+  (L1's budget upsampled), so the world's rivers keep the history's closed basins; a basin its sediment fills opens
+  (`closed::open_filled`, the step solved again with its area passed on: before, the sediment past a closed lake's room
+  settled on its one-cell spill and dammed it; the test basin's spill rose 660 m closed, cut 186 m opened); a lake's
+  exit is only where its water leaves the lake for good (no share squared over its own shoals); the plateau test's
+  humid lake now spills (20 mm a year net loss; at 0.1 m it was closed) and the humid interior's net is 129.8 m/Myr with
+  its balance, against 129.9 spilling; four new tests; a log warning when `hydro.lake_balance` is off. Docs: Sobel et
+  al. 2003 was read in full (the line above said abstracts only), Langbein 1961's pages, ERO-080's note, a stray
+  abstract line in Richardson2019's entry.
 ### 2026-10-31: Docking lane: how small terranes dock, measured, read, built behind a switch (off) and measured on the pool, on recommended (PLT-770, PLT-771; lane agent, worktree .claude/worktrees/agent-a6cb992bc704b30f3, branch small-terrane-docking, master f80d75a8 and origin/collision-orogen 0e8a5ac9 merged in; sub-agent of session 88bb1af2-7722-4f74-9e04-4e8b8af667a9; not merged)
 
 - **Measured, cached runs only** (base33, key 31c7c70bd7c7, cd665cef, 24 runs; `tools/review/terranes/dock_records.py` and `dock_maps.py` on the VM's numpy python, outputs in `/data/ban/deeptime-runs/terranes/`): hand-offs under 50 samples 29.2 per 100 Myr, lasting 0 / 0 / 4 Myr with 123 / 151 / 200 km of shortening, all on PLT-068's threshold, at an undiminished 55 to 60 mm/yr; 42,500 km² of crust crossing each (median), 1.3 million km³ kept, 0.35 of what reached the front crossing and the rest moving as area; the front's largest uplift 5.1 km, the land they stamped a median 0.5 km over the sea at the run's end (p90 1.2 km). They are the nearest qualifying high ground of 0.0099 of the coast (50 to 200 samples 0.0037); without both classes' high ground M5 falls 0.142 to 0.129 on the map (the open collisions hold 0.055). The small bodies are island arcs (0.73; 14.4 km of own crust on 7 km of ocean crust) and continental fragments (28.6 km), 333 / 455 / 642 km across the front: not small in the sources' sense (Yan et al. 2021: 150 km subducts, 300 km reorganizes), 0.054 to 0.127 of them within the slab's reach.
