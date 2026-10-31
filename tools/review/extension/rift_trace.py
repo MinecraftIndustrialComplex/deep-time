@@ -133,6 +133,36 @@ def run(folder, n_pairs):
         if order.index(key) < n_pairs:
             print(line)
     print(f"pairs {len(pairs)}, never broke up {never}")
+    opens, lives, broke_open = [], [], []
+    for key, rs in pairs.items():
+        opening = sum(r["asked_km2"] / r["length_km"] for r in rs if r["length_km"] > 0)
+        opens.append(opening)
+        lives.append(rs[-1]["t_myr"] - rs[0]["t_myr"] + 2.0)
+        bt = first_break.get(key)
+        if bt is not None:
+            broke_open.append(
+                sum(r["asked_km2"] / r["length_km"] for r in rs if r["length_km"] > 0 and r["t_myr"] <= bt)
+            )
+    print(
+        "pair opening km p10/p50/p90", [round(q(opens, x)) for x in (0.1, 0.5, 0.9)],
+        "| opening before break-up p10/p50/p90", [round(q(broke_open, x)) for x in (0.1, 0.5, 0.9)],
+        f"| broke within 100 km {sum(1 for x in broke_open if x <= 100) / max(len(broke_open), 1):.2f}",
+        "| life Myr p10/p50/p90", [round(q(lives, x)) for x in (0.1, 0.5, 0.9)],
+    )
+    for name, mode in (("wide", 2), ("narrow", 1)):
+        xs = [(r, s) for r in steps for s in "ab" if r[f"{s}_mode"] == mode and r[f"{s}_thinned"] > 0]
+        print(
+            f"{name} sides that thinned: {len(xs)}; reach km p50 {q([r[f'{s}_reach_km'] for r, s in xs], 0.5):.0f}, "
+            f"far km p50/p90 {q([r[f'{s}_far_km'] for r, s in xs], 0.5):.0f}/{q([r[f'{s}_far_km'] for r, s in xs], 0.9):.0f}, "
+            f"thinned km2 per step p50/p90 {q([r[f'{s}_thinned'] * area for r, s in xs], 0.5):.3g}/"
+            f"{q([r[f'{s}_thinned'] * area for r, s in xs], 0.9):.3g}, "
+            f"edge crust km p50 {q([r[f'{s}_crust_km'] for r, s in xs], 0.5):.1f}"
+        )
+    lens = [r["length_km"] for r in steps]
+    print(
+        f"boundary length km p10/p50/p90 {q(lens, 0.1):.0f}/{q(lens, 0.5):.0f}/{q(lens, 0.9):.0f}; "
+        f"speed mm/yr p50 {q([r['speed_mm_yr'] for r in steps], 0.5):.1f}"
+    )
     # The mode against the edge crust: does a side's mode change as its edge thins?
     bins = [(0, 15), (15, 20), (20, 25), (25, 30), (30, 35), (35, 45), (45, 1000)]
     print("edge crust km   side-steps  wide share  moho_c median  lith_km median")
