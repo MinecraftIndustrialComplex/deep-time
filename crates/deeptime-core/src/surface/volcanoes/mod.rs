@@ -1445,7 +1445,7 @@ impl VolcanoStage {
         // 8. Flood basalts from the plate model's new large igneous provinces.
         let started = Instant::now();
         let from = st.events_seen as usize;
-        let mut new_lips: Vec<(EventId, f32, f32, f64)> = Vec::new();
+        let mut new_lips: Vec<(EventId, f32, f32, f64, f64)> = Vec::new();
         for e in world.events.iter().skip(from) {
             if e.kind != LARGE_IGNEOUS_PROVINCE {
                 continue;
@@ -1455,13 +1455,21 @@ impl VolcanoStage {
                     Some(ParamValue::Float(x)) => *x,
                     _ => self.preset.tectonics.lip_thickness_m,
                 };
-                new_lips.push((e.id, lat, lon, th));
+                // A sourced plume head's own radius (`tectonics.plume_heads_sourced`, PLT-797),
+                // else the preset's.
+                let radius_m = match e.params.get("radius_km") {
+                    Some(ParamValue::Float(x)) => {
+                        *x / self.preset.tectonics.model_radius_km * s.radius_m()
+                    }
+                    _ => lip_radius_m,
+                };
+                new_lips.push((e.id, lat, lon, th, radius_m));
             }
         }
         st.events_seen = world.events.len() as u64;
         // The flows' log entries: the provinces count them (provenance `LIP_FLOW`).
         let lip_from = log_ops.len();
-        for (event, lat, lon, th) in new_lips {
+        for (event, lat, lon, th, lip_radius_m) in new_lips {
             let x = frame.x_of_lon(f64::from(lon));
             let z = frame.z_of_lat(f64::from(lat));
             let c = cell_of(&grid, x, z);

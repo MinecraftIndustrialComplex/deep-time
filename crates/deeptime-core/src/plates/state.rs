@@ -614,6 +614,16 @@ pub struct Hotspot {
     pub track_km: f64,
     /// Its hotspot_track event was written (it died, or the run ended).
     pub closed: bool,
+    /// With `tectonics.hotspots_sourced` (PLT-790): its buoyancy flux, Mg/s, and the magma its
+    /// tail adds, km³ a year (Earth-normalized); 0 under the preset's uplift rule.
+    #[serde(default)]
+    pub flux_mg_s: f64,
+    #[serde(default)]
+    pub magma_km3_yr: f64,
+    /// The radius its plume head spread to under the lithosphere, km on the model sphere (its
+    /// large igneous province's), 0 without a head (PLT-798).
+    #[serde(default)]
+    pub head_radius_km: f64,
 }
 
 /// A spreading ridge between two plates, recorded at its ridge_birth event.

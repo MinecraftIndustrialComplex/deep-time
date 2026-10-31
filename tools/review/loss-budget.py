@@ -151,9 +151,21 @@ def budget(run, length):
         "continental_arcs": per(g.get("arc_c", 0.0) + g.get("arc_cones_c", 0.0)),
         "suture_arcs": per(g.get("arc_s", 0.0)),
         "arc_cones": per(g.get("arc_cones_o", nan) + g.get("arc_cones_c", nan)),
-        "hotspots": per(g.get("hotspot_magma_c", 0.0) + g.get("hotspot_cones_c", 0.0))
+        "hotspots": per(
+            g.get("hotspot_magma_c", 0.0)
+            + g.get("hotspot_cones_c", 0.0)
+            # The hotspot lane (PLT-795, PLT-799): the LIPs' plateau beyond the plate model's dome
+            # on continental crust (the volcano stage lays it), and the volcanic margins.
+            + g.get("lip_c", 0.0)
+            - g.get("lip_dome_c", 0.0)
+            + g.get("vrm", 0.0)
+        )
         if split
         else per(g.get("hotspot_magma", 0.0)),
+        "lip_c": per(g.get("lip_c", nan)),
+        "lip_all": per(g.get("lip", nan)),
+        "vrm": per(g.get("vrm", nan)),
+        "tails_c": per(g.get("hotspot_magma_c", 0.0) + g.get("hotspot_cones_c", 0.0) - g.get("lip_dome_c", 0.0)),
         "hotspots_all": per(g.get("hotspot_magma", 0.0) + g.get("hotspot_cones", 0.0)),
         "cones_all": per(g.get("cone_felsic", 0.0) + g.get("cone_mafic", 0.0)),
         "sed_trench": per(g.get("sed_trench", nan)),
@@ -223,6 +235,12 @@ def budget(run, length):
     out["v_n_o"] = g.get("front_n_o", nan) / max(g.get("front_o", 0.0), 1e-9)
     out["v_n_c"] = g.get("front_n_c", nan) / max(g.get("front_c", 0.0), 1e-9)
     out["cord_per_km"] = g.get("cordillera", 0.0) / max(g.get("front_c", 0.0), 1e-9)
+    # The hotspot lane (PLT-795, PLT-799): plume heads' provinces per 100 Myr, the mean
+    # province, and the volcanic margins' gap points.
+    nlip = g.get("lip_n", nan)
+    out["lip_per_100myr"] = nlip / length * 100.0
+    out["lip_mean_km3"] = g.get("lip", nan) / nlip if nlip > 0 else nan
+    out["vrm_n"] = g.get("vrm_n", nan)
     t0, t1 = run["first"], run["t"]
     vol = lambda t: t.get("vol_km3", 0.0) + t.get("vol_hidden_km3", 0.0)
     out["net"] = (vol(t1) - vol(t0)) / yrs
@@ -243,6 +261,10 @@ ROWS = [
     ("crust-suturing zones (arc magma at collision fronts, PLT-763)", "suture_arcs", 0.2),
     ("rifts, hotspots, rifted margins (on continental crust)", "hotspots", 0.5),
     ("  model only: the arcs' felsic cones, in both arc rows", "arc_cones", float("nan")),
+    ("  of it the tails (basalt and cones, LIP domes out)", "tails_c", float("nan")),
+    ("  of it LIPs on continental crust, whole (PLT-795)", "lip_c", float("nan")),
+    ("  of it volcanic rifted margins (PLT-799)", "vrm", float("nan")),
+    ("  model only: LIPs, all, whole (PLT-795)", "lip_all", float("nan")),
     ("  model only: hotspots, all (their basalt and cones)", "hotspots_all", float("nan")),
     ("  model only: the volcano stage's cones, all", "cones_all", float("nan")),
     ("model only: ocean floor's own crust made continental", "ocean_floor", 0.0),
@@ -284,6 +306,9 @@ LENGTHS = [
     ("intra-oceanic arcs' front past incipient, km (PLT-760)", "front_io_km", "{:.0f}"),
     ("island law's rock per km of it, km3/km/Myr", "arc_io_per_km", "{:.1f}"),
     ("cordillera per km of continental front, km3/km/Myr", "cord_per_km", "{:.1f}"),
+    ("plume heads' LIPs per 100 Myr (PLT-795)", "lip_per_100myr", "{:.2f}"),
+    ("mean LIP, km3 (whole)", "lip_mean_km3", "{:.3g}"),
+    ("volcanic-margin gap points over the run (PLT-799)", "vrm_n", "{:.0f}"),
     ("trench input per km of front, km3/km/Myr (Clift et al. 2009: 44.0)", "sed_in_per_km", "{:.1f}"),
     ("sediment subducted per km, km3/km/Myr (Clift 2009: 41.0; S&S: 25)", "sed_down_per_km", "{:.1f}"),
     ("erosion per km of erosive front, km3/km/Myr (Clift 2009: 58.1)", "erosion_per_km", "{:.1f}"),

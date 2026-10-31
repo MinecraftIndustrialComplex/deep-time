@@ -958,6 +958,24 @@ pub struct TectonicParams {
     /// holds under ERO-215's porosity law (536 m). Off, the solid pile is read against 1 km.
     /// ledger: PLT-762
     pub trench_pile_in_place: bool,
+    /// Hotspots from sources (the hotspot lane, 2026-10-31; off by default;
+    /// docs/design/hotspots-lips-margins.md): the plume tails' number, lifetimes and buoyancy
+    /// fluxes from the hotspot catalogues, each tail's magma from its flux, and the heights from
+    /// the model's isostasy (`plates::hotspots::sourced`), in place of `hotspots_initial`,
+    /// `hotspot_births_per_100myr`, `hotspot_lifetime_myr`, `hotspot_uplift_mm_yr`'s rate and the
+    /// volcanic ceilings (PLT-108 to PLT-115, uncited). ledger: PLT-790
+    pub hotspots_sourced: bool,
+    /// Plume heads from sources (the hotspot lane, 2026-10-31; off by default): which new plumes
+    /// start with a head, the large igneous province's volume and the head's radius from the LIP
+    /// record (`plates::hotspots::sourced`), in place of `lip_probability`, `lip_thickness_m` and
+    /// `lip_radius_km` (PLT-117, PLT-118, uncited). ledger: PLT-795
+    pub plume_heads_sourced: bool,
+    /// Volcanic rifted margins (the hotspot lane, 2026-10-31; off by default): new sea floor
+    /// formed beside a continent over a plume head's hot mantle (White & McKenzie 1989's
+    /// condition) takes the igneous crust that mantle melts to, as continental crust over its ocean
+    /// basement (PLT-331), at a resampling (`ridges::volcanic_margin`). Off, every gap point
+    /// is the ocean column (PLT-104). ledger: PLT-799
+    pub volcanic_margins: bool,
     /// Island-arc crust counts as continental once it is this thick, km: an oceanic sample turns
     /// continental once the arc crust it has built (`arc_oceanic_m`) on top of normal ocean crust
     /// (7 km) reaches it, whatever its height. Cloos (1993): crust thicker than about 15 km is
@@ -1510,6 +1528,9 @@ impl Default for TectonicParams {
             island_arc_own_crust: false, // ledger: PLT-760 (built 2026-10-31, off)
             collision_arc_magma: false, // ledger: PLT-763 (built 2026-10-31, off)
             trench_pile_in_place: false, // ledger: PLT-762 (built 2026-10-31, off)
+            hotspots_sourced: false,     // ledger: PLT-790 (built 2026-10-31, off)
+            plume_heads_sourced: false,  // ledger: PLT-795 (built 2026-10-31, off)
+            volcanic_margins: false,     // ledger: PLT-799 (built 2026-10-31, off)
             arc_mature_crust_km: 15.0, // ledger: PLT-047
             cordillera_shortening_mm_yr: 0.0, // ledger: PLT-048
             cordillera_width_km: 120.0,

@@ -4754,6 +4754,9 @@ fn hotspot_cones_are_counted_inside_the_hotspot_rate() {
         plates: Vec::new(),
         track_km: 0.0,
         closed: false,
+        flux_mg_s: 0.0,
+        magma_km3_yr: 0.0,
+        head_radius_km: 0.0,
     });
     let n = st.samples.len();
     let run = |cone_m: f64| {
@@ -7396,4 +7399,138 @@ fn a_collision_melts_from_twenty_myr_after_its_onset_to_eighty_after_its_last_st
     );
     s.kind = OCEANIC;
     assert!(!melt(&s, -450.0), "continental crust only");
+}
+
+/// The two-plate planet of [`two_plates`] opening a gap where y < 0 (plate 1 turned 0.1 rad about
+/// x since the last resampling, 20 Myr before `env`'s step), the pair parted by a rift 10 Myr
+/// before it, and, with `head_from`, a plume head that rose at (0, −1, 0) then and spread
+/// `head_km`; resampled (PLT-799 as `p` has it). Returns the state, the world and the new
+/// lattice's points.
+fn a_rift_over_a_head(
+    p: &PlanetPreset,
+    env: &Env<'_>,
+    head_from: Option<f64>,
+    head_km: f64,
+) -> (PlateState, WorldState, Vec<DVec3>) {
+    let at = DVec3::new(0.0, -1.0, 0.0);
+    let (mut st, geo, pos) = two_plates(p, env, 0.1);
+    let mut world = WorldState::new(1, 16_384, p.t_start_years());
+    st.resample_myr = env.t_myr - 20.0;
+    let e = events::event(&mut world, env.t_myr - 10.0, events::RIFT_ONSET, at);
+    let rift = world.emit(e).unwrap();
+    st.rift_links.push(state::RiftLink {
+        a: 0,
+        b: 1,
+        event: rift,
+        quiet_since_myr: None,
+    });
+    st.hotspots.clear();
+    if let Some(from) = head_from {
+        let e = events::event(&mut world, from, events::LARGE_IGNEOUS_PROVINCE, at);
+        let lip = world.emit(e).unwrap();
+        st.hotspots.push(state::Hotspot {
+            id: 0,
+            pos: at.to_array(),
+            born_myr: from,
+            dies_myr: from + 100.0,
+            uplift_mm_yr: 0.3,
+            lip_event: Some(lip),
+            plates: Vec::new(),
+            track_km: 0.0,
+            closed: false,
+            flux_mg_s: 0.0,
+            magma_km3_yr: 0.0,
+            head_radius_km: head_km,
+        });
+    }
+    let new = ridges::resample(
+        &mut st,
+        &mut world,
+        &pos,
+        &Tree::over(&pos, |_| true),
+        &geo,
+        env,
+    )
+    .unwrap();
+    let pts = new.points().to_vec();
+    (st, world, pts)
+}
+
+/// Volcanic rifted margins (PLT-799, White & McKenzie 1989's condition): new sea floor of the
+/// continent's plate beside its continental edge, formed over a plume head's hot mantle, is the
+/// igneous crust that mantle melts to (`igneous_crust_m` at the head's excess temperature), lavas
+/// over intrusions in the margins' share, continental crust over its 7 km ocean basement
+/// (PLT-331), booked in its global. Only there: not beyond the head's spread, not with the switch
+/// off, not without a head, not once the head's hot mantle had gone when the pair parted.
+#[test]
+fn a_breakup_over_a_plume_head_makes_a_volcanic_margin() {
+    use super::hotspots::sourced::{HEAD_EXCESS_K, HEAD_HOT_MYR, MARGIN_EXTRUSIVE_SHARE};
+    let mut p = preset(20_000, 20.0, "supercontinent", 5);
+    p.tectonics.volcanic_margins = true;
+    let mut off = p.clone();
+    off.tectonics.volcanic_margins = false;
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let env_off = stage.env(&off.tectonics, 1);
+    let margin = |st: &PlateState| -> Vec<usize> {
+        (0..st.samples.len())
+            .filter(|&i| st.samples[i].kind == CONTINENTAL && st.samples[i].basement_m > 0.0)
+            .collect()
+    };
+    let head_km = 1000.0;
+    let rose = env.t_myr - 12.0;
+    let (st, _, _) = a_rift_over_a_head(&off, &env_off, Some(rose), head_km);
+    assert!(margin(&st).is_empty(), "the switch off");
+    let (st, _, _) = a_rift_over_a_head(&p, &env, None, head_km);
+    assert!(margin(&st).is_empty(), "no head");
+    let gone = env.t_myr - 10.0 - HEAD_HOT_MYR - 2.0;
+    let (st, _, _) = a_rift_over_a_head(&p, &env, Some(gone), head_km);
+    assert!(
+        margin(&st).is_empty(),
+        "the head's hot mantle gone when the pair parted"
+    );
+    let (st, world, pts) = a_rift_over_a_head(&p, &env, Some(rose), head_km);
+    let vrm = margin(&st);
+    let want = ridges::volcanic_margin_column(HEAD_EXCESS_K).expect("a thick igneous crust");
+    let h = f64::from(pools::thickness(&want));
+    eprintln!(
+        "volcanic margin: {} gap points, {h:.0} m of igneous crust each",
+        vrm.len()
+    );
+    assert!(vrm.len() >= 3, "{} points", vrm.len());
+    let at = DVec3::new(0.0, -1.0, 0.0);
+    let reach = env.norm.rad(head_km);
+    let width = env.norm.rad(super::hotspots::sourced::MARGIN_WIDTH_KM);
+    let mut own = 0.0;
+    for &i in &vrm {
+        let s = &st.samples[i];
+        assert!(pts[i].angle_between(at) <= reach + 1e-9, "beyond the head's spread");
+        assert!(pts[i].y < 0.0, "on the opening side");
+        // Within the margin's width of the continent's edge, the equator's turned image: the
+        // continent's samples are where z > 0, so the gap begins at z = 0.
+        assert!(
+            pts[i].z.asin() > -(width + 2.0 * env.norm.spacing_rad()),
+            "far from the continent: z {}",
+            pts[i].z
+        );
+        assert!(
+            (f64::from(s.thickness_m) - h).abs() < 1.0,
+            "{} m",
+            s.thickness_m
+        );
+        assert!((f64::from(s.basement_m) - 7000.0).abs() < 1.0);
+        let lava = f64::from(s.pools[state::pool::MAFIC_VOLCANIC]);
+        assert!((lava - h * MARGIN_EXTRUSIVE_SHARE).abs() < 1.0);
+        own += f64::from(s.own_thickness_m());
+    }
+    let booked = world.globals[ridges::VOLCANIC_MARGIN_GLOBAL];
+    let expect = own * env.norm.sample_area_km2() / 1000.0;
+    assert!(
+        (booked - expect).abs() < 1e-6 * expect,
+        "{booked} km³ against {expect}"
+    );
+    assert_eq!(
+        world.globals[ridges::VOLCANIC_MARGIN_SAMPLES_GLOBAL],
+        vrm.len() as f64
+    );
 }

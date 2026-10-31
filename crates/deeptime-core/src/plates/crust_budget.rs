@@ -120,7 +120,7 @@ pub const EDGES_KM: [f64; 10] = [
 ];
 
 /// The globals each snapshot copies (cumulative over the run, km³ or km² Earth-normalized).
-const GLOBALS: [(&str, &str); 76] = [
+const GLOBALS: [(&str, &str); 82] = [
     ("flow_steps", super::flow::STEPS_GLOBAL),
     ("flow_substeps", super::flow::SUBSTEPS_GLOBAL),
     ("flow_short_myr", super::flow::SHORT_GLOBAL),
@@ -250,6 +250,15 @@ const GLOBALS: [(&str, &str); 76] = [
     ("hotspot_magma_c", super::hotspots::MAGMA_CONTINENTAL_GLOBAL),
     ("hotspot_cones", super::hotspots::CONES_GLOBAL),
     ("hotspot_cones_c", super::hotspots::CONES_CONTINENTAL_GLOBAL),
+    // The hotspot lane (ledger: PLT-795, PLT-799): the plume heads' large igneous provinces, all
+    // and on continental crust, their count, and the volcanic rifted margins' continental crust
+    // and gap points.
+    ("lip", super::hotspots::LIP_GLOBAL),
+    ("lip_c", super::hotspots::LIP_CONTINENTAL_GLOBAL),
+    ("lip_dome_c", super::hotspots::LIP_DOME_CONTINENTAL_GLOBAL),
+    ("lip_n", super::hotspots::LIP_COUNT_GLOBAL),
+    ("vrm", super::ridges::VOLCANIC_MARGIN_GLOBAL),
+    ("vrm_n", super::ridges::VOLCANIC_MARGIN_SAMPLES_GLOBAL),
 ];
 
 /// Earth's radius, km: the distances to the coast are Earth-normalized.
