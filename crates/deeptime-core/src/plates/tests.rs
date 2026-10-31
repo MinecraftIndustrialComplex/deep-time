@@ -873,8 +873,14 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // seeds 1 to 24 with sediment subduction by margin type and the margin's sediment continental
     // on by default, PLT-660 to PLT-662, 2026-10-31: 1 to 4, 6, 11, 12, 15, 16, 18, 20 to 22 and
     // 24, seed 8 no more, so seed 1; from the supercontinent 1, 4, 6, 8, 10, 12, 14, 18, 20, 22
-    // and 24).
-    let mut p = preset(8000, 300.0, "scattered_continents", 1);
+    // and 24; 11 of seeds 1 to 24 with the two wedges and the retro plateau on by default,
+    // PLT-730, PLT-731 and PLT-740, 2026-10-31, the sweep `weld_seed_sweep`: 2, 3, 5, 6, 8, 9,
+    // 11, 12, 17, 18 and 22, seed 1 no more, so seed 2; from the supercontinent 1, 3, 5, 6, 8,
+    // 12 to 15, 20, 22 and 24; 15 of seeds 1 to 24 with small terranes docking stripped of their
+    // cover on by default, PLT-770 and PLT-771, 2026-10-31, the sweep `weld_seed_sweep`: 3, 5, 6, 8
+    // to 13, 15, 17, 18, 20, 22 and 24, seed 2 no more, so seed 3; from the supercontinent 1, 2,
+    // 6 to 8, 10, 12 to 16, 18, 21 and 23).
+    let mut p = preset(8000, 300.0, "scattered_continents", 3);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: under Forsyth & Uyeda's
     // balance on this small planet, whose ridge push is several times Earth's
     // (`plates_quick_16k`, ridge -1,000 m, floor -10,000 m), the speed guard bound on every
@@ -1071,8 +1077,11 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // seed 8; seed 2 since sediment subduction by margin type and the margin's sediment
     // continental went on by default, PLT-660 to PLT-662, 2026-10-31, when seed 19 no longer
     // welds: the sweep's welding seeds 1 to 4, 6, 11, 12, 15, 16, 18, 20 to 22 and 24, the guard
-    // binding on none, seed 2 the first after seed 1).
-    let mut p = preset(8000, 300.0, "scattered_continents", 2);
+    // binding on none, seed 2 the first after seed 1; seed 3 since small terranes docking stripped
+    // of their cover went on by default, PLT-770 and PLT-771, 2026-10-31, when seed 2 no longer
+    // welds: the sweep's welding seeds 3, 5, 6, 8 to 13, 15, 17, 18, 20, 22 and 24, the guard
+    // binding on none, seed 3 the first).
+    let mut p = preset(8000, 300.0, "scattered_continents", 3);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: the guard asserted below
     // bound under Forsyth & Uyeda's balance on every welding seed of 1 to 24 of this small planet
     // but supercontinent 11, whose ridge push is several times Earth's (`plates_quick_16k`, ridge
@@ -2302,6 +2311,7 @@ fn a_collision() -> state::Collision {
         continental_over: 1.0,
         stalled_since_myr: None,
         jam_km: None,
+        subducting: false,
         belt: Default::default(),
     }
 }
@@ -5910,6 +5920,99 @@ fn the_final_heat_flow_pass_lifts_only_low_continental_samples() {
         s.heat_flow_mw_m2 = 0.0;
     }
     assert_eq!(flat, was, "no field but heat flow moved");
+}
+
+/// Young floor made continental after `finish_samples` (the rate guard's spread after the
+/// resampling, PLT-662) takes the continental law's heat flow, not the floor's (ledger: PLT-469):
+/// the bake test's planet with the collision orogen on (seed 1, 60 Myr) baked 300 mW/m² on
+/// crust spread onto 2.4 Myr floor at the last step, which the pass's "at least" kept. The
+/// floor's value goes with its kind (`Sample::make_continental`); the pass gives the law's, the
+/// proxy's without the state and the state's over the floor's own lithosphere with it.
+#[test]
+fn young_floor_made_continental_after_the_step_takes_the_continental_law() {
+    let mut p = preset(2_000, 20.0, "supercontinent", 5);
+    p.tectonics.thermal_state = false;
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (mut st, _geo) = init::initial_state(&p, &env).unwrap();
+    let t = st.t_myr;
+    let sea: Vec<usize> = (0..st.samples.len())
+        .filter(|&i| st.samples[i].kind == OCEANIC)
+        .take(3)
+        .collect();
+    let land = (0..st.samples.len())
+        .find(|&i| st.samples[i].kind == CONTINENTAL)
+        .unwrap();
+    // Floor 2.4 Myr old with the floor's heat flow, 510 / √2.4 = 329, capped at 300 (ISO-016),
+    // and the lithosphere `thermal::step` gives it; no orogeny, so the proxy's 55.
+    let age = 2.4;
+    for (n, &i) in sea.iter().enumerate() {
+        let s = &mut st.samples[i];
+        s.formed_myr = (t - age) as f32;
+        s.heat_flow_mw_m2 = ocean_heat_flow(age) as f32;
+        s.lithosphere_km = thermal::ocean_km(age) as f32;
+        s.orogeny_myr = f32::NEG_INFINITY;
+        s.flags = if n == 1 { ARC } else { 0 };
+    }
+    assert_eq!(st.samples[sea[0]].heat_flow_mw_m2, 300.0);
+    st.samples[land].heat_flow_mw_m2 = 120.0;
+    for &i in &sea {
+        st.samples[i].make_continental();
+        assert_eq!(
+            st.samples[i].heat_flow_mw_m2, 0.0,
+            "the floor's went with it"
+        );
+    }
+    st.samples[land].make_continental();
+    assert_eq!(
+        st.samples[land].heat_flow_mw_m2, 120.0,
+        "continental crust keeps its own"
+    );
+    let made = st.clone();
+
+    // Without the state: the proxy, 55 and an arc's 95.
+    thermal::refresh_heat_flow(&mut st, &p.tectonics, t);
+    let q = |st: &PlateState, i: usize| f64::from(st.samples[i].heat_flow_mw_m2);
+    assert!((q(&st, sea[0]) - 55.0).abs() < 1e-3, "{}", q(&st, sea[0]));
+    assert!((q(&st, sea[1]) - 95.0).abs() < 1e-3, "{}", q(&st, sea[1]));
+    assert_eq!(q(&st, land), 120.0);
+    for &i in &sea {
+        assert_eq!(
+            st.samples[i].heat_flow_mw_m2,
+            continental_heat_flow(&st.samples[i], t, false, 0.0),
+            "what finish_samples sets"
+        );
+    }
+
+    // With the state: its law over the floor's lithosphere, 26 + 3375 / L at L = 18.0 km.
+    let mut k = p.tectonics.clone();
+    k.thermal_state = true;
+    let mut st = made.clone();
+    thermal::refresh_heat_flow(&mut st, &k, t);
+    let l = thermal::ocean_km(age);
+    assert!((l - 18.0).abs() < 0.1, "{l}");
+    let law = thermal::conductive_mw_m2(l);
+    assert!(
+        (q(&st, sea[0]) - law).abs() < 1e-3,
+        "{} against {law}",
+        q(&st, sea[0])
+    );
+    assert!(
+        (q(&st, sea[1]) - law - thermal::ARC_HEAT_MW_M2).abs() < 1e-3,
+        "{}",
+        q(&st, sea[1])
+    );
+    assert!(
+        law < ocean_heat_flow(age),
+        "under the floor's law, which has no say"
+    );
+
+    // Off (both switches), the pass leaves the made crust with none: the fault it fixes.
+    let mut off = p.tectonics.clone();
+    off.heat_flow_refresh = false;
+    let mut st = made.clone();
+    thermal::refresh_heat_flow(&mut st, &off, t);
+    assert_eq!(st, made);
 }
 
 /// The front lane's cut trace (2026-10-24, plates.md "The front's length: why the plates are

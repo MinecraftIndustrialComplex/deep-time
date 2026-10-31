@@ -1,10 +1,12 @@
 # The collision orogen as a doubly vergent wedge and its plateau: design
 
-Status: **designed and built behind switches** (2026-10-31, the orogen lane, branch `collision-orogen`; Ben's
+Status: **designed and built; both switches on by default since 2026-10-31** (the coordinator's call, under Ben's
+rule of 2026-10-23, decisions log 2026-10-31; built by the orogen lane, branch `collision-orogen`; Ben's
 order "Freeboard, then orogen (Recommended)", decisions log 2026-10-30). The two wedges (PLT-730, PLT-731) were
 built on 2026-10-29 and kept off; this design reads them again on the freeboard physics (PLT-660, PLT-661, on since
 2026-10-31) and adds one rule, the plateau's retro-ward growth (PLT-740, `tectonics.collision_retro_plateau`).
-Defaults are the coordinator's call on the lane's report. plates.md "The collision orogen (PLT-740)" holds the
+The defaults were the coordinator's call on the lane's report: `collision_two_wedges` and `collision_retro_plateau` are
+on. plates.md "The collision orogen (PLT-740)" holds the
 arms' tables.
 
 **Measured** (2026-10-31): the cumulative arm orog-cum (O1 + O2, 8 runs) against base34-s4 and base34: the guard
@@ -117,8 +119,8 @@ Strecker 2012, pp. 103-104) and southern Tibet's at under 0.01 km/Myr since 12-1
 **O1. The orogen is two critical wedges about the front** (PLT-730, PLT-731, built 2026-10-29). Unchanged. The
 pro-wedge on the incoming plate's samples rides to the front and crosses whole (PLT-400), which stands for a wedge
 that stays at the front while the lower plate passes under it: in the sources the orogen is fixed to S and the retro
-mantle, so its pro-wedge is accreted lower-plate crust that no longer moves with the lower plate. Whether it goes on
-by default is the coordinator's call on the arms (the table above and the cumulative arm).
+mantle, so its pro-wedge is accreted lower-plate crust that no longer moves with the lower plate. It went on
+by default on 2026-10-31, the coordinator's call on the arms (the table above and the cumulative arm).
 
 **O2. Past the strength height the plateau grows retro-ward without a set width** (new, PLT-740,
 `tectonics.collision_retro_plateau`, with O1 only). Today the retro flank is the overriding plate's continental
