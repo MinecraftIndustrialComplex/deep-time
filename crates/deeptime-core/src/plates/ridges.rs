@@ -96,10 +96,31 @@ pub const ACCRETIONARY_SUBDUCTED: f64 = 0.83;
 /// Marianas, Tonga) is erosive, one fed by a thick fan (the Lesser Antilles) accretes.
 // ledger: PLT-660
 pub fn sediment_subducted_share(pile_m: f64, convergence_mm_yr: f64) -> f64 {
-    if pile_m > ACCRETIONARY_PILE_M && convergence_mm_yr.abs() < ACCRETIONARY_MAX_MM_YR {
+    sediment_subducted_share_at(pile_m, convergence_mm_yr, ACCRETIONARY_PILE_M)
+}
+
+/// [`sediment_subducted_share`] with the accretionary pile's line `line_m`, m of rock: 1 km
+/// (`ACCRETIONARY_PILE_M`), or with `trench_pile_in_place` the rock a 1 km porous column holds
+/// ([`trench_line_solid_m`], PLT-762).
+pub fn sediment_subducted_share_at(pile_m: f64, convergence_mm_yr: f64, line_m: f64) -> f64 {
+    if pile_m > line_m && convergence_mm_yr.abs() < ACCRETIONARY_MAX_MM_YR {
         ACCRETIONARY_SUBDUCTED
     } else {
         1.0
+    }
+}
+
+/// A trench sediment line of Clift & Vannucchi's (2004), `line_m` of sediment at the trench, as
+/// the model's solid pools hold it: with `in_place` the rock in a porous column `line_m` thick
+/// under ERO-215's porosity law (`surface::pelagic::solid_of_in_place_m`; 1 km holds 536 m), else
+/// `line_m` itself. C&V [31]: Table 1's thickness is "the thickness of sediment (uncorrected for
+/// porosity) on the subducting plate at the trench axis", and their accretion criterion is
+/// "trench sediment thicknesses >1 km" (abstract). ledger: PLT-762
+pub fn trench_line_solid_m(in_place: bool, line_m: f64) -> f64 {
+    if in_place {
+        crate::surface::pelagic::solid_of_in_place_m(line_m)
+    } else {
+        line_m
     }
 }
 
@@ -384,6 +405,13 @@ pub const DROPPED_GLOBAL: &str = "plates/resample_dropped_km3";
 /// … and the mafic pools of the continental crust that accretes, which `pools::accrete` does not
 /// carry (only the conserved pools join the column on top), km³.
 pub const MAFIC_DROPPED_GLOBAL: &str = "plates/resample_mafic_dropped_km3";
+/// World global (measurement only, PLT-760): the new continental samples of the resamplings whose
+/// island-arc class, carried from the nearest corner (`Sample::island_arc_marked`), the blend of
+/// their columns' basement and island-arc crust against the 8 km line would have lost (a matured
+/// arc's edge beside its ocean flank, PR #53's leak B), km² summed over the resamplings …
+pub const ISLAND_CLASS_KEPT_GLOBAL: &str = "plates/resample_island_class_kept_km2";
+/// … and would have given (a continent's own column beside an accreted arc, leak A), km².
+pub const ISLAND_CLASS_REFUSED_GLOBAL: &str = "plates/resample_island_class_refused_km2";
 /// World global: subducted ocean floor's sediment and sedimentary rock that went down with the
 /// slab at resamplings instead of accreting (`sediment_subduction_share`, PLT-440), km³
 /// (Earth-normalized; the crust budget's sediment subduction against Stern & Scholl 2010).
@@ -761,11 +789,16 @@ pub fn resample(
     // time (ledger: PLT-276, PLT-292). Both are counted, m of rock per new sample.
     let mut plate_new: Vec<u32> = vec![u32::MAX; n];
     // 9 to 11: the floor's sediment reaching a trench, under continental or oceanic crust, or the
-    // one-way slab's (measurement only).
-    let mut tally: Vec<[f64; 12]> = vec![[0.0; 12]; n];
+    // one-way slab's (measurement only); 12 and 13: the new continental samples whose island-arc
+    // class, carried from the nearest corner, the blend of their columns would have lost or given
+    // (measurement only, PLT-760: the old reading of the class).
+    let mut tally: Vec<[f64; 14]> = vec![[0.0; 14]; n];
+    let mature_m = super::subduction::mature_arc_m(k);
     let sediment_share = k.sediment_subduction_share as f32; // ledger: PLT-440
     // By margin type instead of one share (ledger: PLT-660).
     let sourced = k.sediment_subduction_sourced;
+    // The accretionary pile's line in rock (ledger: PLT-660, PLT-762).
+    let pile_line_m = trench_line_solid_m(k.trench_pile_in_place, ACCRETIONARY_PILE_M);
     // How each new sample was blended, for the gap budget (`gap_budget.rs`) when it is on.
     let mut traces: Vec<Option<gap_budget::Trace>> = vec![None; n];
     // The step's limits (`rate.rs`) on the new lattice: a covered sample's ceiling and top are
@@ -806,6 +839,14 @@ pub fn resample(
             Some((g, c)) => {
                 let mut s = interp(*g, c, q);
                 *pl = group_plate[*g as usize];
+                if s.kind == CONTINENTAL {
+                    let blended = s.basement() > 0.0 && s.arc_oceanic_m >= mature_m;
+                    if s.island_arc_marked() && !blended {
+                        tally[12] += 1.0;
+                    } else if !s.island_arc_marked() && blended {
+                        tally[13] += 1.0;
+                    }
+                }
                 if let Some(old) = old_limits {
                     let blend = |v: &[f32]| -> f32 {
                         (0..3)
@@ -834,7 +875,7 @@ pub fn resample(
                             .sum();
                         // Crust a collision took across its front is consumed, hidden or
                         // not: the belt stacked its share and the rest went down with the slab.
-                        if (under.is_hidden() && under.stacked)
+                        if (under.is_hidden() && under.stacked())
                             || (!under.is_hidden()
                                 && under.kind == CONTINENTAL
                                 && p2 != *pl
@@ -861,9 +902,10 @@ pub fn resample(
                                 let share = if sourced {
                                     let pile = u.pools[pool::SEDIMENT].max(0.0)
                                         + u.pools[pool::SEDIMENTARY].max(0.0);
-                                    sediment_subducted_share(
+                                    sediment_subducted_share_at(
                                         f64::from(pile),
                                         super::subduction::orthogonal_convergence_mm_yr(&s),
+                                        pile_line_m,
                                     ) as f32
                                 } else {
                                     sediment_share
@@ -947,6 +989,8 @@ pub fn resample(
         (SEDIMENT_REACHING_TRENCH_GLOBAL, sum(9) + sum(10) + sum(11)),
         (SEDIMENT_REACHING_TRENCH_CONTINENTAL_GLOBAL, sum(9)),
         (SEDIMENT_REACHING_TRENCH_OCEANIC_GLOBAL, sum(10)),
+        (ISLAND_CLASS_KEPT_GLOBAL, sum(12) * 1000.0),
+        (ISLAND_CLASS_REFUSED_GLOBAL, sum(13) * 1000.0),
     ] {
         *world.globals.entry(name.to_owned()).or_insert(0.0) += v;
     }
@@ -1453,6 +1497,66 @@ pub fn bury(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// PLT-760 through a resampling (PR #53's review): the island-arc class of continental crust
+    /// is the nearest corner's, as the kind is, whatever the blend makes of the columns' island-arc
+    /// crust and basement. Leak B: a matured arc's edge column (8.5 km of island-arc crust over its
+    /// ocean basement) beside its ocean-floor flank keeps its kind and full basement but blends to
+    /// under the 8 km line, since the arc crust is blended over all three corners. Leak A: a
+    /// continent's own column beside an accreted arc (40 km of island-arc crust) takes a share of
+    /// its basement and enough arc crust to pass the line at a 0.2 weight.
+    #[test]
+    fn the_island_arc_class_survives_a_resampling_from_the_nearest_corner() {
+        let k = &crate::params::TectonicParams::default();
+        let mature = super::super::subduction::mature_arc_m(k);
+        let arc = |crust_m: f32| {
+            let mut s = Sample::blank(0);
+            s.pools = oceanic_column();
+            s.arc_oceanic_m = crust_m;
+            s.make_continental();
+            s.set_island_arc(true);
+            s.pools[pool::FELSIC_PLUTONIC] += crust_m;
+            s.thickness_m = thickness(&s.pools);
+            s
+        };
+        let mut floor = Sample::blank(0);
+        floor.pools = oceanic_column();
+        floor.thickness_m = thickness(&floor.pools);
+        let mut continent = Sample::blank(0);
+        continent.kind = CONTINENTAL;
+        continent.pools = super::super::pools::continental_column();
+        continent.thickness_m = thickness(&continent.pools);
+        let island = super::super::subduction::island_arc_crust;
+        let cover = |w: [f64; 3]| Cover {
+            t: 0,
+            tri: [0, 1, 2],
+            w,
+        };
+        let edge = arc(8500.0);
+        assert!(island(&edge) && !island(&continent) && island(&floor));
+        // Leak B, edge weights 0.4 to 0.8.
+        for w0 in [0.4, 0.6, 0.8] {
+            let w1 = 0.5 * (1.0 - w0);
+            let src = [edge, floor, floor];
+            let s = interpolate(&src, &cover([w0, w1, w1]), DQuat::IDENTITY, 0);
+            assert_eq!(s.kind, CONTINENTAL);
+            assert!(
+                s.basement() > 0.0 && s.arc_oceanic_m < mature,
+                "{w0}: {s:?}"
+            );
+            assert!(island(&s), "the matured arc's edge lost its class at {w0}");
+        }
+        // Leak A.
+        let src = [continent, arc(40_000.0), continent];
+        let s = interpolate(&src, &cover([0.6, 0.2, 0.2]), DQuat::IDENTITY, 0);
+        assert_eq!(s.kind, CONTINENTAL);
+        assert!(s.basement() > 0.0 && s.arc_oceanic_m >= mature, "{s:?}");
+        assert!(!island(&s), "the continent took the accreted arc's class");
+        // Ocean floor again is no island arc's continental crust.
+        let mut back = edge;
+        back.make_oceanic();
+        assert!(!back.island_arc_marked());
+    }
 
     /// PLT-660, Clift & Vannucchi (2004): an accretionary margin (a pile over 1 km, convergence
     /// under 76 mm/yr) subducts 83 % of the incoming pile; an erosive one (a thinner pile or a

@@ -661,8 +661,30 @@ impl PlatesStage {
             ),
             // ledger: PLT-554 (measurement only)
             (subduction::ARC_BAND_GLOBAL, pull.arc_band_km_myr),
+            // ledger: PLT-761, PLT-760 (measurement only)
+            (
+                subduction::ARC_CONES_CONTINENTAL_GLOBAL,
+                pull.arc_cones_km3[0],
+            ),
+            (subduction::ARC_CONES_OCEANIC_GLOBAL, pull.arc_cones_km3[1]),
+            // ledger: PLT-763
+            (subduction::ARC_SUTURE_GLOBAL, pull.arc_suture_km3),
+            (
+                subduction::ARC_FRONT_INTRA_OCEANIC_GLOBAL,
+                pull.front_intra_oceanic_km_myr,
+            ),
+            (subduction::SUTURE_FRONT_GLOBAL, pull.suture_front_km_myr[0]),
+            (
+                subduction::SUTURE_FRONT_ACTIVE_GLOBAL,
+                pull.suture_front_km_myr[1],
+            ),
         ] {
             *world.globals.entry(name.to_owned()).or_insert(0.0) += x;
+        }
+        // Measurement only (the crust-budget lane's trace of PLT-760; a global whatever the crust
+        // budget, so recording it changes nothing).
+        for (name, x) in subduction::ARC_SPLIT_GLOBALS.iter().zip(pull.arc_split_km3) {
+            *world.globals.entry((*name).to_owned()).or_insert(0.0) += x;
         }
         lap(&mut clock, "fronts");
         cut_trace::mark(st, &cache.geo, "fronts");
@@ -1084,6 +1106,7 @@ impl PlatesStage {
                 b.write_plates(&st.samples, |i| st.plate_of(i), env.t_myr);
                 b.write_ages(&st.samples, env.t_myr);
             }
+            b.end_step(env.t_myr, env.norm.sample_area_km2(), &world.globals);
             if step >= self.total {
                 world.notes.insert(CRUST_BUDGET_NOTE.to_owned(), b.lines());
             }
@@ -1727,7 +1750,7 @@ fn finish_samples(st: &mut PlateState, geo: &Geo, z0: &[f32], env: &Env<'_>) {
     // column's thickness: the plate model keeps crust stacked at resamplings under the oceanic
     // label (`transition.rs`), and that is no arc. Until 2026-10-02 a mature arc also had to
     // stand above sea level that step; most intra-oceanic arcs are submarine (Stern 2010).
-    let mature_m = (env.k.arc_mature_crust_km * 1000.0 - transition::oceanic_m()).max(0.0) as f32;
+    let mature_m = subduction::mature_arc_m(env.k);
     let thermal_heat = env.k.thermal_state;
     let thermal_reference = env.k.thermal_reference_km as f32;
     st.samples.par_iter_mut().enumerate().for_each(|(i, s)| {
@@ -1736,8 +1759,10 @@ fn finish_samples(st: &mut PlateState, geo: &Geo, z0: &[f32], env: &Env<'_>) {
             && s.arc_oceanic_m > 0.0
             && s.arc_oceanic_m >= mature_m
         {
-            // The ocean crust under the arc stays under it, as its basement (ledger: PLT-331).
+            // The ocean crust under the arc stays under it, as its basement (ledger: PLT-331), and
+            // the crust is an island arc's (ledger: PLT-760).
             s.make_continental();
+            s.set_island_arc(true);
             s.flags |= EMERGED;
             if s.orogeny != OROGENY_HIMALAYAN {
                 s.orogeny = OROGENY_ANDEAN;
