@@ -1,12 +1,15 @@
 # The surface's runoff from the bake's water budget: design
 
-Status: **built behind a switch, off; its arm ran, verdict default-on** (2026-10-31, the runoff lane, branch
-`surface-runoff-budget` on `plateau-drainage` 7df49df8). The switch is `surface.runoff_budget`
-(`crates/deeptime-core/src/surface/climate.rs`, ERO-221). The checks against cold basins are ERO-222. The arm plat-rb0
-ran on the closed basins ("The arm's results"): the flat high ground wears a third less, the land above 4 km doubles,
-K's regions stay inside Montgomery & Brandon's lines, and the export to the sea does not move. Since 689af56b the
-branch carries origin/plateau-drainage-on (the closed basins on by default with their review's fixes, and with it
-master's PR #50 and the small-terrane docking): with `surface.runoff_budget` off it is plateau-drainage-on's physics.
+Status: **built behind a switch, off; its review's fixes built; to be armed again on base35-s4 before any default**
+(2026-10-31, the runoff lane, branch `surface-runoff-budget` on `plateau-drainage` 7df49df8). The switch is
+`surface.runoff_budget` (`crates/deeptime-core/src/surface/climate.rs`, ERO-221). The checks against cold basins are
+ERO-222. The arm plat-rb0 ran on the closed basins ("The arm's results"): the flat high ground wears a third less, the
+land above 4 km doubles, K's regions stay inside Montgomery & Brandon's lines, and the export to the sea does not move.
+Its verdict was default-on. The review (an Opus reviewer at a38ab3e9) held that: the young stage and the amplifier
+kept the old rule (the pool's runs stop after the volcanoes, so the arm never read them), the months were centred on
+the mean, and no test went through the switch ("The review and its fixes"). The branch carries origin/master 8b24e359 (the closed basins on by default since PR #52, the crust budget of
+PR #53). With `surface.runoff_budget` off it is master's physics but for one correction: the climate stage's months are
+now taken as given, which changes master's closed basins and the flexure's lakes on cold ground.
 
 ## Why
 
@@ -37,10 +40,16 @@ listed it as a simplification: "two runoffs that differ on frozen ground".
 | evapotranspiration | Fu's curve on P (HYD-034) | Fu's curve on the liquid water (HYD-035) |
 | a mean below 0 °C, a thawed summer | all of P runs off | the summer evaporates |
 | a warmest month below 0 °C | all of P runs off | nothing runs off: the snow stays, the glaciers' to move (HYD-038) |
+| a mean above 0 °C, a month below it | P less Fu's ET at PET 60 T | the biotemperature counts the frozen months as 0 °C, so it is above the mean and PET is higher: less runs off (P 600 mm at 5 ± 15 °C: 336 against 245 mm, -27 %; a test) |
 | no month below 0 °C | P less Fu's ET at PET 60 T | the same, to 1e-12 (a test) |
+| land of either kind below cold headwaters | its drainage area counts the headwaters' weights | less area where the headwaters run off less, so a frost-free valley below cold ground erodes less too |
 
-The months come from the climate stage's seasons, taken as departures about the surface's own mean temperature
-(HYD-033). Without the stage they are the mean ± 8 °C (HYD-032).
+The months are the climate stage's warmest and coldest month as it wrote them (`climate/t_warm_c`, `climate/t_cold_c`).
+The stage writes the mean and both months from the same twelve months with the same lapse rate, and the surface's
+temperature is that mean, so they are HYD-033's departures about the surface's mean exactly. Until the review they
+were centred on the mean instead (the half-range on either side), which a polar year does not keep: at a mean of
+-17 °C with months of -5 and -40 °C it put the warmest month at +0.5 °C ("The review and its fixes"). Without the stage
+they are the mean ± 8 °C (HYD-032).
 
 ## What cold lands do (sources read)
 
@@ -78,8 +87,8 @@ runoff").
     temperatures lower than O0 Celsius were considered as O0" (HYD-030). He also cuts at 30 °C: "biotemperature is an
     average of the temperature between 0. and 300C". The code does not cut there.
   - **The degree-day factor.** Hock 2003's Table 1 gives snow factors of 2.5 to 5.5 mm per °C per day at
-    non-glaciated sites and 2.7 to 11.6 on glaciers. The budget's 4.0 lies inside the first range (HYD-037, now
-    `verified`).
+    non-glaciated sites and 2.7 to 11.6 on glaciers. The budget's 4.0 lies inside the first range. No source gives
+    4.0 itself, so HYD-037 is a `game-choice` inside the range read (as ERO-219's arid loss is), not `verified`.
   - **Fu's ω of 2.6** is read only at second hand: "The original formulation introduced by Budyko (1956, 1974) is best
     represented by setting ω = 2.6 (Zhang et al., 2004)" (Greve et al. 2015, author response). Zhang, Hickel & Shao
     (MODSIM 2005) used "a single value of 2.63".
@@ -93,13 +102,19 @@ runoff").
 
 **R1 (ERO-221).** With `surface.runoff_budget`, the stream power's runoff weight (ERO-010) takes each cell's runoff from
 the bake's budget: `climate::water_budget` per cell, the same `climate::cell_water` the lakes' balance takes. The
-weight is runoff / 0.5 m, floored at 0.05 (ERO-011). Nothing else reads the change: the aridity index, the facies and
-the soils keep the snapshot's PET (MOI-067).
+weight is runoff / 0.5 m, floored at 0.05 (ERO-011). The step's wiring is two functions, `surface::step_water` (the
+budget, when the lakes or the switch read it) and `surface::runoff_weight`, and a test goes through both
+(`the_runoff_budget_reaches_the_stream_power_s_weight`). The young landscape takes the same weight on L1
+(`young::runoff_weights`, YNG-011), and with it the amplifier's drainage (`amplify.rs` reads `young/runoff_weight`).
+Nothing else reads the change: the aridity index, the facies and the soils keep the snapshot's PET (MOI-067).
 
 What follows from the budget:
-- frost-free land is unchanged (`without_frost_the_budget_is_the_surface_s_runoff`), so K's calibration of 2026-10-18 on
-  that land is unchanged;
-- ground that never thaws runs off nothing, and its weight is the floor;
+- land with no month below freezing is unchanged (`without_frost_the_budget_is_the_surface_s_runoff`);
+- land with a mean above freezing and a frosty month runs off less (`a_warm_mean_with_a_frosty_month_runs_off_less`),
+  and so does the land below cold headwaters, whose drainage area counts their smaller weights. K's calibration of
+  2026-10-18 was made with the snapshot's rule on all of it, so the regions' table is read again on the arm;
+- ground that never thaws runs off nothing, and its weight is the floor. The floor (ERO-011, uncited) is then
+  load-bearing: it gives that ground 25 mm a year of runoff in the stream power where the lakes' balance counts 0;
 - a cold land with a summer evaporates in it;
 - the lakes and the rivers they are fed by share one budget.
 
@@ -111,8 +126,10 @@ Unit tests in `surface/climate.rs` and `surface/plateau_check.rs` (mm/yr):
 |---|---|---|---|
 | Mackenzie basin, P 410, months 15 and -25 °C | runoff 169, ET 237 (measured) | runoff 204, ET 206: within Fu's 54 mm | runoff 410, ET 0 |
 | Dry Valleys, P 7 to 11, mean -17, coldest -40 °C | "most of which is lost to sublimation" | 0 with the warmest month below 0 °C; under half of P at 2 or 3 °C; 0.29 to 0.87 of P at 0.5 to 1.5 °C (the gap) | all of P |
-| Tibetan lakes, P 230 to 420, MAAT 0 to -3 °C (months ± 8 °C, HYD-032) | ET 170 to 290, runoff ratio 0.26 to 0.31 (modelled) | ET 69 to 141, runoff ratio 0.46 to 0.83 | all of P |
+| Tibetan lakes, P 230 to 420, MAAT 0 to -3 °C (months ± 8 °C, HYD-032) | ET 170 to 290, runoff ratio 0.26 to 0.31 (modelled) | ET 69 to 141, runoff ratio 0.46 to 0.83 (the shortfall printed, not asserted) | all of P |
 | Verkhoyansk, months 13.3 and -50.0 °C | biotemperature 3.05 °C (Holdridge, rough) | 2.65 °C | (none) |
+| a mean above 0 °C with a frosty month: P 600 at 5 ± 15, 900 at 8 ± 12, 400 at 2 ± 10 °C | (none: the model's own arithmetic) | runoff 245, 456, 189 | runoff 336, 484, 287 (the budget -27, -6 and -34 %) |
+| the Dry Valleys' year as the stage gives it: P 7 and 11, mean -17, months -5 and -40 °C | (as above) | 0 | all of P; centred on the mean (+0.5 and -34.5 °C) the budget ran off 5.5 and 9.5 mm, 0.79 and 0.86 of P |
 
 The cold controlled plateau (`a_cold_plateau_runs_off_what_its_summer_leaves`) uses ERO-219's rimmed plateau with Tangra
 Yumco's interior climate (P 300, MAAT -1.5 °C) and spills in every case. Its interior weight is 0.600 under the
@@ -120,7 +137,9 @@ snapshot's rule and 0.396 under the budget, and its interior net lowering 118.0 
 thaws wears 3.8 m/Myr.
 
 Gate (VM, `tools/review/plateau/gate.sh full` on da27fa0d): fmt and clippy (workspace, all targets) clean, deeptime-core
-1,158 passed and 12 ignored, its integration tests passed.
+1,158 passed and 12 ignored, its integration tests passed. After the review's fixes, the quick gate (`gate.sh quick`):
+fmt and clippy (core and cli, all targets) clean, the lane's 80 tests passed; the cold plateau's weights are unchanged
+(0.600, 0.396 and 0.050; interior net 118.0, 88.0 and 3.8 m/Myr).
 
 Reading: the budget gets a measured permafrost basin right within the curve's own error, and closes off ground that
 never thaws, where the old rule erred most. It still runs off too much where the plateau's sun and wind evaporate more
@@ -136,7 +155,56 @@ than Holdridge's biotemperature allows, and where cold-season snow sublimates.
   rivers do not erode anyway (`surface/mod.rs`).
 - **Holdridge's 30 °C cut** is not applied (HYD-030). It would matter only on hot land, where the two rules agree today.
 - **K, ERO-011's floor and the reference runoff** are untouched. The arm reads the regions' table instead (`recal.sh`).
+- **The hydro section's PET and degree-day factor are not pinned.** `hydro.pet_mm_per_c` (60) and
+  `hydro.snow_melt_mm_per_degree_day` (4) are the editor's knobs, and the budget reads them, so with the switch they
+  steer the history's erosion, as they already steer its lakes (the closed basins, the flexure's water). The snapshot's
+  own rule keeps 60 in code (MOI-067). They are documented as such (`HydroParams`, the editor's hints, HYD-029,
+  HYD-037), not pinned: one budget for the history's lakes, its rivers and the bake. K's calibration holds at the
+  defaults; another PET also parts the budget from the snapshot on frost-free land.
 - **No knob, cap or forcing term.** The runoff is the bake's existing, sourced budget.
+
+## The review and its fixes (2026-10-31)
+
+An Opus reviewer read the branch at a38ab3e9. With the switch off nothing changed (the alias was identical), and the
+units, the frost-free identity, the NaN cases, the determinism, the lakes and the ice checked out. It asked for fixes
+before landing, and no default until the law is armed again:
+
+1. **The young stage and the amplifier kept the old rule** (blocks default-on). `young.rs` built `young/runoff_weight`
+   with PET = 60 T, 0 below 0 °C, never reading the switch, and that weight drives L2's stream power and the
+   amplifier's drainage (`amplify.rs`). The young lakes already took the budget. A plateau that never thaws at P 300 mm
+   weighed 0.05 on L1 and 0.6 on L2: 12 times the stream power the balance uplift (L1's erosion rate) replaces. **Fix:**
+   `young::runoff_weights` takes the deep-time surface's rule, the budget on L1's months with the switch on; YNG-011
+   and the stage's header say so; `the_young_weights_follow_the_surface_s_runoff` checks it against the surface's own
+   weight, cell by cell, on and off.
+2. **The months were centred on the mean** (a code path, already on master in the lakes). `cell_water` built
+   t ± (warmest - coldest) / 2, but the climate stage writes the mean, the warmest and the coldest of twelve months of
+   its energy balance, and the bake keeps their asymmetry (HYD-033). A cell at a mean of -17 °C with months of -5 and
+   -40 got +0.5 and -34.5, and some of its precipitation ran off where the bake gives none. **Fix:** `cell_water` takes
+   the months; `water_budget` and the young lakes pass the stage's own (`climate::months`); without the stage, the mean
+   ± 8 °C (HYD-032) as before. **This changes master's default:** the closed basins (ERO-217, on since PR #52) and the
+   flexure's lakes (ISO-126) read the same budget, so lakes on cold ground now get no melt from a year that never
+   thaws. Test: `a_year_s_months_are_taken_as_given`.
+3. **No test went through the switch.** The ERO-222 tests call the budget directly, and dropping `|| p.runoff_budget`
+   from the step failed nothing. **Fix:** the step's wiring is two functions, `surface::step_water` and
+   `surface::runoff_weight`; `the_runoff_budget_reaches_the_stream_power_s_weight` runs four climates through them,
+   the switch on and off and the lakes' budget alone, and the cold plateau's weights now come from
+   `runoff_weight` too. The Tibet test pinned a known shortfall (the budget's ET under Biskop's): it now asserts only
+   that the budget evaporates, at most P, and prints the shortfall (`the_tibetan_lakes_evaporate_under_the_budget`).
+4. **Docs the data contradicted.** "Below 500 m of relief they are unchanged" and "15 to 19 % slower" are corrected
+   from the regions' table ("The arm's results"); "frost-free land is unchanged" now says land with no month below
+   freezing, and the table above gains rows for a warm mean with a frosty month (a test:
+   `a_warm_mean_with_a_frosty_month_runs_off_less`) and for land below cold headwaters.
+5. **Smaller.**
+   - The hydro knobs: documented, not pinned ("What it does not do").
+   - ERO-011's floor is load-bearing for ground that never thaws (25 mm a year in the stream power where the lakes
+     count 0): said so, and marked `game-choice` (no source sets it).
+   - ERO-220's `flatf` is a temperature class, not a runoff one.
+   - HYD-037 is a `game-choice` inside Hock's range, not `verified`.
+   - The bibliography: the orogen lane's Armijo1986 and Blisniuk2001 had landed after this lane's section with no
+     blank line; they are back in the collision orogen's section.
+   - STATUS's "all 2,996" is gone.
+   - The summary's runoff-weight sums run in cell order (they were a parallel f64 reduce).
+   - `// ledger: MOI-067` on the snapshot's two 60s.
 
 ## The arm
 
@@ -147,9 +215,17 @@ and plat-cb0. With both new switches off, the build is orog-cum's physics; check
     tools/review/pool/pool.sh run plat-rb0 --seeds 1,2,3,4 --set tectonics.collision_two_wedges=true --set tectonics.collision_retro_plateau=true --set surface.closed_basins=true --set surface.runoff_budget=true +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps
     tools/review/pool/pool.sh table --base orog-cum --arm plat-cb0 --arm plat-rb0
 
-On base35-s4 instead, once it exists: merge `origin/master` into this
-branch, then `pool.sh run plat-rb --seeds 1,2,3,4 --set surface.runoff_budget=true` (and `--set surface.closed_basins=true` unless it is on by default by then) with the same two environment
-words, and `pool.sh table --base base35-s4 --arm plat-rb`.
+On base35-s4, after the review's fixes (the closed basins and the orogen switches are master's defaults by then).
+The months' correction changes the branch's default on cold ground, so the alias check is not expected to be
+identical, and the correction gets its own arm beside the law's:
+
+    tools/review/pool/pool.sh run rb-months --seeds 1,2,3,4 +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps
+    tools/review/pool/pool.sh run rb1 --seeds 1,2,3,4 --set surface.runoff_budget=true +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps
+    tools/review/pool/pool.sh table --base base35-s4 --arm rb-months --arm rb1
+
+The young stage is not in the pool's runs (they stop after the volcanoes), so its weight is read by its unit check
+(`the_young_weights_follow_the_surface_s_runoff`: L2's weight on L1 equals the deep-time surface's to 1e-6, the
+switch on and off).
 
 The reads, on the VM:
 
@@ -215,15 +291,23 @@ Reading:
   and above 3 km rises a fifth.
 - **What wears the dry flat top now.** It has no runoff to speak of: stream power without the cut is 2.7 m/Myr of its
   63.5. The cut at its edge is 28.2 and diffusion 26.1: the escarpment's retreat and κ 2 at 4.8-km cells.
-- **K's regions.** Below 500 m of relief they are unchanged. At 500 m and more they wear 15 to 19 % slower, still
-  between Montgomery & Brandon's quiet-land line and their power law (at 500 m and more 150 and 210 against 178.5; at
-  1,000 m and more 250 and 525 against 332.4). K was not touched.
+- **K's regions** (against plat-cb0; corrected after the review, which read the table: the first reading said the
+  regions below 500 m were unchanged and those above wore 15 to 19 % slower):
+  - under 100 m of relief +8 % (9.0 against 8.3 m/Myr), 100 to 250 m -4 % (46.2 against 48.0), 250 to 500 m -11 %
+    (93.5 against 105.3);
+  - 500 m and more -19 % (178.5 against 219.9), 1,000 m and more -16 % (332.4 against 394.2), 1,500 m and more -8 %
+    (502.7 against 548.4).
+
+  They stay between Montgomery & Brandon's quiet-land line and their power law (at 500 m and more 150 and 210
+  against 178.5; at 1,000 m and more 250 and 525 against 332.4). K was not touched.
 - **The export did not move:** 3.34 against 3.36 km³ a year, the runs' pairs off in both directions. The land kept its
   mean lowering (38.9 against 36.8 m/Myr) by standing higher: the export is set by what the plates lift, not by the erosion law.
 - **The guard** is plat-cb0's (10.5 km, under the Challenger Deep), and the largest one-step rise is back to orog-cum's.
 - **The belt-shape read** moves halfway back (0.188).
 
-**Verdict: default-on.** It meets the project's rule:
+**Verdict then: default-on** (held by the review: the young stage and the amplifier, which the pool's runs do not
+reach, kept the old rule, and the months were centred on the mean, so it is to be armed again; "The review and its
+fixes"). It met the project's rule:
 - unit tests against its sources (ERO-222);
 - no divergence or guard failure on the pool;
 - K's regions inside Montgomery & Brandon's lines;
