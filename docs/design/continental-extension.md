@@ -296,15 +296,20 @@ a `Sample` cannot grow).
 
 ## The arm
 
-After base35-s4 exists: merge origin/master into this branch, then
-`tools/review/pool/pool.sh alias HEAD <base35's key> --check-seed 1`. The switches off must be base35's physics. Then
-one cumulative arm:
+On base35-s4 (master 9d9e4c94, key 4dd28019a295, argkey cd665cef), after merging origin/master 9d9e4c94 into this
+branch (head 81c3104b, key 10fe59b33034). The switches off must be base35's physics: the identity check is the pool's
+check of HEAD against base35's seed 1 at 1,000 Myr with the base's own environment words (`--check-seed 1 --length
+1000 +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`). Then one cumulative arm, and the land ledger's
+base, the same runs with both switches off and the gap budget on:
 
     tools/review/pool/pool.sh run ext-cum --seeds 1,2,3,4 --set tectonics.rift_stretching=true --set tectonics.settle_top_density=true +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps +DEEPTIME_GAP_BUDGET=1
-    tools/review/pool/pool.sh table --base base35-s4 --arm ext-cum
+    tools/review/pool/pool.sh run ext-base --seeds 1,2,3,4 +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps +DEEPTIME_GAP_BUDGET=1
+    tools/review/pool/pool.sh table --base base35-s4 --arm ext-base --arm ext-cum
 
 The gap budget is measurement only (the uplift trace showed its worlds bit for bit), and gives the land ledger and the
-rate cap's split on the arm.
+rate cap's split on both: ext-base is base35-s4's physics with the ledger, so it should match base35-s4's table to the
+bit, and it is the ledger's base for ext-cum. The reads: `tools/review/extension/arm.sh ext=<ext-cum folder>
+base=<ext-base folder>` (the land ledger, the rift totals from `fields/globals.json`, the crust budget, the wear read).
 
 **What to read:**
 - the guard and `v1census`;
