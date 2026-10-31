@@ -330,4 +330,9 @@ The re-review of a7c42428, two must-fixes and the follow-ups, on the same branch
   or not touching on the lattice, the step before), about half on the step after a resampling,
   where the first floor down is the resampling's new floor (median 7 Myr). The contacts begin
   where the resampling and the plates' motion first make two plates overlap. Reported before
-  building; next, a resampling trace (where the next step's new overlaps come from).
+  building. The resampling trace (oo-resample) and the overlap trace (oo-overlap) followed:
+  half the intra-oceanic onsets fall on the step after a resampling, on its gap fill, mostly
+  between plates that converge; 0.31 of them began on a pair not converging across the overlap.
+  The gate PLT-810 (a new contact only where the plates converge across their overlap, at any
+  angle since PR #55's review) is on by default; it does not shorten the intra-oceanic front
+  (plates.md "The overlap trace" and "The review's fixes (PR #55)").
