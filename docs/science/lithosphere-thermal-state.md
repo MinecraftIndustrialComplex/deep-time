@@ -697,6 +697,7 @@ base run (master 84b8ee03, key 7f9d8f115049, argkey 2a53566b, pass off).
   equals the base byte for byte), so an A/A control would only repeat the on arm. With the
   lithosphere's thermal state on (the default since 2026-10-23) the pass runs whatever its switch
   says, and the state's own heat flow (PLT-467) reaches the plates by the same path.
+- **The continental law over a young floor's lithosphere has no ceiling** (a follow-up from PR #50's review, 2026-10-31; not changed there). With the state on, crust made continental on young floor keeps the floor's lithosphere, 2.32 √(κt) (PLT-466), and its heat flow is 26 + 3,375 / L (PLT-467): 213 mW/m² on 2.4 Myr floor (L = 18 km), over the ocean law's own 300 under about 1.1 Myr, up to 3,401 at `conductive_mw_m2`'s 1 km clamp (arithmetic from the two laws). Floor the resampling made in the same step has no state yet and takes the frame's 225 km instead ("Young floor (2026-10-31)"). Where the column ends is open: a continental column over so thin a lithosphere is a rift's or a young margin's, and the bound may belong in L (the transition's, PLT-476, or a floor for continental L) rather than in the heat flow.
 - The land share's top. The strength moves the largest landmass and the drowned crust towards
   Earth and pushes seven of 24 runs over 0.32 land: the crust it keeps from spreading under the sea
   stands on land instead. Under Ben's rule this is a realism check, not a reason to turn it off: if
