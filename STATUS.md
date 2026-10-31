@@ -194,12 +194,23 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
   - HYD-030 gains the read: Holdridge also cuts at 30 °C, the code does not.
   - claims.md recounted (ERO 200, HYD 138; all 2,996).
   - Bibliography: a new section of 13 entries; Holdridge1967 and Zhang2004 updated.
-- **Next.** The coordinator queues the arm. With both switches off the build should be orog-cum's physics:
-  `tools/review/pool/pool.sh alias HEAD f2d6412d801f --check-seed 1`. Then `pool.sh run plat-rb0 --seeds 1,2,3,4 --set
-  tectonics.collision_two_wedges=true --set tectonics.collision_retro_plateau=true --set surface.closed_basins=true
-  --set surface.runoff_budget=true +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`, and `pool.sh
-  table --base orog-cum --arm plat-cb0 --arm plat-rb0`. Then `tools/review/plateau/wear.sh`, `recal.sh` and
-  `closedshare.py` over plat-rb0, plat-cb0 and orog-cum.
+- **The arm** (queued by the coordinator). The alias check was identical. plat-rb0 ran on key a3b047bb6ddb, argkey
+  7591e701, 8 runs, with the orogen switches and both of the lanes' switches. Reads: `tools/review/plateau/arm_rb.sh`,
+  after `pool.sh measure --arm plat-rb0 --measures guard,coastset,collcoast` with the gap4 and boundary registries;
+  design "The arm's results". Against plat-cb0 (the closed basins alone):
+  - **Runoff weight:** on land 0.731 against the snapshot's own 0.833; above 2 km 0.438 against 0.902.
+  - **The flat high ground** wears 91.9 against 141.4 m/Myr (the runs apart: 82 to 123 against 114 to 196), and there
+    is 1.7 times as much of it.
+  - **High ground over time:** land above 4 km 0.0022 against 0.0010, above 3 km 0.0105 against 0.0086.
+  - **K's regions** of 500 m relief and more wear 15 to 19 % slower, still inside Montgomery & Brandon's lines; lower
+    relief is unchanged.
+  - **The export** to the sea is 3.34 against 3.36 km³ a year, and the land's mean lowering 38.9 against 36.8 m/Myr.
+  - **Guard:** 10.5 km, 0 steps beyond one relief. The criteria median 6.
+
+  The dry flat top now wears by its edge's cut (28.2 m/Myr) and diffusion (26.1), with stream power without the cut
+  at 2.7.
+- **Next.** Verdict: `surface.runoff_budget` default-on, on top of the closed basins. It replaces MOI-067's PET for the
+  runoff (no evaporation below 0 °C). Left for the plateaus: the escarpment's cut and κ 2 at 4.8-km cells.
 
 ### 2026-10-31: What wears the plateaus, measured on cached runs; lakes that pass on what their water balance leaves, built and off (`surface.closed_basins`, ERO-217 to ERO-220) (the plateau lane, worktree agent-a4e92fd13092b08b0, branch `plateau-drainage` on origin/collision-orogen 0e8a5ac9; not merged)
 
