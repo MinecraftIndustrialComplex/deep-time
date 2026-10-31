@@ -4,6 +4,7 @@
 cached pool folders, nothing simulated.
 
     python3 -I dock_maps.py <arm folder> <out.jsonl> [workers] [run,run,...]
+    python3 -I dock_maps.py --summary <out.jsonl> [<out.jsonl>...]   # medians and means per field, side by side
 
 <arm folder> as dock_records.py's (runs with maps/, DEEPTIME_CRUST_BUDGET_MAPS). Per run:
 
@@ -254,7 +255,44 @@ def one(run):
     return out
 
 
+def flat(d, prefix=""):
+    """{"a": {"b": 1}} as {"a.b": 1}; lists of numbers are kept whole."""
+    out = {}
+    for k, v in d.items():
+        if isinstance(v, dict):
+            out.update(flat(v, f"{prefix}{k}."))
+        else:
+            out[f"{prefix}{k}"] = v
+    return out
+
+
+def summary(paths):
+    """Medians and means over runs of every field of one or more out.jsonl files, side by side."""
+    tables = []
+    for p in paths:
+        rows = [flat(json.loads(line)) for line in Path(p).read_text().splitlines() if line.strip()]
+        tables.append(rows)
+    keys = [k for k in flat(json.loads(Path(paths[0]).read_text().splitlines()[0])) if k != "run"]
+    print("field", *[f"{Path(p).stem} (n={len(t)}) median / mean" for p, t in zip(paths, tables)], sep="\t")
+    for k in keys:
+        cells = []
+        for rows in tables:
+            vals = [r[k] for r in rows if k in r and r[k] is not None]
+            if not vals:
+                cells.append("-")
+            elif isinstance(vals[0], list):
+                a = np.array([v for v in vals if len(v) == len(vals[0])], dtype=float)
+                cells.append("[" + ", ".join(f"{x:.4g}" for x in np.median(a, axis=0)) + "]")
+            else:
+                a = np.array(vals, dtype=float)
+                cells.append(f"{np.median(a):.4g} / {a.mean():.4g}")
+        print(k, *cells, sep="\t")
+
+
 def main():
+    if sys.argv[1] == "--summary":
+        summary(sys.argv[2:])
+        return
     arm = Path(sys.argv[1])
     dest = Path(sys.argv[2])
     workers = int(sys.argv[3]) if len(sys.argv) > 3 else 3

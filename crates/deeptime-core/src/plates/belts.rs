@@ -2334,15 +2334,18 @@ mod tests {
             plutonic.abs() < 1e-6 * cover,
             "no plutonic rock stays: {plutonic}"
         );
-        // Five rows wide, the switch off, no slab: a collision as before.
         // The terrane is read through its crust already under the overriding plate: five rows
         // with the first hidden still jam the slab.
         let (_, s, _, _, subducting, fired) = run(true, 5.0, true, 1.0);
         assert!(!subducting && fired == 1, "{s:?}");
+        // Five rows wide, the switch off, no slab: a collision as before.
         for (docking, rows, slab) in [(true, 5.0, true), (false, 1.0, true), (true, 1.0, false)] {
             let (share, s, added, plutonic, subducting, fired) = run(docking, rows, slab, 0.0);
             assert!(!subducting, "{docking} {rows} {slab}");
-            assert_eq!(fired, 1, "{docking} {rows} {slab}: it transfers at the threshold");
+            assert_eq!(
+                fired, 1,
+                "{docking} {rows} {slab}: it transfers at the threshold"
+            );
             let whole = share * s.crossed_km2 * s.thickness_m;
             assert!(
                 (added - whole).abs() < 1e-4 * whole,

@@ -76,6 +76,37 @@ So the small terranes hold a small part of the excess, about 0.006 to 0.008 of M
 advisor's +0.01, about), and the belts they leave stand at Earth's examples' heights (below). The
 bulk is the open, large collisions near the sea: the orogen lane's.
 
+### On base34 (the freeboard merge)
+
+base34: master f80d75a8 (PR #49, PLT-660 and PLT-661 on), pool key 122e4803cded, `cd665cef`, 24 runs;
+the arm's base, `base34-s4`, is its seeds 1 to 4. The same tools (`records-base34.json`,
+`maps-base34.jsonl`; `dock_maps.py --summary` prints both bases side by side). base33's in brackets.
+
+- **Records.** Hand-offs per 100 Myr: under 50 samples 20.4 (29.2), 50 to 200 11.8 (13.3), 200 to
+  1,000 8.1 (8.6), 1,000 or more 5.3 (3.9). Under 50: duration 0 / 2 / 4 Myr, shortening 122 / 152 /
+  202 km, front 229 / 311 / 479 km, crust crossed 31,400 / 44,600 / 69,000 km², kept 0.72 / 1.03 / 1.59 M
+  km³ (the mean crossing thickness 24.4 km (32.8), kept share 0.949), the front's uplift 2.8 / 4.4 /
+  6.9 km, the terrane at the hand-off 51,000 / 97,000 / 158,000 km², 0.35 of what reached the front
+  crossing it (pooled 0.59). Extent across the front 336 / 462 / 660 km (p10 256, p90 915); the share
+  within 220 / 270 / 300 / 350 / 400 km 0.052 / 0.128 / 0.179 / 0.277 / 0.377 (base33 0.054 / 0.127 /
+  0.180 / 0.289 / 0.392); 50 to 200 samples 0.002 / 0.006 / 0.012 / 0.021 / 0.030.
+- **Makeup.** 60 small bodies a snapshot (127), and thinner: own crust p10 / p25 / p50 / p75 / p90
+  2.4 / 6.4 / 10.2 / 15.0 / 23.6 km, 0.75 of the samples under 15 km (0.40); island arcs 0.68 of them
+  (own crust 7.1 / 10.0 / 13.7 km), the rest 4.0 / 10.5 / 21.4 km; their surface a median 3.3 km under
+  the sea, 0.057 dry (0.18).
+- **The coast with high ground** (the map's M5 0.089 median, 0.098 mean (0.142)). The nearest
+  qualifying high ground: hand-offs under 50 / 50 to 200 / 200 to 1,000 / 1,000 or more samples
+  0.0029 / 0.0041 / 0.0011 / 0.0017; partings 0.0017; open 0.0443; Andean 0.0114; other 0.0035. Without
+  the high ground of the hand-offs under 200 samples M5 is 0.0870 (0.0021 lower, the mean 0.0044);
+  without the open collisions' 0.056. The land the hand-offs under 50 samples stamped: 0.026 of the
+  land, 117 / 331 / 635 / 838 m over the sea, 0.014 of it above 2 km; the open collisions' 0.044 of the
+  land at 551 / 1,056 / 2,046 / 3,118 m, 0.26 above 2 km.
+
+The freeboard merge left fewer, thinner small bodies, most of them under Cloos's 15 km, and their
+share of the coast with high ground fell to about 0.002 to 0.004. The thinner crust lengthens the reach
+(S* = 308 km under 17 km of crust, an arc of 10 km on its 7 km basement; 391 km under 10.5 km; on a
+full slab), so more of them are within it than on base33, and they matter less to M5.
+
 ## What Earth does (a Sonnet research sub-agent, 2026-10-30; its prints, copied)
 
 Read in full or by pages as marked; the agent could not open the full texts of Cloos 1993, Tetreault
@@ -235,7 +266,12 @@ model's own pools.
 Small: about 0.05 to 0.13 of the hand-offs under 50 samples and almost none above are within S* on
 base33, so the coast with high ground should move by less than its small terranes' 0.006 to 0.008, and
 the continental crust should lose a few hundredths of a km³ a year (the project's estimate: 1.6 to 3.7
-bodies per 100 Myr, each taken at about 60,000 km² and 20 km of crust, less their cover). The arm is for the law's
+bodies per 100 Myr, each taken at about 60,000 km² and 20 km of crust, less their cover). On base34,
+the arm's base, about 0.18 to 0.38 of the hand-offs under 50 samples are within S* (300 to 400 km at
+the crust's thinner thickness, on a full slab; a shorter slab reaches less), 3.7 to 7.7 bodies per 100
+Myr: the coast with high ground should move by less than their 0.002 to 0.004, and the crust should
+lose about 0.02 to 0.07 km³ a year (the project's estimate: each body at most its extent times its
+front, 60,000 to 90,000 km², at 8 to 10 km of own crust less its cover, at the share). The arm is for the law's
 correctness on the planet (the guard, no divergence) and its count (`collision_stripped_km3`, the
 records' `stripped_km2_m`, partings by reason); Ben's rule puts physics on once it is built and
 correct, whatever V1 does. On a finer lattice (32k presets) the smaller bodies are resolved and the law
@@ -250,4 +286,5 @@ reaches more of them.
 Unit tests: `a_slab_drags_down_buoyant_crust_as_far_as_its_pull_outweighs_it` (shortening.rs: S*'s
 values and the balance at it), `a_terrane_its_slab_drags_down_subducts_stripped_of_its_cover` (belts.rs:
 an arc one row wide subducts stripped and does not transfer; five rows wide, the switch off or no slab,
-a collision as before), `the_cover_is_the_layered_rock_on_the_basement` (pools.rs).
+a collision as before; five rows with the first already hidden under the overriding plate still jam
+the slab), `the_cover_is_the_layered_rock_on_the_basement` (pools.rs).

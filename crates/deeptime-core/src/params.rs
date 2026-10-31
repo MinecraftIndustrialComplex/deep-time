@@ -1551,7 +1551,7 @@ impl Default for TectonicParams {
             initiation_stress_mpa: 20.0, // ledger: PLT-505 (game-choice; on since 2026-10-23)
             transference: true,          // ledger: PLT-516
             collision_backarc_reversal: true, // ledger: PLT-737 (on since 2026-10-30)
-            terrane_docking_cover: false,     // ledger: PLT-760 (off until its pool arm)
+            terrane_docking_cover: false, // ledger: PLT-760 (off until its pool arm)
             contact_timeout_myr: 24.0,   // ledger: PLT-059
             collision_orogeny_myr: 30.0, // ledger: PLT-079
             collision_melt_after_myr: 20.0, // ledger: PLT-735
