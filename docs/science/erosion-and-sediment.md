@@ -1300,7 +1300,7 @@ and closure keeps the orogen's rock ("its effect in terms of mass removal from t
 2007, p. 380). The basin fills and its base level rises (Sobel et al. 2003, [60]); it opens when it fills to its outlet,
 the climate wets, or a river captures it (Garcia-Castellanos 2006, pp. 284-285; Sobel et al. 2003, [58]).
 
-**The law (ERO-217, ERO-218; `surface.closed_basins`, off).** The flexure's lake balance (ISO-126, the bake's budget,
+**The law (ERO-217, ERO-218; `surface.closed_basins`, on by default since 2026-10-31, decisions log).** The flexure's lake balance (ISO-126, the bake's budget,
 HYD-050 and HYD-051) now also sets what each lake passes on: the stream power's drainage area leaves a lake's exit at
 the share of its inflow its balance lets out, and none from a lake that cannot fill to its spill. The depression stays
 the solve's lake (HYD-110), so what a closed basin's ranges shed stays on its crust. The flat high ground is also split

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //! What a lake passes on, and internally drained (closed) basins: the surface's rivers take
-//! their discharge through a lake as its water balance leaves it (`surface.closed_basins`, off
-//! by default; ledger ERO-217 to ERO-220; docs/design/plateau-drainage.md).
+//! their discharge through a lake as its water balance leaves it (`surface.closed_basins`, on
+//! by default since 2026-10-31; ledger ERO-217 to ERO-220; docs/design/plateau-drainage.md).
 //!
 //! # Why
 //! The surface stage floods every depression to its spill (`pflood.rs`) and routes it over the
