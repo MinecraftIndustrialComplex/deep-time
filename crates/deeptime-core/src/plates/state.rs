@@ -341,7 +341,7 @@ impl Sample {
             return;
         }
         self.kind = CONTINENTAL;
-        // The floor's lithosphere goes on as the crust's, never above its Moho (only with the
+        // The floor's lithosphere goes on as the crust's, never above its lid's floor (only with the
         // thermal state, which alone sets L; ledger: PLT-820).
         if self.lithosphere_km > 0.0 {
             self.lithosphere_km = super::thermal::continental_l_km(
