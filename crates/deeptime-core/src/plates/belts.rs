@@ -10,7 +10,11 @@
 //! `s = max(v_n, 0) · δt` (`v_n`: the convergence across the front), so `s · L` of continental
 //! crust (`L`: the front's length) crosses the front. Of its volume `s · L · H` (`H`: the mean
 //! thickness of the incoming crust at the front) the share `collision_stacking_share` stays in
-//! the crust; the rest goes down with the slab. Thickening the crust by `T` raises the ground by
+//! the crust; the rest goes down with the slab. A terrane its slab drags down whole
+//! (`tectonics.terrane_docking_cover`, `Collision::subducting`; ledger PLT-770, PLT-771) keeps
+//! less: of each pool, its cover (sediment, sedimentary and volcanic rock) in full and the share
+//! of the column this collision stacked on it ([`kept_pools`]), all of it on the overriding plate
+//! (no wedge or pro-wedge on a terrane going down). Thickening the crust by `T` raises the ground by
 //! `T / 7.0` (Airy with the crust's mean density, `pools::COLUMN_ISOSTATIC_FACTOR`), less what an
 //! eclogite root pulls down once the column is thick enough (`pools::isostatic_change_m`), so
 //! the step's ground to raise is `share · s · L · H / 7.0` (km² × m). Nothing is created: the
@@ -2495,7 +2499,15 @@ mod tests {
             let col = st.contacts[0].collision.as_ref().expect("a collision");
             let share = fx.preset.tectonics.collision_stacking_share;
             let subducting = col.subducting;
-            (share, s, added, on_incoming, plutonic, subducting, fired.len())
+            (
+                share,
+                s,
+                added,
+                on_incoming,
+                plutonic,
+                subducting,
+                fired.len(),
+            )
         };
         assert!((shortening::dragged_length_km(700.0, 15_000.0) - 329.4).abs() < 0.1);
         for restack in [true, false] {
@@ -2549,52 +2561,64 @@ mod tests {
         }
     }
 
-    /// The front and the collision's shortening of the docking tests' planet after one step
-    /// (`Fixture::step`'s first half), for [`shortening::drags_whole`].
-    fn docking_front(fx: &Fixture, st: &mut PlateState) -> (shortening::Front, f64) {
+    /// The front of the docking tests' planet after one step (`Fixture::step`'s first half), for
+    /// [`shortening::drags_whole`].
+    fn docking_front(fx: &Fixture, st: &mut PlateState) -> shortening::Front {
         let pos = positions(st, &fx.geo);
         let tree = Tree::over(&pos, |_| true);
         st.contacts[0].last_step = 1;
         let env = fx.env(1);
-        let (mut fronts, _) =
-            shortening::advance(st, &fx.geo, &pos, &tree, &env, BTreeMap::new());
-        let s = st.contacts[0]
-            .collision
-            .as_ref()
-            .expect("a collision")
-            .shortening_km;
-        (fronts.remove(&0).expect("a front"), s)
+        let (mut fronts, _) = shortening::advance(st, &fx.geo, &pos, &tree, &env, BTreeMap::new());
+        fronts.remove(&0).expect("a front")
     }
 
-    /// The reach's boundary (ledger PLT-770): a terrane two rows deep (one body) goes down with a
-    /// slab 1 % longer than the one whose reach S* = L / (1 + 2.25 T / 30 km) is its extent across
-    /// the front, the shortening so far plus its visible area over the front's length, and jams
-    /// one 1 % shorter. The slab's cap (`slab_depth_km`, PLT-184) is lifted so the slab can be
-    /// that long.
+    /// The incoming plate's continental samples, hidden or not, of the docking tests' planet.
+    fn terrane_samples(st: &PlateState) -> Vec<usize> {
+        (0..st.samples.len())
+            .filter(|&i| st.plate_of(i) == 1 && st.samples[i].kind == CONTINENTAL)
+            .collect()
+    }
+
+    /// The reach's boundary (ledger PLT-770): a terrane two rows deep (one body), its first row
+    /// already under the overriding plate, goes down with a slab 1 % longer than the one whose
+    /// reach S* = L / (1 + 2.25 T / 30 km) is its extent across the front, all its area (hidden
+    /// and visible) over the front's length, and jams one 1 % shorter. The slab's cap
+    /// (`slab_depth_km`, PLT-184) is lifted so the slab can be that long.
     #[test]
     fn the_reach_holds_a_terrane_just_inside_it_and_not_one_just_beyond() {
         let mut fx = Fixture::new();
         fx.preset.tectonics.collision_threshold_km = 1.0e9;
         fx.preset.tectonics.terrane_docking_cover = true;
         fx.preset.tectonics.slab_depth_km = 1.0e5;
-        let mut st = arc_terrane(&fx, |_| Some(2.0), 0.0, false);
-        let (f, s_km) = docking_front(&fx, &mut st);
+        let mut st = arc_terrane(&fx, |_| Some(2.0), 1.0, false);
+        let f = docking_front(&fx, &mut st);
         let area = fx.norm.sample_area_km2();
-        let ours: Vec<usize> = (0..st.samples.len())
-            .filter(|&i| st.plate_of(i) == 1 && st.samples[i].kind == CONTINENTAL)
-            .collect();
-        let visible = ours.iter().filter(|&&i| !st.samples[i].is_hidden()).count();
+        let ours = terrane_samples(&st);
+        assert!(ours.iter().any(|&i| st.samples[i].is_hidden()));
         let t_m = f64::from(st.samples[ours[0]].thickness_m);
         assert!((t_m - 15_000.0).abs() < 1.0, "{t_m}");
-        let extent_km = s_km + visible as f64 * area / f.length_km();
+        let extent_km = ours.len() as f64 * area / f.length_km();
         let slab_km = extent_km * (1.0 + 2.25 * t_m / 30_000.0);
+        let back = shortening::dragged_length_km(slab_km, t_m);
         assert!(
-            (shortening::dragged_length_km(slab_km, t_m) - extent_km).abs() < 1e-9 * extent_km
+            (back - extent_km).abs() < 1e-9 * extent_km,
+            "{back} {extent_km}"
         );
         let env = fx.env(1);
-        let whole = |km: f64| shortening::drags_whole(&st, &fx.geo, &env, 1, &f, s_km, km);
-        assert!(whole(1.01 * slab_km), "extent {extent_km:.0} km, slab {slab_km:.0} km");
-        assert!(!whole(0.99 * slab_km), "extent {extent_km:.0} km, slab {slab_km:.0} km");
+        let whole = |km: f64| shortening::drags_whole(&st, &fx.geo, &env, 1, &f, km);
+        let msg = format!("extent {extent_km:.0} km, slab {slab_km:.0} km");
+        assert!(whole(1.01 * slab_km), "{msg}");
+        assert!(!whole(0.99 * slab_km), "{msg}");
+        // Judged going down before with as many samples or more, it keeps going down; with
+        // fewer judged than it holds now (crust joined), it is judged afresh.
+        let n = ours.len() as u32;
+        let judged =
+            |km: f64, j: u32| shortening::docking(&st, &fx.geo, &env, 1, &f, km, j);
+        assert_eq!(judged(1.01 * slab_km, 0), Some(n), "{msg}");
+        assert_eq!(judged(0.99 * slab_km, n), Some(n), "{msg}");
+        assert_eq!(judged(0.99 * slab_km, n + 5), Some(n + 5), "{msg}");
+        assert_eq!(judged(0.99 * slab_km, n - 1), None, "{msg}");
+        assert_eq!(judged(1.01 * slab_km, n - 1), Some(n), "{msg}");
     }
 
     /// Each body at a front is judged against its own share of the front (ledger PLT-770): a long
@@ -2617,23 +2641,20 @@ mod tests {
             }
         };
         let mut st = arc_terrane(&fx, arc_and_fragment, 0.0, true);
-        let (f, s_km) = docking_front(&fx, &mut st);
+        let f = docking_front(&fx, &mut st);
         let area = fx.norm.sample_area_km2();
-        let visible = (0..st.samples.len())
-            .filter(|&i| {
-                st.plate_of(i) == 1
-                    && st.samples[i].kind == CONTINENTAL
-                    && !st.samples[i].is_hidden()
-            })
-            .count();
-        let pooled_km = s_km + visible as f64 * area / f.length_km();
+        let pooled_km = terrane_samples(&st).len() as f64 * area / f.length_km();
         let reach_km = shortening::dragged_length_km(700.0, 15_000.0);
-        assert!(pooled_km < reach_km, "pooled {pooled_km:.0} km, reach {reach_km:.0} km");
+        let msg = format!("pooled {pooled_km:.0} km, reach {reach_km:.0} km");
+        assert!(pooled_km < reach_km, "{msg}");
         let env = fx.env(1);
-        assert!(!shortening::drags_whole(&st, &fx.geo, &env, 1, &f, s_km, 700.0));
+        let whole = |st: &PlateState, f: &shortening::Front| {
+            shortening::drags_whole(st, &fx.geo, &env, 1, f, 700.0)
+        };
+        assert!(!whole(&st, &f), "{msg}");
         let mut st = arc_terrane(&fx, |p| (p.z >= 0.0).then_some(1.0), 0.0, true);
-        let (f, s_km) = docking_front(&fx, &mut st);
-        assert!(shortening::drags_whole(&st, &fx.geo, &env, 1, &f, s_km, 700.0));
+        let f = docking_front(&fx, &mut st);
+        assert!(whole(&st, &f));
     }
 
     /// What a terrane going down keeps, pool by pool (ledger PLT-770, PLT-771): its cover in full
@@ -2658,17 +2679,27 @@ mod tests {
         for restack in [0.0, 0.25, 1.0] {
             let kept = kept_pools([a, b].into_iter(), restack);
             for (p, &k) in kept.iter().enumerate() {
-                assert!(k <= mean(p) + 1e-9, "restack {restack}, pool {p}: {k} of {}", mean(p));
+                assert!(
+                    k <= mean(p) + 1e-9,
+                    "restack {restack}, pool {p}: {k} of {}",
+                    mean(p)
+                );
                 let want = if crate::plates::pools::COVER.contains(&p) {
                     mean(p)
                 } else {
                     restack * mean(p)
                 };
-                assert!((k - want).abs() < 1e-9, "restack {restack}, pool {p}: {k}, want {want}");
+                assert!(
+                    (k - want).abs() < 1e-9,
+                    "restack {restack}, pool {p}: {k}, want {want}"
+                );
             }
             let sum: f64 = kept.iter().sum();
             let want = cover + restack * (total - cover);
-            assert!((sum - want).abs() < 1e-6, "restack {restack}: {sum}, want {want}");
+            assert!(
+                (sum - want).abs() < 1e-6,
+                "restack {restack}: {sum}, want {want}"
+            );
         }
         assert_eq!(kept_pools(std::iter::empty(), 0.5), [0.0; pool::COUNT]);
     }
@@ -2677,7 +2708,10 @@ mod tests {
     /// arc one row deep of `arc_terrane` on plate 1 coming in at 20 mm/yr, the step's motion, its
     /// overlaps and their resolution (`subduction::resolve`, which hides what passes under) and
     /// the stacking, eight times (16 Myr, 320 km of convergence). Every step the front goes down
-    /// and does not transfer; nothing lands on the incoming plate (its visible crust never grows
+    /// and does not transfer, though halfway the collision's shortening and the arc's visible
+    /// rest add up past the reach (the lattice's lag) and at the end the front is its last few
+    /// samples (the judgment at its arrival holds, `shortening::docking`); nothing lands on the
+    /// incoming plate (its visible crust never grows
     /// in the stacking); all the crust kept is the crossings' cover, on the overriding plate, and
     /// none of it plutonic; and the arc ends wholly under the overriding plate. Lattice-triangle
     /// overlaps (`outline_cover` off): the fixture has no outline.
@@ -2714,7 +2748,27 @@ mod tests {
                 subduction::resolve(&mut st, &mut world, &fx.geo, &overlaps, &pos, &env).unwrap();
             let (fronts, fired) =
                 shortening::advance(&mut st, &fx.geo, &pos, &tree, &env, resolved.seeds);
-            assert!(fired.is_empty(), "step {step}: a transfer");
+            let contacts: Vec<_> = st
+                .contacts
+                .iter()
+                .map(|c| {
+                    let col = c.collision.as_ref();
+                    (
+                        c.under,
+                        c.over,
+                        col.map(|x| (x.subducting, x.shortening_km, x.last_step)),
+                    )
+                })
+                .collect();
+            let fronts_at: Vec<_> = fronts
+                .iter()
+                .map(|(c, f)| (*c, f.crust.len(), f.length_km()))
+                .collect();
+            assert!(
+                fired.is_empty(),
+                "step {step}: a transfer; contacts {contacts:?}, fronts {fronts_at:?}, slabs {:?}",
+                st.slabs
+            );
             let (over0, incoming0) = (crust_on(&st, 0, area), crust_on(&st, 1, area));
             let stacked = stack(&mut st, &fx.geo, &pos, &env, &fronts, None, 0.0);
             let on_over = crust_on(&st, 0, area) - over0;

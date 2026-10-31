@@ -548,13 +548,18 @@ pub struct Collision {
     /// be read back.
     #[serde(default)]
     pub jam_km: Option<f64>,
-    /// The contact's slab drags the incoming terrane down whole: its extent across the front
-    /// (the shortening so far and the rest's area over the front's length) is within the slab's
+    /// The contact's slab drags the incoming terranes down whole: each body at the front has its
+    /// extent across the front (its area over its share of the front's length) within the slab's
     /// reach against its buoyancy (`shortening::dragged_length_km`). Set each step with a front
     /// by `shortening::advance` (only with `tectonics.terrane_docking_cover`, ledger PLT-770): such
     /// a terrane is stripped to its cover at the front and does not transfer at the threshold.
     #[serde(default)]
     pub subducting: bool,
+    /// The samples (hidden and visible) of the bodies at the front when they were judged going
+    /// down ([`Collision::subducting`]), 0 otherwise: while the bodies hold no more, they are the
+    /// ones judged and keep going down (`shortening::advance`; ledger PLT-770).
+    #[serde(default)]
+    pub docking_samples: u32,
     /// The belt this collision has built (`belts.rs`).
     pub belt: Belt,
 }

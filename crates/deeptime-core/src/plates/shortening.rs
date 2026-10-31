@@ -56,7 +56,11 @@
 //!   its id; a smaller terrane moves alone;
 //! - or its shortening has reached `tectonics.collision_threshold_km`: a terrane smaller than
 //!   `collision_suture_frac` moves to the overriding plate (Cortial's transfer, on real
-//!   shortening); a continent does not (it goes on converging until it stalls).
+//!   shortening); a continent does not (it goes on converging until it stalls). A front whose
+//!   terranes their slab drags down whole (`tectonics.terrane_docking_cover`: each body at the
+//!   front within the slab's reach against its buoyancy, [`drags_whole`]; ledger PLT-770) does
+//!   not transfer on shortening: its terranes go down, stripped of their cover by the belts
+//!   (`Collision::subducting`, set here each step); a stall still welds or transfers.
 //!
 //! The terrane's seeds are the continental samples of the subducting plate under the overriding
 //! plate and those standing at the front ([`Front::crust`]); at least [`MIN_CONTACT`] are needed.
@@ -494,6 +498,7 @@ pub fn step_collision(
             stalled_since_myr: None,
             jam_km: None,
             subducting: false,
+            docking_samples: 0,
             belt: super::state::Belt::default(),
         });
     }
@@ -615,22 +620,28 @@ pub fn advance(
             let e = slab_km.entry((s.under, s.over)).or_insert(0.0);
             *e = e.max(s.km);
         }
-        let classed: Vec<(usize, bool)> = state
+        let classed: Vec<(usize, Option<u32>)> = state
             .contacts
             .iter()
             .enumerate()
             .filter_map(|(k, c)| {
                 let col = c.collision.as_ref()?;
                 let f = fronts.get(&k).filter(|_| col.last_step == env.step)?;
-                let whole = slab_km.get(&(c.under, c.over)).is_some_and(|&km| {
-                    drags_whole(state, geo, env, c.under, f, col.shortening_km, km)
-                });
-                Some((k, whole))
+                let judged = if col.subducting {
+                    col.docking_samples
+                } else {
+                    0
+                };
+                let down = slab_km
+                    .get(&(c.under, c.over))
+                    .and_then(|&km| docking(state, geo, env, c.under, f, km, judged));
+                Some((k, down))
             })
             .collect();
-        for (k, whole) in classed {
+        for (k, down) in classed {
             if let Some(col) = state.contacts[k].collision.as_mut() {
-                col.subducting = whole;
+                col.subducting = down.is_some();
+                col.docking_samples = down.unwrap_or(0);
             }
         }
     }
@@ -671,68 +682,97 @@ pub fn advance(
 /// in the slab's length L, F_sp (L − S) / D: the two balance at S* = L / (1 + R T / T_c). A
 /// terrane whose whole extent across the front is under S* goes down with its slab; a larger one
 /// jams it. The balance in one dimension along the slab is the project's reading of Cloos's
-/// buoyancy analysis for a body of finite extent (Yan et al. 2021's two-dimensional models,
-/// abstract: plateaus of 150 km or less subduct "without subduction zone reorganization", of
-/// 300 km or more reorganize it).
+/// buoyancy analysis for a body of finite extent, not a source's. It takes in Yan et al. 2021's
+/// small plateaus (150 km or less subduct "without subduction zone reorganization", abstract) at
+/// any thickness, but under crust thinner than about 18 km it reaches past their 300 km, where
+/// they find the slab breaks off or the subduction jumps, which the model does not have.
 pub fn dragged_length_km(slab_km: f64, thickness_m: f64) -> f64 {
     let r = super::forces::CONTINENT_BUOYANCY_RATIO * thickness_m.max(0.0)
         / (super::forces::CONTINENT_BUOYANCY_CRUST_KM * 1000.0); // ledger: FRC-028, FRC-029
     slab_km.max(0.0) / (1.0 + r)
 }
 
-/// Whether the slab of a contact, `slab_km` long, drags the terranes at its front `f` down whole
-/// (ledger PLT-770). Each body at the front (the incoming plate's continental crust connected to
-/// some of the front's crust, through its crust already under the overriding plate too) is judged
-/// on its own: its extent across the front, the collision's `shortening_km` so far plus its visible
-/// area over its share of the front's length (the front's length times its share of the front's
-/// crust samples), must be within [`dragged_length_km`] of the slab (up to `slab_depth_km`,
-/// PLT-184) for its own front crust's mean thickness. The front goes down only when every body at
-/// it does: a body that jams the slab holds the whole front (the stripping and the transfer are
-/// the front's). Each body's fill stops once its area would carry it past its reach.
+/// Whether the slab of a contact, `slab_km` long, drags the terranes at its front `f` down whole,
+/// judged afresh ([`docking`] with nothing judged before).
 pub fn drags_whole(
     state: &PlateState,
     geo: &Geo,
     env: &Env,
     under: u32,
     f: &Front,
-    shortening_km: f64,
     slab_km: f64,
 ) -> bool {
+    docking(state, geo, env, under, f, slab_km, 0).is_some()
+}
+
+/// Whether the slab of a contact, `slab_km` long, drags the terranes at its front `f` down whole
+/// (ledger PLT-770), and if so the bodies' samples to remember (`Collision::docking_samples`).
+///
+/// Each body at the front (the incoming plate's continental crust connected to some of the front's
+/// crust, along lattice edges as `collide`'s fill) is judged on its own: its extent across the
+/// front, its area over its share of the front's length (the front's length times its share of the
+/// front's crust samples), must be within [`dragged_length_km`] of the slab (up to
+/// `slab_depth_km`, PLT-184) for its own front crust's mean thickness. Its area is all its
+/// samples', the part already under the overriding plate (hidden) and the rest. The front goes
+/// down only when every body at it does: a body that jams the slab holds the whole front (the
+/// stripping and the transfer are the front's).
+///
+/// A body is judged as it arrives and keeps that judgment while it goes down: with `judged` the
+/// samples of the bodies judged going down at this front before (0: none), bodies that hold no
+/// more samples than that are the ones judged (their crust only goes under, and a resampling only
+/// consumes what is under, PLT-276) and go on down. Judging again on the way down would read the
+/// lattice's lag as size: a sample stays visible until the overriding plate covers it, so the
+/// collision's shortening runs ahead of the samples' hiding by up to a spacing, and as the body
+/// goes under the front left beside it shortens to its last samples while its hidden part lies
+/// along the whole of the old front. Crust that joins the bodies (a new body, or crust behind them
+/// reached) has them judged again, all of them as they now stand. Each fill stops once it passes
+/// the most any body could hold, or the samples judged before.
+pub fn docking(
+    state: &PlateState,
+    geo: &Geo,
+    env: &Env,
+    under: u32,
+    f: &Front,
+    slab_km: f64,
+    judged: u32,
+) -> Option<u32> {
     let length_km = f.length_km();
     let ours = |i: usize| state.plate_of(i) == under && state.samples[i].kind == CONTINENTAL;
-    let seeds: Vec<u32> = f.crust.iter().copied().filter(|&s| ours(s as usize)).collect();
-    if seeds.is_empty() || length_km <= 0.0 {
-        return false;
+    let seeds: Vec<u32> = f
+        .crust
+        .iter()
+        .copied()
+        .filter(|&s| ours(s as usize))
+        .collect();
+    if seeds.is_empty() || length_km <= 0.0 || slab_km <= 0.0 {
+        return None;
     }
     let slab_km = slab_km.min(env.k.slab_depth_km); // ledger: PLT-184
     let area = env.norm.sample_area_km2();
     let crust: std::collections::BTreeSet<u32> = seeds.iter().copied().collect();
-    let most_any = (dragged_length_km(slab_km, 0.0) - shortening_km) * length_km / area;
-    // The samples reached so far, by any body's fill (the fill is `collide`'s: the plate's
-    // continental samples, hidden or not, along lattice edges; only the visible ones count as
-    // the rest of a body, the hidden ones are already under the overriding plate).
+    // A body's own front length and thickness are known only once its fill is done, so a fill
+    // stops early only past the most any body could hold, the whole front's length at the reach
+    // of crust of no thickness, and past the samples judged before.
+    let most = (dragged_length_km(slab_km, 0.0) * length_km / area).max(f64::from(judged));
+    // The samples reached so far, by any body's fill (hidden or not).
     let mut seen: std::collections::BTreeSet<u32> = std::collections::BTreeSet::new();
+    let mut bodies: Vec<(usize, usize, f64)> = Vec::new();
+    let mut total = 0_usize;
     for &seed in &seeds {
         if !seen.insert(seed) {
             continue;
         }
-        // The body's front crust (its seeds and their thickness) and its visible area, by one
-        // fill. Its own front length and thickness are known only once the fill is done, so the
-        // fill stops early only past the most any body could hold: the whole front's length at
-        // the reach of crust of no thickness.
         let mut stack = vec![seed];
-        let (mut n_seeds, mut t_sum, mut rest) = (0_usize, 0.0_f64, 0_usize);
+        let (mut n_seeds, mut t_sum, mut n) = (0_usize, 0.0_f64, 0_usize);
         while let Some(v) = stack.pop() {
-            let s = &state.samples[v as usize];
             if crust.contains(&v) {
                 n_seeds += 1;
-                t_sum += f64::from(s.thickness_m);
+                t_sum += f64::from(state.samples[v as usize].thickness_m);
             }
-            if !s.is_hidden() {
-                rest += 1;
-                if rest as f64 > most_any {
-                    return false;
-                }
+            n += 1;
+            total += 1;
+            if total as f64 > most {
+                return None;
             }
             for (u, _) in geo.edges(v) {
                 if ours(u as usize) && seen.insert(u) {
@@ -740,14 +780,16 @@ pub fn drags_whole(
                 }
             }
         }
-        let t_m = t_sum / n_seeds.max(1) as f64;
-        let room_km = dragged_length_km(slab_km, t_m) - shortening_km;
-        let body_length_km = length_km * n_seeds as f64 / seeds.len() as f64;
-        if room_km <= 0.0 || rest as f64 > room_km * body_length_km / area {
-            return false;
-        }
+        bodies.push((n, n_seeds, t_sum / n_seeds.max(1) as f64));
     }
-    true
+    if judged > 0 && total <= judged as usize {
+        return Some(judged);
+    }
+    let within = bodies.iter().all(|&(n, n_seeds, t_m)| {
+        let body_length_km = length_km * n_seeds as f64 / seeds.len() as f64;
+        n as f64 * area <= dragged_length_km(slab_km, t_m) * body_length_km
+    });
+    within.then_some(total as u32)
 }
 
 /// Ends contact `k`'s collision (if it is in one) without a transfer or weld, recording why.
