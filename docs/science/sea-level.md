@@ -920,7 +920,12 @@ start and 31.0 at the end (2.0 km in 1,000 Myr). Their column at the sea, T - 7 
 end at about +385 m. Earth's cratons (CRUST1.0, the land in m4cold.py's boxes, p50): the East European platform 42 km
 at 150 m, the Siberian platform 42 km at 360 m, the Canadian shield 39 km at 280 m, western and central Australia 40 km
 at 290 m, the Brazilian shield 39 km at 304 m, Africa 39 km at 620 m. So Earth's cratons stand a few hundred metres
-over the sea on 39 to 42 km of crust; the model's interiors stand at the sea on 34 km.
+over the sea on 39 to 42 km of crust; the model's interiors stand at the sea on 34 km. Through time Earth's freeboard
+"must have been close to zero at least during the Phanerozoic", the sea "less than 200 m" over today's, and cratons
+"such as Laurentia, were episodically flooded and exposed repeatedly through the last 0.5 Gyr" (Korenaga, Planavsky
+& Evans 2017, full text, citing Wise 1974, Algeo & Seslavinsky 1995 and Sloss 1963); the drowned share of Earth's
+continental crust reached 0.528 at 80 Ma and 0.600 at 510 Ma (RLC-031). base35's 0.602 is Earth's most flooded
+Phanerozoic stand, held from -700 Myr to the end.
 
 **The split.** For the crust at least 20 km thick in 1-km bands b, with s_b the band's share of that crust, d_b its
 dry share and m_b its mean height over the sea, the dry share D = Σ s_b d_b and the mean height H = Σ s_b m_b split
@@ -972,9 +977,16 @@ The terms of a column's height, against Earth:
   PLT-281) put a hot back-arc at the sea on about 27 km of crust and a craton on about 38 km, about 1,600 m apart at
   equal thickness. PLT-281's one line, set through the global median, is therefore a mean of the two: on the model's
   datum it lies about 940 m over Hyndman & Currie's craton line at 38 km and about 630 m under their back-arc line at 27
-  km (lithosphere-thermal-state.md, "Why these frames", with the sea at the datum).
-- **Dynamic topography.** None in the model. On Earth the African craton boxes stand 620 m against the other
-  cratons' 150 to 360 m on the same 39 to 42 km of crust (the sources below).
+  km (lithosphere-thermal-state.md, "Why these frames", with the sea at the datum). The keel does not cancel the
+  cold: depletion lowers the cratonic roots' density by 1.1 to 1.5 % on average, and "the density variations due to
+  temperature are partly (about 40%) compensated by density variations due to compositional differences. This
+  conclusion contradicts the classical isopycnic hypothesis of Jordan" (Kaban et al. 2003, abstract and pp. 66-67);
+  Eaton & Perry 2013 (abstract) find the near-isopycnic state "inherently ephemeral".
+- **Dynamic topography.** None in the model (physics-gap-audit.md lists it as a second-order gap). On Earth the
+  African craton boxes stand 620 m against the other cratons' 150 to 360 m on the same 39 to 42 km of crust;
+  Gurnis et al. 2000 (abstract) put southern Africa's residual topography at 300 to 600 m, and Hoggard, White &
+  Al-Attar 2016 (abstract) observe "about ±500 m" at 10^4 km wavelengths. It explains Africa's extra height, not the
+  other cratons' low stand.
 - **The sea.** Filled on Earth's own CRUST1.0 surface with its own water (2,613 m over the planet), the fill gives +2
   m: the factors start at Earth's sea. Swapping in the model's factors one at a time (Shapley over the water, the share
   of crust at least 20 km thick, that crust's height histogram and the thinner crust's; lowcont.py `model`), the
@@ -1019,7 +1031,16 @@ more slowly remove the remainder as the land surface is reduced to the stable fr
 (Harrison, 1994)", and erosion will "thin the crust back to the equilibrium values of ca. 38 km, close to sealevel
 (Christensen and Mooney, 1995)" (p. 89); their long-term export, 1.77 km³ a year, "is much less than the modern 6.5
 km3/a estimated by Milliman (1997)" (p. 93), with "low lying, stable" land 83 % of the exposed continents (p. 92) and
-"modern rivers are not in equilibrium" (p. 91). So K's present-day calibration over-erodes the lowland between the
+"modern rivers are not in equilibrium" (p. 91). The cratons' long-run rates, from the sources the research
+sub-agent read: the western Canadian shield "≤2.5 μm/yr since ca. 1.7 Ga" (Flowers et al. 2006, abstract); West
+Africa "~ 2–20 m Ma–1" over three Cenozoic intervals, "weathering‐limited" (Beauvais & Chardon 2013, abstract);
+Namibian outcrops 3.2 to 3.6 m/Myr, basins 5 to 16, large rivers 3 to 9, fission track 2 to 14 (Bierman & Caffee 2001,
+full text); Australian granite 0.3 to 5.7 m/Myr (Bierman & Caffee 2002, abstract). The whole continents' Phanerozoic
+mean is 16 m/Myr (SD 11; 4 to 53), against about 62 from present river loads, and the lowest present rates, near sea
+level, 7.21 m/Myr (Wilkinson & McElroy 2007, full text). Cosmogenic catchment rates barely sample flat land ("only 1 %
+of the available 10Be measurements" from basins under 22 m/km, half the land; Willenbring et al. 2014, full text).
+So the model's interiors (2 m/Myr) wear at Earth's cratonic rates, its low-relief windows (8.4) inside them, and its
+land below 1 km (22) above the Phanerozoic mean of all land. K's present-day calibration over-erodes the lowland between the
 interiors and the belts (the edges and the belts' decaying ground: 0.94 of the land at 22 m/Myr, about half of the
 land's mean 38 m/Myr; the export is 2.2 times Clift's, the uplift trace), but not the cratons, and the interiors' low stand is the sea's (253 of their first 404 m) and the
 line's (34 km at the sea against Earth's 39 to 42 km at a few hundred metres).
@@ -1057,7 +1078,12 @@ is a separate question that moves the lowland's relief and the export, not the d
 law against measured rates). K (ERO-004), κ (ERO-023) and the chemical floor were set on Montgomery & Brandon's eq. 2,
 a present-day relation, whose low-relief end (E0 10 m/Myr and the quiet-land 0.2 mm/yr per km of relief) is 2 to 5
 times Clift et al. 2009's Cenozoic rates for stable basins (median 4.0 m/Myr), and Clift et al. call the modern
-export unrepresentative of long periods (p. 90 to 91). The options:
+export unrepresentative of long periods (p. 90 to 91); Wilkinson & McElroy 2007 put the Phanerozoic mean of all land
+at 16 m/Myr against about 62 from present river loads, a factor of about 4. Baldwin, Whipple & Tucker 2003 (abstract)
+find that a critical shear stress for erosion, with isostasy and transport-limited conditions, keeps residual
+topography "for hundreds of million years" where detachment-limited stream power decays it in 1 to 10 Myr; the model has
+the isostasy and Yuan et al.'s deposition (`g_deposition` 1) but no erosion threshold (S_c caps a slope, ERO-013).
+The options:
 
 1. *Keep the present-day calibration* (the recommendation until the column's height law is built). The lowland keeps
    eroding at 22 m/Myr; the export stays 2.2 times Clift's, set by the plates' supply (the uplift trace: erosion-law
@@ -1182,3 +1208,8 @@ export unrepresentative of long periods (p. 90 to 91). The options:
   Syvitski2005 (at second hand, Walling 2006), vonHueneScholl1991 (the abstract), SternScholl2010
   (read earlier), Harris2014 (read earlier) and SimpsonSimpson2018 (full text, the land's mean
   heights).
+- For "Why base35's continents stand low, against Earth" (2026-10-31; bibliography.md, "The sources of the
+  low-continents lane"): Laske2013 and Tozer2019 (measured), Clift2009 (the library text, pp. 89 to 93 and Table
+  4), HyndmanCurrie2011 (read earlier), Flowers2006, BeauvaisChardon2013, BiermanCaffee2002, EatonPerry2013,
+  HoggardWhiteAlAttar2016, Gurnis2000 and BaldwinWhippleTucker2003 (abstracts), BiermanCaffee2001,
+  WilkinsonMcElroy2007, Willenbring2014, Kaban2003 and Korenaga2017 (full texts, Kaban in its main parts).
