@@ -503,6 +503,40 @@ struct Setup {
     cell_water: Option<Vec<lakes::CellWater>>,
 }
 
+// ledger: ISO-126, ERO-217, ERO-221
+/// What each cell gives and takes as water under the bake's budget (`HydroParams::budget`,
+/// `climate::water_budget`), when the step reads it: for the lakes the flexure loads
+/// (`lakes.rs`, with the flexure's water by basin), for what the lakes pass on (`closed.rs`,
+/// `surface.closed_basins`) and for the stream power's runoff (`surface.runoff_budget`).
+pub(crate) fn step_water(
+    world: &WorldState,
+    clim: &climate::Snapshot,
+    hydro: &crate::hydro::HydroParams,
+    p: &SurfaceParams,
+) -> Option<Vec<lakes::CellWater>> {
+    let flexure_water = p.flexure.active() && p.flexure.water_by_basin;
+    (flexure_water || p.closed_basins || p.runoff_budget)
+        .then(|| climate::water_budget(world, clim, hydro))
+}
+
+// ledger: ERO-010, ERO-011, ERO-221
+/// The stream power's runoff weight at cell `c`: its runoff over `surface.runoff_ref_m_yr`, at
+/// least 0.05 (ERO-011's floor). The runoff is the bake's budget's (`water`, from
+/// [`step_water`]) with `surface.runoff_budget`, else the snapshot's own (PET = 60 mm/°C x the
+/// mean temperature, 0 below 0 °C, MOI-067).
+pub(crate) fn runoff_weight(
+    p: &SurfaceParams,
+    clim: &climate::Snapshot,
+    water: Option<&[lakes::CellWater]>,
+    c: usize,
+) -> f32 {
+    let runoff = match water {
+        Some(cw) if p.runoff_budget => cw[c].runoff_m_yr as f32,
+        _ => clim.runoff_m_yr[c],
+    };
+    (runoff / p.runoff_ref_m_yr as f32).max(0.05)
+}
+
 /// The rock a cell shows and erodes: regolith only where it is thick (a few metres of soil are
 /// gone in the first thousand years of a 2-Myr step), else the log's top, else the basement.
 fn surface_class(cls: &Classes, basement: &[u16], st: &SurfaceState, c: usize) -> u16 {
@@ -1293,12 +1327,9 @@ impl SurfaceStage {
                 let h_start = crate::alloc::copied(sc_h);
                 let clim = climate::snapshot(world, &d, &lat_of, sc_h, sea);
                 // ledger: ISO-126, ERO-221
-                // What each cell gives and takes as water under the bake's budget
-                // (`HydroParams::budget`), for the lakes the flexure loads (`lakes.rs`), what
-                // the lakes pass on (`closed.rs`, ERO-217) and, with `surface.runoff_budget`, the
-                // stream power's runoff.
-                let cell_water = (flexure_water || p.closed_basins || p.runoff_budget)
-                    .then(|| climate::water_budget(world, &clim, &hydro_p));
+                // What each cell gives and takes as water under the bake's budget, when the
+                // lakes or the stream power read it.
+                let cell_water = step_water(world, &clim, &hydro_p, p);
                 let ela_z = if gp.active() {
                     glacial::ela_z_from(
                         world
@@ -1367,11 +1398,7 @@ impl SurfaceStage {
                     .for_each(|(c, (kf, weight))| {
                         *kf = p.k_spl * erod[usize::from(class0[c])];
                         // ledger: ERO-010, ERO-011, ERO-221
-                        let runoff = match &cell_water {
-                            Some(cw) if p.runoff_budget => cw[c].runoff_m_yr as f32,
-                            _ => clim.runoff_m_yr[c],
-                        };
-                        *weight = (runoff / p.runoff_ref_m_yr as f32).max(0.05);
+                        *weight = runoff_weight(p, &clim, cell_water.as_deref(), c);
                     });
                 let setup = Setup {
                     h_start,
@@ -1413,21 +1440,25 @@ impl SurfaceStage {
             cell_water,
         } = setup;
         // ledger: ERO-221
-        // The runoff weight used against the snapshot's own (measurement only).
-        let mut runoff_weight = [0.0f64; 6];
+        // The runoff weight used against the snapshot's own (measurement only), summed in cell
+        // order so the summary is the same on any number of threads.
+        let mut runoff_weight_sums = [0.0f64; 6];
         if p.runoff_budget {
-            let own = |c: usize| (clim.runoff_m_yr[c] / p.runoff_ref_m_yr as f32).max(0.05);
-            runoff_weight = (0..n)
-                .into_par_iter()
-                .filter(|&c| sc.h[c] > sea)
-                .map(|c| {
-                    let (u, o) = (f64::from(sc.weight[c]), f64::from(own(c)));
-                    let hi = if sc.h[c] - sea > 2000.0 { 1.0 } else { 0.0 };
-                    [1.0, u, o, hi, hi * u, hi * o]
-                })
-                .reduce(|| [0.0; 6], |a, b| std::array::from_fn(|i| a[i] + b[i]));
+            for c in (0..n).filter(|&c| sc.h[c] > sea) {
+                let (u, o) = (
+                    f64::from(sc.weight[c]),
+                    f64::from(runoff_weight(p, &clim, None, c)),
+                );
+                let hi = if sc.h[c] - sea > 2000.0 { 1.0 } else { 0.0 };
+                for (s, v) in runoff_weight_sums
+                    .iter_mut()
+                    .zip([1.0, u, o, hi, hi * u, hi * o])
+                {
+                    *s += v;
+                }
+            }
             let km2_myr = d.cell_area() / 1.0e6 * dt / 1.0e6;
-            runoff_weight.iter_mut().for_each(|v| *v *= km2_myr);
+            runoff_weight_sums.iter_mut().for_each(|v| *v *= km2_myr);
         }
         let class_of = |st: &SurfaceState, c: usize| surface_class(&cls, &basement, st, c);
 
@@ -2702,7 +2733,7 @@ impl SurfaceStage {
         t.partial_lakes += partial_lakes;
         t.closed_km2_myr += closed_km2_myr;
         t.filled_lakes += filled_lakes;
-        for (a, b) in t.runoff_weight_km2_myr.iter_mut().zip(runoff_weight) {
+        for (a, b) in t.runoff_weight_km2_myr.iter_mut().zip(runoff_weight_sums) {
             *a += b;
         }
 

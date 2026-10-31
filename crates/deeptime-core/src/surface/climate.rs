@@ -157,7 +157,7 @@ pub fn snapshot(
                         (t0 - LAPSE_C_PER_M * z, p0 * orographic(z) * cont)
                     }
                 };
-                let e = (60.0 * tc).max(0.0);
+                let e = (60.0 * tc).max(0.0); // ledger: MOI-067
                 t[i] = tc as f32;
                 sst[i] = if out.from_stage { tc } else { t0 } as f32;
                 p[i] = pc as f32;
@@ -178,18 +178,31 @@ pub fn snapshot(
 /// (MOI-067, HYD-034), so a land below freezing sends all of P to its rivers. The stream power's
 /// runoff unless `surface.runoff_budget` (ERO-010).
 pub fn mean_t_runoff_m_yr(precip_mm: f64, t_c: f64) -> f64 {
-    let e = (60.0 * t_c).max(0.0);
+    let e = (60.0 * t_c).max(0.0); // ledger: MOI-067
     (precip_mm - fu_et(precip_mm, e)).max(0.0) / 1000.0
 }
 
 /// One cell's water a year under the bake's budget (`HydroParams::budget`, HYD-035 to HYD-038):
-/// precipitation `precip_mm` (mm/yr), the mean annual temperature `t_c` (°C) and half the range
-/// between the warmest and the coldest month `half_c` (°C; not finite: the ±8 °C of HYD-032).
-/// Its runoff is what the lakes are fed with (ISO-126, ERO-217) and, with
-/// `surface.runoff_budget`, what the stream power's area counts (ERO-221).
+/// precipitation `precip_mm` (mm/yr), the mean annual temperature `t_c` (°C) and the mean
+/// temperatures of the warmest and the coldest month `warm_c`, `cold_c` (°C; not finite: the
+/// mean ± 8 °C of HYD-032). Its runoff is what the lakes are fed with (ISO-126, ERO-217) and,
+/// with `surface.runoff_budget`, what the stream power's area counts (ERO-221).
+///
+/// The months are taken as given, not centred on the mean: the climate stage's year is twelve
+/// months of its energy balance, and their mean, warmest and coldest need not be symmetric
+/// (a polar desert at a mean of −17 °C has its warmest month at −5 and its coldest at −40). Until
+/// 2026-10-31 the half-range about the mean was passed instead, which put that warmest month at
+/// +0.5 °C, so its snow melted and ran off where the bake, keeping the months' departures
+/// (HYD-033), runs off nothing (the runoff law's review; `a_year_s_months_are_taken_as_given`).
 // ledger: ERO-221
-pub fn cell_water(hydro: &HydroParams, precip_mm: f64, t_c: f64, half_c: f64) -> CellWater {
-    let cl = Climate::of(precip_mm, t_c, t_c + half_c, t_c - half_c);
+pub fn cell_water(
+    hydro: &HydroParams,
+    precip_mm: f64,
+    t_c: f64,
+    warm_c: f64,
+    cold_c: f64,
+) -> CellWater {
+    let cl = Climate::of(precip_mm, t_c, warm_c, cold_c);
     let b = hydro.budget(&cl);
     CellWater {
         runoff_m_yr: b.runoff_mm / 1000.0,
@@ -197,11 +210,9 @@ pub fn cell_water(hydro: &HydroParams, precip_mm: f64, t_c: f64, half_c: f64) ->
     }
 }
 
-/// [`cell_water`] for every cell of the step's climate `clim`: the climate stage's seasons
-/// (`climate/t_warm_c`, `climate/t_cold_c`) as departures about the surface's own mean
-/// temperature (HYD-033), none without the stage.
-pub fn water_budget(world: &WorldState, clim: &Snapshot, hydro: &HydroParams) -> Vec<CellWater> {
-    let n = clim.t_c.len();
+/// The climate stage's warmest and coldest month (`climate/t_warm_c`, `climate/t_cold_c`) on a
+/// grid of `n` cells, each None where the world holds no such field.
+pub fn months(world: &WorldState, n: usize) -> (Option<&[f32]>, Option<&[f32]>) {
     let season = |name: &str| {
         world
             .fields
@@ -209,20 +220,32 @@ pub fn water_budget(world: &WorldState, clim: &Snapshot, hydro: &HydroParams) ->
             .filter(|f| f.data.len() == n)
             .map(|f| &f.data[..])
     };
-    let warm = season(crate::climate::field::T_WARM);
-    let cold = season(crate::climate::field::T_COLD);
+    (
+        season(crate::climate::field::T_WARM),
+        season(crate::climate::field::T_COLD),
+    )
+}
+
+/// [`cell_water`] for every cell of the step's climate `clim`. From the climate stage, its own
+/// warmest and coldest month: the snapshot's temperature is the stage's mean (`T_FIELD`), and the
+/// stage writes the three of the same twelve months with the same lapse rate, so the months are
+/// HYD-033's departures about the surface's mean exactly. Without the stage, none (HYD-032).
+pub fn water_budget(world: &WorldState, clim: &Snapshot, hydro: &HydroParams) -> Vec<CellWater> {
+    let n = clim.t_c.len();
+    let (warm, cold) = match months(world, n) {
+        (Some(w), Some(k)) if clim.from_stage => (Some(w), Some(k)),
+        _ => (None, None),
+    };
+    let month = |m: Option<&[f32]>, c: usize| m.map_or(f64::NAN, |m| f64::from(m[c]));
     (0..n)
         .into_par_iter()
         .map(|c| {
-            let half = match (warm, cold) {
-                (Some(w), Some(k)) => 0.5 * f64::from(w[c] - k[c]),
-                _ => f64::NAN,
-            };
             cell_water(
                 hydro,
                 f64::from(clim.precip_mm[c]),
                 f64::from(clim.t_c[c]),
-                half,
+                month(warm, c),
+                month(cold, c),
             )
         })
         .collect()
@@ -259,7 +282,7 @@ mod tests {
             (1200.0, 8.0, 8.0),
             (50.0, 30.0, 5.0),
         ] {
-            let budget = cell_water(&hydro, p, t, half).runoff_m_yr;
+            let budget = cell_water(&hydro, p, t, t + half, t - half).runoff_m_yr;
             let own = mean_t_runoff_m_yr(p, t);
             assert!(
                 (budget - own).abs() < 1.0e-12,
@@ -279,7 +302,10 @@ mod tests {
             (100.0, -30.0, 15.0),
             (800.0, -8.0, 6.0),
         ] {
-            assert_eq!(cell_water(&hydro, p, t, half).runoff_m_yr, 0.0);
+            assert_eq!(
+                cell_water(&hydro, p, t, t + half, t - half).runoff_m_yr,
+                0.0
+            );
             assert!((mean_t_runoff_m_yr(p, t) - p / 1000.0).abs() < 1.0e-12);
         }
     }
@@ -358,11 +384,12 @@ mod tests {
     /// reanalysis, land components, mm/yr: Mapam Yumco P 230, AET 170, runoff 60; Paiku Co 250,
     /// 180, 70; Tangra Yumco 300, 210, 90; Nam Co 420, 290, 130; §2.1: "The mean annual air
     /// temperature (MAAT) lies between 0 and −3 ◦C"). The source gives no months, so they are the
-    /// mean ± 8 °C of HYD-032. The budget evaporates part of what the plateau does and the
-    /// snapshot's own rule (MAAT below 0 °C) none: the budget still runs off more than these
-    /// basins (Holdridge's PET has no term for the plateau's sun and wind).
+    /// mean ± 8 °C of HYD-032. The budget evaporates in the plateau's summer, where the snapshot's
+    /// own rule (MAAT below 0 °C) evaporates nothing, and no more than the precipitation. The
+    /// budget's shortfall against Biskop's AET is printed, not asserted: Holdridge's PET has no
+    /// term for the plateau's sun and wind, and a better PET would close it (ERO-222's gap).
     #[test]
-    fn the_tibetan_lakes_evaporate_more_than_the_budget() {
+    fn the_tibetan_lakes_evaporate_under_the_budget() {
         for (p, aet) in [
             (230.0, 170.0),
             (250.0, 180.0),
@@ -371,8 +398,11 @@ mod tests {
         ] {
             for t in [0.0, -1.5, -3.0] {
                 let et = p - budget_runoff_mm(p, t, t + 8.0, t - 8.0);
-                eprintln!("Tibet P {p} MAAT {t}: budget ET {et:.0} mm (Biskop {aet})");
-                assert!(et > 0.0 && et < aet, "P {p}, MAAT {t}: budget ET {et:.0}");
+                eprintln!(
+                    "Tibet P {p} MAAT {t}: budget ET {et:.0} mm (Biskop {aet}, shortfall {:.0})",
+                    aet - et
+                );
+                assert!(et > 0.0 && et <= p, "P {p}, MAAT {t}: budget ET {et:.0}");
                 if t < 0.0 {
                     assert!((1000.0 * mean_t_runoff_m_yr(p, t) - p).abs() < 1.0e-9);
                 }
@@ -410,7 +440,7 @@ mod tests {
     fn a_cold_land_with_a_summer_evaporates_in_it() {
         let hydro = HydroParams::default();
         for (p, t, half) in [(400.0, -2.0, 12.0), (250.0, -8.0, 18.0), (600.0, -1.0, 8.0)] {
-            let budget = cell_water(&hydro, p, t, half).runoff_m_yr;
+            let budget = cell_water(&hydro, p, t, t + half, t - half).runoff_m_yr;
             let own = mean_t_runoff_m_yr(p, t);
             assert!((own - p / 1000.0).abs() < 1.0e-12);
             assert!(
@@ -418,5 +448,56 @@ mod tests {
                 "P {p} T {t} ±{half}: budget {budget}, own {own}"
             );
         }
+    }
+
+    // ledger: ERO-221, HYD-030
+    /// Land with a mean above freezing and a month below it is not frost-free: its
+    /// biotemperature counts the frozen months as 0 °C, so it is above the mean (Holdridge), the
+    /// budget's PET is higher than the snapshot's 60 T, and it runs off less (the runoff law's
+    /// review: P 600 mm at 5 ± 15 °C, 336 against 245 mm). With no month below freezing the two
+    /// are the same (`without_frost_the_budget_is_the_surface_s_runoff`).
+    #[test]
+    fn a_warm_mean_with_a_frosty_month_runs_off_less() {
+        let hydro = HydroParams::default();
+        for (p, t, half) in [(600.0, 5.0, 15.0), (900.0, 8.0, 12.0), (400.0, 2.0, 10.0)] {
+            let budget = 1000.0 * cell_water(&hydro, p, t, t + half, t - half).runoff_m_yr;
+            let own = 1000.0 * mean_t_runoff_m_yr(p, t);
+            eprintln!(
+                "P {p} at {t} ± {half} °C: runoff {own:.0} mm by the snapshot's rule, {budget:.0} by the budget ({:+.0} %)",
+                100.0 * (budget / own - 1.0)
+            );
+            assert!(
+                budget > 0.0 && budget < own,
+                "P {p} at {t} ± {half}: budget {budget}, own {own}"
+            );
+        }
+    }
+
+    // ledger: ERO-221, HYD-033
+    /// The months are taken as the climate stage gives them, not centred on the mean (the runoff
+    /// law's review): the Dry Valleys' year (Fountain et al.: a mean of about −17 °C, a winter
+    /// minimum of about −40), with its warmest month at −5 °C, never thaws and runs off nothing.
+    /// Centred on the mean, the same range put the warmest month at +0.5 °C: what that ran off is
+    /// printed.
+    #[test]
+    fn a_year_s_months_are_taken_as_given() {
+        let hydro = HydroParams::default();
+        let (t, warm, cold) = (-17.0, -5.0, -40.0);
+        let half = 0.5 * (warm - cold);
+        for p in [7.0, 11.0, 300.0] {
+            assert_eq!(cell_water(&hydro, p, t, warm, cold).runoff_m_yr, 0.0);
+            let centred = 1000.0 * cell_water(&hydro, p, t, t + half, t - half).runoff_m_yr;
+            eprintln!(
+                "P {p} mm, mean {t}, months {warm} and {cold} °C: runoff 0; centred (+{:.1} and {:.1}): {centred:.1} mm, {:.2} of P",
+                t + half,
+                t - half,
+                centred / p
+            );
+            assert!(centred > 0.0);
+        }
+        // Without the months, the mean ± 8 °C (HYD-032).
+        let none = cell_water(&hydro, 300.0, -1.0, f64::NAN, f64::NAN).runoff_m_yr;
+        let eight = cell_water(&hydro, 300.0, -1.0, 7.0, -9.0).runoff_m_yr;
+        assert_eq!(none, eight);
     }
 }

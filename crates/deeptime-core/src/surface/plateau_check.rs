@@ -516,13 +516,25 @@ fn an_arid_plateau_behind_its_rim_keeps_its_rock() {
 /// rim in every case, so only the runoff differs.
 #[test]
 fn a_cold_plateau_runs_off_what_its_summer_leaves() {
-    use super::climate::{cell_water, mean_t_runoff_m_yr};
+    use super::climate::{Snapshot, cell_water, mean_t_runoff_m_yr};
     let hydro = crate::hydro::HydroParams::default();
     let (p, t, half) = (300.0, -1.5, 8.0); // ledger: ERO-222, HYD-032
-    let weight = |runoff_m_yr: f64| ((runoff_m_yr / 0.5) as f32).max(0.05); // ledger: ERO-010
-    let own = weight(mean_t_runoff_m_yr(p, t));
-    let budget = weight(cell_water(&hydro, p, t, half).runoff_m_yr);
-    let frozen = weight(cell_water(&hydro, p, -12.0, 8.0).runoff_m_yr);
+    // The step's own weight (`runoff_weight`, ERO-010) on a one-cell climate.
+    let weight = |t: f64, warm: f64, cold: f64, budget: bool| -> f32 {
+        let sp = super::SurfaceParams {
+            runoff_budget: budget,
+            ..super::SurfaceParams::default()
+        };
+        let clim = Snapshot {
+            runoff_m_yr: vec![mean_t_runoff_m_yr(p, t) as f32],
+            ..Snapshot::default()
+        };
+        let water = [cell_water(&hydro, p, t, warm, cold)];
+        super::runoff_weight(&sp, &clim, Some(&water[..]), 0)
+    };
+    let own = weight(t, t + half, t - half, false);
+    let budget = weight(t, t + half, t - half, true);
+    let frozen = weight(-12.0, -4.0, -20.0, true);
     eprintln!(
         "cold plateau interior weights: own {own:.3}, budget {budget:.3}, frozen {frozen:.3}"
     );
