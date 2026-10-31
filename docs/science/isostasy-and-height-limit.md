@@ -14,6 +14,7 @@ The crust floats on the denser mantle: thick or light crust stands high, thin or
 | [ISO](ledger/ISO.md) | sea level (its own page: [sea-level.md](sea-level.md); ISO-033 to ISO-035, ISO-037 and ISO-039 retired 2026-10-21 with the fixed curve) | ISO-036, ISO-038, ISO-085 to ISO-087 (5) |
 | [ISO](ledger/ISO.md) | lithospheric flexure (its own page: [flexure.md](flexure.md)) | ISO-040 to ISO-069 (30) |
 | [ISO](ledger/ISO.md) | the continent's settling on the plate model (written up in [plates.md](plates.md), "Mountains eat the world", 2026-10-20) | ISO-078 (1) |
+| [PLT](ledger/PLT.md) | the settling's light top, rock the surface takes off a column's top at the upper crust's density (`tectonics.settle_top_density`, off; written up in [plates.md](plates.md), "Rifts stretch before they break up, and the settling's light top", 2026-10-31) | PLT-780 (1) |
 
 Rows by status (67 active, 2 `merged`): `verified` 3, `cited-unverified` 8, `abstract-only` 6, `calibrated` 6, `game-choice` 14, `uncited` 30.
 

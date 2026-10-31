@@ -114,7 +114,8 @@ pub const FALLBACK_GLOBAL: &str = "plates/rift_fallback_km3";
 /// Rift-steps (a pair of plates with a rift in a step) over the run.
 pub const RIFT_STEPS_GLOBAL: &str = "plates/rift_steps";
 
-/// How far a rift reaches, in half-widths: e^(−4) = 0.018 of the strain at the rift.
+/// How far a wide rift reaches, in decay lengths: e^(−4) = 0.018 of the strain at the rift.
+// ledger: PLT-782 (game-choice: the search's end)
 const REACH_HALF_WIDTHS: f64 = 4.0;
 
 /// What one step did.

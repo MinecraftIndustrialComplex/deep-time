@@ -1043,13 +1043,14 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Molnar, P. and Lyon-Caen, H. (1988). Some simple physical aspects of the support, structure, and evolution of mountain belts. In: Clark, S. P., Burchfiel, B. C. and Suppe, J. (eds), Processes in Continental Lithospheric Deformation, Geological Society of America Special Paper 218, pp. 179-208.
 - DOI or URL: 10.1130/SPE218-p179.
 - Cited as: (ERO, ISO, HYP) "Molnar & Lyon-Caen 1988, GSA Special Paper 218:179-207". (PLT) "Molnar & Lyon-Caen 1988 (GSA Spec. Pap. 218)", "pages 179-207" in the force-balance design (Tibet 6-7e12 N/m).
-- Ledger ids: ISO-019, ISO-020, PLT-187, FRC-014, PLT-652 (the belt's push on the overriding plate's interior, as cited: not read)
+- Ledger ids: ISO-019, ISO-020, PLT-187, FRC-014, PLT-652 (the belt's push on the overriding plate's interior, as cited: not read), PLT-781 (2026-10-31, continental extension)
 - Access: book (not online); paywalled chapter. [other sections: book chapter (abstract visible via OpenAlex; full text not online).]
 - Library (the project's source library, not distributed): not fetched. Reason: book, no open copy named.
 - Merged keys: Molnar1988
 - Read so far (by the project): (ERO, ISO, HYP) bibliographic check only. (PLT) not stated.
 - Read in this pass: (ERO, ISO, HYP) not fetched. (PLT) abstract fetched. Abstract again (OpenAlex) by a Sonnet sub-agent of the gap 6 agent, 2026-10-24, for flexure.md "Foreland basins": the weights of some ranges are not enough for their foredeeps; the Himalaya's geometry and India's rigidity are not in the abstract.
 - Reference check: (ERO, ISO, HYP) title is not written in the code; Crossref gives the title above and pages 179-208. The code has 179-207, a one-page difference (immaterial, but the Crossref end page is 208). The editors are not verified in this pass. (PLT) title and page start correct; the editors and the "6-7e12 N/m" figure are not in the abstract. The abstract does state that more gravitational potential energy is stored in a column with a thick crustal root and that ranges reach a maximum mean elevation; no number.
+- Read 2026-10-31 (the continental-extension lane, a Sonnet research sub-agent; docs/design/continental-extension.md): OCR of the whole scan (http://web.archive.org/web/2017id_/http://www.colorado.edu/geolsci/faculty/molnarpdf/1988GSASpecPaper.M%26LyonCaen.pdf), p. 200 checked on the page image: "Fx,L = 6.9 × 10^15 dynes/cm = 690 bars × 100 km (Tibet); Fx,L = 5.2 × 10^15 dynes/cm = 520 bars × 100 km (Andes)" with "ρc = 2.8 g/cm³, ρm = 3.35 g/cm³", h = 5 and 4 km, H0 = 35 km; "When normal faulting occurs at high altitudes, the horizontal driving forces presumably are not strong enough to elevate the range higher" (p. 200). The scan's running head reads "Aspects of support, structure, and evolution of mountain chains"; no title page seen.
 
 ### Bird1991
 - Reference: Bird, P. (1991). Lateral extrusion of lower crust from under high topography in the isostatic limit. Journal of Geophysical Research 96(B6):10275-10286.
@@ -1068,7 +1069,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Rey, P., Vanderhaeghe, O. and Teyssier, C. (2001). Gravitational collapse of the continental crust: definition, regimes and modes. Tectonophysics 342(3-4):435-449.
 - DOI or URL: 10.1016/S0040-1951(01)00174-3.
 - Cited as: (ERO, ISO, HYP) "Rey, Vanderhaeghe & Teyssier 2001, Tectonophysics 342(3-4):435-449". (PLT) "Rey, Vanderhaeghe & Teyssier 2001 (Tectonophysics 342:435)".
-- Ledger ids: ISO-019, ISO-020, PLT-079 (note, 2026-10-29)
+- Ledger ids: ISO-019, ISO-020, PLT-079 (note, 2026-10-29), PLT-781, PLT-782 (2026-10-31, continental extension)
 - Access: paywalled; not fetched. [other sections: paywalled.]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -1077,6 +1078,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference check: (ERO, ISO, HYP) Crossref matches title, volume 342, issue 3-4, pages 435-449. (PLT) correct.
 - Read in the high-ground task (2026-10-22, PLT-412): the abstract, verbatim, from the University of Minnesota's research portal (Experts@Minnesota, https://experts.umn.edu/en/publications/gravitational-collapse-of-the-continental-crust-definition-regime/; the full text stays paywalled). "Gravitational collapse corresponds to the decay of lateral contrast in gravitational potential energy that builds up during lithospheric deformation"; "When the surrounding lithosphere is fixed (fixed-boundary collapse), collapse occurs through a transfer of gravitational potential energy from the elevated regions towards the low lands. This transfer is accommodated by a combination of gravitational sliding of the brittle crust and horizontal spread of the lower crust. In orogenic domains, fixed-boundary divergent collapse implies the lateral growth of the orogenic domain at the expense of the surrounding lithosphere"; and of convergent collapse, "a deficit in gravitational potential energy drives crustal material towards the deformed lithosphere. This regime can be expected to occur following thinning of the continental crust." Ledger ids added: PLT-412.
 - Read 2026-10-29 (the collision-front lane, a Sonnet research sub-agent, a Wayback copy of the first author's page, geosci.usyd.edu.au/users/prey/Publi/PapersPDF/ReyVDHTeyssier01.pdf): its collapse after root removal is illustrated, not derived: "After convective thinning, which we assume to occur 30 Ma after convergence" (pp. 440-441). PLT-079.
+- Read 2026-10-31 (the continental-extension lane, a Sonnet research sub-agent; docs/design/continental-extension.md): FULL TEXT, all 15 pages, from http://web.archive.org/web/20201112032131id_/http://www.geosci.usyd.edu.au/users/prey/Publi/PapersPDF/ReyVDHTeyssier01.pdf. p. 435: "when the surrounding lithosphere is free to move (free-boundary divergent collapse), the thickened crust is homogeneously thinned without transfer of gravitational potential energy towards the forelands"; p. 443: the lower crust flows back if "the temperature at the Moho ... is sufficiently high (≥700 °C, Sonder et al., 1987; Kaufman and Royden, 1994)" (the "≥" garbled in the extracted text, not checked against the page image); pp. 442-443 the triggers of divergent collapse, among them "(2) reduction of the basal shear stresses ... due to the rollback of the subducting slab"; p. 445, mode 2: "if a free boundary is adjacent to the orogenic domain (e.g.; an active continental margin), or alternatively, if a phase of tectonic divergence follows the protracted history, then space is provided for the bulk extension of the thickened crust", "The Cenozoic extension in the Basin and Range province could well be very close to the mode 2", expected after "(1) changes in the plates motion; (2) rollback and/or retreat of subducting slab; and (3) opening of a back arc basin"; p. 441, the thin-sheet numbers (after convective thinning a net tension of 6.7 × 10^12 N m−1 against an extensional strength of 4 × 10^12). The paper states no thickness the collapse thins to.
 
 ### EnglandThompson1984
 - Reference: England, P. C., Thompson, A. B. (1984). Pressure-Temperature-Time Paths of Regional Metamorphism I. Heat Transfer during the Evolution of Regions of Thickened Continental Crust. Journal of Petrology 25(4):894-928.
@@ -6661,10 +6663,11 @@ USGS publication records; no copy was saved to the library. Bird 1991 and Christ
 ### Dewey1988
 - Reference: Dewey, J. F. (1988). Extensional collapse of orogens. Tectonics 7(6):1123-1139.
 - DOI or URL: 10.1029/TC007i006p01123
-- Ledger ids: PLT-254
+- Ledger ids: PLT-254, PLT-781 (2026-10-31, continental extension)
 - Access: paywalled; abstract read.
 - Library: not fetched.
 - Read so far (by the project): abstract, 2026-10-03: collapse explains "the return of orogenic large crustal thicknesses to normal without very much erosional denudation"; "Even where overall convergence is continuing, orogenic collapse may be enhanced by subduction rollback".
+- Read 2026-10-31 (the continental-extension lane, a Sonnet research sub-agent; docs/design/continental-extension.md): the abstract again (OpenAlex): "Where, as in the disruption of Pangea, boundary forces change rapidly from compressional to tensional, body force collapse is continued by general extension which may lead to continental splitting. Even where overall convergence is continuing, orogenic collapse may be enhanced by subduction rollback into small remnant oceans." No open full text found.
 
 ### Carbonell2000
 - Reference: Carbonell, R. and others (2000). [Wide-angle seismic study of the Urals crustal root; title not recorded by the sub-agent.] Journal of Geophysical Research 105(B6):13755-13777. Co-authors and title to be taken from the DOI before quoting.
@@ -6685,10 +6688,11 @@ USGS publication records; no copy was saved to the library. Bird 1991 and Christ
 ### WernickeEtAl1987
 - Reference: Wernicke, B. P., Christiansen, R. L., England, P. C. and Sonder, L. J. (1987). Tectonomagmatic evolution of Cenozoic extension in the North American Cordillera. Geological Society, London, Special Publications 28:203-221.
 - DOI or URL: 10.1144/GSL.SP.1987.028.01.15
-- Ledger ids: PLT-254, PLT-257, PLT-390 (2026-10-21: the timing set by the heat)
+- Ledger ids: PLT-254, PLT-257, PLT-390 (2026-10-21: the timing set by the heat), PLT-782 (2026-10-31, continental extension)
 - Access: read in full by the sub-agent.
 - Library: not fetched.
 - Read so far (by the project): full text, 2026-10-03: "We conclude that the locus of extension is controlled principally by crustal thickness, while its timing is governed by the thermal state of the lithosphere at the time of thickening"; the extended area "widened to several hundred kilometres".
+- Read 2026-10-31 (the continental-extension lane, a Sonnet research sub-agent; docs/design/continental-extension.md): the summary and p. 216 (http://geomorphology.sese.asu.edu/Papers/Wernicke_BasinandRange_1987.pdf): "a lower crust at or near its minimum-melting temperature (~650-750 °C) is apparently a requirement for it to begin".
 
 ### PeronPinvidicOsmundsen2020
 - Reference: Peron-Pinvidic, G. and Osmundsen, P. T. (2020). From orogeny to rifting: insights from the Norwegian 'reactivation phase'. Scientific Reports 10:14860.
@@ -6701,10 +6705,11 @@ USGS publication records; no copy was saved to the library. Bird 1991 and Christ
 ### JolivetBrun2010
 - Reference: Jolivet, L. and Brun, J.-P. (2010). Cenozoic geodynamic evolution of the Aegean. International Journal of Earth Sciences 99:109-138.
 - DOI or URL: 10.1007/s00531-008-0366-4
-- Ledger ids: PLT-254, PLT-390 (2026-10-21: where a hot orogen thins to)
+- Ledger ids: PLT-254, PLT-390 (2026-10-21: where a hot orogen thins to), PLT-781 (2026-10-31, continental extension)
 - Access: author PDF; full text read.
 - Library: not fetched.
 - Read so far (by the project): full text, 2026-10-03: "The Cyclades archipelago is underlain by a thinned crust with a very constant thickness around 26 km"; "The extended domain is superposed to a collapsed Early Cenozoic mountain belts".
+- Read 2026-10-31 (the continental-extension lane, a Sonnet research sub-agent; docs/design/continental-extension.md): the author PDF (https://www.dynamicearth.de/Lectures/Geodynamik.WiSe09/seminar/2009Jolivet&Brun.pdf; pages derived from the PDF): "a rather flat Moho around 25–26 km deep below most of the Aegean Sea", "The crust in the Cretan Sea has been thinned down to ~15 km", the Rhodope "up to 45 km" (p. 112); "The beginning of fast slab retreat has been set to 30–35 Ma" (p. 127); "~600–650 km of retreat since 30–35 Ma, thus an average rate of ~2.0 cm/year", against Africa–Eurasia convergence of "1.3 cm/year in average" (p. 128). No β or extension in km for the Cyclades.
 
 ### MooneyProdehlPavlenkova2002
 - Reference: Mooney, W. D., Prodehl, C. and Pavlenkova, N. I. (2002). Seismic velocity structure of the continental lithosphere from controlled source data. In: Lee, W. H. K. and others (eds), International Handbook of Earthquake and Engineering Seismology, Part A. Academic Press. (Pages and DOI not checked.)
@@ -8165,10 +8170,11 @@ The sources of the high-ground task (build log 2026-10-21 "The high ground"; pla
 - Reference: Long, S. P. (2019). Geometry and magnitude of extension in the Basin and Range Province (39°N), Utah, Nevada, and California, USA: constraints from a province-scale cross section (title as the agent recalls it). Geological Society of America Bulletin 131(1-2):99-119.
 - DOI or URL: 10.1130/B31974.1
 - Cited as: "Long 2019".
-- Ledger ids: PLT-390
+- Ledger ids: PLT-390, PLT-781 (2026-10-31, continental extension)
 - Access: paywalled; the abstract read.
 - Library: not fetched.
 - Read so far (by the project): the abstract, 2026-10-21: "230 ± 42 km of cumulative extension (46% ± 8%), and an average pre-extensional thickness of 54 ± 6 km"; the eastern domain "restores to a 60 ± 11 km thickness" and the western "66 ± 5 km"; "The eastern domain underwent a protracted, Late Cretaceous-Miocene transition to an extensional regime, while widespread extension in the western domain did not start until the Miocene". The modern 37 ± 1 km came only through a search tool's summary (not read); 54 / 1.46 = 37 km is the agent's arithmetic.
+- Read 2026-10-31 (the continental-extension lane, a Sonnet research sub-agent; docs/design/continental-extension.md): pp. 99-101, 109-111, 114-115 of the author's copy (http://www.seanpatricklong.com/uploads/1/4/5/6/14564072/long_2019_gsab_basin_range_xsec.pdf): "an average modern thickness of 37 ± 1 km" (p. 109, after Gilbert 2012); the inception "attributed to reorganization of the Pacific–North American plate boundary in the middle Miocene, and more specifically to establishment of the San Andreas transform system" (p. 101); "geodynamic events that altered boundary conditions ... were necessary to initiate pulses of gravitational collapse" (p. 115). The modern 37 km is now read.
 
 ### Profeta2015
 - Reference: Profeta, L. and others (2015). Quantifying crustal thickness over time in magmatic arcs (title as the agent recalls it). Scientific Reports 5:17786.
@@ -8561,10 +8567,11 @@ Nothing was saved to the library.
 - Reference: England, P. and Houseman, G. (1989). Extension during continental convergence, with application to the Tibetan Plateau. Journal of Geophysical Research 94(B12):17561-17579.
 - DOI or URL: 10.1029/JB094iB12p17561
 - Cited as: "England & Houseman 1989".
-- Ledger ids: PLT-414, PLT-415, PLT-478 (2026-10-23: the instability "would only occur after there had already been substantial thickening of the lithosphere", the same abstract read again)
+- Ledger ids: PLT-414, PLT-415, PLT-478 (2026-10-23: the instability "would only occur after there had already been substantial thickening of the lithosphere", the same abstract read again), PLT-781 (2026-10-31, continental extension)
 - Access: paywalled; the abstract from OpenAlex's record.
 - Library: not fetched.
 - Read so far (by the project): the abstract, 2026-10-22 (the high-ground task): "For the last 5 m.y. or so the plateau has been thinning by the mechanism of extension on north‐south trending normal faults"; the collision time scale "(∼50 m.y. in the case of India and Asia)"; "the increase in surface height (as much as 2 km) and of potential energy (5 to 10 × 10 12 N m −1 ) resulting from convective instability of the lower lithosphere are sufficient for east‐west extension to replace north‐south compression as the dominant feature of the stress field of the Tibetan plateau".
+- Read 2026-10-31 (the continental-extension lane, a Sonnet research sub-agent; docs/design/continental-extension.md): the abstract again (OpenAlex), for extension during convergence: the transition "could not, however, be effected by a reduction in strength of the elevated region alone; this produces increased compressional strain rates in the weakened zone".
 
 ### EnglandMolnar1997
 - Reference: England, P. and Molnar, P. (1997). Active deformation of Asia: from kinematics to dynamics. Science 278(5338):647-650.
@@ -8588,10 +8595,11 @@ Nothing was saved to the library.
 - Reference: Sonder, L. J. and Jones, C. H. (1999). Western United States extension: how the west was widened. Annual Review of Earth and Planetary Sciences 27:417-462.
 - DOI or URL: 10.1146/annurev.earth.27.1.417
 - Cited as: "Sonder & Jones 1999".
-- Ledger ids: PLT-414
+- Ledger ids: PLT-414, PLT-781 (2026-10-31, continental extension)
 - Access: paywalled; the abstract from OpenAlex's record.
 - Library: not fetched.
 - Read so far (by the project): the abstract, 2026-10-22 (the high-ground task): "Forces driving extension can originate at plate boundaries, through basal traction, basal normal forces, or from buoyancy forces internal to the crust and lithospheric mantle. The latter two are most responsible for driving extension where it is observed in the Basin and Range."
+- Read 2026-10-31 (the continental-extension lane, a Sonnet research sub-agent; docs/design/continental-extension.md): the abstract again: "crustal buoyancy forces combined with a divergent plate boundary between about 28 and 16 Ma to drive extension in the southern Basin and Range".
 
 ## The cube simulation grid and its surface solvers (SCL-140 to SCL-152), added 2026-10-22
 
@@ -8975,10 +8983,11 @@ The sources of stage 2 (rifted margins drawn by a stretching factor) and stage 3
 - Reference: Molnar, P., England, P. and Martinod, J. (1993). Mantle dynamics, uplift of the Tibetan Plateau, and the Indian monsoon (the title from memory). Reviews of Geophysics 31(4):357-396.
 - DOI or URL: 10.1029/93RG02030
 - Cited as: "Molnar, England & Martinod 1993".
-- Ledger ids: none (lithosphere-thermal-state.md, stage 3)
+- Ledger ids: none (lithosphere-thermal-state.md, stage 3), PLT-781 (2026-10-31, continental extension)
 - Access: paywalled; the abstract from Crossref.
 - Library: not kept.
 - Read so far (by the project): abstract, 2026-10-23: "Convective removal of lower lithosphere beneath the Tibetan Plateau can account for a rapid increase in the mean elevation of the Tibetan Plateau of 1000 m or more in a few million years"; "uplift was rapid: approximately 1000 m to 2500 m in a few million years".
+- Read 2026-10-31 (the continental-extension lane, a Sonnet research sub-agent; docs/design/continental-extension.md): the whole scan, OCR (http://web.archive.org/web/2017id_/http://www.colorado.edu/geolsci/faculty/molnarpdf/1993RofG.MolnarEnglandMartinod.pdf), pp. 357 and 368-374 closely, p. 373-374 checked on the page images: "Roughly half is absorbed by crustal thinning and half is absorbed by north-south shortening by strike-slip faulting", "the crust has thinned about 2.8 km (5 × 10^-9 yr−1 × 70 km × 8 m.y.)" (p. 374); "both normal and thrust faulting occur where mean elevations are about 4500 m" (p. 374); Table 2 (p. 373): the force per unit length 8.4 × 10^12 N m−1 for a 5.5 km plateau under Airy isostasy.
 
 ### KayKay1993
 - Reference: Kay, R. W. and Kay, S. M. (1993). Delamination and delamination magmatism (the title from memory). Tectonophysics 219:177-189.
@@ -10301,3 +10310,79 @@ The runoff lane's sources (docs/design/surface-runoff-budget.md, erosion-and-sed
 - Access: open.
 - Library: not kept.
 - Read so far (by the project): full text, 2026-10-31. Abstract: areal precipitation "548 mm/year in De Geerdalen, 486 mm/year in Endalen/Isdammen and 890 mm/year in Bayelva"; "the best estimates indicate an average annual evaporation of ca. 80 mm/year from glacier-free areas, and no net evaporation from glaciers"; "Annual runoff ranges from 545 mm in Endalen/Isdammen, 539 mm/year in De Geerdalen up to 1050 mm/year in Bayelva". The runoff includes the glaciers' mass loss.
+
+## Continental extension: sources added 2026-10-31 (PLT-780 to PLT-785)
+
+The continental-extension lane's Sonnet research sub-agent read these on 2026-10-31 (docs/design/continental-extension.md). What it read is stated per entry; the quotes are what it printed.
+
+### Buck1991
+- Reference: Buck, W. R. (1991). Modes of continental lithospheric extension. Journal of Geophysical Research 96(B12):20161-20178.
+- DOI or URL: 10.1029/91JB01485
+- Cited as: "Buck 1991".
+- Ledger ids: PLT-782
+- Access: paywalled; the abstract from Crossref (https://api.crossref.org/works/10.1029/91JB01485). Wiley, Academia and ResearchGate refused scripted access.
+- Library: not fetched.
+- Read so far (by the project): the abstract, 2026-10-31: "The model predicts three distinct modes of extension depending on the model crustal thickness, heat flow, and strain rate. The modes are (1) core complex mode (concentrated upper crustal extension with lower crustal thinning over a broad area and any mantle lithosphere extending in a local area), (2) wide rift mode (uniform crustal and mantle lithospheric thinning over a width greater than the lithospheric thickness), and (3) narrow rift mode (concentrated crustal and mantle lithospheric extension)"; "The model implies a temporal progression from core complex mode to wide rift mode to narrow rift mode. Data from the southern Basin and Range Province are consistent with this progression." Its Fig. 30 is seen only as Buck 2007 reprints it (below). Buck's own Moho thresholds and β per mode not found.
+
+### BuckLavierPoliakov1999
+- Reference: Buck, W. R., Lavier, L. L. and Poliakov, A. N. B. (1999). How to make a rift wide. Philosophical Transactions of the Royal Society of London A 357:671-693.
+- DOI or URL: http://web.archive.org/web/20111215000318id_/http://www.ldeo.columbia.edu/~buck/Publications_files/1999BuckHowToMakeARiftWide.pdf (author copy)
+- Cited as: "Buck, Lavier & Poliakov 1999".
+- Ledger ids: PLT-782
+- Access: open author copy; partly read.
+- Library: not fetched.
+- Read so far (by the project): pp. 671-693 in part, 2026-10-31: "The wide rift mode occurs for moderate to high extension rates when the continental crust was thicker and hotter than normal" (p. 672); "narrow means about as wide as the lithosphere is thick" (p. 673); "To extend lithosphere with a typical heat flow, of ca. 50 mW m−2 ..., may require as much as 3 × 10^13 N m−1 of force to be applied, while to deform lithosphere with twice that heat flow can take less than 10^12 N m−1 of force" (p. 675); wide rifting "requires brittle lithosphere that is thinner than the crust. This only occurs when the regional heat flow is greater than normal" (p. 688).
+
+### Buck2007
+- Reference: Buck, W. R. (2007). The Dynamics of Continental Breakup and Extension. Treatise on Geophysics (a publisher proof, article 00110, sections 6.09.x; not the final print).
+- DOI or URL: http://web.archive.org/web/20111215000055id_/http://www.ldeo.columbia.edu/~buck/Publications_files/2007Buck_TreatiseChapter110proof.pdf
+- Cited as: "Buck 2007".
+- Ledger ids: PLT-782
+- Access: an open publisher proof; pp. 25-30 partly read (the proof's printed numbers).
+- Library: not fetched.
+- Read so far (by the project): 2026-10-31: narrow rifts (the Rhinegraben, the Gulf of Suez, the East African Rift System, the Baikal Rift, the Rio Grande Rift) "on the order of 100 km wide"; the Basin and Range's "region of significant normal faulting is as much as 800 km wide" (p. 25); "If the lower crust is extremely hot and weak, then this model predicts a 'core complex mode' of extension" (p. 28); "the wide rift and the 'core complex' modes are only predicted for thick, hot crust" (p. 28); "collapse of high mountains can occur even while convergence is still occurring across those mountains (see Dewey, 1988 ...)" (p. 28); Fig. 29's panels labelled Qs = 100 (core complex), 80 (wide rift) and 60 mW m−2 (narrow rift); Fig. 30 (from Buck 1991), the modes against crustal thickness and surface heat flow, whose data points the sub-agent read off the plot, approximately (the northern Basin and Range about 33 km and 90 mW m−2, the Altiplano 48 and 90, Tibet 64 and 87, the Rhinegraben 36 and 68, East Africa and Baikal 40 and 51, the northern Red Sea 30 and 45, the southern Rio Grande 26 and 87). The proof's force scalings on p. 27 may carry typos (the sub-agent's note) and are not used.
+
+### Brun1999
+- Reference: Brun, J.-P. (1999). Narrow rifts versus wide rifts: inferences for the mechanics of rifting from laboratory experiments. Philosophical Transactions of the Royal Society of London A 357(1753):695-712.
+- DOI or URL: 10.1098/rsta.1999.0349
+- Cited as: "Brun 1999".
+- Ledger ids: PLT-782
+- Access: paywalled; the abstract from OpenAlex.
+- Library: not fetched.
+- Read so far (by the project): the abstract, 2026-10-31: "Necking occurs preferentially in a stable lithosphere that has a four–layer–type of strength profile with the greatest strength located in the sub–Moho mantle. It gives birth to narrow rifts, from continental rifts to passive margins. Spreading occurs preferentially in a thickened lithosphere whose strength profile, after thermal relaxation, exhibits maximum strength at the base of upper brittle crust. It gives birth to wide rifts, such as the Basin and Range of the western United States or the Aegean."
+
+### MolnarEngland1990
+- Reference: Molnar, P. and England, P. (1990). Late Cenozoic uplift of mountain ranges and global climate change: chicken or egg? Nature 346:29-34.
+- DOI or URL: http://web.archive.org/web/20160826010447id_/http://www.colorado.edu/GeolSci/faculty/molnarpdf/1990Nature.Molnar&England.pdf (the first author's copy)
+- Cited as: "Molnar & England 1990".
+- Ledger ids: PLT-780
+- Access: open copy (a scan); full text by OCR, p. 30 checked on the page image.
+- Library: not fetched.
+- Read so far (by the project): full text, 2026-10-31: "the removal of a layer of crust of thickness ΔT and density ρc, compensated by a crustal root in a mantle of density ρm, results in a lowering of the surface of ΔT(ρm − ρc)/ρm ≈ ΔT/6" (p. 30); Fig. 2 caption: "the mean elevation should decrease by Δh ≈ ΔT/6, and the underlying rock, including the Moho, should rise by 5ΔT/6"; "for each 1 km of material removed from the range, the isostatic response is a lowering of the mean elevation by only ~0.17 km" (p. 31). No densities given as numbers.
+
+### WernickeEtAl2000
+- Reference: Wernicke, B., Friedrich, A. M., Niemi, N. A., Bennett, R. A. and Davis, J. L. (2000). Dynamics of Plate Boundary Fault Systems from Basin and Range Geodetic Network (BARGEN) and Geologic Data. GSA Today 10(11):1-7.
+- DOI or URL: https://rock.geosociety.org/gsatoday/archive/10/11/pdf/gt0011.pdf
+- Cited as: "Wernicke et al. 2000".
+- Ledger ids: none (docs/design/continental-extension.md)
+- Access: open; pp. 1-5 read.
+- Library: not fetched.
+- Read so far (by the project): 2026-10-31: "This part of the Basin and Range reaches a maximum width of 750 km at latitude 40°N"; the Sierra Nevada block moved west "first at rates near 20 mm/yr almost due west ..., then slowing to the current overall rate near 12 mm/yr northwest"; "Total displacement of the block since 16 Ma is ~250 km" (p. 1); "broadly distributed extensional strain at a rate of ~10 nstr/yr" (p. 5).
+
+### ZhangTibetGPS2004
+- Reference: Zhang, P.-Z. and others (2004). Continuous deformation of the Tibetan Plateau from global positioning system data. Geology 32(9):809-812.
+- DOI or URL: 10.1130/G20554.1; read from http://web.archive.org/web/2017id_/http://www.colorado.edu/geolsci/faculty/molnarpdf/2004Geology.Zhang.TibetGPS.pdf
+- Cited as: "Zhang et al. 2004".
+- Ledger ids: none (docs/design/continental-extension.md)
+- Access: open copy; full text, pp. 809-810 checked on the page image.
+- Library: not fetched.
+- Read so far (by the project): 2026-10-31: "Deformation occurs throughout the plateau interior by ESE-WNW extension and slightly slower NNE-SSW shortening" (p. 809); "eastward stretching of 21.6 ± 2.5 mm/yr between long 79°E and 93°E"; "the average orthogonal extensional strain rate is 2.1 ± 0.3 × 10^-8 yr^-1" (p. 810).
+
+### ArmijoEtAl1986
+- Reference: Armijo, R. and others (1986). Journal of Geophysical Research 91(B14):13803-13872 (the title not recorded by the sub-agent; take it from the DOI before quoting).
+- DOI or URL: 10.1029/JB091iB14p13803
+- Cited as: "Armijo et al. 1986".
+- Ledger ids: none (docs/design/continental-extension.md)
+- Access: paywalled; the abstract from Crossref.
+- Library: not fetched.
+- Read so far (by the project): the abstract, 2026-10-31: "The rate of Quaternary extension is about 1% m.y.−1 along an 1100-km-long ESE traverse across south Tibet. This corresponds to a 'spreading' rate of 1 ± 0.6 cm/yr."

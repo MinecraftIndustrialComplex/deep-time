@@ -1475,6 +1475,45 @@ fn the_gap_budget_changes_nothing_and_adds_up() {
     same_world(&strip(with), &strip(without));
 }
 
+/// A run with the rifts' stretching (`extension.rs`, PLT-781 to PLT-784) and the settling's light
+/// top (PLT-780) on: every metre a rift stretched into its opening is laid as a rift's floor or
+/// by the fallback, or still waits on its pair; and with both off the run is master's.
+#[test]
+fn the_rifts_stretching_keeps_its_crust_and_off_changes_nothing() {
+    let mut p = preset(8000, 200.0, "supercontinent", 3);
+    p.tectonics.rift_stretching = true;
+    p.tectonics.settle_top_density = true;
+    let mut pending_km3 = 0.0;
+    let with = run_stage_with(PlatesStage::new(p.clone()), &p, |stage, _, st| {
+        let area = stage.norm().sample_area_km2();
+        pending_km3 = st.rift_fill.iter().map(|f| f.total_m()).sum::<f64>() * area / 1000.0;
+        for f in &st.rift_fill {
+            assert!(f.a < f.b && f.total_m() >= 0.0, "{f:?}");
+        }
+    });
+    let g = |k: &str| with.globals.get(k).copied().unwrap_or(0.0);
+    let stretched = g(super::extension::STRETCHED_GLOBAL);
+    let placed = g(super::extension::FLOOR_GLOBAL) + g(super::extension::FALLBACK_GLOBAL);
+    assert!(stretched > 0.0, "no rift stretched in 200 Myr");
+    assert!(g(super::extension::RIFT_STEPS_GLOBAL) > 0.0);
+    assert!(
+        (stretched - placed - pending_km3).abs() < 1.0e-6 * stretched,
+        "stretched {stretched} km3, laid {placed}, waiting {pending_km3}"
+    );
+    let mut q = p.clone();
+    q.tectonics.rift_stretching = false;
+    q.tectonics.settle_top_density = false;
+    let off = run_stage_with(PlatesStage::new(q.clone()), &q, |_, _, st| {
+        assert!(st.rift_fill.is_empty() && st.top_deficit_m.is_empty());
+    });
+    let base = run_stage_with(
+        PlatesStage::new(preset(8000, 200.0, "supercontinent", 3)),
+        &q,
+        |_, _, _| {},
+    );
+    same_world(&off, &base);
+}
+
 /// The continental crust budget (`crust_budget.rs`) changes nothing but its note, and snapshots
 /// the start and every 50 Myr.
 #[test]

@@ -12754,3 +12754,51 @@ model reads the subducting floor's age. Test: `law_3_scales_the_incipient_resist
 (`forces.rs`: Case 1 at 30 Myr, the 2.2 factor between the two thicknesses, the ridge below 10 Myr,
 the cap, off as PLT-612; law 2's strength, PLT-517 at 30 Myr and constant off, and its pull, FRC-002
 for a full 80 Myr slab straight across the margin).
+
+## Rifts stretch before they break up, and the settling's light top (PLT-780 to PLT-785, 2026-10-31)
+
+Both off by default; the design, the sources and the arm are docs/design/continental-extension.md. The uplift trace
+(docs/design/uplift-trace.md) found that rifting thins nothing: a rift only relabels a plate's samples, and the gap
+between its sides is new sea floor at the next resampling. The margin's taper (PLT-261) draws the break-up's end state on
+every ocean-continent boundary, and the collapse (PLT-254, PLT-414) is a fixed-boundary collapse that fills room up to
+the lowland's column. Neither stretches a continent where its plate boundary opens.
+
+**The rift's stretching (`tectonics.rift_stretching`, `plates/extension.rs`).**
+- **Where.** A boundary where both plates' sides are visible continental crust and the motion opens it (no transform,
+  PLT-311) is a rift. Its opening's area grows at u W, the opening speed times the boundary's straight length.
+- **How much.** The two sides' continental columns take that area in pure shear, Σ ε̇_i A = u W (McKenzie 1978's
+  uniform stretching; PLT-781). Each keeps e^(−ε̇ δt) of its crust and never less than 10 km of crystalline crust
+  (Brune et al. 2014; PLT-783). Its lithosphere thins by the same factor.
+- **Narrow or wide (PLT-782).** A side is wide if its edge columns' Moho, on the model's own geotherm, stands at 700 °C
+  or more (Rey, Vanderhaeghe & Teyssier 2001, p. 443; Wernicke et al. 1987, p. 216), else narrow.
+  - A narrow side spreads the strain evenly over half a lithosphere's thickness from the rift (Buck et al. 1999, p. 673:
+    "about as wide as the lithosphere is thick").
+  - A wide side spreads it over its hot columns by the thin sheet's decay e^(−x/L), L = 2W/π (PLT-733's form): Buck
+    2007's Basin and Range, "as much as 800 km wide".
+  - On the model's geotherm the test puts each of Buck's (1991) Fig. 30 rifts in its mode (test
+    `the_moho_test_puts_bucks_rifts_in_their_modes`).
+- **Where the crust goes (PLT-784).** It waits on the pair until the next resampling, which lays it in the gap as the
+  rift's floor of stretched continental crust. Past break-up (under 10 km), it is laid as hyper-extended margins nearest
+  the plates' edges, and the rest of the gap is sea floor.
+- **The rule's reach.** It is Rey et al.'s free-boundary collapse wherever an opening boundary meets thick or hot crust:
+  a rift through an orogen, a back-arc sliver moving off a continental arc (PLT-710).
+
+**The settling's light top (`tectonics.settle_top_density`, PLT-780).** The settling (ISO-078) snaps a continental
+column to its whole-column Airy height (2,830 kg/m³, PLT-281), so ground the surface erodes comes back by 6/7 of the
+rock taken. PLT-281's own upper crust (2,700, ISO-008) gives 0.82, and Molnar & England 1990 (p. 30) "ΔT(ρm − ρc)/ρm ≈
+ΔT/6". With the switch a column carries a deficit of 0.039 m per metre the surface took off its top (less as much per
+metre laid down), and settles that much lower. It moves heights, not the long-run export.
+
+**What the rate cap trims (PLT-785, measurement only).** The land ledger books `rate::limit`'s release to the parts that
+thickened the column earlier in the step, on land and under the sea (`cap_land`, `cap_sea`). The cap (PLT-287) is a
+per-column thickening ceiling. Its excess goes to the collapse's room, ocean floor at the continent's edge filled to the
+normal column, so it is a numerical guard and a stand-in for the orogen's widening (docs/design/continental-extension.md,
+"The rate cap").
+
+Tests:
+- `extension.rs`: seven tests (the opening's area, the pure shear and its limit, Buck's rifts, the wide decay, a rift
+  that keeps its crust, the weaker side, the resampling's floor and break-up);
+- `settle.rs`: `rock_off_the_top_lowers_the_column_by_the_upper_crusts_airy_share`;
+- `gap_budget.rs`: `the_rate_caps_release_goes_to_the_parts_that_thickened_the_column`;
+- `plates/tests.rs`: `the_rifts_stretching_keeps_its_crust_and_off_changes_nothing`.
+
