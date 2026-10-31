@@ -876,8 +876,11 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // and 24; 11 of seeds 1 to 24 with the two wedges and the retro plateau on by default,
     // PLT-730, PLT-731 and PLT-740, 2026-10-31, the sweep `weld_seed_sweep`: 2, 3, 5, 6, 8, 9,
     // 11, 12, 17, 18 and 22, seed 1 no more, so seed 2; from the supercontinent 1, 3, 5, 6, 8,
-    // 12 to 15, 20, 22 and 24).
-    let mut p = preset(8000, 300.0, "scattered_continents", 2);
+    // 12 to 15, 20, 22 and 24; 15 of seeds 1 to 24 with small terranes docking stripped of their
+    // cover on by default, PLT-770 and PLT-771, 2026-10-31, the sweep `weld_seed_sweep`: 3, 5, 6, 8
+    // to 13, 15, 17, 18, 20, 22 and 24, seed 2 no more, so seed 3; from the supercontinent 1, 2,
+    // 6 to 8, 10, 12 to 16, 18, 21 and 23).
+    let mut p = preset(8000, 300.0, "scattered_continents", 3);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: under Forsyth & Uyeda's
     // balance on this small planet, whose ridge push is several times Earth's
     // (`plates_quick_16k`, ridge -1,000 m, floor -10,000 m), the speed guard bound on every
@@ -1077,8 +1080,12 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // binding on none, seed 2 the first after seed 1; seed 2 kept with the two wedges and the
     // retro plateau on by default, PLT-730, PLT-731 and PLT-740, 2026-10-31: it still welds (the
     // sweep's welding seeds 2, 3, 5, 6, 8, 9, 11, 12, 17, 18 and 22), and the weld test above
-    // takes it now too, seed 1 no longer welding, so the two tests share this planet).
-    let mut p = preset(8000, 300.0, "scattered_continents", 2);
+    // takes it now too, seed 1 no longer welding, so the two tests share this planet; seed 3
+    // since small terranes docking stripped of their cover went on by default, PLT-770 and
+    // PLT-771, 2026-10-31, when seed 2 no longer welds: the sweep's welding seeds 3, 5, 6, 8 to
+    // 13, 15, 17, 18, 20, 22 and 24, the guard binding on none, seed 3 the first, and the weld
+    // test above takes seed 3 too, so the two tests still share this planet).
+    let mut p = preset(8000, 300.0, "scattered_continents", 3);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: the guard asserted below
     // bound under Forsyth & Uyeda's balance on every welding seed of 1 to 24 of this small planet
     // but supercontinent 11, whose ridge push is several times Earth's (`plates_quick_16k`, ridge
@@ -2308,6 +2315,9 @@ fn a_collision() -> state::Collision {
         continental_over: 1.0,
         stalled_since_myr: None,
         jam_km: None,
+        subducting: false,
+        docking: Vec::new(),
+        docking_resample: 0,
         belt: Default::default(),
     }
 }

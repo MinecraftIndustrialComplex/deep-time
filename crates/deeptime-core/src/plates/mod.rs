@@ -539,6 +539,17 @@ impl PlatesStage {
         ] {
             *world.globals.entry(name.to_owned()).or_insert(0.0) += x;
         }
+        // The crust terranes docking stripped sent down (PLT-770, measurement only; written only
+        // with the switch so a run without it keeps its globals list).
+        if env.k.terrane_docking_cover {
+            *world
+                .globals
+                .entry(belts::STRIPPED_GLOBAL.to_owned())
+                .or_insert(0.0) += stacked
+                .values()
+                .map(|s| s.stripped_km2_m / 1000.0)
+                .sum::<f64>();
+        }
         // The crust the belts had no room for and kept (PLT-700, measurement only; written only
         // with the switch so a run without it keeps its globals list).
         if env.k.collision_noroom_stays {
