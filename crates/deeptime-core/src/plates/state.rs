@@ -496,6 +496,15 @@ impl Contact {
     }
 }
 
+/// A body of continental crust at a collision front judged going down with its slab (ledger
+/// PLT-770, `shortening::docking`): its samples, hidden and visible, sorted, as of the last step,
+/// and its share of the front's length when it was judged, km.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Docked {
+    pub samples: Vec<u32>,
+    pub length_km: f64,
+}
+
 /// A collision: the state of a [`Contact`] from the step continental crust of the subducting
 /// plate first stands at the overriding plate's edge and converges on it, until the crust is
 /// transferred or welded, the two part, or the contact closes or reverses (`shortening.rs`; design
@@ -548,13 +557,22 @@ pub struct Collision {
     /// be read back.
     #[serde(default)]
     pub jam_km: Option<f64>,
-    /// The contact's slab drags the incoming terrane down whole: its extent across the front
-    /// (the shortening so far and the rest's area over the front's length) is within the slab's
+    /// The contact's slab drags the incoming terranes down whole: each body at the front has its
+    /// extent across the front (its area over its share of the front's length) within the slab's
     /// reach against its buoyancy (`shortening::dragged_length_km`). Set each step with a front
     /// by `shortening::advance` (only with `tectonics.terrane_docking_cover`, ledger PLT-770): such
     /// a terrane is stripped to its cover at the front and does not transfer at the threshold.
     #[serde(default)]
     pub subducting: bool,
+    /// The bodies at the front judged going down ([`Collision::subducting`]; empty otherwise), as
+    /// of the last step: each body's samples and its share of the front's length when it was
+    /// judged (`shortening::docking`; ledger PLT-770).
+    #[serde(default)]
+    pub docking: Vec<Docked>,
+    /// The resampling (`PlateState::resample_step`) the samples of [`Collision::docking`] are
+    /// numbered by: a resampling numbers the samples afresh.
+    #[serde(default)]
+    pub docking_resample: u64,
     /// The belt this collision has built (`belts.rs`).
     pub belt: Belt,
 }
