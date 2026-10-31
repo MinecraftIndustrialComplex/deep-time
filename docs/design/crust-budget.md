@@ -1,8 +1,9 @@
 # The continents' crust budget against Stern & Scholl 2010: design
 
-Status: **built behind switches, off; traced switch by switch, recommended on** (2026-10-31, the
-crust-budget lane, branch `crust-budget`; the coordinator's task after the freeboard landed, PR #49):
-PLT-760 to PLT-763, the arm cb-cum and the second pass below; section 5 designed only. Ledger PLT-760 onward; plates.md "The crust budget
+Status: **built behind switches; traced switch by switch; on by default since 2026-10-31** (the
+coordinator's call under Ben's rule of 2026-10-23, decisions log 2026-10-31; the crust-budget lane,
+branch `crust-budget`; the coordinator's task after the freeboard landed, PR #49): PLT-760 to PLT-763,
+the arm cb-cum and the second pass below; section 5 designed only. Ledger PLT-760 onward; plates.md "The crust budget
 against Stern & Scholl 2010, row by row (2026-10-31)" holds the readings and the arm.
 
 ## Why
@@ -29,7 +30,7 @@ and the arcs 1.48:
 |---|---|---|---|
 | intra-oceanic arcs | 1.05 | 1.5 | front 25,744 km (S&S 14,500) at 40.9 km³/km/Myr; 0.31 of the arc fronts make no arc (incipient, PLT-610 and PLT-681; past the slab's ends, PLT-561); v_n at the island fronts 43.6 mm/yr against PLT-666's 86.6, so the mature rate runs at half; the early pulse (PLT-668) ends within a step at the axis, when the arc's own crust turns its column continental (PLT-047's 8 km at 4.7 km/Myr) and the column takes the continental law; the felsic cones the arcs count inside their rate (PLT-286) were in neither arc row |
 | continental arcs | 0.60 | 1.0 | front 29,436 km (S&S 27,500) at 20.4 against the law's 33.1 at v_n 55.5 mm/yr; the same band share and cones |
-| crust-suturing zones (juvenile) | 0 | 0.2 | no rule |
+| crust-suturing zones (juvenile) | 0 | 0.2 | no rule in base34 (section 4 builds one; on by default since 2026-10-31) |
 | rifts, hotspots, volcanic rifted margins | 0.05 | 0.5 | the hotspots' own basalt only (their rules uncited, PLT-108 to PLT-120, `pending-rewrite`); no magmatic addition at breakup (PLT-294 trades the continental side's crust for ocean crust on the ocean side, adding none) |
 | sediment subduction | 2.60 | 1.1 (+0.1 at sutures); Clift et al. 2009 1.65 | the trenches receive 2.90 km³ a year (the one-way slab's 0.33 of it all subducted); a quarter of the trench samples, piles over 1 km of rock (mean about 4.7 km), carry 0.9 of it; PLT-660 sends 0.83 down at accretionary margins and all elsewhere |
 | subduction erosion | 0.49 | 1.4 (+0.3 at sutures); Clift et al. 2009 1.33 | erosive fronts 13,395 km (Clift & Vannucchi 2004: 22,925) at PLT-441's 90 asks 1.21; the forearc band holds 0.49 of crust beyond 7 km (`forearc_short` 0.72) |
@@ -39,7 +40,7 @@ and the arcs 1.48:
 
 ## The fixes
 
-### 1. An intra-oceanic arc keeps the island law on the crust it made (PLT-760, built)
+### 1. An intra-oceanic arc keeps the island law on the crust it made (PLT-760, built; on by default since 2026-10-31)
 
 `tectonics.island_arc_own_crust`. The arc's law (island, PLT-045 and PLT-668; continental, PLT-285)
 was the column's label: magma on oceanic crust took the island law, on continental crust the
@@ -81,7 +82,7 @@ continental crust and the cones they counted (`hotspot_magma_c`, `hotspot_cones`
 the cones to the arc rows and reads the hotspot row on continental crust (S&S's additions are to
 continental crust; ocean floor's seamounts go down with their slab, PLT-286).
 
-### 3. Sediment subduction: the share stays; the line is read in place (PLT-762, built)
+### 3. Sediment subduction: the share stays; the line is read in place (PLT-762, built; on by default since 2026-10-31)
 
 The row is 2.4 times Stern & Scholl's 1.1, and the first reading was that PLT-660's 0.83 at
 accretionary margins was the wrong share: Stern & Scholl (p. 15) write that "large accretionary
@@ -123,7 +124,7 @@ erosive fronts shrink by the same samples.
 
 Test: `the_trench_pile_line_is_read_in_place`.
 
-### 4. Arc magma at sutures (PLT-763, built)
+### 4. Arc magma at sutures (PLT-763, built; on by default since 2026-10-31)
 
 `tectonics.collision_arc_magma`. Stern & Scholl's Table 1 books 0.2 AU of additions at
 crust-suturing subduction zones; Scholl & von Huene 2009 (the abstract): "During collisional
@@ -191,7 +192,8 @@ switches; the continental arcs' magma on island-arc crust comes from arcs begun 
 before the substrate rule, the half line); the sea rises by the continental crust each switch keeps,
 the three adding (+76, +60 and +87 m alone, +223 together); the supercontinents' drowning on cb-cum
 follows from the sea, the coast with high ground does not; on the final code the criteria are 6
-against 6.5 (p 0.35). Verdict: all three correct, on (PLT-760 with the substrate rule).
+against 6.5 (p 0.35). Verdict: all three correct, on (PLT-760 with the substrate rule); on by
+default since 2026-10-31 (decisions log: the coordinator's call, Ben's rule of 2026-10-23).
 
 ## What is left
 
