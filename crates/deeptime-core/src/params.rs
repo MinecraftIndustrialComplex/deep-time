@@ -546,9 +546,11 @@ pub struct TectonicParams {
     /// `tan β / (tan α + tan β)` of it). Past
     /// the strength height the crest widens as a plateau on the overriding side. In place of the
     /// wedge capped by the overriding edge's height (PLT-244) and the belt from that edge
-    /// (`collision_belt_taper`). `false` (the default; the pool arm of 2026-10-29 put more
-    /// collision land at the coast, plates.md "Step 20"): those, as before. ledger: PLT-730,
-    /// PLT-731
+    /// (`collision_belt_taper`). On by default since 2026-10-31 (the coordinator's call, under
+    /// Ben's rule of 2026-10-23: physics goes on by default once built and correct; decisions
+    /// log 2026-10-31; the arm orog-cum, plates.md "The collision orogen"). `false`: those, as
+    /// before (the pool arm of 2026-10-29 had put more collision land at the coast, plates.md
+    /// "Step 20"). ledger: PLT-730, PLT-731
     pub collision_two_wedges: bool,
     /// How much steeper the retro-wedge on the overriding plate stands than the pro-wedge, with
     /// `collision_two_wedges`: tan β / tan α, β the retro-wedge's surface slope and α
@@ -562,8 +564,10 @@ pub struct TectonicParams {
     /// orogen turns into a plateau that "grow[s] laterally at constant thickness" with its
     /// growth retro-ward (Vanderhaeghe et al. 2003), "located mostly on the retro-side" (Wolf et
     /// al. 2021). Only what the connected crust cannot hold goes to the no-room rule
-    /// (`collision_noroom_stays`). `false` (the default): the retro flank ends at the belt's
-    /// reach, as before. ledger: PLT-740
+    /// (`collision_noroom_stays`). On by default since 2026-10-31 (the coordinator's call, under
+    /// Ben's rule of 2026-10-23: physics goes on by default once built and correct; decisions
+    /// log 2026-10-31; the arm orog-cum). `false`: the retro flank ends at the belt's reach, as
+    /// before. ledger: PLT-740
     pub collision_retro_plateau: bool,
     /// `true` (the default since 2026-10-26, the suture-loss lane): the crust a collision belt
     /// has no room for stays in the crust. The belt's passes run until its crust is placed or
@@ -1437,9 +1441,9 @@ impl Default for TectonicParams {
             collision_restack_whole: true,    // ledger: PLT-400 (game-choice; on since 2026-10-22)
             wedge_slope_deg: 1.5,             // ledger: PLT-192
             collision_belt_taper: true,       // ledger: PLT-600, PLT-601 (on since 2026-10-25)
-            collision_two_wedges: false,      // ledger: PLT-730
+            collision_two_wedges: true,       // ledger: PLT-730 (on since 2026-10-31)
             retro_slope_ratio: 1.55,          // ledger: PLT-731
-            collision_retro_plateau: false,   // ledger: PLT-740
+            collision_retro_plateau: true,    // ledger: PLT-740 (on since 2026-10-31)
             collision_noroom_stays: true,     // ledger: PLT-700 (on since 2026-10-26)
             weld_speed_mm_yr: 2.0,            // ledger: PLT-246 (Bird 2003 [3], since 2026-10-27)
             weld_after_myr: 10.0,             // ledger: PLT-246

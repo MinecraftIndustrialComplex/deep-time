@@ -873,8 +873,11 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // seeds 1 to 24 with sediment subduction by margin type and the margin's sediment continental
     // on by default, PLT-660 to PLT-662, 2026-10-31: 1 to 4, 6, 11, 12, 15, 16, 18, 20 to 22 and
     // 24, seed 8 no more, so seed 1; from the supercontinent 1, 4, 6, 8, 10, 12, 14, 18, 20, 22
-    // and 24).
-    let mut p = preset(8000, 300.0, "scattered_continents", 1);
+    // and 24; 11 of seeds 1 to 24 with the two wedges and the retro plateau on by default,
+    // PLT-730, PLT-731 and PLT-740, 2026-10-31, the sweep `weld_seed_sweep`: 2, 3, 5, 6, 8, 9,
+    // 11, 12, 17, 18 and 22, seed 1 no more, so seed 2; from the supercontinent 1, 3, 5, 6, 8,
+    // 12 to 15, 20, 22 and 24).
+    let mut p = preset(8000, 300.0, "scattered_continents", 2);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: under Forsyth & Uyeda's
     // balance on this small planet, whose ridge push is several times Earth's
     // (`plates_quick_16k`, ridge -1,000 m, floor -10,000 m), the speed guard bound on every
