@@ -878,6 +878,177 @@ lose for real is rock: 2.0 km of it planet-mean down the slab over the run (the 
 to 1.65, Stern & Scholl 2010's Table 1 with Clift et al. 2009's figures as it quotes them). That drain and the belts built
 from the slope's crust are the two leads it leaves (the build log of 2026-10-31).
 
+### Why base35's continents stand low, against Earth (2026-10-31)
+
+base35 (master 9d9e4c94, pool key 4dd28019a295, argkey cd665cef, 24 runs) against base34 (122e4803cded, 24
+runs): land 0.227 to 0.209, continental crust under the sea 0.540 to 0.602 (the check: at most 0.56, RLC-032),
+the sea at the end 174 to 319 m over the datum (medians of the final frames). This section measures the continents'
+crust and heights against Earth's and splits a continental column's height over the sea into its terms, on the
+cached runs only (no simulation, nothing built). Tools: `tools/review/freeboard/lowcont.py` (modes `series`,
+`earth`, `model`) and its VM driver `lowcont.sh`, beside `thinning.py`, `m5sea.py`, `m4cold.py` and
+`m5earthbands.py`; outputs in `/data/ban/deeptime-runs/lowcont/` on the VM. Earth: CRUST1.0 (Laske et al. 2013, 1 x
+1 degree, the solid surface, ice or rock, over the sea; cells by cos latitude) and SRTM15+ at 15' (Tozer et al. 2019)
+for the hypsometry. "Crust at least 20 km thick" is the census's like-for-like continental crust (RLC-030: the
+model's kind flag sits where the margin's target thickness is 20 km), read without labels on both sides.
+
+**The continents and the land against Earth** (final frames, medians; Earth's ice sheets out in brackets):
+
+| measure | base35 | base34 | Earth |
+|---|---|---|---|
+| crust at least 20 km thick: share of the planet | 0.483 | 0.442 | 0.384 |
+| its thickness, mean (p10, p50, p90), km | 31.8 (24.2, 33.2, 36.4) | 31.7 (24.8, 32.6, 36.5) | 36.4 (26.6, 36.9, 44.5) |
+| its volume, planet-mean km | 15.4 | 14.2 | 14.0 |
+| the planet's share at 10-30 km / 30-35 / 35-40 / 40-50 km | 0.274 / 0.272 / 0.059 / 0.012 | 0.245 / 0.252 / 0.063 / 0.008 | 0.149 / 0.077 / 0.115 / 0.104 |
+| its share above the sea (under it) | 0.446 (0.554) | 0.505 (0.495) | 0.752 (0.248, RLC-030) |
+| its height over the sea, mean / p50, m | -408 / -21 | -216 / +3 | +457 / +270 (+351 / +240) |
+| continental label under the sea (the check) | 0.602 | 0.540 | 0.248 to 0.306 (RLC-030) |
+| land, share of the planet | 0.209 | 0.227 | 0.291 (0.281) |
+| land's mean / p50 height, m | 279 / 118 | 357 / 162 | 793 / 424 (655 / 383) |
+| land above 1 km / 2 km, share of the land | 0.054 / 0.009 | 0.067 / 0.022 | 0.257 / 0.106 (0.199 / 0.055) |
+| sea floor 0-200 m deep / 200-2,000 m, share of the planet | 0.086 / 0.145 | 0.080 / 0.124 | 0.047 / 0.064 |
+| the sea over the datum, m | 319 | 174 | about 0 (the datum's calibration, above) |
+
+The model holds Earth's continental volume (+10 %) over a quarter more of the planet, a third thinner at the top:
+half of its continental crust lies at 30 to 35 km (Earth a fifth), almost none at 40 to 50 km (Earth 0.27 of it).
+The land stands a third of Earth's height, the shelf and slope cover twice Earth's sea floor.
+
+**The cratons' standing height.** The interiors no orogeny raised (300 km or more from an edge; `thinning.py`'s
+"never" class) start at 35.1 km and +496 m over a sea at the datum; on base35 they stand +312 m at -900 Myr, +92 m at
+-700 and +9 to +68 m over the sea from then to the end, at 33.8 to 34.1 km, their own crystalline crust 33.0 km at the
+start and 31.0 at the end (2.0 km in 1,000 Myr). Their column at the sea, T - 7 (z - S), is 33.1 to 33.9 km, T_n + 7
+(S - 525 m) as the thinning trace found. Of their 404 m fall to -700 Myr the sea's rise is 253 m. Over the datum they
+end at about +385 m. Earth's cratons (CRUST1.0, the land in m4cold.py's boxes, p50): the East European platform 42 km
+at 150 m, the Siberian platform 42 km at 360 m, the Canadian shield 39 km at 280 m, western and central Australia 40 km
+at 290 m, the Brazilian shield 39 km at 304 m, Africa 39 km at 620 m. So Earth's cratons stand a few hundred metres
+over the sea on 39 to 42 km of crust; the model's interiors stand at the sea on 34 km.
+
+**The split.** For the crust at least 20 km thick in 1-km bands b, with s_b the band's share of that crust, d_b its
+dry share and m_b its mean height over the sea, the dry share D = Σ s_b d_b and the mean height H = Σ s_b m_b split
+exactly into a thickness term Σ (s_M - s_E) x_E (the model's thicknesses on Earth's heights), a line term Σ s_M
+(x_M0 - x_E) (the model's band read over its datum against Earth's over its sea, at equal thickness) and a sea term
+Σ s_M (x_M - x_M0). Medians over runs:
+
+| | model | Earth | thickness | line | sea |
+|---|---|---|---|---|---|
+| base35, dry share | 0.446 | 0.752 | -0.123 | +0.014 | -0.196 |
+| base35, mean height, m | -408 | +457 | -184 | -392 | -319 |
+| base34, dry share | 0.505 | 0.752 | -0.124 | +0.038 | -0.151 |
+| base34, mean height, m | -216 | +457 | -204 | -339 | -174 |
+
+The land on that crust, A x D, is 0.209 against Earth's 0.289: its larger area gives +0.074, its dry share -0.146.
+
+The line at equal thickness (p50 of each 1-km band, m; base35 over its sea and over its datum; PLT-281's line z_0 +
+(T - 35.1 km)/7.02 over the datum; Earth over its sea):
+
+| crust, km | 24 | 28 | 30 | 32 | 34 | 36 | 38 | 40 | 44 | 48 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| base35 over the sea | -1,897 | -1,127 | -654 | -85 | 98 | 405 | 672 | 916 | 1,429 | 1,957 |
+| base35 over the datum | -1,578 | -808 | -335 | 234 | 417 | 724 | 991 | 1,235 | 1,748 | 2,276 |
+| PLT-281's line | -1,056 | -486 | -201 | 84 | 368 | 653 | 938 | 1,223 | 1,793 | 2,362 |
+| Earth over its sea | -780 | -70 | 10 | 198 | 410 | 430 | 340 | 380 | 437 | 820 |
+
+The model's columns from 32 km up stand on PLT-281's line (within about 150 m; the drowned ones below it by the
+water's load, ISO-078's settling). Over its datum that line is Earth's between 32 and 34 km, where most of the
+model's crust is (0.56 of it at 30 to 35 km), so the line term of the dry share is about 0. It is not Earth's on
+either side: thin crust (20 to 30 km, the margins) stands 350 to 820 m deeper than Earth's, which is most of the line
+term of the mean height but changes only how deep drowned crust lies; and thick crust stands too high, 290 m at 36
+km, 650 m at 38 km and 860 to 1,310 m at 40 to 44 km, where Earth's height is flat with thickness (270 to 560 m from
+34 to 44 km).
+
+The terms of a column's height, against Earth:
+
+- **The crust's thickness and density.** PLT-281's line is Airy for one crust density (2,830 kg/m³) from z_0 = 525
+  m at the normal 35.1 km; the pools enter it only through the eclogite root (PLT-278 to PLT-280), so sediment,
+  felsic and mafic pools raise a column alike per metre. Earth's crust does not separate its high and low columns by
+  density either: in CRUST1.0 (m4cold.py) the Basin and Range and Cordillera crust (mean 2,777 to 2,802 kg/m³) and
+  the cratons' (2,776 to 2,832) are alike, so the crust's density is not the term (as the M4 trace found).
+- **The mantle lithosphere's buoyancy.** Not in the model's height: ISO-110 (thermal isostasy) is built and off,
+  "an open fault" (lithosphere-thermal-state.md); the keel K and the lithosphere's depth L (PLT-460 to PLT-463) set
+  strength and heat flow only. The start's continents are cratons by the state (L at the frame, K 200 km) and stand on
+  the same line as any column. On Earth the same crust stands 1.2 to 1.4 km higher over a hot lithosphere: the Basin
+  and Range and Cordillera's land stands 1,407 m on 30 to 35 km of crust, 1,606 m on 35 to 40 and 1,834 m on 40 to 45,
+  the cratons' 140 to 660 m on 35 to 45 km (m4cold.py, CRUST1.0, rock p50), the uppermost mantle 3,250 to 3,310 kg/m³
+  under the Cordillera against 3,340 to 3,420 under the cratons; Hyndman & Currie 2011 (read in full earlier,
+  PLT-281) put a hot back-arc at the sea on about 27 km of crust and a craton on about 38 km, about 1,600 m apart at
+  equal thickness. PLT-281's one line, set through the global median, is therefore a mean of the two: on the model's
+  datum it lies about 940 m over Hyndman & Currie's craton line at 38 km and about 630 m under their back-arc line at 27
+  km (lithosphere-thermal-state.md, "Why these frames", with the sea at the datum).
+- **Dynamic topography.** None in the model. On Earth the African craton boxes stand 620 m against the other
+  cratons' 150 to 360 m on the same 39 to 42 km of crust (the sources below).
+- **The sea.** Filled on Earth's own CRUST1.0 surface with its own water (2,613 m over the planet), the fill gives +2
+  m: the factors start at Earth's sea. Swapping in the model's factors one at a time (Shapley over the water, the share
+  of crust at least 20 km thick, that crust's height histogram and the thinner crust's; lowcont.py `model`), the
+  model's fill stands 371 m over Earth's on base35 (198 m on base34): the area of the thick crust +516 m (+303), its
+  lower heights -156 m (-117), the water +57 m (+58: the planet's 2,664 m less its ice against Earth's present ocean),
+  the ocean floor and margins under 20 km -28 m (-76). The ocean basins are not shallow any more (with the margins
+  continental since PLT-661 the floor beyond them is Earth's to within 30 to 80 m on the fill); the sea stands high
+  because the continents cover 0.48 of the planet. From base34 to base35 the filled sea rose 179 m, of it +204 m the
+  continental area (m5sea.py's Shapley), from the crust budget's kept crust: the own-crust volume at the end 6.56 to
+  7.14 × 10⁹ km³ (cb_t lines), at the same mean thickness (26.0 and 26.1 km own; 31.7 and 31.8 km for the crust at
+  least 20 km thick).
+
+So the sea and the thin crust put base35's continents low, and both are one fact: Earth's volume of continental crust
+spread over 0.48 of the planet instead of 0.38. In the cb_t series the own-crust volume holds (7.56 to 7.14 × 10⁹ km³
+over the run) while the label's area grows from 0.42 to 0.50 within 50 Myr and to 0.53 to 0.55 after -750 Myr, and its
+own mean thickness falls from 35.1 to 31.8 km by -900 Myr and to 26.1 km at the end; the sea follows the area (0 to 157
+m by -900 Myr, 316 m at the end).
+
+**Why the crust stays thin.** On PLT-281's line every column thicker than the column at the sea (31.4 km + 7.02 S,
+33.6 km under base35's sea) stands above it in proportion, and erosion takes it back down: the interiors reach the sea
+within 300 Myr and stay there, and a belt's crust spreads and erodes to the same column. On Earth thick cold crust does
+not stand high, so it is not eroded away: Earth keeps 0.22 of the planet at 35 to 50 km (the model 0.07). At the model's line a 40
+km craton would stand 1,223 m over the datum; on Hyndman & Currie's craton line it stands about 280 m (the arithmetic
+ours, 141 m/km from 38 km), where CRUST1.0's cratons are. With the same volume at Earth's thickness distribution the
+crust at least 20 km thick would cover 15.4 / 36.4 = 0.42 of the planet (ours), and on Earth's own balance the sea
+stands at the datum with 0.75 of that crust dry.
+
+**Erosion at low relief.** The model's erosion does not wear the cratons faster than Earth's: the interiors' own
+crust loses 2.0 km in 1,000 Myr (2 m/Myr), and the land in windows under 100 m of relief (0.68 of the land's
+window-time) lowers at 8.4 m/Myr net (stream power 4.9, diffusion 1.8; `erosion_bands` wz0, base35 median). Against
+Clift et al. 2009's Cenozoic rates (the library text, Table 4 p. 93, rock exported to the ocean from each basin's
+dated offshore sediment, porosity-corrected) the ten basins that drain stable continent erode at 0.98 (Orange) to 12.8
+m/Myr (Mississippi), a median of 4.0 (ours from the table's cm/m.y.), and the four orogenic systems at 6.7 (Alps) to 169
+m/Myr (Andes). The land below 1 km of height (0.94 of the land) erodes at 22 m/Myr (`erosion_bands` z0), the windows
+with 100 to 250 m of relief at 48 m/Myr: Montgomery & Brandon's present-day eq. 2 (54 m/Myr there; ERO-004,
+ERO-179), and 22 m/Myr is 5.5 times the stable basins' median and 1.7 times their fastest. Clift et al. 2009: "erosion will rapidly reduce mountains to altitudes of <1 km and then
+more slowly remove the remainder as the land surface is reduced to the stable freeboard value above the ocean surface
+(Harrison, 1994)", and erosion will "thin the crust back to the equilibrium values of ca. 38 km, close to sealevel
+(Christensen and Mooney, 1995)" (p. 89); their long-term export, 1.77 km³ a year, "is much less than the modern 6.5
+km3/a estimated by Milliman (1997)" (p. 93), with "low lying, stable" land 83 % of the exposed continents (p. 92) and
+"modern rivers are not in equilibrium" (p. 91). So K's present-day calibration over-erodes the lowland between the
+interiors and the belts (the edges and the belts' decaying ground: 0.94 of the land at 22 m/Myr, about half of the
+land's mean 38 m/Myr; the export is 2.2 times Clift's, the uplift trace), but not the cratons, and the interiors' low stand is the sea's (253 of their first 404 m) and the
+line's (34 km at the sea against Earth's 39 to 42 km at a few hundred metres).
+
+**The batch's first change** (the coordinator's pointer: orog-cum, the two wedges and the retro plateau on base34,
+already read 0.605 under the sea). orog-cum (f2d6412d801f, d3261b0a, 8 runs) against base34-s4 (base34's seeds 1 to
+4), medians: continental label under the sea 0.527 to 0.605 (the orogen lane's p 0.23 on 8 runs); crust at least 20 km
+thick 0.444 to 0.464 of the planet, its mean thickness 31.7 to 31.4 km, p90 36.3 to 35.9 km, its dry share 0.528 to
+0.439 (thickness term -0.119 to -0.141, line +0.041 to +0.032, sea -0.167 to -0.195); the planet's crust under 10 km
+0.428 to 0.392, 10 to 30 km 0.239 to 0.273, 35 to 40 km 0.056 to 0.042. By class (`thinning.py`, the end): the
+converted margins 0.076 to 0.086 of the planet, the edges 0.207 to 0.223 at -200 to -357 m over the sea (land 0.33
+to 0.25), the interiors 0.206 to 0.201, the raised interiors 34.4 to 33.9 km. The pro-wedge fills the incoming
+plate's drowned margin first (docs/design/collision-orogen.md) and the crest stands lower: the two wedges turn about
+0.035 of the planet from ocean floor into 10 to 35 km crust under the sea and take crust out of the 35 to 40 km band.
+On the fill the area term rose +316 to +418 m and the run's sea 187 to 201 m. Then base34 to base35 (the full batch,
+24 runs): the crust budget's kept crust adds 9 % of volume at the same thickness, and the sea follows (+204 m on the
+area). Both changes are sourced and act through the same term: more continental area at the model's thickness.
+
+**Reading.** The continents stand low because the sea stands high (-0.196 of the dry share of the crust at least 20
+km thick; -319 m of its mean height) and their crust is thin (-0.123; -184 m); the line at equal thickness puts the
+model's 32 to 34 km crust where Earth's stands (+0.014). Both terms are the continental area at Earth's volume: +516
+m of the sea's 371 over Earth's fill, 15.4 km of planet-mean crust at 31.8 km mean thickness instead of 36.4. The
+area is large because no column can hold crust thicker than the column at the sea (33.6 km on base35): PLT-281
+gives every continental column one Airy line through the global median, so thick crust stands up to a kilometre higher
+than Earth's thick crust, which stands on cold lithosphere (the cratons 39 to 42 km at 150 to 360 m, Africa 620),
+and erosion brings it back to the sea's column. What Earth does that the model does not: it holds its thick crust low
+on cold, keeled lithosphere and its thin crust high on hot lithosphere (the Cordillera 1.4 to 1.8 km on 30 to 45 km),
+about 1,600 m apart at equal crust (Hyndman & Currie 2011). The lead is therefore a wrong law with its replacement
+built and off: the continental column's height should come from its lithosphere (ISO-110, or the whole column's
+buoyancy against the ridge's, lithosphere-thermal-state.md's open question), not from one line. The erosion law is
+not the lead: the interiors wear at Earth's long-run cratonic rates. K's calibration (present-day against long-run)
+is a separate question that moves the lowland's relief and the export, not the drowning.
+
 ## Simplifications and limits
 
 - The fill uses the ground at the step's start; the floor's answer to the new water load comes in
