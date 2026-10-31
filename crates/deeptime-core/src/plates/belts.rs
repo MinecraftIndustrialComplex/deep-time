@@ -4651,7 +4651,7 @@ mod tests {
         assert!(st.contacts[0].collision.is_none());
         assert_eq!((st.counters.transferences, st.counters.sutures), (1, 0));
         for &i in &terrane {
-            if !st.samples[i as usize].stacked {
+            if !st.samples[i as usize].stacked() {
                 assert_eq!(st.plate_of(i as usize), 0, "{i} moved with the continent");
             }
         }
@@ -4854,7 +4854,10 @@ mod tests {
         for &i in &ocean {
             assert_eq!(st.plate_of(i as usize), 0, "{i} stayed with its plate");
         }
-        for &i in terrane.iter().filter(|&&i| !st.samples[i as usize].stacked) {
+        for &i in terrane
+            .iter()
+            .filter(|&&i| !st.samples[i as usize].stacked())
+        {
             assert_eq!(st.plate_of(i as usize), 1, "{i} stayed with its plate");
         }
         assert_eq!(omega(&st, 0), o0);
@@ -4927,7 +4930,7 @@ mod tests {
             for &i in &crossed {
                 let s = &mut st.samples[i as usize];
                 s.flags |= HIDDEN;
-                s.stacked = true;
+                s.set_stacked(true);
             }
             let seeds: Vec<u32> = terrane
                 .iter()
@@ -4958,7 +4961,10 @@ mod tests {
             }
             for &i in &crossed {
                 let s = &st.samples[i as usize];
-                assert!(s.is_hidden() && s.stacked, "weld {weld}: {i} came back up");
+                assert!(
+                    s.is_hidden() && s.stacked(),
+                    "weld {weld}: {i} came back up"
+                );
                 if !weld {
                     assert_eq!(st.plate_of(i as usize), 1, "{i} moved with the terrane");
                 }

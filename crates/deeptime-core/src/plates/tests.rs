@@ -568,8 +568,14 @@ fn sutures_and_initiations_keep_continents_whole() {
     // welding seeds being supercontinent 8 and scattered 1; with the interior as a 2-D sheet on by
     // default, PLT-733, the same day, scattered 1 no more, the sweep's welding seeds supercontinent
     // 6, 8, 10, 13 and 17 to 20 and scattered 8, 19, 21 and 23, so supercontinent 8 and
-    // scattered 8).
-    for (start, seed) in [("supercontinent", 8), ("scattered_continents", 8)] {
+    // scattered 8; with the crust budget's PLT-760, PLT-762 and PLT-763, the two wedges and
+    // small-terrane docking on by default, 2026-10-31, supercontinent 8 no more, the sweep's
+    // welding seeds supercontinent 2, 5, 7, 9, 13 to 15, 17, 20, 21 and 23 and scattered 1, 3,
+    // 5, 6, 8, 9, 11 to 13, 16 to 22 and 24, so supercontinent 2 and scattered 8 still; both
+    // still weld with the island-arc class carried through the resamplings and no suture magma on
+    // a terrane going down, PR #53's re-review, the same day: supercontinent 1 to 4, 10, 12, 14,
+    // 18 and 21 to 24, scattered 1, 3 to 6, 8 to 10, 12, 13, 15 to 17 and 21 to 23).
+    for (start, seed) in [("supercontinent", 2), ("scattered_continents", 8)] {
         let mut p = preset(8000, 300.0, start, seed);
         // The old law (PLT-585 off, PLT-540 on): under Forsyth & Uyeda's balance on this small
         // planet, whose ridge push is several times Earth's (`plates_quick_16k`, ridge -1,000 m,
@@ -909,7 +915,21 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // 12 to 15, 20, 22 and 24; 15 of seeds 1 to 24 with small terranes docking stripped of their
     // cover on by default, PLT-770 and PLT-771, 2026-10-31, the sweep `weld_seed_sweep`: 3, 5, 6, 8
     // to 13, 15, 17, 18, 20, 22 and 24, seed 2 no more, so seed 3; from the supercontinent 1, 2,
-    // 6 to 8, 10, 12 to 16, 18, 21 and 23).
+    // 6 to 8, 10, 12 to 16, 18, 21 and 23; on the crust-budget branch, before it merged those:
+    // 15 of seeds 1 to 24 with the island arcs' law on the crust an intra-oceanic arc
+    // made, the trench sediment line in place and the arc magma at collision fronts on by
+    // default, PLT-760, PLT-762 and PLT-763, 2026-10-31: 1, 3, 7 to 9, 13 to 16, 18 and 20 to 24,
+    // seed 1 still welds; from the supercontinent 1 to 3, 6, 7, 9, 11 to 13, 17 to 19, 21, 23
+    // and 24; 13 of seeds 1 to 24 once PLT-760's onset reads a continent's own crust and its
+    // substrate an earlier island arc's (the branch's review, 2026-10-31): 2, 3, 5 to 8, 10, 11,
+    // 13, 14, 20, 23 and 24, seed 1 no more, so seed 2; from the supercontinent 3, 5, 14, 16, 17,
+    // 20, 23 and 24; 17 of seeds 1 to 24 on the merged tree, the crust budget's PLT-760, PLT-762
+    // and PLT-763 with the two wedges and small-terrane docking, 2026-10-31, the sweep
+    // `weld_seed_sweep`: 1, 3, 5, 6, 8, 9, 11 to 13, 16 to 22 and 24, seed 3 still welds; from
+    // the supercontinent 2, 5, 7, 9, 13 to 15, 17, 20, 21 and 23; 16 of seeds 1 to 24 with the
+    // island-arc class carried through the resamplings and no suture magma on a terrane going
+    // down, PR #53's re-review, the same day: 1, 3 to 6, 8 to 10, 12, 13, 15 to 17 and 21 to 23,
+    // seed 3 still welds; from the supercontinent 1 to 4, 10, 12, 14, 18 and 21 to 24).
     let mut p = preset(8000, 300.0, "scattered_continents", 3);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: under Forsyth & Uyeda's
     // balance on this small planet, whose ridge push is several times Earth's
@@ -1114,7 +1134,16 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // since small terranes docking stripped of their cover went on by default, PLT-770 and
     // PLT-771, 2026-10-31, when seed 2 no longer welds: the sweep's welding seeds 3, 5, 6, 8 to
     // 13, 15, 17, 18, 20, 22 and 24, the guard binding on none, seed 3 the first, and the weld
-    // test above takes seed 3 too, so the two tests still share this planet).
+    // test above takes seed 3 too, so the two tests still share this planet;
+    // on the crust-budget branch, before it merged those: seed 3 since the island arcs' law on the
+    // crust an intra-oceanic arc made, the trench sediment line in place and the arc magma at
+    // collision fronts went on by default, PLT-760, PLT-762 and PLT-763, 2026-10-31, when seed
+    // 2 no longer welds: the sweep's welding seeds 1, 3, 7 to 9, 13 to 16, 18 and 20 to 24, the
+    // guard binding on none, seed 3 the first after seed 1; seed 3 kept on the merged tree,
+    // 2026-10-31: it still welds (the sweep's welding seeds 1, 3, 5, 6, 8, 9, 11 to 13, 16 to 22
+    // and 24, the guard binding on none), so the two tests still share this planet; and after PR
+    // #53's re-review, the same day (the sweep's welding seeds 1, 3 to 6, 8 to 10, 12, 13, 15 to 17
+    // and 21 to 23, the guard binding on none)).
     let mut p = preset(8000, 300.0, "scattered_continents", 3);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: the guard asserted below
     // bound under Forsyth & Uyeda's balance on every welding seed of 1 to 24 of this small planet
@@ -2351,7 +2380,7 @@ fn a_resampling_accretes_hidden_continent_once() {
     for stacked in [false, true] {
         let mut s2 = st.clone();
         for s in s2.samples.iter_mut().filter(|s| s.is_hidden()) {
-            s.stacked = stacked;
+            s.set_stacked(stacked);
         }
         let mut world = WorldState::new(1, 16_384, p.t_start_years());
         ridges::resample(
@@ -2428,7 +2457,7 @@ fn a_resampling_consumes_the_visible_crust_a_collision_took() {
         s.kind = CONTINENTAL;
         s.pools = pools::continental_column();
         s.thickness_m = pools::thickness(&s.pools);
-        s.stacked = false;
+        s.set_stacked(false);
     }
     let k = st
         .contacts
@@ -5111,9 +5140,10 @@ fn island_arcs_front_loaded_pulse_then_mature_rate() {
 /// began intra-oceanic adds Stern & Scholl's pulse, 500 × the band, with the switch on, and the
 /// continental arcs' law with it off (the column's label), as it does on the switch with an arc
 /// that began at a continent, or on a continent's own crust whatever the setting. The crust's
-/// substrate decides (an ocean basement or not), not its share of arc magma. The arc's setting
-/// comes from its onset: an arc begun over ocean floor is intra-oceanic, one begun at a continent
-/// is not, and the intra-oceanic front is measured.
+/// substrate decides (ocean floor or an earlier island arc, or a continent's crust), not its share
+/// of arc magma. The arc's setting comes from its onset: an arc begun over ocean floor or behind
+/// an earlier intra-oceanic arc is intra-oceanic with the switch on, one begun at a continent's
+/// own crust is not, and the intra-oceanic front is measured.
 #[test]
 fn an_intra_oceanic_arc_keeps_the_island_law_on_the_crust_it_made() {
     // A young arc (4 Myr) on a matured island arc's crust, its contact's setting `io`.
@@ -5122,6 +5152,7 @@ fn an_intra_oceanic_arc_keeps_the_island_law_on_the_crust_it_made() {
         p.tectonics.island_arc_own_crust = switch;
         for s in st.samples.iter_mut().filter(|s| s.group == 0) {
             s.make_continental();
+            s.set_island_arc(true);
             s.pools[pool::FELSIC_PLUTONIC] += 9000.0;
             s.arc_oceanic_m = 9000.0;
             s.thickness_m = pools::thickness(&s.pools);
@@ -5175,16 +5206,33 @@ fn an_intra_oceanic_arc_keeps_the_island_law_on_the_crust_it_made() {
     assert!(cont.arc_continental_km3 > 0.0);
     assert_eq!(cont.arc_oceanic_km3, 0.0);
 
-    // The substrate decides (Stern 2010: IOASs "are built on oceanic crust"): continental crust
-    // over an ocean basement is crust an intra-oceanic arc builds on, whatever share of it is
-    // island-arc magma; a continent's own crust is not, whatever island-arc magma it took.
+    // The substrate decides (Stern 2010: IOASs "are built on oceanic crust", their basements
+    // "earlier intra-oceanic arcs"): an island arc matured over its ocean floor (an ocean basement
+    // and PLT-047's 8 km of island-arc crust, marked where it matured) is crust an intra-oceanic
+    // arc builds on, whatever else it took; a continent's crust on ocean floor (a sediment margin,
+    // PLT-661; ocean floor thickened or spread onto, PLT-289 and PLT-662: an ocean basement, no
+    // arc) is not, nor is a continent's own crust, whatever island-arc magma it took, nor a
+    // continent that took a share of a basement from an accreted arc beside it at a resampling
+    // (none of them is marked; `ridges::tests` has the resampling).
+    let k = &crate::params::TectonicParams::default();
+    let mature = subduction::mature_arc_m(k);
+    assert_eq!(mature, 8000.0);
+    let mut arc = state::Sample::blank(0);
+    arc.pools = pools::oceanic_column();
+    arc.arc_oceanic_m = mature;
+    arc.make_continental();
+    arc.set_island_arc(true);
+    arc.pools[pool::FELSIC_PLUTONIC] += mature;
+    arc.thickness_m = pools::thickness(&arc.pools);
+    assert!(arc.basement() > 0.0);
+    assert!(subduction::island_arc_crust(&arc));
     let mut margin = state::Sample::blank(0);
     margin.pools = pools::oceanic_column();
     margin.make_continental();
     margin.pools[pool::FELSIC_PLUTONIC] += 20_000.0;
     margin.thickness_m = pools::thickness(&margin.pools);
     assert!(margin.basement() > 0.0 && margin.arc_oceanic_m == 0.0);
-    assert!(subduction::island_arc_crust(&margin));
+    assert!(!subduction::island_arc_crust(&margin));
     let mut own = state::Sample::blank(0);
     own.kind = CONTINENTAL;
     own.pools = pools::continental_column();
@@ -5192,10 +5240,33 @@ fn an_intra_oceanic_arc_keeps_the_island_law_on_the_crust_it_made() {
     own.thickness_m = pools::thickness(&own.pools);
     assert!(own.basement() <= 0.0);
     assert!(!subduction::island_arc_crust(&own));
+    let mut traced = own;
+    traced.basement_m = 500.0;
+    traced.arc_oceanic_m = 0.3 * mature;
+    assert!(traced.basement() > 0.0);
+    assert!(!subduction::island_arc_crust(&traced));
 
-    // The setting at the onset: over ocean floor intra-oceanic, at a continent not.
-    for (ocean, io) in [(true, true), (false, false)] {
-        let (p, mut st, geo, pos) = arc_fixture(true, ocean, 150.0, None, 50.0);
+    // The setting at the onset: over ocean floor intra-oceanic, at a continent's own crust not;
+    // behind an earlier intra-oceanic arc (the overriding plate's samples a matured island arc)
+    // intra-oceanic with the switch on, at a continent with it off (any continental column).
+    for (ocean, matured_over, switch, io) in [
+        (true, false, true, true),
+        (false, false, true, false),
+        (true, true, true, true),
+        (true, true, false, false),
+    ] {
+        let (mut p, mut st, geo, pos) = arc_fixture(true, ocean, 150.0, None, 50.0);
+        p.tectonics.island_arc_own_crust = switch;
+        if matured_over {
+            for s in st.samples.iter_mut().filter(|s| s.group == 0) {
+                s.arc_oceanic_m = 9000.0;
+                s.make_continental();
+                s.set_island_arc(true);
+                s.pools[pool::FELSIC_PLUTONIC] += 9000.0;
+                s.thickness_m = pools::thickness(&s.pools);
+                assert!(subduction::island_arc_crust(s));
+            }
+        }
         arc_step(&p, &mut st, &geo, &pos, 1);
         let begun: Vec<bool> = st
             .contacts
@@ -5204,7 +5275,10 @@ fn an_intra_oceanic_arc_keeps_the_island_law_on_the_crust_it_made() {
             .map(|c| c.arc_intra_oceanic)
             .collect();
         assert!(!begun.is_empty());
-        assert!(begun.iter().all(|&x| x == io), "ocean {ocean}: {begun:?}");
+        assert!(
+            begun.iter().all(|&x| x == io),
+            "ocean {ocean}, matured {matured_over}, switch {switch}: {begun:?}"
+        );
     }
 }
 
@@ -5247,6 +5321,26 @@ fn a_collision_front_adds_scholl_and_von_huenes_suture_arc() {
     );
     assert_eq!(on.arc_continental_km3 + on.arc_oceanic_km3, 0.0);
     assert!((fast.arc_suture_km3 - on.arc_suture_km3).abs() < 1e-9 * want);
+    assert!(on.suture_front_km_myr[0] > 0.0 && on.suture_front_km_myr[1] > 0.0);
+    // A terrane its slab drags down whole (PLT-770, `Collision::subducting`) is no crust-suturing
+    // front (PR #53's re-review): it takes no suture magma and is no suture front.
+    let (mut p, mut st, geo, pos) = arc_fixture(true, false, 150.0, Some(20.0), 50.0);
+    p.tectonics.collision_arc_magma = true;
+    for s in st.samples.iter_mut().filter(|s| s.group == 1) {
+        s.kind = CONTINENTAL;
+        s.pools = pools::continental_column();
+        s.elevation_m = 400.0;
+        s.thickness_m = pools::thickness(&s.pools);
+    }
+    for c in &mut st.contacts {
+        c.collision = Some(state::Collision {
+            subducting: true,
+            ..a_collision()
+        });
+    }
+    let dragged = arc_step(&p, &mut st, &geo, &pos, 1).0;
+    assert_eq!(dragged.arc_suture_km3, 0.0);
+    assert_eq!(dragged.suture_front_km_myr, [0.0; 2]);
 }
 
 /// Clift & Vannucchi's trench sediment line in place (PLT-762): 1 km of sediment uncorrected
@@ -6017,7 +6111,7 @@ fn accreted_crust_stands_up_by_its_airy_height() {
     for stacked in [false, true] {
         let mut s2 = st.clone();
         for s in s2.samples.iter_mut().filter(|s| s.is_hidden()) {
-            s.stacked = stacked;
+            s.set_stacked(stacked);
         }
         let mut world = WorldState::new(1, 16_384, p.t_start_years());
         ridges::resample(

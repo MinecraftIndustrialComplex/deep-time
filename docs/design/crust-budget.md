@@ -1,8 +1,9 @@
 # The continents' crust budget against Stern & Scholl 2010: design
 
-Status: **built behind switches, off; traced switch by switch, recommended on** (2026-10-31, the
-crust-budget lane, branch `crust-budget`; the coordinator's task after the freeboard landed, PR #49):
-PLT-760 to PLT-763, the arm cb-cum and the second pass below; section 5 designed only. Ledger PLT-760 onward; plates.md "The crust budget
+Status: **built behind switches; traced switch by switch; on by default since 2026-10-31** (the
+coordinator's call under Ben's rule of 2026-10-23, decisions log 2026-10-31; the crust-budget lane,
+branch `crust-budget`; the coordinator's task after the freeboard landed, PR #49): PLT-760 to PLT-763,
+the arm cb-cum and the second pass below; section 5 designed only. Ledger PLT-760 onward; plates.md "The crust budget
 against Stern & Scholl 2010, row by row (2026-10-31)" holds the readings and the arm.
 
 ## Why
@@ -29,7 +30,7 @@ and the arcs 1.48:
 |---|---|---|---|
 | intra-oceanic arcs | 1.05 | 1.5 | front 25,744 km (S&S 14,500) at 40.9 km³/km/Myr; 0.31 of the arc fronts make no arc (incipient, PLT-610 and PLT-681; past the slab's ends, PLT-561); v_n at the island fronts 43.6 mm/yr against PLT-666's 86.6, so the mature rate runs at half; the early pulse (PLT-668) ends within a step at the axis, when the arc's own crust turns its column continental (PLT-047's 8 km at 4.7 km/Myr) and the column takes the continental law; the felsic cones the arcs count inside their rate (PLT-286) were in neither arc row |
 | continental arcs | 0.60 | 1.0 | front 29,436 km (S&S 27,500) at 20.4 against the law's 33.1 at v_n 55.5 mm/yr; the same band share and cones |
-| crust-suturing zones (juvenile) | 0 | 0.2 | no rule |
+| crust-suturing zones (juvenile) | 0 | 0.2 | no rule in base34 (section 4 builds one; on by default since 2026-10-31) |
 | rifts, hotspots, volcanic rifted margins | 0.05 | 0.5 | the hotspots' own basalt only (their rules uncited, PLT-108 to PLT-120, `pending-rewrite`); no magmatic addition at breakup (PLT-294 trades the continental side's crust for ocean crust on the ocean side, adding none) |
 | sediment subduction | 2.60 | 1.1 (+0.1 at sutures); Clift et al. 2009 1.65 | the trenches receive 2.90 km³ a year (the one-way slab's 0.33 of it all subducted); a quarter of the trench samples, piles over 1 km of rock (mean about 4.7 km), carry 0.9 of it; PLT-660 sends 0.83 down at accretionary margins and all elsewhere |
 | subduction erosion | 0.49 | 1.4 (+0.3 at sutures); Clift et al. 2009 1.33 | erosive fronts 13,395 km (Clift & Vannucchi 2004: 22,925) at PLT-441's 90 asks 1.21; the forearc band holds 0.49 of crust beyond 7 km (`forearc_short` 0.72) |
@@ -39,7 +40,7 @@ and the arcs 1.48:
 
 ## The fixes
 
-### 1. An intra-oceanic arc keeps the island law on the crust it made (PLT-760, built)
+### 1. An intra-oceanic arc keeps the island law on the crust it made (PLT-760, built; on by default since 2026-10-31)
 
 `tectonics.island_arc_own_crust`. The arc's law (island, PLT-045 and PLT-668; continental, PLT-285)
 was the column's label: magma on oceanic crust took the island law, on continental crust the
@@ -53,11 +54,14 @@ Izu-Bonin-Mariana and the Aleutians among them, arcs whose crust is far thicker 
 the arc's, by its setting, not the label the model gives its crust.
 
 The rule: a contact's arc takes its setting at its onset (PLT-669): intra-oceanic where none of its
-oceanic fronts that step has visible continental crust of the overriding plate within
-`arc_distance_km` (PLT-370's test), stored as `Contact::arc_intra_oceanic`, cleared with the onset at
-a polarity reversal and kept by a split's copies. With the switch on, magma that lands on crust an
-intra-oceanic arc is built on (`subduction::island_arc_crust`: ocean floor, or continental crust over
-an ocean basement, PLT-331) under an arc that began intra-oceanic follows the island law (its pulse
+oceanic fronts that step has a continent's own crust (visible continental crust of the overriding
+plate that is not crust an intra-oceanic arc is built on) within `arc_distance_km`, stored as
+`Contact::arc_intra_oceanic`, cleared with the onset at a polarity reversal and kept by a split's
+copies (until the review, PLT-370's test, any continental column; the switch off still reads that).
+With the switch on, magma that lands on crust an intra-oceanic arc is built on
+(`subduction::island_arc_crust`: ocean floor, or an earlier intra-oceanic arc, continental crust over
+an ocean basement, PLT-331, with PLT-047's island-arc crust in it; until the review any basement)
+under an arc that began intra-oceanic follows the island law (its pulse
 while young, then 30 × v_n / 86.6), its pools, and the island accumulator. A continent's own crust
 under any arc, and every column under an arc that began at a continent, keep the label's law. The
 column's height still follows its kind (Airy on continental crust, the ocean's line on oceanic). The
@@ -81,7 +85,7 @@ continental crust and the cones they counted (`hotspot_magma_c`, `hotspot_cones`
 the cones to the arc rows and reads the hotspot row on continental crust (S&S's additions are to
 continental crust; ocean floor's seamounts go down with their slab, PLT-286).
 
-### 3. Sediment subduction: the share stays; the line is read in place (PLT-762, built)
+### 3. Sediment subduction: the share stays; the line is read in place (PLT-762, built; on by default since 2026-10-31)
 
 The row is 2.4 times Stern & Scholl's 1.1, and the first reading was that PLT-660's 0.83 at
 accretionary margins was the wrong share: Stern & Scholl (p. 15) write that "large accretionary
@@ -130,7 +134,7 @@ erosive fronts shrink by the same samples.
 
 Test: `the_trench_pile_line_is_read_in_place`.
 
-### 4. Arc magma at sutures (PLT-763, built)
+### 4. Arc magma at sutures (PLT-763, built; on by default since 2026-10-31)
 
 `tectonics.collision_arc_magma`. Stern & Scholl's Table 1 books 0.2 AU of additions at
 crust-suturing subduction zones; Scholl & von Huene 2009 (the abstract): "During collisional
@@ -198,7 +202,85 @@ switches; the continental arcs' magma on island-arc crust comes from arcs begun 
 before the substrate rule, the half line); the sea rises by the continental crust each switch keeps,
 the three adding (+76, +60 and +87 m alone, +223 together); the supercontinents' drowning on cb-cum
 follows from the sea, the coast with high ground does not; on the final code the criteria are 6
-against 6.5 (p 0.35). Verdict: all three correct, on (PLT-760 with the substrate rule).
+against 6.5 (p 0.35). Verdict: all three correct, on (PLT-760 with the substrate rule); on by
+default since 2026-10-31 (decisions log: the coordinator's call, Ben's rule of 2026-10-23).
+
+## The branch's review (2026-10-31)
+
+The Opus review of crust-budget-on (980a4395), fixed on the same branch (plates.md, "The review's
+fixes"):
+
+1. PLT-760's onset read any continental column while its law read the substrate: an arc begun
+   behind a matured intra-oceanic arc took the continental law. With the switch on the onset now
+   reads a continent's own crust.
+2. The substrate test passed any basement, which the resampling blends onto continents beside
+   accreted arcs, and PLT-289's and PLT-662's columns. The substrate is now ocean floor or an
+   earlier intra-oceanic arc (an ocean basement with PLT-047's island-arc crust in it); PLT-661,
+   PLT-289 and PLT-662 columns are a continent's crust on ocean floor.
+3. PLT-763's 0.18 against 0.2 is no match: the magma needs a slab past incipient and the slab
+   breaks off after 10 Myr of a collision, so it runs about a third of a collision on a front
+   three times Scholl & von Huene's. The collision fronts are measured now; whether suture magma
+   needs a slab is a lead.
+4. Small fixes: PLT-762's 1.62 km in place (not 1.78), the switch's doc, PLT-763's convergence
+   as a game-choice, its ARC flags documented, the "moves no rock" wording, `loss-budget.py
+   --from` checking its time.
+
+Left for later (the review's, not done):
+
+- PLT-761 splits the cones by row approximately: the suture's cones land in the arc rows, and
+  cones the volcano stage zeroed are still recorded as arc cones.
+- PLT-762's test would pass without the switch (it checks the line, not the switch's effect).
+- PLT-761's recording has no test.
+
+## The re-review (PR #53, 2026-10-31)
+
+The re-review of a7c42428, two must-fixes and the follow-ups, on the same branch:
+
+1. The island-arc class did not survive a resampling, both ways. `island_arc_crust` read the
+   column's basement and its island-arc crust against the 8 km line, and `ridges::interpolate`
+   blends the two differently: the arc crust over all three corners, ocean floor included, the
+   basement over the column's own class, the kind from the nearest corner. Leak B: a matured arc's
+   edge column (8.5 km) beside its ocean flank kept its kind and full basement but fell to 6.4 to
+   7.8 km of arc crust (edge weights 0.4 to 0.8), read as a continent's own crust and took the
+   continental law for good. Leak A: a continent's own column beside an accreted arc (about 47 km
+   at the axis after the pulse) took a share of both and passed at a 0.2 weight. Fixed: the class
+   is a mark (`Sample::island_arc_marked`, `MARK_ISLAND_ARC` in the byte that held `stacked`, so a
+   `Sample` stays 144 bytes), set where an ocean column matures under island-arc magma (PLT-047),
+   cleared where it is ocean floor again, and carried through a resampling from the nearest corner
+   as the kind is. Test: `ridges::tests::the_island_arc_class_survives_a_resampling_from_the_nearest_corner`
+   (both leaks through `interpolate`). Measured from now on: `plates/resample_island_class_kept_km2`
+   (the class the blend would have lost, leak B) and `plates/resample_island_class_refused_km2`
+   (would have given, leak A), summed over the resamplings. On the fixed head (1c78fb32, arm
+   cbon-leaks, key 7aa49cd328e6, seed 1 of both starts, 1,000 Myr): B 5.75 and 5.81 × 10⁸ km², A
+   2.48 and 2.53 × 10⁸ km² over the run; at about 55 resamplings a run (the oo-resample trace's
+   count, another tree) that is about 1.0 × 10⁷ km² (some 330 samples) of an island arc's crust
+   the old reading would have taken for a continent's at each resampling, and about 4.5 × 10⁶ km²
+   (some 140 samples) of a continent's crust it would have taken for an island arc's. Each
+   resampling counts the columns as they stand, so a column the blend had put under the line
+   counts again at the next: a stock, which under the old reading would have stayed lost, not a
+   count of new events. The continental law on island-arc-dominated crust under arcs begun
+   intra-oceanic (`arc_split_c_io_crust_io_onset_not_island_km3`) is 2.1 and 2.4 × 10⁷ km³ over
+   the run, about 1 % of the arcs' magma.
+2. The breakoff does not bound PLT-763. `forces::grow_slab` counts block time only while
+   continental crust holds at least half the front; any oceanic front sample regrows the slab
+   (100 km in a few Myr) and the magma resumes, and a mostly oceanic contact never breaks off. The
+   docs that said each collision's suture magma runs at most about 10 Myr (params.rs, the suture
+   front globals, PLT-763, plates.md, item 3 above) now say so; the 0.18 against 0.6 is a
+   hypothesis that `suture_front_on` against `suture_front` tests.
+3. Follow-ups:
+   - Fixed: `fronts_finish` took every continental front sample as a suture front, so a terrane
+     its slab drags down whole (PLT-770, `Collision::subducting`, from master) took suture magma
+     while it went down and counted in both suture-front globals. Such a terrane goes down instead
+     of suturing: no suture magma, no suture front (the test
+     `a_collision_front_adds_scholl_and_von_huenes_suture_arc`).
+   - Fixed (docs): `ARC_SPLIT_GLOBALS`' slot 1; PLT-289 is ocean floor thickened at a contact and
+     turned continental, not "crust stacked to a continent's column"; Gerya's list of
+     intra-oceanic basements also has accretionary complexes and oceanic plateaux, which the rule
+     leaves out (said in `island_arc_crust` and PLT-760); the 0.13 to 0.15 km³ a year of "arc began
+     at a continent" holds the path the first review found, how much of it unmeasured.
+   - Left: `loss-budget.py`'s `suture_per_km` leaves out the suture's cones, which the volcano
+     stage's split books in the arc rows (`Pull::arc_cones_km3`); booking them apart needs a cones
+     global by the suture.
 
 ## What is left
 
