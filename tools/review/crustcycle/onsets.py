@@ -55,7 +55,7 @@ def share_table(title, rows, key, order):
 
 
 def main(argv):
-    onsets, length_myr, fronts, resamples = [], 0.0, {}, []
+    onsets, length_myr, fronts, resamples, step_ts = [], 0.0, {}, [], []
     runs = 0
     for folder in argv:
         for r in runs_of(folder):
@@ -67,6 +67,7 @@ def main(argv):
             length_myr += float(steps[-1]["t"]) - float(rec.get("t0_myr", steps[0]["t"]))
             lives = {int(x["id"]): x for x in rec.get("plates") or []}
             resamples.append(rec.get("resamples") or [])
+            step_ts.append([float(s["t"]) for s in steps])
             for o in rec.get("onsets") or []:
                 lu, lo = lives.get(o["under"], {}), lives.get(o["over"], {})
                 o["lives"] = (lu, lo)
@@ -143,7 +144,7 @@ def main(argv):
                          "other"])
             share_table("    the plates' relation", sub, lambda o: o.get("relation", "?"), ["parent", "siblings", "other"])
     if any(resamples):
-        resampling_report(onsets, resamples, length_myr)
+        resampling_report(onsets, resamples, length_myr, step_ts)
     print("# the subducting fronts by their contact's onset, mean km at any time, median of the runs")
     for key, names in (("onset_kind", KINDS), ("onset_route", ROUTES), ("onset_buoyant", BUOYANT)):
         for setting in ("oo", "oc"):
@@ -156,7 +157,13 @@ def main(argv):
 PROV = ["gap", "slab gap", "orphan", "contested", "moved"]
 
 
-def resampling_report(onsets, resamples, length_myr):
+def since_of(t, res_ts):
+    # The time since the last resampling at or before t (-1 before any), as the onset trace records it.
+    last = [r for r in res_ts if r <= t + 1e-9]
+    return t - last[-1] if last else -1.0
+
+
+def resampling_report(onsets, resamples, length_myr, step_ts):
     n_res = sum(len(r) for r in resamples)
     gaps = [b["t"] - a["t"] for r in resamples for a, b in zip(r, r[1:])]
     tot = [0] * len(PROV)
@@ -174,6 +181,19 @@ def resampling_report(onsets, resamples, length_myr):
         return
     bands = [("first step after", lambda x: 0 <= x <= 2.001), ("2-10 Myr after", lambda x: 2.001 < x <= 10),
              ("over 10 Myr after", lambda x: x > 10), ("before any", lambda x: x < 0)]
+    # The chance rate: the share of the runs' steps in each band (an onset on a step drawn at random).
+    sinces = [since_of(t, [x["t"] for x in r]) for ts, r in zip(step_ts, resamples) for t in ts]
+    dts = [b - a for ts in step_ts for a, b in zip(ts, ts[1:])]
+    print(f"# steps: {len(sinces)} over the runs, step median {statistics.median(dts) if dts else 0:g} Myr; share of"
+          f" steps by time since the last resampling: " + "  ".join(
+              f"{name} {sum(1 for x in sinces if test(x)) / max(len(sinces), 1):.3f}" for name, test in bands))
+    near = sorted({round(x, 6) for x in sinces if 0 <= x <= 6.001})
+    for setting in (0, 1):
+        sub = [o for o in traced if o["setting"] == setting]
+        print(f"# onsets {SETTINGS[setting]} at the onset by the exact time since the last resampling (up to 6 Myr):"
+              f" share of the onsets / share of the steps: " + "  ".join(
+                  f"{v:g} {sum(1 for o in sub if abs(o['since_resample_myr'] - v) < 1e-6) / max(len(sub), 1):.3f}"
+                  f"/{sum(1 for x in sinces if abs(x - v) < 1e-6) / max(len(sinces), 1):.3f}" for v in near))
     for setting in (0, 1):
         print(f"# onsets {SETTINGS[setting]} at the onset, by time since the last resampling (all routes)")
         for name, test in bands:
