@@ -204,8 +204,8 @@ def by_contact_age(rows):
             continue
         a = np.array([x["slab_age"] for x in sel])
         w = sum(x["km"] for x in sel)
-        print(f"      {lo:g}-{hi:g} Myr: {w / tot:.3f}  {np.percentile(a, 25):.0f}/{np.percentile(a, 50):.0f}/"
-              f"{np.percentile(a, 75):.0f}  {np.mean(a < YOUNG_MYR):.3f}")
+        print(f"      {lo:g}-{hi:g} Myr: {w / tot:.3f}  {np.nanpercentile(a, 25):.0f}/{np.nanpercentile(a, 50):.0f}/"
+              f"{np.nanpercentile(a, 75):.0f}  {np.mean(a < YOUNG_MYR):.3f}")
 
 
 if __name__ == "__main__":
