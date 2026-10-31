@@ -1069,6 +1069,7 @@ mod tests {
         let base = Fx::new(MODEL_KM).k;
         let k = TectonicParams {
             transition_ocean_crust: true,
+            margin_sediment_continental: false,
             ..base
         };
         let on = Fx::with(TectonicParams {
