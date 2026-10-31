@@ -493,6 +493,7 @@ pub fn step_collision(
             continental_over: 0.0,
             stalled_since_myr: None,
             jam_km: None,
+            subducting: false,
             belt: super::state::Belt::default(),
         });
     }
@@ -605,6 +606,34 @@ pub fn advance(
             }
         }
     }
+    // ledger: PLT-760. A front whose terrane its slab drags down whole subducts it: the belts
+    // strip its crossing crust to the cover, and it does not transfer at the threshold. Read on
+    // each front of this step against the slab of the pair (the last balance's, as the jam).
+    if env.k.terrane_docking_cover {
+        let mut slab_km: BTreeMap<(u32, u32), f64> = BTreeMap::new();
+        for s in state.slabs.iter().filter(|s| s.km > 0.0) {
+            let e = slab_km.entry((s.under, s.over)).or_insert(0.0);
+            *e = e.max(s.km);
+        }
+        let classed: Vec<(usize, bool)> = state
+            .contacts
+            .iter()
+            .enumerate()
+            .filter_map(|(k, c)| {
+                let col = c.collision.as_ref()?;
+                let f = fronts.get(&k).filter(|_| col.last_step == env.step)?;
+                let whole = slab_km.get(&(c.under, c.over)).is_some_and(|&km| {
+                    drags_whole(state, geo, env, c.under, f, col.shortening_km, km)
+                });
+                Some((k, whole))
+            })
+            .collect();
+        for (k, whole) in classed {
+            if let Some(col) = state.contacts[k].collision.as_mut() {
+                col.subducting = whole;
+            }
+        }
+    }
     // ledger: PLT-068 (the threshold, for terrane transfers), PLT-246 (the weld on stall).
     let threshold = env.k.collision_threshold_km;
     let mut fired = Vec::new();
@@ -613,7 +642,8 @@ pub fn advance(
         let stalled = col
             .stalled_since_myr
             .is_some_and(|t0| env.t_myr - t0 >= env.k.weld_after_myr - 1e-9);
-        if !stalled && col.shortening_km < threshold {
+        // A terrane its slab drags down goes on down: no transfer on shortening (ledger PLT-760).
+        if !stalled && (col.shortening_km < threshold || col.subducting) {
             continue;
         }
         let mut list = seeds.remove(&k).unwrap_or_default();
@@ -632,6 +662,80 @@ pub fn advance(
         }
     }
     (fronts, fired)
+}
+
+/// How much buoyant lithosphere a slab `slab_km` long can drag down with it, km, when the crust
+/// on it is `thickness_m` thick (ledger PLT-760). The model's collision buoyancy (FRC-030: the
+/// dragged length S pushes back with R (T / T_c) times the pull of the same length of slab, R and
+/// T_c from Cloos 1993's densities, FRC-028 and FRC-029) against the pull of the dense slab left
+/// in the slab's length L, F_sp (L − S) / D: the two balance at S* = L / (1 + R T / T_c). A
+/// terrane whose whole extent across the front is under S* goes down with its slab; a larger one
+/// jams it. The balance in one dimension along the slab is the project's reading of Cloos's
+/// buoyancy analysis for a body of finite extent (Yan et al. 2021's two-dimensional models,
+/// abstract: plateaus of 150 km or less subduct "without subduction zone reorganization", of
+/// 300 km or more reorganize it).
+pub fn dragged_length_km(slab_km: f64, thickness_m: f64) -> f64 {
+    let r = super::forces::CONTINENT_BUOYANCY_RATIO * thickness_m.max(0.0)
+        / (super::forces::CONTINENT_BUOYANCY_CRUST_KM * 1000.0); // ledger: FRC-028, FRC-029
+    slab_km.max(0.0) / (1.0 + r)
+}
+
+/// Whether the slab of a contact, `slab_km` long, drags the terrane at its front `f` down whole
+/// (ledger PLT-760): the terrane's extent across the front, the collision's `shortening_km` so
+/// far plus the visible area of the incoming plate's continental crust connected to the front's
+/// crust over the front's length, is within [`dragged_length_km`] of the slab (up to
+/// `slab_depth_km`, PLT-184) for the front crust's mean thickness. The fill stops once the area
+/// would carry the extent past the reach.
+pub fn drags_whole(
+    state: &PlateState,
+    geo: &Geo,
+    env: &Env,
+    under: u32,
+    f: &Front,
+    shortening_km: f64,
+    slab_km: f64,
+) -> bool {
+    let length_km = f.length_km();
+    if f.crust.is_empty() || length_km <= 0.0 {
+        return false;
+    }
+    let t_m = f
+        .crust
+        .iter()
+        .map(|&j| f64::from(state.samples[j as usize].thickness_m))
+        .sum::<f64>()
+        / f.crust.len() as f64;
+    let reach_km = dragged_length_km(slab_km.min(env.k.slab_depth_km), t_m); // ledger: PLT-184
+    let room_km = reach_km - shortening_km;
+    if room_km <= 0.0 {
+        return false;
+    }
+    // The most samples the rest of the terrane may hold.
+    let most = room_km * length_km / env.norm.sample_area_km2();
+    let ours = |i: usize| {
+        let s = &state.samples[i];
+        state.plate_of(i) == under && s.kind == CONTINENTAL && !s.is_hidden()
+    };
+    let mut seen = std::collections::BTreeSet::new();
+    let mut stack: Vec<u32> = Vec::new();
+    for &s in &f.crust {
+        if ours(s as usize) && seen.insert(s) {
+            stack.push(s);
+        }
+    }
+    let mut found = 0_usize;
+    while let Some(v) = stack.pop() {
+        found += 1;
+        if found as f64 > most {
+            return false;
+        }
+        for (u, _) in geo.edges(v) {
+            if ours(u as usize) && seen.insert(u) {
+                stack.push(u);
+            }
+        }
+    }
+    true
 }
 
 /// Ends contact `k`'s collision (if it is in one) without a transfer or weld, recording why.
@@ -804,6 +908,25 @@ mod tests {
     /// within 30° of +y, where a rotation about z is close to head-on.
     fn arc(p: DVec3) -> bool {
         p.y > 0.866
+    }
+
+    /// The slab's reach against a terrane's buoyancy (ledger PLT-760): the pull of the dense slab
+    /// left, F (L − S)/D, against FRC-030's buoyancy of the dragged length S, 2.25 F (T/30 km) S/D,
+    /// balance at S* = L / (1 + 2.25 T/30 km): 215 km of a full 700 km slab under Cloos's 30 km
+    /// continental crust, 329 km under 15 km of arc crust, all of a slab under none, and half of
+    /// it for a slab half as long.
+    #[test]
+    fn a_slab_drags_down_buoyant_crust_as_far_as_its_pull_outweighs_it() {
+        assert!((dragged_length_km(700.0, 30_000.0) - 700.0 / 3.25).abs() < 1e-9);
+        assert!((dragged_length_km(700.0, 15_000.0) - 700.0 / 2.125).abs() < 1e-9);
+        assert_eq!(dragged_length_km(700.0, 0.0), 700.0);
+        let half = dragged_length_km(350.0, 30_000.0);
+        assert!((half - 0.5 * dragged_length_km(700.0, 30_000.0)).abs() < 1e-9);
+        // At S* the pull left and the buoyancy are equal.
+        let s = dragged_length_km(700.0, 22_000.0);
+        let (pull, buoyancy) = (700.0 - s, 2.25 * (22.0 / 30.0) * s);
+        assert!((pull - buoyancy).abs() < 1e-9, "{pull} {buoyancy}");
+        assert!(dragged_length_km(700.0, 40_000.0) < dragged_length_km(700.0, 20_000.0));
     }
 
     #[test]

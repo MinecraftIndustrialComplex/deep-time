@@ -71,6 +71,9 @@ def one(run):
             "cls": size, "dur": c["end_myr"] - c["start_myr"], "short": c["shortening_km"],
             "front": c["front_km"], "area": a, "terr": terr, "share_x": a / max(a + terr, 1e-9),
             "vol": a * h_km * kept, "uplift": c["peak_uplift_m"],
+            # The terrane's extent across the front, km: what crossed (the shortening) and the
+            # rest's area over the front's length.
+            "extent": c["shortening_km"] + terr / max(c["front_km"], 1e-9),
             "bw": c.get("belt", {}).get("width_km"), "bl": c.get("belt", {}).get("length_km"),
             "lift100": c.get("lifted100", {}).get("samples"),
             "stalled": bool(c.get("stalled")), "sutured": bool(c.get("sutured")),
@@ -117,6 +120,11 @@ def table(runs):
         if not cls.startswith("part_"):
             o.update({
                 "terrane_km2": q([x["terr"] for x in xs]),
+                "extent_km": q([x["extent"] for x in xs]),
+                "extent_p10_p90": [float(np.percentile([x["extent"] for x in xs], p)) for p in (10, 90)]
+                if xs else None,
+                "extent_under": {str(e): float(np.mean([x["extent"] <= e for x in xs])) if xs else None
+                                 for e in (150, 220, 270, 300)},
                 "share_crossed_of_reached": q([x["share_x"] for x in xs]),
                 "share_crossed_of_reached_pooled": float(sum(x["area"] for x in xs)
                                                          / max(sum(x["area"] + x["terr"] for x in xs), 1e-9)),

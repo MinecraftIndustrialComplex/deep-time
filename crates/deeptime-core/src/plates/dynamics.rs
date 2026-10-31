@@ -619,6 +619,21 @@ pub struct CollisionRec {
     /// Birth of the terrane's plate and its parent.
     pub under_born_myr: f64,
     pub under_parent: Option<u32>,
+    /// The belt's highest mean height above the sea within half its width of the front, m, and
+    /// the crust the belt and wedge stacked, km² × m (as [`PartingRec`]'s; measurement only, the
+    /// docking lane, 2026-10-30: the record kept neither for a terrane transfer).
+    #[serde(default)]
+    pub peak_height_m: f64,
+    #[serde(default)]
+    pub stacked_km2_m: f64,
+    /// The crust the slab took instead of the belt where the terrane docked stripped to its cover
+    /// (`tectonics.terrane_docking_cover`, PLT-760), km² × m (measurement only).
+    #[serde(default)]
+    pub stripped_km2_m: f64,
+    /// The front's unit centroid in the step it was last seen (zero when it never had one), so a
+    /// measure can find the belt on a map.
+    #[serde(default)]
+    pub centroid: [f64; 3],
 }
 
 /// Why a collision state ended with no transfer or weld ([`PartingRec::reason`]): no continental
@@ -658,6 +673,11 @@ pub struct PartingRec {
     pub stacked_km2_m: f64,
     /// [`PARTED`], [`REVERSED`], [`CLOSED`], [`EMPTIED`] or [`OPEN`].
     pub reason: String,
+    /// As [`CollisionRec::stripped_km2_m`] and [`CollisionRec::centroid`].
+    #[serde(default)]
+    pub stripped_km2_m: f64,
+    #[serde(default)]
+    pub centroid: [f64; 3],
 }
 
 /// Records the end of `contact`'s collision state `col` with no transfer or weld. Measurement
@@ -682,6 +702,8 @@ pub fn record_parting(
             peak_height_m: col.belt.peak_height_m,
             stacked_km2_m: col.belt.stacked_km2_m,
             reason: reason.to_owned(),
+            stripped_km2_m: col.belt.stripped_km2_m,
+            centroid: col.centroid,
         });
     }
 }
