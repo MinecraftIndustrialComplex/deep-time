@@ -8270,6 +8270,7 @@ Straume2019, Harris2014, SternScholl2010.
 - Library: not fetched.
 - Read so far (by the project): the abstract, 2026-10-22 (a research sub-agent): sediment subduction at 43,500 km of margin about 1.5 km^3 a year of solid, 1.0 over the long term; about 20 % of the incoming sediment accreted at margins with small to medium prisms, about 70 % subducted at margins with large prisms; subduction erosion about 1.1 km^3 a year.
 - Read in the trench-budget task (2026-10-22, the abstract on the USGS page through the Wayback Machine, by a research sub-agent; the page cuts the abstract off at "subcrustally subducted materia"): "type 2 margins (~19,000 km in global length)", where "effectively all incoming sediment is subducted"; at "small-to-medium-sized prisms ... (~16,300 km)" "approximately 20% of the incoming sediment is skimmed off ... and frontally accreted. The remaining 80% subducts"; at "margins bordered by large prisms (~8,200 km)" "roughly 70% of the incoming trench floor section is subducted"; "the contemporary rate of solid-volume sediment subduction at convergent ocean margins (~43,500 km) is calculated to be 1.5 km3/yr", long term 1.0; subduction erosion "long-term rates ... range from 25 to 50 km3/m.y. per kilometer of margin. A conservative long-term rate ... is 30 km3/km/m.y.", about 0.6 km3/yr on type 2 margins and 1.1 with type 1 sectors.
+- Read in the trench-input diagnosis (2026-10-31, the full text, by a Sonnet research sub-agent through `pdftotext` on a scan's text layer, so OCR noise is possible): p. 308, "the total solid-volume mass of ocean floor sediment (ocean basin and trench axis deposits) presently entering the approximately 43,500 km of convergent margins ... is 1.9 km³/yr", of which 0.9 is accreted or underplated and 1.0 bypasses the prism; type 2 margins, about 19,000 km, "dominantly pelagic and hemipelagic", a mean section of 0.4 km bulk (0.2 to 0.6), 0.24 km solid, 0.40 km³/yr; the Pacific trench wedges perhaps twice their pre-glacial thickness; p. 306, the long-term bypass of 0.7 km³/yr exceeds Hay et al. 1988's deep-basin figure (0.4, up to 0.5) by 0.2 to 0.3, put down to "subduction of axial turbidite deposits", which at 65 km/Myr "requires on average the bypass subduction of a 100-m-thick (solid-volume) section of axial deposits"; p. 313, "about 40% pelagic and 60% clastic deposits are subcrustally subducted at modern convergent margins", long term 56 and 44 %; p. 305, "70% of the sediment discharged by rivers to ocean basins is from two regions of intense tectonic uplift" (India and Asia, Australia and Indonesia; after Milliman & Meade 1983, not read). The sub-agent's arithmetic: 1.9 km³/yr over 43,500 km is about 44 km³/km/Myr incoming.
 
 ### SimpsonSimpson2018
 - Reference: Simpson and Simpson (2018), arXiv:1810.08658 (the authors' initials and the title not recorded by the sub-agent).
@@ -10121,3 +10122,30 @@ The continents' crust budget against Stern & Scholl 2010's Table 1, row by row (
 - Access: the abstract open (Crossref).
 - Library: not kept.
 - Read so far (by the project): the abstract, 2026-10-31 (the research sub-agent, verbatim through Crossref): the central Aleutian crust, 35-37 km thick, has "more mafic compositions, than average continental crust, implying that significant modifications would be required for this arc to be a suitable building block for continental crust".
+
+### PlankLangmuir1998
+- Reference: Plank, T. and Langmuir, C. H. (1998). Chemical Geology 145(3-4):325-394 (the title not recorded by the sub-agent).
+- DOI or URL: 10.1016/S0009-2541(97)00150-2
+- Cited as: "Plank & Langmuir 1998" (GLOSS: the sediment entering the trenches, the trench-input diagnosis in plates.md).
+- Ledger ids: none (a comparison only).
+- Access: paywalled; the full text was not reached (HTTP 403).
+- Library: not kept.
+- Read so far (by the project): search-engine snippets and the abstract through a secondary summary, 2026-10-31 (a Sonnet research sub-agent; not checked against the paper): section 7, "If applied over the global trench length, our total mass fluxes for sediment (1.8×10^15 g/year) and H2O- (0.86×10^15 g/year) also compare favorably to R&R's (1.4 and 0.9×10^15 g/year)", and "0.51 km^3/year for the 70% of the total trench length ... or about 0.73 km^3/year globally (not including any tectonic erosion)", bulk or solid not stated (the sub-agent's inference from 1.8e15 g over 0.73 km³, about 2.5 g/cm³: solid); Table 3, 1.30E+15 g/year over 2.97E+04 km, about 70 % of the trench length; the abstract, 76 wt% terrigenous, 7 wt% CaCO3, 10 wt% opal, 7 wt% mineral-bound H2O+. The sub-agent's arithmetic: about 17 km³/km/Myr of solid over about 42,400 km.
+
+### ReaRuff1996
+- Reference: Rea, D. K. and Ruff, L. J. (1996). Earth and Planetary Science Letters 140:1-12 (the title not recorded by the sub-agent).
+- DOI or URL: 10.1016/0012-821X(96)00036-2
+- Cited as: "Rea & Ruff 1996" (the trench-input diagnosis in plates.md).
+- Ledger ids: none (a comparison only).
+- Access: paywalled; the abstract read.
+- Library: not kept.
+- Read so far (by the project): the abstract through ResearchGate and search summaries, 2026-10-31 (a Sonnet research sub-agent): 1.4 x 10^15 g/yr of sediment entering the trenches, of it 1.1 x 10^15 terrigenous (about 79 %), with 0.9 x 10^15 g/yr of water; "an order of magnitude more sediment enters the ocean than leaves it via subduction".
+
+### MillimanSyvitski1992
+- Reference: Milliman, J. D. and Syvitski, J. P. M. (1992). Journal of Geology 100(5):525-544 (the title not recorded by the sub-agent).
+- DOI or URL: 10.1086/629606
+- Cited as: "Milliman & Syvitski 1992" (where the rivers' load reaches the sea, the trench-input diagnosis in plates.md).
+- Ledger ids: none (a comparison only).
+- Access: an open scan; the full text read through its text layer (OCR noise possible).
+- Library: not kept.
+- Read so far (by the project): the full text, 2026-10-31 (a Sonnet research sub-agent, `pdftotext` on the scan): the abstract, "sediment fluxes to the ocean from large rivers (nearly all of which discharge onto passive margins or marginal seas) have been overestimated, as some of the sediment load is subaerially sequestered in subsiding deltas", and the small mountainous rivers' flux "greatly underestimated ... perhaps by as much as a factor of three"; p. 541, the rivers of mountainous islands and of active or collision margins "are generally much smaller, but collectively they may transport similar amounts of sediment as do passive margin rivers", "Because these small rivers empty onto active margins, the deposits may be subducted", and "the sediment is more likely to escape the narrow shelves to deeper basins during both high and low stands of sea level"; p. 540, about 20 billion tons a year in the mid-20th century, "nearly half of this amount coming from Oceania and another third from southern Asia". No share reaching the trenches is given.
