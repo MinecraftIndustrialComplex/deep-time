@@ -274,7 +274,11 @@ mod tests {
     #[test]
     fn ground_that_never_thaws_runs_off_nothing() {
         let hydro = HydroParams::default();
-        for (p, t, half) in [(300.0, -20.0, 10.0), (100.0, -30.0, 15.0), (800.0, -8.0, 6.0)] {
+        for (p, t, half) in [
+            (300.0, -20.0, 10.0),
+            (100.0, -30.0, 15.0),
+            (800.0, -8.0, 6.0),
+        ] {
             assert_eq!(cell_water(&hydro, p, t, half).runoff_m_yr, 0.0);
             assert!((mean_t_runoff_m_yr(p, t) - p / 1000.0).abs() < 1.0e-12);
         }
