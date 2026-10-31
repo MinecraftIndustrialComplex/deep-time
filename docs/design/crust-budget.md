@@ -214,5 +214,18 @@ against 6.5 (p 0.35). Verdict: all three correct, on (PLT-760 with the substrate
   (plates.md, "Clift et al. 2009's sediment numbers, in rock"). Clift's rivers' 1.77 km³ a year is
   the whole export to the ocean in rock, a Cenozoic mean, against the model's 3.8 to 4.3 (modern
   loads are several times Clift's mean, so the export's own excess is open); the trench-bound share
-  of the export is 0.75 to 0.79 against Earth's 0.60 to 0.65 (the agent's derivation). The next
-  diagnosis splits the trench input by source and by delivery term.
+  of the export is 0.75 to 0.79 against Earth's 0.60 to 0.65 (the agent's derivation).
+  Diagnosed 2026-10-31 (plates.md, "The trenches' input split by source and by delivery term";
+  traces ti-base and ti-src, measurement only, bit for bit on base34-s4's seed 1): the excess is
+  the export, a rate, not a trench law. Of the 2.90 km³ a year, about half is laid straight onto
+  the trench samples (mostly by the slope failure), half carried in on the incoming floor, a tenth
+  the one-way slab's; nine tenths or more came off continental crust, the island arcs and ocean
+  islands shed 1.1 to 1.4 % of the land's erosion, and the pelagic rain reaches the trenches only
+  on the floor. The drainage is Earth's in kind (subduction-zone coasts take 0.34 to 0.37 of the
+  river load, collisions 0.09 to 0.10; the arcs' own erosion is 1.3 times the first; Milliman &
+  Syvitski 1992: "similar amounts" to the passive margins'). Export 3.82 against Clift's 1.77
+  (2.16 times) times share 0.76 against 0.65 (1.17 times); with the export scaled to Clift's, the
+  intra-oceanic fronts take Clift's per km (17.4 against 18.4) and the continental margins less
+  (25.3 against 34.1), and what is left is the intra-oceanic fronts' length, 1.9 times Earth's.
+  The floor's stock agrees (young floor 1.9 times GlobSed in place). Next: which law sets the
+  export's rate, the surface's erosion or the plates' uplift.
