@@ -250,7 +250,17 @@ The re-review of a7c42428, two must-fixes and the follow-ups, on the same branch
    as the kind is. Test: `ridges::tests::the_island_arc_class_survives_a_resampling_from_the_nearest_corner`
    (both leaks through `interpolate`). Measured from now on: `plates/resample_island_class_kept_km2`
    (the class the blend would have lost, leak B) and `plates/resample_island_class_refused_km2`
-   (would have given, leak A), summed over the resamplings.
+   (would have given, leak A), summed over the resamplings. On the fixed head (1c78fb32, arm
+   cbon-leaks, key 7aa49cd328e6, seed 1 of both starts, 1,000 Myr): B 5.75 and 5.81 × 10⁸ km², A
+   2.48 and 2.53 × 10⁸ km² over the run; at about 55 resamplings a run (the oo-resample trace's
+   count, another tree) that is about 1.0 × 10⁷ km² (some 330 samples) of an island arc's crust
+   the old reading would have taken for a continent's at each resampling, and about 4.5 × 10⁶ km²
+   (some 140 samples) of a continent's crust it would have taken for an island arc's. Each
+   resampling counts the columns as they stand, so a column the blend had put under the line
+   counts again at the next: a stock, which under the old reading would have stayed lost, not a
+   count of new events. The continental law on island-arc-dominated crust under arcs begun
+   intra-oceanic (`arc_split_c_io_crust_io_onset_not_island_km3`) is 2.1 and 2.4 × 10⁷ km³ over
+   the run, about 1 % of the arcs' magma.
 2. The breakoff does not bound PLT-763. `forces::grow_slab` counts block time only while
    continental crust holds at least half the front; any oceanic front sample regrows the slab
    (100 km in a few Myr) and the magma resumes, and a mostly oceanic contact never breaks off. The
