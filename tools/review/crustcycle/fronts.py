@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: LGPL-3.0-or-later
-"""The subduction fronts by setting and state, from the runs' step records (no simulation): fronts.py <arm folder> ...
+"""The subduction fronts by setting and state, from the runs' step records (no simulation): fronts.py <arm folder>[@N] ...
 
 Reads each run's rec.json (`steps[*].mix_km` and `steps[*].front_bands`, plates/dynamics.rs `boundary_mix`) and prints
 the mean length at any time, km (Earth-normalized, as the record's), over the steps from --from (Myr, default -1000)
@@ -39,8 +39,13 @@ COAST = ["0-150", "150-300", "300-600", "600-1200", "1200-2400", ">2400/none"]
 PAIR = ["initiation", "rift", "other"]
 
 
-def runs_of(folder):
-    return sorted(p for p in Path(folder).iterdir() if (p / "rec.json").is_file())
+def runs_of(arg):
+    # `folder@N`: seeds 1 to N of both starts only (as probe.py reads an arm), else every run in the folder.
+    folder, _, n = arg.partition("@")
+    runs = sorted(p for p in Path(folder).iterdir() if (p / "rec.json").is_file())
+    if n:
+        runs = [p for p in runs if int(p.name.rsplit("-", 1)[1]) <= int(n)]
+    return runs
 
 
 def one(run, t_from):
