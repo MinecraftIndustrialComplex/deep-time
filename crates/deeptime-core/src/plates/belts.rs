@@ -1995,6 +1995,10 @@ mod tests {
         // taper (the default) the front's edge in this fixture stands at its own height until
         // the toe advances (ledger: PLT-600, PLT-601); the taper's own tests check it.
         fx.preset.tectonics.collision_belt_taper = false;
+        // The old law (PLT-243, PLT-244): crust on the overriding plate within the belt and the
+        // capped wedge only, whatever the default (the two wedges, PLT-730, on since 2026-10-31,
+        // put the pro-wedge's crust on the incoming plate and the retro plateau's behind the belt).
+        fx.preset.tectonics.collision_two_wedges = false;
         // The old default share (0.5), so twelve steps stay under the strength height (PLT-253)
         // and every step's rise shows in the belt's height.
         fx.preset.tectonics.collision_stacking_share = 0.5;
@@ -2722,7 +2726,12 @@ mod tests {
     /// little more.)
     #[test]
     fn the_front_keeps_its_taper_and_strength_height_beside_the_interiors_share() {
-        let weak = |fx: &mut Fixture| fx.preset.tectonics.crust_strength_mpa = 40.0;
+        let weak = |fx: &mut Fixture| {
+            fx.preset.tectonics.crust_strength_mpa = 40.0;
+            // The belt from critical taper (PLT-600, PLT-601), lowest at the front, whatever the
+            // default: the two wedges (PLT-730, on since 2026-10-31) stand their crest at the front.
+            fx.preset.tectonics.collision_two_wedges = false;
+        };
         let off = upper_run(150.0, false, 12, weak);
         let r = upper_run(150.0, true, 12, weak);
         let k = &r.fx.preset.tectonics;
@@ -3381,6 +3390,8 @@ mod tests {
             let mut fx = Fixture::new();
             fx.preset.tectonics.collision_threshold_km = 1.0e9;
             fx.preset.tectonics.collision_belt_taper = taper;
+            // The belt laws of PLT-243 and PLT-600, not the two wedges (PLT-730, on since 2026-10-31).
+            fx.preset.tectonics.collision_two_wedges = false;
             let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
             let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
             let (stacked, _) = fx.step(&mut st, 1, None);
@@ -3441,8 +3452,10 @@ mod tests {
             fx.preset.tectonics.collision_threshold_km = 1.0e9;
             fx.preset.tectonics.collision_belt_km = 2000.0;
             fx.preset.tectonics.collision_belt_taper = taper;
-            // The sliver rule itself (PLT-700 off).
+            // The sliver rule itself (PLT-700 off), under the old belt laws: the two wedges
+            // (PLT-730, on since 2026-10-31) have no sliver rule.
             fx.preset.tectonics.collision_noroom_stays = false;
+            fx.preset.tectonics.collision_two_wedges = false;
             let mut st = sliver_plates(&fx);
             let (stacked, _) = fx.step(&mut st, 1, None);
             let s = &stacked[&0];
@@ -3527,6 +3540,9 @@ mod tests {
                 fx.preset.tectonics.collision_belt_km = 2000.0;
                 fx.preset.tectonics.collision_belt_taper = taper;
                 fx.preset.tectonics.collision_noroom_stays = on;
+                // The old belt laws, whose sliver rule loses the crust for want of room: the two
+                // wedges (PLT-730, on since 2026-10-31) hold it on the incoming plate too.
+                fx.preset.tectonics.collision_two_wedges = false;
                 let mut st = sliver_plates(&fx);
                 let area = fx.norm.sample_area_km2();
                 let before = crust_km2_m(&st, area);
@@ -3569,6 +3585,9 @@ mod tests {
             let mut fx = Fixture::new();
             fx.preset.tectonics.collision_threshold_km = 1.0e9;
             fx.preset.tectonics.collision_noroom_stays = on;
+            // The old belt laws, whose belt part goes down for want of room: the two wedges
+            // (PLT-730, on since 2026-10-31) put the pro-wedge's crust on the incoming plate.
+            fx.preset.tectonics.collision_two_wedges = false;
             // The interior's share (PLT-652) rises elsewhere on the plate: the front alone here.
             fx.preset.tectonics.collision_upper_plate_shortening = false;
             let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
