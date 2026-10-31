@@ -217,10 +217,18 @@ crustal section").
    of the front's crust samples). When every body is within its S*, the front subducts them
    (`Collision::subducting`); one body beyond its reach jams the slab for the whole front
    (`shortening::docking`).
-2. **Judged as it arrives.** A front judged going down keeps the judgment while its bodies hold no
-   more samples than when judged (`Collision::docking_samples`): their crust only goes under, and a
-   resampling only consumes what is under (PLT-276). Crust that joins them (a new body at the front,
-   or crust behind them reached) has them judged again as they now stand.
+2. **Judged as it arrives.** Each body judged going down is remembered by its samples and its share
+   of the front's length when judged (`Collision::docking`, refreshed each step). A body now holding
+   some of a judged body's samples is that body (or their union, where judged bodies have joined):
+   while it holds no more samples than it did a step before (its crust only goes under, and a
+   resampling or a sample turned oceanic only takes some away), it goes on down; when it holds more
+   (crust has joined it), it alone is judged again, by all its samples over the share of the front
+   it was judged with, so a few samples joining move its extent by a few samples' width. A body
+   holding none of the judged samples has just arrived and is judged over its share of today's
+   front. A resampling numbers the samples afresh: the bodies then share the judged bodies' length
+   by their front crust and go on down while they hold no more samples than the judged did (or are
+   judged again over those shares). A plate split keeps the numbering; samples gone to the other
+   piece no longer count.
 3. **What stays of them.** At a subducting front only the crossing crust's cover stays (PLT-771,
    `pools::COVER`: its own sediment, sedimentary rock and volcanic rock; the basement already goes,
    PLT-331), by PLT-242's share, as the cover's rock (its sediments metamorphosed, PLT-248), with the
@@ -366,7 +374,9 @@ short deep fragment at one front, within the reach pooled, jam),
 `a_terrane_going_down_over_many_steps_leaves_its_cover_on_the_overriding_plate` (belts.rs: eight steps
 with the plates moving, the overlaps resolved: no transfer, nothing on the incoming plate, the cover
 kept on the overriding plate, no plutonic rock, the arc all under),
-`the_cover_is_the_layered_rock_on_the_basement` (pools.rs).
+`a_terrane_going_down_keeps_the_crust_its_collision_stacked_on_it` (belts.rs: restacked crust, r > 0,
+through `stack_front`), `a_front_going_down_feeds_its_slab_and_does_not_break_it_off` (belts.rs:
+through `forces::step`), `the_cover_is_the_layered_rock_on_the_basement` (pools.rs).
 
 ## The review (PR #51, 2026-10-31) and what it changed
 
@@ -442,3 +452,41 @@ So the corrected law does on the planet what the first build did, more cleanly: 
 hand-offs and more partings, both now significant, half the small landmasses' collision high coasts,
 the crust stripped at about 1 % of the continents' additions, and no V1 number beyond the spread. The
 deeper trench floor is the one significant change to read again against base35-s4.
+
+## The re-review (ab427b39, 2026-10-31) and its fixes
+
+The re-review confirmed fixes 1 to 6 and found no bug in the deeper trench floor (a slab grows only
+with convergence; the 243 m is the surface stage's, from the fed slab, the cover on the overriding
+edge or master's heat flow: `base35-s4` will tell). Its two findings, fixed on `small-terrane-on`:
+
+1. **Bodies recognised only by their count** (`docking_samples`). Too lax: once hidden crust is
+   consumed (a resampling, a sample turned oceanic), new crust could join unjudged up to the
+   consumed count. Too harsh: on growth every body was judged again by all its samples over today's
+   front, the reading found wrong halfway down, so one sample joining near the end made a jam that
+   transferred at once (likely the second arm's remaining 1.33 per 100 Myr). Fixed by remembering
+   each judged body by its samples and its judged share of the front (`Collision::docking`, the
+   rule's item 2): any growth is seen (the samples are refreshed each step), and only the body that
+   gained crust is judged again, over the share it was judged with.
+2. **A forces test**: `a_front_going_down_feeds_its_slab_and_does_not_break_it_off` (the arc along
+   the whole converging boundary through `forces::step` for 12 Myr: going down, the slab lengthens
+   to `slab_depth_km` and stays; with the switch off it jams, lengthens only by the ocean floor at
+   the arc's ends, and breaks off). And `a_terrane_going_down_keeps_the_crust_its_collision_stacked_on_it`
+   (a stripping with restacked crust, r = 5 / 40.1, through `stack_front`), the reach test's kept and
+   renewed judgments (`docking` with judged bodies, one sample short, a doubled share, a stranger,
+   and a resampling).
+
+Of its lower findings one is fixed: the stripped rise's rock mix weighed the cover at 1 where the
+rise holds it at s (1 − r) + r with `collision_restack_whole` (at most 5 % too much cover rock); it
+now weighs it so. Two are limits, kept:
+
+- **The cover on ocean floor.** With no pro flank, a front whose overriding plate has no continental
+  crust within the belt's reach puts the kept cover on the overriding edge by PLT-700's rule, on
+  ocean floor (a few km per event), as PLT-700 already does for any collision against an oceanic
+  overriding plate. The sources' accretionary prism stands at that edge whatever its crust; PLT-290's
+  concern (ocean floor taking a continent's stack and coming back as one lump at a resampling) is
+  about tens of km, not a cover's few.
+- **A jammed body after a resampling.** A front that jams keeps no bodies; after a resampling has
+  consumed the part of a jammed body already under, it is judged afresh by what is left and may go
+  down for its remainder. A jam that holds half its front breaks its slab off in 10 Myr (FRC-019),
+  and without a slab nothing goes down, so this needs a jam on a front mostly ocean floor that
+  outlasts a resampling.

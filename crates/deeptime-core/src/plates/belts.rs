@@ -2858,7 +2858,6 @@ mod tests {
         assert!(fx.preset.tectonics.collision_restack_whole);
         let mut st = arc_terrane(&fx, |_| Some(1.0), 0.0, true);
         st.slabs[0].km = 3000.0;
-        let onset_myr = fx.env(1).t_myr as f32;
         let column = continental_column();
         for s in &mut st.samples {
             if s.group == 1 && s.kind == CONTINENTAL {
@@ -2866,6 +2865,15 @@ mod tests {
                 s.pools[pool::METAMORPHIC] += 5000.0;
                 s.basement_m = 0.0;
                 s.thickness_m = s.pools.iter().sum();
+            }
+        }
+        // The collision begins (judged going down), then its own stamp is on the crust at its
+        // front, as a collision stamps the crust it stacks (crust another collision stamped
+        // lately is locked, PLT-224, and makes no front).
+        fx.step(&mut st, 1, None);
+        let onset_myr = st.contacts[0].collision.as_ref().expect("a collision").onset_myr as f32;
+        for s in &mut st.samples {
+            if s.group == 1 && s.kind == CONTINENTAL {
                 s.orogeny = OROGENY_HIMALAYAN;
                 s.orogeny_myr = onset_myr;
             }
@@ -2883,10 +2891,15 @@ mod tests {
             crust_on(&st, 1, area),
             plutonic(&st),
         );
-        let (stacked, fired) = fx.step(&mut st, 1, None);
+        let (stacked, fired) = fx.step(&mut st, 2, None);
         assert!(fired.is_empty());
-        let s = stacked[&0].clone();
         let col = st.contacts[0].collision.as_ref().expect("a collision");
+        let s = stacked.get(&0).cloned().unwrap_or_else(|| {
+            panic!(
+                "nothing stacked: {:?}",
+                (col.subducting, col.last_step, col.shortening_km)
+            )
+        });
         assert!(col.subducting, "{s:?}");
         assert!((s.restack_m - 5000.0).abs() < 1.0, "{s:?}");
         let r = s.restack_m / s.thickness_m;
@@ -2907,7 +2920,10 @@ mod tests {
         let below = share * s.crossed_km2 * (s.thickness_m - kept);
         assert!((s.stripped_km2_m - below).abs() < 1e-6 * below, "{s:?}");
         let on_incoming = crust_on(&st, 1, area) - incoming0;
-        assert!(on_incoming.abs() < 1e-9 * want, "{on_incoming:.4e} on the terrane");
+        assert!(
+            on_incoming.abs() < 1e-9 * want,
+            "{on_incoming:.4e} on the terrane"
+        );
     }
 
     /// A front going down feeds its slab and does not break it off (ledger PLT-770, FRC-019): an
@@ -2946,7 +2962,10 @@ mod tests {
             let mut kms = Vec::new();
             for step in 1..=6u64 {
                 let (_, fired) = fx.step(&mut st, step, None);
-                assert!(fired.is_empty(), "docking {docking}, step {step}: a transfer");
+                assert!(
+                    fired.is_empty(),
+                    "docking {docking}, step {step}: a transfer"
+                );
                 let col = st.contacts[0].collision.as_ref().expect("a collision");
                 assert_eq!(col.subducting, docking, "step {step}");
                 let pos = positions(&st, &fx.geo);
@@ -2967,8 +2986,10 @@ mod tests {
         let depth = Fixture::new().preset.tectonics.slab_depth_km;
         assert!((down[5] - depth).abs() < 1e-6, "{down:?}");
         let jam = run(false);
-        assert!(jam[0] <= 600.0 + 1e-6, "a jammed slab was fed: {jam:?}");
-        assert_eq!(jam[5], 0.0, "the jammed slab did not break off: {jam:?}");
+        // Jammed, only the ocean floor at the arc's ends feeds it, more slowly, and it breaks off
+        // (a new slab may start from that ocean floor after).
+        assert!(jam[0] < down[0], "jammed {jam:?}, going down {down:?}");
+        assert!(jam[..5].contains(&0.0), "the jammed slab did not break off: {jam:?}");
     }
 
     /// The crust that stacks is the crust that crossed the front: the volume added is the
