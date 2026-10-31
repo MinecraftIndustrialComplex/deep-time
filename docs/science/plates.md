@@ -13945,7 +13945,14 @@ which a split's copies keep; every continental onset has slab age 0, so two of o
 record. The key adds the onset's convergence. `onsets.py` says the records' signs
 (`PairBound.normal_mm_yr` negative converging, `OverlapMotion` positive).
 
-WELD_SWEEP_PLACEHOLDER
+**The weld sweep's drop.** With the gate as built, `weld_seed_sweep` found welding seeds in 20 of
+its 48 runs (scattered 11, supercontinent 9), against 28 with the gate off (16 and 12). With the
+gate on any angle of convergence, 26 (13 and 13: scattered 2, 3, 5 to 7, 10 to 13, 17, 19, 22 and
+24; supercontinent 1, 2, 4, 5, 7, 8, 10, 12, 13, 17, 20, 21 and 24; the guard binding on none).
+So most of the drop was oblique collisions the 20 degrees refused at their onset, whose crust the
+next resampling dropped; the rest is within the sweep's chaos (each switch changes which seeds
+weld, not only how many). The weld, recording and sutures tests keep their seeds (scattered 3,
+supercontinent 2).
 
 Not run yet: the arm oo-gate2 (the fixed gate, 8 runs against base35-s4) needs a simulation slot.
 
