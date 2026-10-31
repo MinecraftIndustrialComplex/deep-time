@@ -108,7 +108,11 @@ pub fn step(
                 let life = state
                     .rng
                     .range(k.hotspot_lifetime_myr[0], k.hotspot_lifetime_myr[1]);
-                (life, k.hotspot_uplift_mm_yr * state.rng.range(0.6, 1.4), 0.0)
+                (
+                    life,
+                    k.hotspot_uplift_mm_yr * state.rng.range(0.6, 1.4),
+                    0.0,
+                )
             };
             let head_share = if k.plume_heads_sourced {
                 sourced::head_share(births_per_myr) // ledger: PLT-795
@@ -377,7 +381,7 @@ pub(super) fn erupt(
 /// over intrusions, the height by the model's Airy isostasy of the column's change
 /// (`pools::isostatic_change_m`), water-loaded under the sea (`settle::WATER_LOADED`).
 pub fn add_magma(s: &mut Sample, m: f64, extrusive: f64, env: &Env) {
-    if !(m > 0.0) {
+    if m.is_nan() || m <= 0.0 {
         return;
     }
     let before = s.pools;
@@ -582,11 +586,12 @@ pub mod sourced {
     /// stretching), m, at a potential temperature above the normal 1280 °C, K: 7 km at 1280 °C,
     /// 17 km at 1400 °C, 26 km at 1480 °C ("an increase of 200 °C above its normal value ... can
     /// more than triple the amount of melt"). ledger: PLT-799
-    pub const IGNEOUS_CRUST_M: [(f64, f64); 3] = [(0.0, 7000.0), (120.0, 17_000.0), (200.0, 26_000.0)];
+    pub const IGNEOUS_CRUST_M: [(f64, f64); 3] =
+        [(0.0, 7000.0), (120.0, 17_000.0), (200.0, 26_000.0)];
     /// [`IGNEOUS_CRUST_M`] interpolated linearly (the agent's), held at its ends.
     pub fn igneous_crust_m(excess_k: f64) -> f64 {
         let t = &IGNEOUS_CRUST_M;
-        if !(excess_k > t[0].0) {
+        if excess_k.is_nan() || excess_k <= t[0].0 {
             return t[0].1;
         }
         for w in t.windows(2) {

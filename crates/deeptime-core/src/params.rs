@@ -1528,9 +1528,9 @@ impl Default for TectonicParams {
             island_arc_own_crust: false, // ledger: PLT-760 (built 2026-10-31, off)
             collision_arc_magma: false, // ledger: PLT-763 (built 2026-10-31, off)
             trench_pile_in_place: false, // ledger: PLT-762 (built 2026-10-31, off)
-            hotspots_sourced: false,     // ledger: PLT-790 (built 2026-10-31, off)
-            plume_heads_sourced: false,  // ledger: PLT-795 (built 2026-10-31, off)
-            volcanic_margins: false,     // ledger: PLT-799 (built 2026-10-31, off)
+            hotspots_sourced: false, // ledger: PLT-790 (built 2026-10-31, off)
+            plume_heads_sourced: false, // ledger: PLT-795 (built 2026-10-31, off)
+            volcanic_margins: false, // ledger: PLT-799 (built 2026-10-31, off)
             arc_mature_crust_km: 15.0, // ledger: PLT-047
             cordillera_shortening_mm_yr: 0.0, // ledger: PLT-048
             cordillera_width_km: 120.0,
