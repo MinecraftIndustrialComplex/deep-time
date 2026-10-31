@@ -379,6 +379,7 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Exte
                 fill.pools[p] += r;
                 given += r;
             }
+            fill.source_m += given * f64::from(thickness(&before));
             s.thickness_m = thickness(&s.pools);
             fill.basement_m += f64::from(s.basement_m) * (1.0 - keep);
             s.basement_m = (f64::from(s.basement_m) * keep) as f32;
@@ -414,6 +415,7 @@ fn merge(fills: &mut Vec<RiftFill>, fill: RiftFill) {
         }
         f.lithosphere_km_m += fill.lithosphere_km_m;
         f.basement_m += fill.basement_m;
+        f.source_m += fill.source_m;
         for (x, y) in f.centroid.iter_mut().zip(fill.centroid) {
             *x += y;
         }
@@ -486,7 +488,20 @@ pub fn lay(
         } else {
             ((crystalline_total / HYPER_EXTENDED_M).floor() as usize).clamp(1, n)
         };
-        let column = total / m as f64;
+        // No gap sample takes a thicker column than the columns the crust came from had before
+        // they stretched: the opening's crust is at most their own, never stacked (the pure shear
+        // of PLT-781 spreads crust, it does not thicken it). A gap narrower than the fill (a
+        // resampling that found few of its samples between the pair, or a fill that waited)
+        // takes that much, and the rest waits for the next resampling while both plates live,
+        // else goes to the fallback (ledger: PLT-784).
+        let source = fill.source_m / total;
+        let even = total / m as f64;
+        let column = if source.is_finite() && source > 0.0 {
+            even.min(source)
+        } else {
+            even
+        };
+        let placed = column * m as f64;
         let basement = (fill.basement_m / m as f64).min(column);
         for g in &members[..m] {
             let s = &mut samples[g.i as usize];
@@ -494,7 +509,22 @@ pub fn lay(
             s.basement_m = basement as f32;
             laid.samples += 1;
         }
-        laid.floor_m += total;
+        laid.floor_m += placed;
+        let rest = 1.0 - placed / total;
+        if rest > 1.0e-9 {
+            let mut f = fill;
+            f.pools.iter_mut().for_each(|x| *x *= rest);
+            f.lithosphere_km_m *= rest;
+            f.basement_m = (f.basement_m - basement * m as f64).max(0.0);
+            f.source_m *= rest;
+            f.centroid.iter_mut().for_each(|x| *x *= rest);
+            if alive(f.a) && alive(f.b) {
+                f.waited += 1;
+                kept.push(f);
+            } else {
+                laid.fallback_m += fallback(&f, samples, points, k, gravity, z_0, sea_m);
+            }
+        }
     }
     *fills = kept;
     laid
@@ -871,6 +901,7 @@ mod tests {
             basement_m: 0.0,
             centroid: [0.0, 1.0, 0.0],
             waited: 0,
+            source_m: total_col * total_col * columns,
         };
         let ocean = || {
             let mut s = Sample::blank(0);
@@ -947,7 +978,7 @@ mod tests {
         land.kind = CONTINENTAL;
         land.pools = column;
         land.thickness_m = total_col as f32;
-        samples[5] = land;
+        samples[5] = land.clone();
         let laid = lay(
             &mut fills,
             &mut samples,
@@ -961,5 +992,52 @@ mod tests {
         assert!(fills.is_empty());
         assert!((laid.fallback_m - total_col).abs() < 1.0);
         assert!((f64::from(samples[5].thickness_m) - 2.0 * total_col).abs() < 1.0);
+
+        // Ten columns' crust over four gap samples (a gap narrower than the fill): each takes the
+        // columns' own thickness, no more, and the other six columns' worth waits while both
+        // plates live (the ext-cum arm's divergence, 2026-10-31: spread evenly, a few gap samples
+        // took hundreds of km of crust and the surface ran away) …
+        let mut fills = vec![fill_of(10.0)];
+        let mut samples: Vec<Sample> = (0..6).map(|_| ocean()).collect();
+        let laid = lay(
+            &mut fills,
+            &mut samples,
+            &gaps,
+            &points,
+            |_| true,
+            &k,
+            9.81,
+            0.0,
+        );
+        assert_eq!(laid.samples, 4);
+        for s in &samples[..4] {
+            assert!(
+                (f64::from(s.thickness_m) - total_col).abs() < 1.0,
+                "{}",
+                s.thickness_m
+            );
+        }
+        assert!((laid.floor_m - 4.0 * total_col).abs() < 1.0);
+        assert_eq!(fills.len(), 1);
+        assert_eq!(fills[0].waited, 1);
+        assert!((fills[0].total_m() - 6.0 * total_col).abs() < 1.0);
+        assert!((fills[0].source_m / fills[0].total_m() - total_col).abs() < 1.0);
+        // … and goes to the fallback when one of them has died.
+        let mut fills = vec![fill_of(10.0)];
+        let mut samples: Vec<Sample> = (0..6).map(|_| ocean()).collect();
+        samples[5] = land.clone();
+        let laid = lay(
+            &mut fills,
+            &mut samples,
+            &gaps,
+            &points,
+            |p| p == 0,
+            &k,
+            9.81,
+            0.0,
+        );
+        assert!(fills.is_empty());
+        assert!((laid.floor_m - 4.0 * total_col).abs() < 1.0);
+        assert!((laid.fallback_m - 6.0 * total_col).abs() < 1.0);
     }
 }

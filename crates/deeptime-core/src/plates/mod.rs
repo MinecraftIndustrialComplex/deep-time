@@ -354,6 +354,11 @@ impl PlatesStage {
         }
         let ft = std::cell::RefCell::new(ft);
         let cb = std::cell::RefCell::new(cb);
+        // The columns' crust after the surface's feedback: what the step's plate processes add to
+        // it takes back the settling's light-top deficit (`settle::restore_top`, PLT-780).
+        let t_feedback: Option<Vec<f32>> = k
+            .settle_top_density
+            .then(|| st.samples.iter().map(|s| s.thickness_m).collect());
         lap(&mut clock, "feedback");
         // The land's gap budget (`gap_budget.rs`, measurement only): each process's change of the
         // gap between the samples' elevation and their columns' Airy height; the crust budget's
@@ -937,6 +942,9 @@ impl PlatesStage {
         // The lithosphere's thermal state from the step's flags (`thermal.rs`; off by default).
         thermal::step(st, &env);
         // Continental columns settle towards the height their crust holds up (`settle.rs`).
+        if let Some(t0) = &t_feedback {
+            settle::restore_top(&mut st.top_deficit_m, &st.samples, t0);
+        }
         let settled = settle::step(st, &env, flexure.as_deref(), sea);
         book(st, gap_budget::Part::Settle);
         *world
@@ -1467,6 +1475,23 @@ impl PlatesStage {
                     settle::take_from_top(d, -sums[v].m / wsum(v));
                 }
             }
+            // Measurement: the deficit's largest and mean over the visible continental crust at
+            // this step (set, not summed: the run's last step in `globals.json`).
+            let (mut most, mut sum, mut count) = (0.0f64, 0.0f64, 0usize);
+            for (s, &d) in st.samples.iter().zip(&st.top_deficit_m) {
+                if s.kind == CONTINENTAL && !s.is_hidden() {
+                    most = most.max(f64::from(d));
+                    sum += f64::from(d);
+                    count += 1;
+                }
+            }
+            world
+                .globals
+                .insert(settle::TOP_DEFICIT_MAX_GLOBAL.to_owned(), most);
+            world.globals.insert(
+                settle::TOP_DEFICIT_MEAN_GLOBAL.to_owned(),
+                if count > 0 { sum / count as f64 } else { 0.0 },
+            );
         } else {
             st.top_deficit_m.clear();
         }

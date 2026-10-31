@@ -14,8 +14,8 @@ if [ "$mode" = full ]; then
         | grep -E '^test result|FAILED|panicked|failures:|^    [a-z_:]+$' | head -80
 else
     deeptime-admit run --kind cargo:clippy -- cargo clippy -p deeptime-core -p deeptime-cli --all-targets -- -D warnings && echo "clippy-ok"
-    for f in extension settle gap_budget; do
+    for f in extension settle gap_budget rifts_stretching; do
         deeptime-admit run --kind cargo:test -- cargo test -p deeptime-core --lib -- "$f" --nocapture 2>&1 \
-            | grep -E '^test |^test result|FAILED|panicked|assertion|left|right' | head -60
+            | grep -E '^test |^test result|thickest|FAILED|panicked|assertion|left|right' | head -60
     done
 fi

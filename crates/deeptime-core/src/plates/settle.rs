@@ -82,6 +82,10 @@ use crate::surface::flexure::{RHO_MANTLE, RHO_WATER};
 /// `WorldState::globals`: the settling's rise and fall over the run, km³ of height × area.
 pub const RISE_GLOBAL: &str = "plates/settle_rise_km3";
 pub const FALL_GLOBAL: &str = "plates/settle_fall_km3";
+/// `WorldState::globals` with `tectonics.settle_top_density` (measurement): the top deficit's
+/// largest and mean over the visible continental crust at the last step, m.
+pub const TOP_DEFICIT_MAX_GLOBAL: &str = "plates/top_deficit_max_m";
+pub const TOP_DEFICIT_MEAN_GLOBAL: &str = "plates/top_deficit_mean_m";
 
 /// How far below its whole-column Airy height a metre of rock taken off a column's top leaves it,
 /// m: 1 / 5.5 − 1 / 7.0 = (ρ̄_c − ρ_u) / ρ_m = (2,830 − 2,700) / 3,300 = 0.039.
@@ -93,6 +97,27 @@ pub const TOP_DEFICIT_PER_M: f64 = 1.0 / ISOSTATIC_FACTOR - 1.0 / COLUMN_ISOSTAT
 pub fn take_from_top(deficit: &mut f32, taken_m: f64) {
     if taken_m.is_finite() {
         *deficit = (f64::from(*deficit) + taken_m * TOP_DEFICIT_PER_M) as f32;
+    }
+}
+
+/// Gives back the deficit of columns a plate process thickened during the step (see the module
+/// docs, "Light rock off the top"): crust stacked onto a column, accreted to it or added by its
+/// arcs brings its own light top, [`TOP_DEFICIT_PER_M`] per metre added, down to no deficit. A
+/// column that thickens as fast as it wears so sheds rock of the column's mean on the whole and
+/// keeps no deficit; one that wears without thickening keeps what it lost. `before` is each
+/// column's crust thickness after the surface's feedback, at the step's start (the samples keep
+/// their indices until the resampling, after the settling); thinning leaves the deficit, and a
+/// surplus (D < 0, light rock laid on top) is left as it is.
+// ledger: PLT-780
+pub fn restore_top(deficit: &mut [f32], samples: &[super::state::Sample], before: &[f32]) {
+    if deficit.len() != samples.len() || before.len() != samples.len() {
+        return;
+    }
+    for ((d, s), &t0) in deficit.iter_mut().zip(samples).zip(before) {
+        let added = f64::from(s.thickness_m) - f64::from(t0);
+        if *d > 0.0 && added > 0.0 {
+            *d = (f64::from(*d) - added * TOP_DEFICIT_PER_M).max(0.0) as f32;
+        }
     }
 }
 
@@ -203,6 +228,45 @@ pub fn step(state: &mut PlateState, env: &Env, flexure: Option<&[f64]>, sea: f64
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ledger: PLT-780
+    /// Crust a plate process adds takes the deficit back, 0.039 per metre, to none and no
+    /// further; thinning leaves it, and so a column that wears as fast as it thickens keeps none
+    /// (before, it grew by 0.039 m per metre worn for as long as the column wore: a kilometre and
+    /// more over a run on land that kept its height by thickening).
+    #[test]
+    fn crust_added_brings_its_own_light_top() {
+        let column = |t: f32| {
+            let mut s = super::super::state::Sample::blank(0);
+            s.kind = CONTINENTAL;
+            s.thickness_m = t;
+            s
+        };
+        let samples = [
+            column(36_000.0),
+            column(45_000.0),
+            column(30_000.0),
+            column(40_000.0),
+        ];
+        let before = [35_000.0, 35_000.0, 35_000.0, 39_000.0];
+        let mut d = [100.0f32, 100.0, 100.0, -50.0];
+        restore_top(&mut d, &samples, &before);
+        assert!((f64::from(d[0]) - (100.0 - 1000.0 * TOP_DEFICIT_PER_M)).abs() < 1.0e-3);
+        assert_eq!(d[1], 0.0, "10 km added gives back all of it, no further");
+        assert_eq!(d[2], 100.0, "thinning leaves it");
+        assert_eq!(d[3], -50.0, "a surplus of light rock stays");
+        // A column that wears 1 km off its top and thickens 1 km in each step keeps no deficit.
+        let mut d = [0.0f32];
+        for _ in 0..100 {
+            take_from_top(&mut d[0], 1000.0);
+            restore_top(&mut d, &[column(36_000.0)], &[35_000.0]);
+        }
+        assert!(d[0].abs() < 1.0e-3, "{}", d[0]);
+        // Lengths that do not match (a resampling between) change nothing.
+        let mut d = [100.0f32];
+        restore_top(&mut d, &samples, &before);
+        assert_eq!(d[0], 100.0);
+    }
 
     /// With the deficit a metre of rock off the top lowers the column's height by the upper
     /// crust's Airy share, 1 − 2,700 / 3,300 of it coming back, and a metre laid down undoes it.

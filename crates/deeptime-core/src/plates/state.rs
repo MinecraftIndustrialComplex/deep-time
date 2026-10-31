@@ -881,8 +881,14 @@ pub struct RiftFill {
     /// Σ of the unit positions of the samples that gave it, weighted by their crust (where it
     /// goes if the pair cannot take it).
     pub centroid: [f64; 3],
-    /// Resamplings it waited through with no gap between the two.
+    /// Resamplings it waited through with no gap between the two, or with more crust than its gap
+    /// could take.
     pub waited: u32,
+    /// The thickness of the columns it came from before they stretched, metres weighted by the
+    /// crust each gave, summed over samples (its mean over `total_m` is the thickest column a gap
+    /// sample takes of it: see `extension::lay`).
+    #[serde(default)]
+    pub source_m: f64,
 }
 
 impl RiftFill {

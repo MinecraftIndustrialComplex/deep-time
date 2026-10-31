@@ -1548,6 +1548,21 @@ fn the_rifts_stretching_keeps_its_crust_and_off_changes_nothing() {
     let off = run_stage_with(PlatesStage::new(q.clone()), &q, |_, _, st| {
         assert!(st.rift_fill.is_empty() && st.top_deficit_m.is_empty());
     });
+    // No rift floor stacks crust: the thickest column is the run's own, give or take the
+    // fallback's 10 km (the ext-cum arm's divergence, 2026-10-31).
+    let thickest = |w: &WorldState| {
+        w.plates
+            .as_ref()
+            .unwrap()
+            .samples
+            .iter()
+            .filter(|s| s.kind == CONTINENTAL && !s.is_hidden())
+            .map(|s| s.thickness_m)
+            .fold(0.0f32, f32::max)
+    };
+    let (t_on, t_off) = (thickest(&with), thickest(&off));
+    eprintln!("thickest continental column: {t_on:.0} m with the stretching, {t_off:.0} m without");
+    assert!(t_on <= t_off + 10_000.0, "{t_on} against {t_off}");
     let base = run_stage_with(
         PlatesStage::new(preset(8000, 200.0, "supercontinent", 3)),
         &q,
