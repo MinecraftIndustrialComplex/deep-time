@@ -1052,6 +1052,16 @@ pub struct FrontBands {
     pub oo_age_ocean: [[f64; BANDS]; 4],
     #[serde(default)]
     pub oo_arc_ocean: [[f64; BANDS]; 4],
+    /// … the subducting fronts by setting and by their contact's slab age at its onset
+    /// (`Contact::onset_slab_age_myr`, the mean age of the floor that first went under; a
+    /// contact begun at a ridge starts on floor near 0 Myr), in the bands of [`AGE_BANDS_MYR`] …
+    #[serde(default)]
+    pub onset_slab: [[f64; BANDS]; 2],
+    /// … and the ocean-ocean subducting front by its contact's age (rows) and the overriding
+    /// plate's floor age at the front sample (columns), both in the bands of [`AGE_BANDS_MYR`]:
+    /// floor younger than its contact was made after the subduction zone began.
+    #[serde(default)]
+    pub oo_over_floor: [[f64; BANDS]; BANDS],
 }
 
 /// One pair of plates' front in one setting and state this step ([`Mix::pairs`]; measurement
@@ -1112,11 +1122,24 @@ struct FrontRec {
     half: u32,
     pair: usize,
     slab_km: f64,
-    /// Measurement only (FrontBands::arc_age, oo_age_ocean, oo_arc_ocean): the subducting
-    /// side's sample, the contact's age and its arc's age (NaN with no arc onset), Myr.
+    /// Measurement only (FrontBands::arc_age, oo_age_ocean, oo_arc_ocean, onset_slab,
+    /// oo_over_floor): the subducting side's sample, the contact's age, its arc's age (NaN with
+    /// no arc onset), its slab's age at its onset and the overriding sample's floor age, Myr.
     u: u32,
     contact_age: f64,
     arc_age: f64,
+    onset_slab_age: f64,
+    over_floor_age: f64,
+}
+
+/// An active contact's measures for [`boundary_mix`]'s bands (measurement only): its slab, km,
+/// its age, its arc's age (NaN with no arc onset) and its slab's age at its onset, Myr.
+#[derive(Clone, Copy)]
+struct ContactMeas {
+    slab_km: f64,
+    age: f64,
+    arc_age: f64,
+    onset_slab_age: f64,
 }
 
 /// [`Mix`] in half sample spacings, summed over samples.
@@ -1212,15 +1235,19 @@ pub fn boundary_mix(
     // Each active contact's slab length, km, and age, Myr (the bands, measurement only).
     let slab_km: BTreeMap<(u32, u32), f64> =
         st.slabs.iter().map(|s| ((s.under, s.over), s.km)).collect();
-    let contact_of: BTreeMap<(u32, u32), (f64, f64, f64)> = st
+    let contact_of: BTreeMap<(u32, u32), ContactMeas> = st
         .contacts
         .iter()
         .filter(|c| c.active(env.step))
         .map(|c| {
             let key = (c.under, c.over);
-            let km = slab_km.get(&key).copied().unwrap_or(0.0);
-            let arc = c.arc_onset_myr.map_or(f64::NAN, |a| env.t_myr - a);
-            (key, (km, env.t_myr - c.onset_myr, arc))
+            let meas = ContactMeas {
+                slab_km: slab_km.get(&key).copied().unwrap_or(0.0),
+                age: env.t_myr - c.onset_myr,
+                arc_age: c.arc_onset_myr.map_or(f64::NAN, |a| env.t_myr - a),
+                onset_slab_age: c.onset_slab_age_myr,
+            };
+            (key, meas)
         })
         .collect();
     let norm = env.norm;
@@ -1380,10 +1407,9 @@ pub fn boundary_mix(
                     _ => None,
                 };
                 let front = setting.zip(front_index(&buf[..n])).map(|(k, f)| {
-                    let (km, age, _) = contact_of
+                    let (km, age) = contact_of
                         .get(&(plate_buf[f], pv))
-                        .copied()
-                        .unwrap_or((0.0, 0.0, f64::NAN));
+                        .map_or((0.0, 0.0), |m| (m.slab_km, m.age));
                     (k, f, km, age)
                 });
                 // An incipient front (PLT-610) is no subduction zone yet: a converging boundary
@@ -1401,6 +1427,7 @@ pub fn boundary_mix(
                 if let Some((k, f, km, age)) = front {
                     // Measurement only (PLT-683): the front sample for the step's cross-tabs.
                     let under = plate_buf[f];
+                    let meas = contact_of.get(&(under, pv));
                     acc.recs.push(FrontRec {
                         v: v as u32,
                         under,
@@ -1414,9 +1441,9 @@ pub fn boundary_mix(
                         slab_km: km,
                         u: idx_buf[f],
                         contact_age: age,
-                        arc_age: contact_of
-                            .get(&(under, pv))
-                            .map_or(f64::NAN, |&(_, _, a)| a),
+                        arc_age: meas.map_or(f64::NAN, |m| m.arc_age),
+                        onset_slab_age: meas.map_or(f64::NAN, |m| m.onset_slab_age),
+                        over_floor_age: sv.age_myr(env.t_myr),
                     });
                     if young {
                         acc.incipient[k] += u64::from(half);
@@ -1471,6 +1498,8 @@ pub fn boundary_mix(
     let mut no_arc = [0u64; 2];
     let mut oo_age_ocean = [[0u64; BANDS]; 4];
     let mut oo_arc_ocean = [[0u64; BANDS]; 4];
+    let mut onset_slab = [[0u64; BANDS]; 2];
+    let mut oo_over_floor = [[0u64; BANDS]; BANDS];
     let mut by_pair: BTreeMap<(u32, u32, u8, bool), (u64, f64)> = BTreeMap::new();
     for r in &recs {
         let h = u64::from(r.half);
@@ -1513,6 +1542,11 @@ pub fn boundary_mix(
             oo_age_ocean[row][band_of(r.contact_age, &AGE_BANDS_MYR)] += h;
             let a = if r.arc_age.is_nan() { 0.0 } else { r.arc_age };
             oo_arc_ocean[row][band_of(a, &AGE_BANDS_MYR)] += h;
+            let c = band_of(r.contact_age, &AGE_BANDS_MYR);
+            oo_over_floor[c][band_of(r.over_floor_age, &AGE_BANDS_MYR)] += h;
+        }
+        if !r.onset_slab_age.is_nan() {
+            onset_slab[r.setting][band_of(r.onset_slab_age, &AGE_BANDS_MYR)] += h;
         }
     }
     let pairs = by_pair
@@ -1550,6 +1584,8 @@ pub fn boundary_mix(
             no_arc: no_arc.map(km),
             oo_age_ocean: oo_age_ocean.map(|row| row.map(km)),
             oo_arc_ocean: oo_arc_ocean.map(|row| row.map(km)),
+            onset_slab: bands(onset_slab),
+            oo_over_floor: oo_over_floor.map(|row| row.map(km)),
             ..FrontBands::default()
         },
     }
