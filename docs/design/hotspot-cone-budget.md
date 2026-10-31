@@ -174,3 +174,26 @@ Follow-ups the re-review of d127d3ae named (not built yet):
   (`volcanoes/hotspot_cones_handed_km3`) equal what the tails netted by id, plus the unnetted, plus
   what the hotspots' records still hold (`handed_km3`); and a carry case where the pending exceeds
   the step's rock.
+
+## 7. The first check on master's default (base35, 2026-10-31)
+
+base35 (master 9d9e4c94, PR #54 with the budget on, key 4dd28019a295, 24 runs, 1000 Myr; the
+preset's hotspots, `hotspots_sourced` off), read from the cached globals by
+`tools/review/crustcycle/cone_books.py` and `cones.py` (km³ a year, Earth-normalized; the mean of
+24 and the range):
+
+- The hotspots' cones handed 0.028 (0.016 to 0.035) against 0.60 at full (0.28 to 0.77): the budget
+  binds on every run, the cones handing 4.7 % of the rock their growth would.
+- The tails netted by id 99.2 % of that, dead tails left 0.62 % unnetted (0.00018 a year, 60,000 to
+  253,000 km³ a run), and the rest, what the live hotspots' records hold at the end and the last
+  frame's, 0.15 % (0 to 0.43 %), never below zero. The kernel's place count is 0 on all 24.
+- The tails netted 55 % of their rock as cones (0.46 to 0.67; their rock 0.050 a year); the
+  hotspots' own basalt, 0.041, is the rest of that rock plus the preset's plume heads' domes (on
+  supercontinent-1, 48.5 × 10⁶ km³ against 27.8 × 10⁶ of rock not netted: about 16 domes of
+  1.27 × 10⁶, the count cones.py reads for the plateaus).
+- All the cones handed 0.31 (base34-s4's worlds 0.84): the arcs counted 0.24, the hotspots by id
+  0.028, the flood basalts' plateaus 0.018, and 0.025 counted by nothing (base34-s4 0.50): felsic
+  cones beyond an arc's reach, and the plateau's estimate's error.
+
+So the books close on the default: no cone hands rock its hotspot's tail did not make but for the
+0.6 % dead tails leave, which the follow-ups above (the take-back after erosion) bear on.

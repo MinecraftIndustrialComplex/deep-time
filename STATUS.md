@@ -153,6 +153,11 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 
 ## Build log
 
+### 2026-10-31: Hotspot lane: the cone budget's books on base35, the first check of the default; hotspot-lid on master 9d9e4c94 (lane agent, worktree .claude/worktrees/agent-abc417f512034b877, branch hotspot-lid; sub-agent of session 88bb1af2-7722-4f74-9e04-4e8b8af667a9; not merged)
+
+- **Measured** (no simulation; base35's 24 cached runs, key 4dd28019a295, argkey cd665cef; `tools/review/crustcycle/cone_books.py` (new) and `cones.py` over `/data/ban/deeptime-runs/pool/4dd28019a295/earthlike_quick_16k-1000/cd665cef/*`): the hotspots' cones handed 0.028 km³ a year (0.016 to 0.035) against 0.60 at full; netted by id 99.2 %, unnetted (dead tails) 0.62 %, the rest at the end 0.15 % (0 to 0.43 %, never negative); the kernel's place count 0 on all 24; the tails netted 55 % of their rock (0.46 to 0.67). All the cones handed 0.31 (base34-s4's worlds 0.84), 0.025 counted by nothing (0.50). Written in the design's section 7 and plates.md "The cone budget".
+- **hotspot-lid**: origin/master 9d9e4c94 merged (1135fc47, the tree of the gated 091bdcd0). hs-lid is ready and waits for a simulation slot: `pool.sh run hs-lid --seeds 1,2,3,4 --set tectonics.hotspots_sourced=true --set tectonics.plume_heads_sourced=true --set tectonics.volcanic_margins=true +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`, against base35-s4.
+
 ### 2026-10-31: Hotspot lane, step 3: the lid, built with `hotspots_sourced` (off); the arm waits for base35-s4 (lane agent, worktree .claude/worktrees/agent-abc417f512034b877, branch hotspot-lid on hotspot-lip 4d9ea6f5; sub-agent of session 88bb1af2-7722-4f74-9e04-4e8b8af667a9; not merged)
 
 - **Task** (the coordinator): how much a tail melts under thick lithosphere, sourced, behind `hotspots_sourced`, unit tests first; one Sonnet research sub-agent; the arm against base35-s4 when it exists.

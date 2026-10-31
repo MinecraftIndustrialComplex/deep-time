@@ -13717,6 +13717,13 @@ test now on a planet whose kernel holds several samples, its netting exact, and 
 test checks each gap point's thickness against its share. The arms above predate the fixes; the
 default without the budget is unchanged.
 
+**The first check on master's default** (base35, master 9d9e4c94 with the budget on, 24 runs;
+`tools/review/crustcycle/cone_books.py`, km³ a year): the hotspots' cones handed 0.028 against 0.60
+at full; the tails netted 99.2 % of it by id, dead tails left 0.62 % unnetted, the live records held
+0.15 % at the end (never below zero); the kernel counted nothing by place. All the cones handed 0.31
+(base34-s4's worlds 0.84), 0.025 of it counted by nothing (0.50). docs/design/hotspot-cone-budget.md
+section 7.
+
 ### The lid (PLT-805 to PLT-808; 2026-10-31)
 
 With the cone budget the sourced tails still put 0.43 km³ a year on continental crust (hs-cum2), because
