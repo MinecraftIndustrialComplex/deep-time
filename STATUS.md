@@ -152,6 +152,47 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 
 ## Build log
 
+### 2026-10-31: Continental extension, rifts that stretch before they break up (`tectonics.rift_stretching`, PLT-781 to PLT-784), and the settling's light top (`tectonics.settle_top_density`, PLT-780), built and off; what the rate cap trims, measured (PLT-785) (the runoff lane, worktree agent-a4e92fd13092b08b0, branch `continental-extension` on `uplift-trace` 9cbdd3c5; not merged)
+
+- **Read.** What the model does at rifts and break-ups (docs/design/continental-extension.md):
+  - a rift only relabels samples, and its gap is sea floor at the next resampling;
+  - the margin's taper (PLT-261) draws the break-up's end state;
+  - the collapse (PLT-254, PLT-414) is fixed-boundary and fills room up to the lowland's column, a continent's height
+    over the sea;
+  - the rate cap (PLT-287, PLT-288) is a per-column thickening ceiling against the resamplings' and the wedge's lumps.
+    Its excess goes to that same room, ocean floor at the continent's edge filled to the normal column: a numerical
+    guard and a stand-in for the orogen's widening, not for extension. On the uplift trace 1.33 of its 2.10 km³ a year
+    went onto ocean floor.
+- **Sources** (one Sonnet research sub-agent; the design and the bibliography have the quotes):
+  - in full or in parts: Rey, Vanderhaeghe & Teyssier 2001 in full (free-boundary collapse, the Moho at 700 °C), Buck
+    et al. 1999 and Buck 2007 in parts (narrow rifts as wide as the lithosphere, the Basin and Range up to 800 km wide,
+    wide and core-complex modes only for thick, hot crust), Jolivet & Brun 2010, Long 2019, Molnar & England 1990
+    (5/6 rebound), Molnar, England & Martinod 1993, Zhang et al. 2004;
+  - abstracts only: Buck 1991, Brun 1999 and Dewey 1988.
+- **Built, off: the rift's stretching (`plates/extension.rs`).**
+  - **Where.** A boundary between two plates' continental crust that opens.
+  - **How much.** The opening's area u W is taken in pure shear by the two sides' columns, each down to no less than
+    10 km of crystalline crust (Brune et al. 2014), so β is the integral of a strain rate the plates' opening sets.
+  - **Narrow or wide** by the edge columns' Moho temperature on the model's geotherm, 700 °C:
+    - narrow: evenly over half a lithosphere's thickness;
+    - wide: the thin sheet's decay over hot columns, L = 2W/π.
+
+    On the model's geotherm this puts every rift of Buck's Fig. 30 in its mode.
+  - **The crust given** waits on the pair and is laid at the next resampling in the gap as the rift's floor, or past
+    break-up as 10 km hyper-extended margins nearest the edges.
+- **Built, off: the settling's light top.** A deficit of 0.039 m per metre the surface takes off a column's top
+  (2,700 against 2,830 kg/m³), so eroded ground comes back by 0.82 instead of 6/7. Molnar & England's 5/6 lies between
+  the two, so it is a small detail of heights, not a plain error.
+- **Measured: the rate cap's release by the parts** that thickened the column (`cap_land`, `cap_sea` in the land
+  ledger; `tools/review/uplift/ledger.py`).
+- **Tests:** seven in `extension.rs`, one in `settle.rs`, one in `gap_budget.rs` and a 200 Myr run in `plates/tests.rs`
+  (the stretched crust all laid or waiting; off is master's). The VM gate (`tools/review/extension/gate.sh full`: fmt, clippy on the workspace, `cargo test --workspace --no-fail-fast`): 1,459 passed, 0 failed, 13 ignored (deeptime-core 1,175 passed, 12 ignored).
+- **Next: the arm.** It runs once base35-s4 exists:
+  - merge origin/master, then `pool.sh alias HEAD <base35's key> --check-seed 1`;
+  - `pool.sh run ext-cum --seeds 1,2,3,4 --set tectonics.rift_stretching=true --set tectonics.settle_top_density=true
+    +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps +DEEPTIME_GAP_BUDGET=1` against base35-s4;
+  - read the export, the land ledger's `extension` part and the cap's split.
+
 ### 2026-10-31: The rock the plates lift above the sea, split by process: no double count; the excess is collisional crust that only erosion returns (the runoff lane, worktree agent-a4e92fd13092b08b0, branch `uplift-trace` on `surface-runoff-budget` 1803fb56; measurement only, nothing built)
 
 - **What was built (measurement only):** the land ledger in the gap budget (`plates/gap_budget.rs`, with
