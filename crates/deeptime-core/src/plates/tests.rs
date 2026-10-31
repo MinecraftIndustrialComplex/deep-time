@@ -591,7 +591,9 @@ fn sutures_and_initiations_keep_continents_whole() {
     // 18 and 21 to 24, scattered 1, 3 to 6, 8 to 10, 12, 13, 15 to 17 and 21 to 23; with a
     // contact only where its plates converge on by default, PLT-810, the same day, scattered 8 no
     // more, the sweep's welding seeds supercontinent 1, 2, 8, 9, 12, 13, 16, 17 and 19 and
-    // scattered 3, 5, 7, 9, 11, 13 to 16, 18 and 22, so supercontinent 2 and scattered 3).
+    // scattered 3, 5, 7, 9, 11, 13 to 16, 18 and 22, so supercontinent 2 and scattered 3; with the
+    // gate on any angle of convergence, PR #55's review, supercontinent 1, 2, 4, 5, 7, 8, 10, 12, 13,
+    // 17, 20, 21 and 24 and scattered 2, 3, 5 to 7, 10 to 13, 17, 19, 22 and 24, the same two).
     for (start, seed) in [("supercontinent", 2), ("scattered_continents", 3)] {
         let mut p = preset(8000, 300.0, start, seed);
         // The old law (PLT-585 off, PLT-540 on): under Forsyth & Uyeda's balance on this small
@@ -949,7 +951,9 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // seed 3 still welds; from the supercontinent 1 to 4, 10, 12, 14, 18 and 21 to 24; 11 of
     // seeds 1 to 24 with a contact only where its plates converge on by default, PLT-810, the same
     // day: 3, 5, 7, 9, 11, 13 to 16, 18 and 22, seed 3 still welds; from the supercontinent 1, 2,
-    // 8, 9, 12, 13, 16, 17 and 19).
+    // 8, 9, 12, 13, 16, 17 and 19; 13 of 24 with the gate on any angle of convergence, PR #55's
+    // review: 2, 3, 5 to 7, 10 to 13, 17, 19, 22 and 24, seed 3 still welds; from the
+    // supercontinent 1, 2, 4, 5, 7, 8, 10, 12, 13, 17, 20, 21 and 24).
     let mut p = preset(8000, 300.0, "scattered_continents", 3);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: under Forsyth & Uyeda's
     // balance on this small planet, whose ridge push is several times Earth's
@@ -1164,7 +1168,9 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // and 24, the guard binding on none), so the two tests still share this planet; and after PR
     // #53's re-review, the same day (the sweep's welding seeds 1, 3 to 6, 8 to 10, 12, 13, 15 to 17
     // and 21 to 23, the guard binding on none)), and with PLT-810 on by default, the same day
-    // (the sweep's welding seeds 3, 5, 7, 9, 11, 13 to 16, 18 and 22, the guard binding on none).
+    // (the sweep's welding seeds 3, 5, 7, 9, 11, 13 to 16, 18 and 22, the guard binding on none), and
+    // with the gate on any angle of convergence (PR #55's review: 2, 3, 5 to 7, 10 to 13, 17, 19, 22
+    // and 24, the guard binding on none).
     let mut p = preset(8000, 300.0, "scattered_continents", 3);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: the guard asserted below
     // bound under Forsyth & Uyeda's balance on every welding seed of 1 to 24 of this small planet
