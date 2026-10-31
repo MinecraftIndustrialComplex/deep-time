@@ -10,8 +10,10 @@ For each front sample it reads the subducting plate at the map's time:
 
   its age since its birth (rec.json `born_myr`) and how it was born (`origin`);
   its visible ocean floor's median and 90th-percentile age, and its share of the planet's samples;
-  the distance from the front sample to the plate's nearest floor younger than 5 Myr (its spreading ridge's flank;
-  great circle, Earth-normalized km; none when the plate has no floor that young), and the spreading rate that
+  the distance from the front sample to the plate's nearest floor within 5 Myr of the planet's youngest floor (its
+  spreading ridge's flank: new floor is made only at resamplings, so between them the youngest floor ages; great
+  circle, Earth-normalized km; none when the plate has no floor that young: no ridge spread on it at the last
+  resampling), and the plate's own youngest floor's age over the planet's (its ridge's age); and the spreading rate that
   distance implies with the floor's age at the front (km / Myr = mm/yr, a half rate: the floor's age over its path
   from the ridge, where the plate's ridge has not moved);
 
@@ -37,6 +39,7 @@ BANDS = {
     "plate's floor p90, Myr": ([0, 25, 55, 100, 150], lambda r: r["plate_p90"]),
     "plate's share of the planet": ([0, 0.01, 0.03, 0.06, 0.12], lambda r: r["plate_share"]),
     "ridge distance, km": ([0, 500, 1000, 2000, 4000], lambda r: r["ridge_km"]),
+    "own youngest over planet's, Myr": ([0, 5, 20, 55, 100], lambda r: r["own_young"]),
     "implied half rate, mm/yr": ([0, 10, 20, 40, 80], lambda r: r["rate"]),
 }
 ORIGINS = ["initial", "rift", "fission", "back_arc", "subduction_initiation", "margin_propagation", "other"]
@@ -62,6 +65,7 @@ def snapshot(run, t, lives):
         trees[q] = cKDTree(p[m])
     all_tree = cKDTree(p)
     ocean = ~cont & np.isfinite(age)
+    youngest = float(age[ocean].min()) if ocean.any() else 0.0
     stats, ridges = {}, {}
     out = []
     for i in idx:
@@ -81,10 +85,11 @@ def snapshot(run, t, lives):
             ages = age[m]
             stats[u] = (float(np.median(ages)) if len(ages) else np.nan,
                         float(np.percentile(ages, 90)) if len(ages) else np.nan,
-                        float((plate == u).sum()) / len(a))
-            young = np.nonzero(m & (age < RIDGE_MYR))[0]
+                        float((plate == u).sum()) / len(a),
+                        float(ages.min()) - youngest if len(ages) else np.nan)
+            young = np.nonzero(m & (age < youngest + RIDGE_MYR))[0]
             ridges[u] = cKDTree(p[young]) if len(young) else None
-        p50, p90, share = stats[u]
+        p50, p90, share, own_young = stats[u]
         ridge_km = np.inf
         if ridges[u] is not None:
             dd, _ = ridges[u].query(p[i])
@@ -98,6 +103,7 @@ def snapshot(run, t, lives):
             "plate_p50": p50,
             "plate_p90": p90,
             "plate_share": share,
+            "own_young": own_young,
             "ridge_km": ridge_km,
             "rate": ridge_km / slab_age if np.isfinite(ridge_km) and slab_age > 0 else np.inf,
         })
