@@ -12,7 +12,9 @@ shift
 HERE=$(cd "$(dirname "$0")" && pwd)
 E=/data/ban/deeptime-runs/m5diag/earth
 mkdir -p "$OUT"
-"$PY" -I "$HERE/lowcont.py" earth "$E/crust1/crust1.bnds" "$E/earth_relief_15m_p.grd" > "$OUT/earth.txt" 2>&1
+# The Earth step needs h5py, which the pool's numpy environment lacks (m5earth.sh's recipe).
+nix shell --impure --expr '(builtins.getFlake "nixpkgs").legacyPackages.${builtins.currentSystem}.python3.withPackages (p: [p.numpy p.scipy p.h5py])' \
+  -c python3 -I "$HERE/lowcont.py" earth "$E/crust1/crust1.bnds" "$E/earth_relief_15m_p.grd" > "$OUT/earth.txt" 2>&1
 tail -n 1 "$OUT/earth.txt" > "$OUT/earth.json"
 TABLE=()
 for kv in "$@"; do
