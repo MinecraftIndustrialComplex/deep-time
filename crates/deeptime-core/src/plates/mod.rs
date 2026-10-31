@@ -332,6 +332,10 @@ impl PlatesStage {
         if tracing {
             traced.z_pre = st.samples.iter().map(|s| s.elevation_m).collect();
         }
+        // The land ledger's sea for the step (`gap_budget.rs`, measurement only).
+        if let Some(gb) = st.gap_budget.as_mut() {
+            gb.set_sea(sea_m(world), env.norm.sample_area_km2());
+        }
         let (mut cones, flexure, held) =
             self.apply_surface_feedback(st, world, &env, collisions || settles)?;
         if tracing {

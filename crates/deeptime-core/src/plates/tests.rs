@@ -1459,6 +1459,12 @@ fn the_gap_budget_changes_nothing_and_adds_up() {
         let sum: f64 = b.parts.iter().sum();
         assert!(b.n == 0 || (sum - b.gap).abs() < 5.0, "{sum} vs {}", b.gap);
     }
+    // The land ledger closes: its parts and the sea's term add up to the land above the sea.
+    assert_eq!(gb.land_snapshots.len(), 4);
+    let v = gb.land_snapshots.last().unwrap().v;
+    assert!(v > 0.0);
+    let left = gb.land_residual();
+    assert!(left.abs() < 1.0e-6 * v, "{left} of {v}");
     let without = run_stage_with(PlatesStage::new(p.clone()), &p, |_, _, st| {
         assert!(st.gap_budget.is_none())
     });

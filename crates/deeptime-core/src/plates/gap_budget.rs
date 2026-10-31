@@ -31,6 +31,17 @@
 //! (the ocean share), so a continental column's gap splits into what it brought from the ocean
 //! floor and what was made on the continent.
 //!
+//! # The land ledger
+//! On the same brackets the budget also keeps, per part, the change of the land's height above
+//! the sea, H = max(z − sea, 0) over the visible samples, and of the columns' thickness by where
+//! the column stood (above the sea, continental crust under it, ocean floor, hidden): the uplift
+//! trace's question (2026-10-31, "split the rock the plates lift above the sea by process"). The
+//! sea is the one the plate step stands under ([`GapBudget::set_sea`]); its own change between
+//! steps is booked apart. A booking split over several parts (the surface's feedback) walks the
+//! parts in order, so the parts of a sample that crosses the shore still add up to its change of
+//! H. Summed over the run the parts and the sea's term add up to the change of the land's volume
+//! above the sea ([`LandSums`], the `land_ledger` lines).
+//!
 //! The budget is off unless [`ON_ENV`] is set; it changes nothing the model does.
 
 use rayon::prelude::*;
@@ -228,6 +239,8 @@ struct Track {
     /// The column's thickness at the last booking, m (the sum of its pools).
     thick: f32,
     continental: bool,
+    /// Not hidden under another plate, at the last booking (the land ledger).
+    visible: bool,
     /// This step's change of elevation and of thickness by part, m ([`GapBudget::begin_step`]
     /// clears them; the spike record, [`StepSpike`]).
     step_dz: [f32; PARTS],
@@ -276,6 +289,99 @@ pub struct Snapshot {
     pub t_myr: f64,
     /// The share of the visible continental samples in each band.
     pub bands: Vec<BandStock>,
+}
+
+/// The land ledger's sums, per part, m summed over samples (times the sample area: volume).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct LandSums {
+    /// Σ change of the height above the sea, H = max(z − sea, 0) on visible samples (0 hidden).
+    pub lift: [f64; PARTS],
+    /// Σ of the rises of H alone.
+    pub up: [f64; PARTS],
+    /// Σ change of H on samples that are continental crust after the change.
+    pub lift_c: [f64; PARTS],
+    /// Σ change of the column's thickness on visible samples above the sea before the change …
+    pub t_land: [f64; PARTS],
+    /// … on visible continental crust at or under the sea …
+    pub t_shelf: [f64; PARTS],
+    /// … on visible ocean floor at or under the sea …
+    pub t_ocean: [f64; PARTS],
+    /// … and on hidden samples.
+    pub t_hidden: [f64; PARTS],
+}
+
+impl LandSums {
+    fn add(&mut self, o: &LandSums) {
+        for (a, b) in [
+            (&mut self.lift, &o.lift),
+            (&mut self.up, &o.up),
+            (&mut self.lift_c, &o.lift_c),
+            (&mut self.t_land, &o.t_land),
+            (&mut self.t_shelf, &o.t_shelf),
+            (&mut self.t_ocean, &o.t_ocean),
+            (&mut self.t_hidden, &o.t_hidden),
+        ] {
+            for (x, y) in a.iter_mut().zip(b) {
+                *x += y;
+            }
+        }
+    }
+
+    /// Books one sample's change of H, `h0` to `h1`, to `part`.
+    fn lift(&mut self, part: usize, h0: f64, h1: f64, continental: bool) {
+        let d = h1 - h0;
+        self.lift[part] += d;
+        self.up[part] += d.max(0.0);
+        if continental {
+            self.lift_c[part] += d;
+        }
+    }
+
+    /// Books one sample's change of thickness `dt` to `part`, by where the column stood before.
+    fn thicken(&mut self, part: usize, dt: f64, visible: bool, above: bool, continental: bool) {
+        let row = match (visible, above, continental) {
+            (false, _, _) => &mut self.t_hidden,
+            (true, true, _) => &mut self.t_land,
+            (true, false, true) => &mut self.t_shelf,
+            (true, false, false) => &mut self.t_ocean,
+        };
+        row[part] += dt;
+    }
+}
+
+/// The land ledger at one time: the sums since the run began, the land's volume above the sea
+/// (Σ H, m summed over samples; on continental crust alone, `v_c`) and the sea, m.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct LandSnapshot {
+    pub t_myr: f64,
+    pub sea_m: f64,
+    pub v: f64,
+    pub v_c: f64,
+    /// The sea's own change between steps: Σ change of H it made, m.
+    pub sea_shift: f64,
+    pub sums: LandSums,
+}
+
+/// One new sample of a resampling, for the land ledger: H at the old samples' blended elevation,
+/// at the blend and at the end (the accretion's rise added), m; whether the blended old elevation
+/// and the blend stood above the sea; the blend's and the accretion's change of thickness, m.
+#[derive(Clone, Copy, Debug, Default)]
+struct LandRow {
+    born: bool,
+    h_was: f64,
+    h_mid: f64,
+    h_end: f64,
+    continental: bool,
+    visible: bool,
+    above_was: bool,
+    above_mid: bool,
+    dt_blend: f64,
+    dt_accrete: f64,
+}
+
+/// The height above the sea of a sample at `z`, m (none while hidden).
+fn above(z: f64, sea: f64, visible: bool) -> f64 {
+    if visible { (z - sea).max(0.0) } else { 0.0 }
 }
 
 /// One step's largest changes of a visible sample, and what made them (the spike record: build
@@ -332,6 +438,15 @@ pub struct GapBudget {
     /// Per part: visible sample-steps on which the part alone raised a sample by more than
     /// [`SPIKE_EDGES_M`], then thickened its column by more than 7 times as much.
     pub part_over: Vec<[u64; 8]>,
+    /// The land ledger: the sea the step stands under, m, the sample's area, km², the sums since
+    /// the start, the sea's own term, the land's volume above the sea at the start (at the datum,
+    /// Σ H in m over samples) and the snapshots.
+    sea_m: f64,
+    area_km2: f64,
+    land: LandSums,
+    sea_shift: f64,
+    v_start: f64,
+    pub land_snapshots: Vec<LandSnapshot>,
 }
 
 fn gap_of(s: &Sample, z_0: f64, gravity: f64) -> (f32, f32) {
@@ -356,9 +471,35 @@ impl GapBudget {
             snapshots: Vec::new(),
             spikes: Vec::new(),
             part_over: vec![[0; 8]; PARTS],
+            sea_m: 0.0,
+            area_km2: f64::NAN,
+            land: LandSums::default(),
+            sea_shift: 0.0,
+            v_start: 0.0,
+            land_snapshots: Vec::new(),
         };
         b.begin(samples);
+        b.v_start = b.land_volume().0;
         b
+    }
+
+    /// The land's volume above the sea now, from the accounts: Σ H over the samples, m, and on
+    /// continental crust alone.
+    fn land_volume(&self) -> (f64, f64) {
+        let sea = self.sea_m;
+        self.track.iter().fold((0.0, 0.0), |(v, c), t| {
+            let h = above(f64::from(t.z), sea, t.visible);
+            (v + h, if t.continental { c + h } else { c })
+        })
+    }
+
+    /// The land ledger's sea for the plate step about to begin (before the surface's feedback),
+    /// m, and the sample's area, km²: the change of H the sea's own move made is booked apart.
+    pub fn set_sea(&mut self, sea_m: f64, area_km2: f64) {
+        let was = self.land_volume().0;
+        self.sea_m = sea_m;
+        self.sea_shift += self.land_volume().0 - was;
+        self.area_km2 = area_km2;
     }
 
     /// The start of a step (after the surface's feedback): clears every sample's change of the
@@ -450,6 +591,7 @@ impl GapBudget {
                     iso,
                     thick: thick_of(&s.pools),
                     continental: s.kind == CONTINENTAL,
+                    visible: !s.is_hidden(),
                     step_dz: [0.0; PARTS],
                     step_dt: [0.0; PARTS],
                 }
@@ -469,27 +611,55 @@ impl GapBudget {
             self.begin(samples);
             return;
         }
-        let (z_0, g) = (self.z_0, self.gravity);
-        let sums = self
+        let (z_0, g, sea) = (self.z_0, self.gravity, self.sea_m);
+        let (sums, land) = self
             .track
             .par_iter_mut()
             .zip(samples.par_iter())
             .enumerate()
             .fold(
-                || vec![[0.0f64; 2 * PARTS]; BANDS],
-                |mut acc, (v, (t, s))| {
+                || (vec![[0.0f64; 2 * PARTS]; BANDS], LandSums::default()),
+                |(mut acc, mut land), (v, (t, s))| {
                     let (z, iso) = gap_of(s, z_0, g);
                     let thick = thick_of(&s.pools);
                     let (dz, diso) = (f64::from(z - t.z), f64::from(iso - t.iso));
+                    let visible = !s.is_hidden();
                     if dz == 0.0
                         && diso == 0.0
                         && thick == t.thick
                         && t.continental == (s.kind == CONTINENTAL)
+                        && t.visible == visible
                     {
-                        return acc;
+                        return (acc, land);
                     }
                     let (mut d, mut l) = ([0.0f64; PARTS], [0.0f64; PARTS]);
                     split(v, dz, diso, &mut d, &mut l);
+                    // The land ledger: H walked through the parts in order; what the walk leaves
+                    // (a change of visibility, rounding) goes to the booked part.
+                    let cont = s.kind == CONTINENTAL;
+                    let mut zw = f64::from(t.z);
+                    let mut hw = above(zw, sea, t.visible);
+                    for (p, x) in l.iter().enumerate() {
+                        if *x != 0.0 {
+                            zw += x;
+                            let h = above(zw, sea, t.visible);
+                            land.lift(p, hw, h, cont);
+                            hw = h;
+                        }
+                    }
+                    land.lift(
+                        thick_part as usize,
+                        hw,
+                        above(f64::from(z), sea, visible),
+                        cont,
+                    );
+                    land.thicken(
+                        thick_part as usize,
+                        f64::from(thick - t.thick),
+                        t.visible,
+                        f64::from(t.z) > sea,
+                        t.continental,
+                    );
                     for (p, x) in t.parts.iter_mut().zip(&d) {
                         *p += *x as f32;
                     }
@@ -512,18 +682,20 @@ impl GapBudget {
                     t.z = z;
                     t.iso = iso;
                     t.continental = s.kind == CONTINENTAL;
-                    acc
+                    t.visible = visible;
+                    (acc, land)
                 },
             )
             .reduce(
-                || vec![[0.0f64; 2 * PARTS]; BANDS],
-                |mut a, b| {
+                || (vec![[0.0f64; 2 * PARTS]; BANDS], LandSums::default()),
+                |(mut a, mut la), (b, lb)| {
                     for (ra, rb) in a.iter_mut().zip(&b) {
                         for (x, y) in ra.iter_mut().zip(rb) {
                             *x += y;
                         }
                     }
-                    a
+                    la.add(&lb);
+                    (a, la)
                 },
             );
         for (ra, rb) in self.flux.iter_mut().zip(&sums) {
@@ -531,6 +703,7 @@ impl GapBudget {
                 *x += y;
             }
         }
+        self.land.add(&land);
     }
 
     /// Books every sample's change of gap since the last booking to `part`.
@@ -578,16 +751,18 @@ impl GapBudget {
     /// After a resampling: the new samples' accounts from the old ones (`traces`, one per new
     /// sample).
     pub fn resampled(&mut self, samples: &[Sample], traces: &[Option<Trace>]) {
-        let (z_0, g) = (self.z_0, self.gravity);
+        let (z_0, g, sea) = (self.z_0, self.gravity, self.sea_m);
+        let (v_old, v_old_c) = self.land_volume();
         let old = std::mem::take(&mut self.track);
-        // Per new sample: its account, its change of gap by part and its blend's and accretion's
-        // changes of elevation.
-        let rows: Vec<(Track, [f64; PARTS], [f64; 2])> = samples
+        // Per new sample: its account, its change of gap by part, its blend's and accretion's
+        // changes of elevation, and the land ledger's row.
+        let rows: Vec<(Track, [f64; PARTS], [f64; 2], LandRow)> = samples
             .par_iter()
             .zip(traces.par_iter())
             .map(|(s, tr)| {
                 let (z, iso) = gap_of(s, z_0, g);
                 let continental = s.kind == CONTINENTAL;
+                let visible = !s.is_hidden();
                 let mut d = [0.0f64; PARTS];
                 let thick = thick_of(&s.pools);
                 let Some(tr) = tr.filter(|tr| tr.tri.iter().all(|&i| (i as usize) < old.len()))
@@ -601,10 +776,17 @@ impl GapBudget {
                         iso,
                         thick,
                         continental,
+                        visible,
                         step_dz: [0.0; PARTS],
                         step_dt: [0.0; PARTS],
                     };
-                    return (t, d, [0.0; 2]);
+                    let row = LandRow {
+                        born: true,
+                        h_end: above(f64::from(z), sea, visible),
+                        continental,
+                        ..LandRow::default()
+                    };
+                    return (t, d, [0.0; 2], row);
                 };
                 let mut parts = [0.0f64; PARTS];
                 let mut ocean = [0.0f64; PARTS];
@@ -652,13 +834,28 @@ impl GapBudget {
                     iso,
                     thick,
                     continental,
+                    visible,
                     step_dz: step_dz.map(|x| x as f32),
                     step_dt: step_dt.map(|x| x as f32),
                 };
-                (t, d, [f64::from(tr.z) - was_z, f64::from(z - tr.z)])
+                let row = LandRow {
+                    born: false,
+                    h_was: above(was_z, sea, true),
+                    h_mid: above(f64::from(tr.z), sea, visible),
+                    h_end: above(f64::from(z), sea, visible),
+                    continental,
+                    visible,
+                    above_was: was_z > sea,
+                    above_mid: f64::from(tr.z) > sea,
+                    dt_blend: blend_t - was_t,
+                    dt_accrete: f64::from(thick) - blend_t,
+                };
+                (t, d, [f64::from(tr.z) - was_z, f64::from(z - tr.z)], row)
             })
             .collect();
-        for ((_, d, lift), s) in rows.iter().zip(samples) {
+        let (blend, accrete) = (Part::ResampleBlend as usize, Part::ResampleAccrete as usize);
+        let (mut mid, mut mid_c) = (0.0, 0.0);
+        for ((_, d, lift, lr), s) in rows.iter().zip(samples) {
             if s.kind == CONTINENTAL && !s.is_hidden() {
                 let row = &mut self.flux[band(s.thickness_m)];
                 for (a, x) in row.iter_mut().zip(d) {
@@ -667,8 +864,31 @@ impl GapBudget {
                 row[PARTS + Part::ResampleBlend as usize] += lift[0];
                 row[PARTS + Part::ResampleAccrete as usize] += lift[1];
             }
+            let land = &mut self.land;
+            if lr.born {
+                land.lift(Part::Birth as usize, 0.0, lr.h_end, lr.continental);
+                continue;
+            }
+            mid += lr.h_mid;
+            if lr.continental {
+                mid_c += lr.h_mid;
+            }
+            land.up[blend] += (lr.h_mid - lr.h_was).max(0.0);
+            land.lift(accrete, lr.h_mid, lr.h_end, lr.continental);
+            land.thicken(blend, lr.dt_blend, true, lr.above_was, lr.continental);
+            land.thicken(
+                accrete,
+                lr.dt_accrete,
+                lr.visible,
+                lr.above_mid,
+                lr.continental,
+            );
         }
-        self.track = rows.into_iter().map(|(t, _, _)| t).collect();
+        // The blend's change of H: the blended heights of the new samples less the old land
+        // (samples dropped or doubled included).
+        self.land.lift[blend] += mid - v_old;
+        self.land.lift_c[blend] += mid_c - v_old_c;
+        self.track = rows.into_iter().map(|(t, _, _, _)| t).collect();
     }
 
     /// The end of a step at `t_myr` (steps of `dt_myr`): records its spike ([`StepSpike`]) and
@@ -728,6 +948,23 @@ impl GapBudget {
         self.snapshots.push(Snapshot { t_myr, bands });
         self.flux = vec![[0.0; 2 * PARTS]; BANDS];
         self.sample_steps = vec![0.0; BANDS];
+        let (v, v_c) = self.land_volume();
+        self.land_snapshots.push(LandSnapshot {
+            t_myr,
+            sea_m: self.sea_m,
+            v,
+            v_c,
+            sea_shift: self.sea_shift,
+            sums: self.land.clone(),
+        });
+    }
+
+    /// The land ledger's closure: the change of the land's volume above the sea since the start
+    /// less its parts and the sea's term, m summed over samples (0 but for rounding, unless the
+    /// accounts were started again, [`GapBudget::restarts`]).
+    pub fn land_residual(&self) -> f64 {
+        let booked: f64 = self.land.lift.iter().sum::<f64>() + self.sea_shift;
+        self.land_volume().0 - self.v_start - booked
     }
 
     /// One sample's account (the peak trace, `peaks.rs`): its gap's parts, and this step's
@@ -792,7 +1029,46 @@ impl GapBudget {
                 );
             }
         }
-        out + &self.spike_lines()
+        out + &self.land_lines() + &self.spike_lines()
+    }
+
+    /// The land ledger's lines: per snapshot the sums since the start, km³ (Earth-normalized:
+    /// m summed over samples times the sample's area), per part in [`NAMES`]' order.
+    pub fn land_lines(&self) -> String {
+        let km3 = self.area_km2 / 1000.0;
+        let fmt = |v: &[f64; PARTS]| {
+            v.iter()
+                .map(|x| format!("{:.4e}", x * km3))
+                .collect::<Vec<_>>()
+                .join("/")
+        };
+        let mut out = format!(
+            "\nland_ledger_head area_km2={:.4} v_start_km3={:.4e} residual_km3={:.4e} parts={}",
+            self.area_km2,
+            self.v_start * km3,
+            self.land_residual() * km3,
+            NAMES.join(",")
+        );
+        for s in &self.land_snapshots {
+            let l = &s.sums;
+            out += &format!(
+                "\nland_ledger t={:.0} sea_m={:.1} v_km3={:.4e} v_c_km3={:.4e} sea_shift_km3={:.4e} \
+                 lift={} up={} lift_c={} t_land={} t_shelf={} t_ocean={} t_hidden={}",
+                s.t_myr,
+                s.sea_m,
+                s.v * km3,
+                s.v_c * km3,
+                s.sea_shift * km3,
+                fmt(&l.lift),
+                fmt(&l.up),
+                fmt(&l.lift_c),
+                fmt(&l.t_land),
+                fmt(&l.t_shelf),
+                fmt(&l.t_ocean),
+                fmt(&l.t_hidden),
+            );
+        }
+        out
     }
 
     /// The spike record's lines: the run's summary, then every step whose largest rise passed
@@ -984,5 +1260,86 @@ mod tests {
         b.snapshot(&new, 2.0, 2.0);
         assert_eq!(b.snapshots[0].bands.iter().map(|s| s.n).sum::<u64>(), 1);
         assert!(b.lines().contains("gap_stock t=2"));
+    }
+
+    /// The land ledger: each part's change of the height above the sea, the sea's own move, a
+    /// sample crossing the shore, one hidden and a resampling's accretion add up to the change of
+    /// the land's volume above the sea, and the thickness goes by where the column stood.
+    #[test]
+    fn the_land_ledger_adds_up_to_the_land_above_the_sea() {
+        use crate::plates::state::HIDDEN;
+        let g = 9.81;
+        let mut samples = vec![
+            column(1000.0, 0.0),
+            column(-200.0, 0.0),
+            column(-3000.0, 0.0),
+        ];
+        samples[2].kind = OCEANIC;
+        let mut b = GapBudget::start(&samples, 525.0, g);
+        assert_eq!(b.v_start, 1000.0);
+        // The sea rises 100 m: the land loses 100 m of height, booked to the sea.
+        b.set_sea(100.0, 10.0);
+        assert_eq!(b.sea_shift, -100.0);
+        // The first column loses 1 km of rock and rebounds 858 m; the second takes 300 m of
+        // sediment under the sea and sinks 257 m.
+        samples[0].pools[pool::METAMORPHIC] -= 1000.0;
+        samples[0].elevation_m -= 142.0;
+        samples[1].pools[pool::SEDIMENT] += 300.0;
+        samples[1].elevation_m += 43.0;
+        let mut surface = vec![vec![0.0; 3]; SURFACE_PARTS.len()];
+        surface[0][0] = 858.0;
+        surface[0][1] = -257.0;
+        b.book_surface(&samples, &[-1000.0, 300.0, 0.0], &surface, &[]);
+        let (e, r) = (Part::Erosion as usize, Part::Rebound as usize);
+        // Walked in order: the erosion takes the 900 m above the sea, the rebound gives 758 back.
+        assert!((b.land.lift[e] + 900.0).abs() < 1e-3, "{}", b.land.lift[e]);
+        assert!((b.land.lift[r] - 758.0).abs() < 1e-3, "{}", b.land.lift[r]);
+        assert!((b.land.t_land[e] + 1000.0).abs() < 1e-3);
+        assert!((b.land.t_shelf[e] - 300.0).abs() < 1e-3);
+        // A collision thickens the drowned column 4 km and lifts it across the shore.
+        samples[1].pools[pool::METAMORPHIC] += 4000.0;
+        samples[1].elevation_m = 400.0;
+        b.book(&samples, Part::Collision);
+        let c = Part::Collision as usize;
+        assert!((b.land.lift[c] - 300.0).abs() < 1e-3);
+        assert!(
+            (b.land.t_shelf[c] - 4000.0).abs() < 1e-3,
+            "it stood under the sea"
+        );
+        // The first column goes under another plate: its land is gone, to the part that hid it.
+        samples[0].flags |= HIDDEN;
+        b.book(&samples, Part::Subduction);
+        assert!((b.land.lift[Part::Subduction as usize] + 758.0).abs() < 1e-3);
+        // A resampling: one sample blended from the second column alone, its accretion adding
+        // 350 m of crust and 50 m of height, and one new.
+        let mut blended = samples[1];
+        let pools = blended.pools;
+        blended.pools[pool::SEDIMENT] += 350.0;
+        blended.elevation_m = 450.0;
+        let mut fresh = samples[2];
+        fresh.elevation_m = -2500.0;
+        let new = vec![blended, fresh];
+        b.resampled(
+            &new,
+            &[
+                Some(Trace {
+                    tri: [1, 0, 2],
+                    w: [1.0, 0.0, 0.0],
+                    pools,
+                    z: 400.0,
+                }),
+                None,
+            ],
+        );
+        let a = Part::ResampleAccrete as usize;
+        assert!((b.land.lift[a] - 50.0).abs() < 1e-3);
+        assert!((b.land.t_land[a] - 350.0).abs() < 1e-3);
+        assert!(b.land.lift[Part::ResampleBlend as usize].abs() < 1e-3);
+        assert!(b.land_residual().abs() < 1e-3, "{}", b.land_residual());
+        assert_eq!(b.land_volume().0, 350.0);
+        b.snapshot(&new, 2.0, 2.0);
+        let lines = b.land_lines();
+        assert!(lines.contains("land_ledger t=2 sea_m=100.0"), "{lines}");
+        assert!(lines.contains("area_km2=10.0000"), "{lines}");
     }
 }
