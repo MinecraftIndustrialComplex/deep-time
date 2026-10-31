@@ -33,7 +33,16 @@ The model's rows:
   hotspots           on continental crust: the hotspots' own basalt and their LIPs there
                      (`hotspot_magma_c`) and the cones they counted inside (`hotspot_cones_c`), since
                      2026-10-31; before, all of the hotspots' own basalt (`hotspot_magma`), ocean
-                     floor's included and the cones left out (row "model only: hotspots, all")
+                     floor's included and the cones left out (row "model only: hotspots, all");
+                     since the hotspot lane (2026-10-31, PLT-795, PLT-799, PLT-800) also the
+                     sourced provinces' plateau beyond the plate model's dome on continental
+                     crust (`lip_c` - `lip_dome_c`, the volcano stage lays it) and the volcanic
+                     rifted margins' continental crust (`vrm`), with sub-rows for the tails, the
+                     provinces whole and the margins; with the cone budget (PLT-803) the cones a
+                     tail netted by their own hotspot (`hot_by_id_c`) in place of its kernel's
+                     (runs of the budget before its review fixes, 2026-10-31, count a continental
+                     hotspot's felsic cones within an arc's reach in `arc_cones_c` too, 0.004 to
+                     0.007 km^3 a year on hs-budget)
   ocean floor        the ocean floor's own crust (7 km a sample) made continental with the crust
                      on it (`cb_moves` o2c, every part), less what stays under it as its basement
                      and is not counted as continental crust (`o2c_b_km`, PLT-331, since
@@ -154,16 +163,38 @@ def budget(run, length):
     o2c_basement = sum(m.get("o2c", 0.0) * PLANET_KM2 * m.get("o2c_b_km", 0.0) for m in moves.values())
     nan = float("nan")
     split = "hotspot_magma_c" in g  # runs from 2026-10-31 on (PLT-761)
+    # The cone budget (PLT-803): a hotspot's cones netted by their hotspot, not by its kernel.
+    budgeted = "hot_by_id" in g
+    hot_cones = g.get("hot_by_id", 0.0) if budgeted else g.get("hotspot_cones", 0.0)
+    hot_cones_c = g.get("hot_by_id_c", 0.0) if budgeted else g.get("hotspot_cones_c", 0.0)
     out = {
         "island_arcs": per(g.get("arc_o", 0.0) + g.get("arc_cones_o", 0.0)),
         "continental_arcs": per(g.get("arc_c", 0.0) + g.get("arc_cones_c", 0.0)),
         "suture_arcs": per(g.get("arc_s", 0.0)),
         "arc_cones": per(g.get("arc_cones_o", nan) + g.get("arc_cones_c", nan)),
-        "hotspots": per(g.get("hotspot_magma_c", 0.0) + g.get("hotspot_cones_c", 0.0))
+        "hotspots": per(
+            g.get("hotspot_magma_c", 0.0)
+            + hot_cones_c
+            # The hotspot lane (PLT-795, PLT-799): the LIPs' plateau beyond the plate model's dome
+            # on continental crust (the volcano stage lays it), and the volcanic margins.
+            + g.get("lip_c", 0.0)
+            - g.get("lip_dome_c", 0.0)
+            + g.get("vrm", 0.0)
+        )
         if split
         else per(g.get("hotspot_magma", 0.0)),
-        "hotspots_all": per(g.get("hotspot_magma", 0.0) + g.get("hotspot_cones", 0.0)),
+        "lip_c": per(g.get("lip_c", nan)),
+        "lip_all": per(g.get("lip", nan)),
+        "vrm": per(g.get("vrm", nan)),
+        "tails_c": per(g.get("hotspot_magma_c", 0.0) + hot_cones_c - g.get("lip_dome_c", 0.0)),
+        "hotspots_all": per(g.get("hotspot_magma", 0.0) + hot_cones),
         "cones_all": per(g.get("cone_felsic", 0.0) + g.get("cone_mafic", 0.0)),
+        # The cone budget's measurement (PLT-804): the cones continental crust took; the hotspots'
+        # cones at full and as handed (the volcano stage).
+        "cones_c": per(g.get("cone_c", nan)),
+        "vh_built": per(g.get("vh_built", nan)),
+        "vh_handed": per(g.get("vh_handed", nan)),
+        "erosion_off_cones_out": -part("vol", "erosion") + per(g.get("cone_c", nan)),
         "sed_trench": per(g.get("sed_trench", nan)),
         # Where the arcs' magma went (subduction::ARC_SPLIT_GLOBALS; trace runs from 2026-10-31 on).
         "split_c_io_cont": per(g.get("split_c_io_cont", nan)),
@@ -246,6 +277,12 @@ def budget(run, length):
     out["v_n_o"] = g.get("front_n_o", nan) / max(g.get("front_o", 0.0), 1e-9)
     out["v_n_c"] = g.get("front_n_c", nan) / max(g.get("front_c", 0.0), 1e-9)
     out["cord_per_km"] = g.get("cordillera", 0.0) / max(g.get("front_c", 0.0), 1e-9)
+    # The hotspot lane (PLT-795, PLT-799): plume heads' provinces per 100 Myr, the mean
+    # province, and the volcanic margins' gap points.
+    nlip = g.get("lip_n", nan)
+    out["lip_per_100myr"] = nlip / length * 100.0
+    out["lip_mean_km3"] = g.get("lip", nan) / nlip if nlip > 0 else nan
+    out["vrm_n"] = g.get("vrm_n", nan)
     t0, t1 = run["first"], run["t"]
     vol = lambda t: t.get("vol_km3", 0.0) + t.get("vol_hidden_km3", 0.0)
     out["net"] = (vol(t1) - vol(t0)) / yrs
@@ -266,8 +303,15 @@ ROWS = [
     ("crust-suturing zones (arc magma at collision fronts, PLT-763)", "suture_arcs", 0.2),
     ("rifts, hotspots, rifted margins (on continental crust)", "hotspots", 0.5),
     ("  model only: the arcs' felsic cones, in both arc rows", "arc_cones", float("nan")),
+    ("  of it the tails (basalt and cones, LIP domes out)", "tails_c", float("nan")),
+    ("  of it LIPs on continental crust, whole (PLT-795)", "lip_c", float("nan")),
+    ("  of it volcanic rifted margins (PLT-799)", "vrm", float("nan")),
+    ("  model only: LIPs, all, whole (PLT-795)", "lip_all", float("nan")),
     ("  model only: hotspots, all (their basalt and cones)", "hotspots_all", float("nan")),
     ("  model only: the volcano stage's cones, all", "cones_all", float("nan")),
+    ("  model only: of them on continental crust (PLT-804)", "cones_c", float("nan")),
+    ("  model only: the hotspots' cones at full (PLT-804)", "vh_built", float("nan")),
+    ("  model only: the hotspots' cones as handed (PLT-803)", "vh_handed", float("nan")),
     ("model only: ocean floor's own crust made continental", "ocean_floor", 0.0),
     ("model only: pelagic sediment made", "pelagic", 0.0),
     ("losses", None, None),
@@ -298,6 +342,7 @@ ROWS = [
     ("flows (moved, not made or lost)", None, None),
     ("ocean-floor felsic rock accreted at resamplings", "accreted_ocean", float("nan")),
     ("off the continents by the surface stage", "erosion_off", float("nan")),
+    ("  the same with the cones out (PLT-804: the erosion alone)", "erosion_off_cones_out", float("nan")),
     ("off the continents by the transition", "transition_off", float("nan")),
     ("crust made continental (o2c x thickness)", "made_continental", float("nan")),
     ("ocean floor kept under it as basement, not counted (PLT-331)", "basement", float("nan")),
@@ -317,6 +362,9 @@ LENGTHS = [
     ("intra-oceanic arcs' front past incipient, km (PLT-760)", "front_io_km", "{:.0f}"),
     ("island law's rock per km of it, km3/km/Myr", "arc_io_per_km", "{:.1f}"),
     ("cordillera per km of continental front, km3/km/Myr", "cord_per_km", "{:.1f}"),
+    ("plume heads' LIPs per 100 Myr (PLT-795)", "lip_per_100myr", "{:.2f}"),
+    ("mean LIP, km3 (whole)", "lip_mean_km3", "{:.3g}"),
+    ("volcanic-margin gap points over the run (PLT-799)", "vrm_n", "{:.0f}"),
     ("trench input per km of front, km3/km/Myr (Clift et al. 2009: 44.0)", "sed_in_per_km", "{:.1f}"),
     ("sediment subducted per km, km3/km/Myr (Clift 2009: 41.0; S&S: 25)", "sed_down_per_km", "{:.1f}"),
     ("erosion per km of erosive front, km3/km/Myr (Clift 2009: 58.1)", "erosion_per_km", "{:.1f}"),

@@ -4872,6 +4872,10 @@ fn arc_cones_are_counted_inside_the_arc_rate() {
 fn hotspot_cones_are_counted_inside_the_hotspot_rate() {
     let mut p = preset(6000, 20.0, "supercontinent", 3);
     p.tectonics.hotspot_births_per_100myr = 0.0;
+    // The kernel's netting (PLT-286) is the old law: with the cone budget (PLT-803, on by default
+    // since 2026-10-31) the cones are netted by their hotspot instead
+    // (`a_budgeted_tail_nets_its_cones_by_their_hotspot`).
+    p.tectonics.hotspot_cone_budget = false;
     let stage = PlatesStage::new(p.clone());
     let env = stage.env(&p.tectonics, 1);
     let (mut st, geo) = init::initial_state(&p, &env).unwrap();
@@ -4889,6 +4893,10 @@ fn hotspot_cones_are_counted_inside_the_hotspot_rate() {
         plates: Vec::new(),
         track_km: 0.0,
         closed: false,
+        flux_mg_s: 0.0,
+        magma_km3_yr: 0.0,
+        head_radius_km: 0.0,
+        cones: Default::default(),
     });
     let n = st.samples.len();
     let run = |cone_m: f64| {
@@ -7708,4 +7716,598 @@ fn a_collision_melts_from_twenty_myr_after_its_onset_to_eighty_after_its_last_st
     );
     s.kind = OCEANIC;
     assert!(!melt(&s, -450.0), "continental crust only");
+}
+
+/// The two-plate planet of [`two_plates`] opening a gap where y < 0 (plate 1 turned 0.1 rad about
+/// x since the last resampling, 20 Myr before `env`'s step), the pair parted by a rift 10 Myr
+/// before it, and, with `head_from`, a plume head that rose at (0, −1, 0) then and spread
+/// `head_km`; resampled (PLT-799 as `p` has it). Returns the state, the world and the new
+/// lattice's points.
+fn a_rift_over_a_head(
+    p: &PlanetPreset,
+    env: &Env<'_>,
+    head_from: Option<f64>,
+    head_km: f64,
+) -> (PlateState, WorldState, Geo) {
+    let at = DVec3::new(0.0, -1.0, 0.0);
+    let (mut st, geo, pos) = two_plates(p, env, 0.1);
+    let mut world = WorldState::new(1, 16_384, p.t_start_years());
+    st.resample_myr = env.t_myr - 20.0;
+    let e = events::event(&mut world, env.t_myr - 10.0, events::RIFT_ONSET, at);
+    let rift = world.emit(e).unwrap();
+    st.rift_links.push(state::RiftLink {
+        a: 0,
+        b: 1,
+        event: rift,
+        quiet_since_myr: None,
+    });
+    st.hotspots.clear();
+    if let Some(from) = head_from {
+        let e = events::event(&mut world, from, events::LARGE_IGNEOUS_PROVINCE, at);
+        let lip = world.emit(e).unwrap();
+        st.hotspots.push(state::Hotspot {
+            id: 0,
+            pos: at.to_array(),
+            born_myr: from,
+            dies_myr: from + 100.0,
+            uplift_mm_yr: 0.3,
+            lip_event: Some(lip),
+            plates: Vec::new(),
+            track_km: 0.0,
+            closed: false,
+            flux_mg_s: 0.0,
+            magma_km3_yr: 0.0,
+            head_radius_km: head_km,
+            cones: Default::default(),
+        });
+    }
+    let new = ridges::resample(
+        &mut st,
+        &mut world,
+        &pos,
+        &Tree::over(&pos, |_| true),
+        &geo,
+        env,
+    )
+    .unwrap();
+    (st, world, new)
+}
+
+/// Volcanic rifted margins (PLT-799, White & McKenzie 1989's condition): new sea floor of the
+/// continent's plate beside its continental edge, formed over a plume head's hot mantle, is the
+/// igneous crust that mantle melts to (`igneous_crust_m` at the head's excess temperature), lavas
+/// over intrusions in the margins' share, continental crust over its 7 km ocean basement
+/// (PLT-331), booked in its global. Only there: not beyond the head's spread, not with the switch
+/// off, not without a head, not once the head's hot mantle had gone when the pair parted.
+#[test]
+fn a_breakup_over_a_plume_head_makes_a_volcanic_margin() {
+    use super::hotspots::sourced::{HEAD_EXCESS_K, HEAD_HOT_MYR, MARGIN_EXTRUSIVE_SHARE};
+    let mut p = preset(20_000, 20.0, "supercontinent", 5);
+    p.tectonics.volcanic_margins = true;
+    let mut off = p.clone();
+    off.tectonics.volcanic_margins = false;
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let env_off = stage.env(&off.tectonics, 1);
+    let margin = |st: &PlateState| -> Vec<usize> {
+        (0..st.samples.len())
+            .filter(|&i| st.samples[i].kind == CONTINENTAL && st.samples[i].basement_m > 0.0)
+            .collect()
+    };
+    let head_km = 1000.0;
+    let rose = env.t_myr - 12.0;
+    let (st, _, _) = a_rift_over_a_head(&off, &env_off, Some(rose), head_km);
+    assert!(margin(&st).is_empty(), "the switch off");
+    let (st, _, _) = a_rift_over_a_head(&p, &env, None, head_km);
+    assert!(margin(&st).is_empty(), "no head");
+    let gone = env.t_myr - 10.0 - HEAD_HOT_MYR - 2.0;
+    let (st, _, _) = a_rift_over_a_head(&p, &env, Some(gone), head_km);
+    assert!(
+        margin(&st).is_empty(),
+        "the head's hot mantle gone when the pair parted"
+    );
+    let (st, world, geo) = a_rift_over_a_head(&p, &env, Some(rose), head_km);
+    let pts = geo.points();
+    let vrm = margin(&st);
+    let want = ridges::volcanic_margin_column(HEAD_EXCESS_K, 1.0).expect("a thick igneous crust");
+    let h = f64::from(pools::thickness(&want));
+    // The margin's strip over the lattice (PLT-802): the rows' shares of a straight margin add to
+    // its width at any spacing.
+    for s_km in [50.0, 71.4, 159.0, 300.0] {
+        let (w, s) = (env.norm.rad(90.0), env.norm.rad(s_km));
+        let rows: f64 = (1..6)
+            .map(|r| ridges::margin_share(r as f64 * s, w, s) * s)
+            .sum();
+        assert!((rows - w).abs() < 1e-12, "{s_km} km: {rows} against {w}");
+    }
+    assert_eq!(
+        ridges::margin_share(env.norm.rad(71.4), env.norm.rad(90.0), env.norm.rad(71.4)),
+        1.0
+    );
+    eprintln!(
+        "volcanic margin: {} gap points, {h:.0} m of igneous crust each",
+        vrm.len()
+    );
+    assert!(vrm.len() >= 3, "{} points", vrm.len());
+    let at = DVec3::new(0.0, -1.0, 0.0);
+    let reach = env.norm.rad(head_km);
+    let width = env.norm.rad(super::hotspots::sourced::MARGIN_WIDTH_KM);
+    // Each gap point's distance along the lattice from the nearest edge sample, as the
+    // resampling finds it: the gap is the new sea floor (formed since the last resampling, 20
+    // Myr before), its sources the samples beside it.
+    let n = st.samples.len();
+    let gap: Vec<bool> = st
+        .samples
+        .iter()
+        .map(|s| {
+            let f = f64::from(s.formed_myr);
+            f >= env.t_myr - 20.0 - 1e-3 && f <= env.t_myr + 1e-3
+        })
+        .collect();
+    assert!(vrm.iter().all(|&i| gap[i]), "a margin point off the gap");
+    let sources: Vec<(u32, f64, u32)> = (0..n as u32)
+        .filter(|&v| !gap[v as usize] && geo.edges(v).any(|(u, _)| gap[u as usize]))
+        .map(|v| (v, 0.0, v))
+        .collect();
+    let best = geometry::dijkstra_two(
+        &geo,
+        &sources,
+        |l| st.plate_of(l as usize),
+        |_, b| gap[b as usize],
+        std::f64::consts::PI,
+    );
+    let mut own = 0.0;
+    for &i in &vrm {
+        let s = &st.samples[i];
+        assert!(
+            pts[i].angle_between(at) <= reach + 1e-9,
+            "beyond the head's spread"
+        );
+        assert!(pts[i].y < 0.0, "on the opening side");
+        // Within the margin's width of the continent's edge, the equator's turned image: the
+        // continent's samples are where z > 0, so the gap begins at z = 0.
+        assert!(
+            pts[i].z.asin() > -(width + 2.0 * env.norm.spacing_rad()),
+            "far from the continent: z {}",
+            pts[i].z
+        );
+        // The igneous crust over the cell's share of the margin (PLT-802), the ocean column
+        // over the rest.
+        let th = f64::from(s.thickness_m);
+        let share = ridges::margin_share(best[i][0].0, width, env.norm.spacing_rad());
+        let column = ridges::volcanic_margin_column(HEAD_EXCESS_K, share).expect("a margin");
+        let expect = f64::from(pools::thickness(&column));
+        assert!(
+            (th - expect).abs() < 1.0,
+            "{th} m against {expect} m at a share of {share}"
+        );
+        assert!(th > 7000.0 && th <= h + 1.0, "{th} m");
+        assert!((f64::from(s.basement_m) - 7000.0).abs() < 1.0);
+        let lava = f64::from(s.pools[state::pool::MAFIC_VOLCANIC]);
+        assert!((lava - th * MARGIN_EXTRUSIVE_SHARE).abs() < 1.0);
+        own += f64::from(s.own_thickness_m());
+    }
+    let booked = world.globals[ridges::VOLCANIC_MARGIN_GLOBAL];
+    let expect = own * env.norm.sample_area_km2() / 1000.0;
+    assert!(
+        (booked - expect).abs() < 1e-6 * expect,
+        "{booked} km³ against {expect}"
+    );
+    assert_eq!(
+        world.globals[ridges::VOLCANIC_MARGIN_SAMPLES_GLOBAL],
+        vrm.len() as f64
+    );
+}
+
+/// The hotspot lane's constants against their sources (PLT-790 to PLT-799): Sleep 1990's 37
+/// buoyancy fluxes add to his 54.9 Mg/s; 37 tails living 100 to 150 Myr (Courtillot et al. 2003)
+/// are born 29.6 per 100 Myr; Hawaii's 8.7 Mg/s makes Sleep's 4 m³/s of magma; heads every 15 Myr
+/// (Ernst et al. 2021) are 0.225 of those births; Clift et al. 2009's nine continental provinces
+/// with their roots add 30,463,152 km³, 0.12 km³ a year over their 250 Myr; White & McKenzie
+/// 1989's igneous crust at full breakup is 7, 17 and 26 km at 1280, 1400 and 1480 °C, 20.4 km at
+/// the heads' 150 K.
+#[test]
+fn the_hotspot_constants_are_their_sources() {
+    use super::hotspots::sourced as s;
+    let total: f64 = s::FLUX_MG_S.iter().sum();
+    assert_eq!(s::COUNT, 37);
+    assert!((total - 54.9).abs() < 1e-9, "{total}");
+    assert!((s::births_per_myr() * 100.0 - 29.6).abs() < 1e-9);
+    let hawaii_m3_s = 8.7 * s::MAGMA_KM3_YR_PER_MG_S * 1.0e9 / 3.155_76e7;
+    assert!((hawaii_m3_s - 4.0).abs() < 1e-9, "{hawaii_m3_s}");
+    assert!((s::head_share(s::births_per_myr()) - (1.0 / 15.0) / 0.296).abs() < 1e-12);
+    assert!(
+        (s::head_share(0.03) - 1.0).abs() < 1e-12,
+        "at most every birth"
+    );
+    let continental: f64 = s::CONTINENTAL_LIPS_KM3.iter().sum();
+    assert!((continental - 30_463_152.0).abs() < 0.5);
+    assert!((continental / 250.0e6 - 0.122).abs() < 0.001);
+    for (k, m) in [
+        (0.0, 7000.0),
+        (120.0, 17_000.0),
+        (200.0, 26_000.0),
+        (-50.0, 7000.0),
+    ] {
+        assert!((s::igneous_crust_m(k) - m).abs() < 1e-9, "{k} K");
+    }
+    assert!((s::igneous_crust_m(s::HEAD_EXCESS_K) - 20_375.0).abs() < 1e-9);
+    assert!((s::plateau(0.3) - 1.0).abs() < 1e-12 && s::plateau(1.0).abs() < 1e-12);
+}
+
+/// A sourced tail (PLT-793, PLT-794): one hotspot of Hawaii's 8.7 Mg/s over the planet adds
+/// Sleep's 4 m³/s of magma over a step, less the cones the volcano stage built over it (PLT-286),
+/// a seventh of it lavas over the rest as intrusions (White et al. 2006's 6:1), and each column
+/// rises by the model's Airy isostasy of what it gained (water-loaded under the sea), with no
+/// volcanic ceiling. On 60,000 samples (spacing about 92 km) the 150 km kernel holds several.
+#[test]
+fn a_sourced_tail_adds_its_buoyancy_fluxs_magma() {
+    use super::hotspots::sourced as src;
+    let mut p = preset(60_000, 20.0, "supercontinent", 3);
+    p.tectonics.hotspots_sourced = true;
+    // Its last check is the kernel's netting (PLT-286), the old law: with the cone budget (PLT-803,
+    // on by default since 2026-10-31) the cones are netted by their hotspot instead
+    // (`a_budgeted_tail_nets_its_cones_by_their_hotspot`).
+    p.tectonics.hotspot_cone_budget = false;
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (mut st, geo) = init::initial_state(&p, &env).unwrap();
+    assert_eq!(
+        st.hotspots.len(),
+        src::COUNT,
+        "the catalogue's count at the start"
+    );
+    for h in &st.hotspots {
+        assert!(h.born_myr <= env.t_myr - env.dt_myr && h.dies_myr > env.t_myr - env.dt_myr);
+        assert!(h.dies_myr - h.born_myr <= src::LIFETIME_MYR[1] + env.dt_myr + 1e-9);
+        assert!(src::FLUX_MG_S.contains(&h.flux_mg_s));
+        assert!((h.magma_km3_yr - h.flux_mg_s * src::MAGMA_KM3_YR_PER_MG_S).abs() < 1e-15);
+    }
+    st.hotspots.clear();
+    // No births this step: the sourced rate times 2 Myr is 0.59, drawn against the generator.
+    p.tectonics.hotspots_sourced = false;
+    p.tectonics.hotspot_births_per_100myr = 0.0;
+    let env = stage.env(&p.tectonics, 1);
+    let pos = geometry::positions(&st, &geo);
+    let tree = Tree::over(&pos, |_| true);
+    let at = pos[0];
+    st.hotspots.push(state::Hotspot {
+        id: 0,
+        pos: at.to_array(),
+        born_myr: env.t_myr - 1.0,
+        dies_myr: env.t_myr + 100.0,
+        uplift_mm_yr: 0.3,
+        lip_event: None,
+        plates: Vec::new(),
+        track_km: 0.0,
+        closed: false,
+        flux_mg_s: 8.7,
+        magma_km3_yr: 8.7 * src::MAGMA_KM3_YR_PER_MG_S,
+        head_radius_km: 0.0,
+        cones: Default::default(),
+    });
+    let n = st.samples.len();
+    let run = |cone_m: f64| {
+        let mut s2 = st.clone();
+        let mut world = WorldState::new(1, 16_384, p.t_start_years());
+        let mut cones = vec![[0.0, cone_m]; n];
+        hotspots::step(&mut s2, &mut world, &pos, &tree, &env, &mut cones).unwrap();
+        let counted = cones.iter().filter(|c| c[1] == 0.0).count();
+        (s2, world.globals[hotspots::MAGMA_GLOBAL], counted)
+    };
+    let (s2, km3, _) = run(0.0);
+    let want = 4.0 * 3.155_76e7 / 1.0e9 * env.dt_yr;
+    assert!((km3 - want).abs() < 1e-9 * want, "{km3} km³ against {want}");
+    let mut seen = 0;
+    for (a, b) in st.samples.iter().zip(&s2.samples) {
+        let gained: f64 = b
+            .pools
+            .iter()
+            .zip(&a.pools)
+            .map(|(x, y)| f64::from(x - y))
+            .sum();
+        if gained <= 0.0 {
+            continue;
+        }
+        seen += 1;
+        let lava =
+            f64::from(b.pools[state::pool::MAFIC_VOLCANIC] - a.pools[state::pool::MAFIC_VOLCANIC]);
+        assert!((lava - gained * src::TAIL_EXTRUSIVE_SHARE).abs() < 1e-3 * gained.max(1.0));
+        let dry = pools::isostatic_change_m(&a.pools, &b.pools, env.gravity);
+        let wet = if a.elevation_m < 0.0 {
+            settle::WATER_LOADED
+        } else {
+            1.0
+        };
+        let rise = f64::from(b.elevation_m - a.elevation_m);
+        assert!(
+            (rise - dry * wet).abs() < 0.01 + 1e-3 * rise.abs(),
+            "{rise} against {}",
+            dry * wet
+        );
+    }
+    assert!(seen >= 4, "{seen} columns took magma");
+    // The cones on the kernel's columns (1 m on each) are counted inside the rate, all of them.
+    let (_, with, counted) = run(1.0);
+    assert_eq!(counted, seen, "the kernel's columns");
+    let cones_km3 = counted as f64 * env.norm.sample_area_km2() / 1000.0;
+    assert!(
+        ((km3 - with) - cones_km3).abs() < 1e-6 * cones_km3,
+        "{km3} − {with} against {cones_km3} km³ of cones"
+    );
+}
+
+/// The cone budget (PLT-803): a tail nets the cones its own volcanoes handed the pools, wherever
+/// they stand, as its lavas: a Hawaii tail of rock R adds R − C, its lavas R / 7 − C over its
+/// intrusions 6 R / 7 whole; the kernel counts no cone by place (none of the hotspot's is among
+/// them, and the others are not its); it leaves its lavas R / 7 as the next frame's budget, and
+/// none when it dies before the next step. A preset tail's rock is all lava, so its budget is all
+/// of it. What the step cannot net carries to the next, of either sign: cones past the step's
+/// rock, a caldera's take-back beyond what was handed (the tail adds its whole rock), cones over
+/// a step with no rock (every kernel column at its ceiling). A dead tail nets nothing: what its
+/// record holds leaves it as unnetted.
+#[test]
+fn a_budgeted_tail_nets_its_cones_by_their_hotspot() {
+    use super::hotspots::sourced as src;
+    let mut p = preset(6000, 20.0, "supercontinent", 3);
+    p.tectonics.hotspot_births_per_100myr = 0.0;
+    p.tectonics.hotspot_cone_budget = true;
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (mut st, geo) = init::initial_state(&p, &env).unwrap();
+    st.hotspots.clear();
+    let pos = geometry::positions(&st, &geo);
+    let tree = Tree::over(&pos, |_| true);
+    let n = st.samples.len();
+    let km3_per_m = env.norm.sample_area_km2() / 1000.0;
+    let hotspot = |magma_km3_yr: f64, dies_myr: f64, handed_km3: f64| state::Hotspot {
+        id: 0,
+        pos: pos[0].to_array(),
+        born_myr: env.t_myr - 1.0,
+        dies_myr,
+        uplift_mm_yr: 0.3,
+        lip_event: None,
+        plates: Vec::new(),
+        track_km: 0.0,
+        closed: false,
+        flux_mg_s: if magma_km3_yr > 0.0 { 8.7 } else { 0.0 },
+        magma_km3_yr,
+        head_radius_km: 0.0,
+        cones: state::HotspotCones {
+            budget_km3: 0.0,
+            handed_km3,
+            handed_continental_km3: 0.25 * handed_km3,
+        },
+    };
+    let run_on = |h: state::Hotspot, ceiling: bool| {
+        let mut s2 = st.clone();
+        s2.hotspots.push(h);
+        if ceiling {
+            for s in &mut s2.samples {
+                s.elevation_m = 4000.0;
+            }
+        }
+        let mut world = WorldState::new(1, 16_384, p.t_start_years());
+        // Cones on every sample: none is the hotspot's, and the kernel counts none by place.
+        let mut cones = vec![[0.0, 1.0]; n];
+        hotspots::step(&mut s2, &mut world, &pos, &tree, &env, &mut cones).unwrap();
+        assert!(
+            cones.iter().all(|c| *c == [0.0, 1.0]),
+            "a cone counted by place"
+        );
+        assert_eq!(world.globals[hotspots::CONES_GLOBAL], 0.0);
+        let gained = |k: usize| -> f64 {
+            st.samples
+                .iter()
+                .zip(&s2.samples)
+                .map(|(a, b)| f64::from(b.pools[k] - a.pools[k]))
+                .sum::<f64>()
+                * km3_per_m
+        };
+        let lavas = gained(state::pool::MAFIC_VOLCANIC);
+        let intrusions = gained(state::pool::MAFIC_PLUTONIC);
+        (s2, world, lavas, intrusions)
+    };
+    let run = |h: state::Hotspot| run_on(h, false);
+    let hawaii = 8.7 * src::MAGMA_KM3_YR_PER_MG_S;
+    let r = hawaii * env.dt_yr;
+    let c = 0.25 * r * src::TAIL_EXTRUSIVE_SHARE;
+    let (s2, world, lavas, intrusions) = run(hotspot(hawaii, env.t_myr + 100.0, c));
+    let g = |k: &str| world.globals[k];
+    let close = |a: f64, b: f64| (a - b).abs() < 1e-4 * b.abs().max(1e-6);
+    assert!(
+        close(g(hotspots::MAGMA_GLOBAL), r - c),
+        "{} against {}",
+        g(hotspots::MAGMA_GLOBAL),
+        r - c
+    );
+    assert!(
+        close(lavas, r * src::TAIL_EXTRUSIVE_SHARE - c),
+        "lavas {lavas}"
+    );
+    assert!(
+        close(intrusions, r * (1.0 - src::TAIL_EXTRUSIVE_SHARE)),
+        "intrusions {intrusions}"
+    );
+    assert!(close(g(hotspots::CONES_BY_ID_GLOBAL), c));
+    assert!(close(g(hotspots::CONES_BY_ID_CONTINENTAL_GLOBAL), 0.25 * c));
+    assert!(close(g(hotspots::TAIL_ROCK_GLOBAL), r));
+    let cones = s2.hotspots[0].cones;
+    assert!(
+        close(cones.budget_km3, r * src::TAIL_EXTRUSIVE_SHARE),
+        "{cones:?}"
+    );
+    assert_eq!((cones.handed_km3, cones.handed_continental_km3), (0.0, 0.0));
+    // Cones past the step's lavas (the frame's lag): the rest comes off the intrusions.
+    let big = 2.0 * r * src::TAIL_EXTRUSIVE_SHARE;
+    let (_, world, lavas, intrusions) = run(hotspot(hawaii, env.t_myr + 100.0, big));
+    assert!(close(world.globals[hotspots::MAGMA_GLOBAL], r - big));
+    assert!(lavas.abs() < 1e-6 * r && close(intrusions, r - big));
+    // A tail that dies before the next step leaves no budget.
+    let (s2, _, _, _) = run(hotspot(hawaii, env.t_myr + 0.5 * env.dt_myr, 0.0));
+    assert_eq!(s2.hotspots[0].cones.budget_km3, 0.0);
+    // The preset's tail: its rock (three times the rise) is all lava, all of it the budget.
+    let (s2, world, lavas, intrusions) = run(hotspot(0.0, env.t_myr + 100.0, 0.0));
+    let rock = world.globals[hotspots::TAIL_ROCK_GLOBAL];
+    assert!(rock > 0.0 && close(world.globals[hotspots::MAGMA_GLOBAL], rock));
+    assert!(close(lavas, rock) && intrusions.abs() < 1e-9);
+    assert!(close(s2.hotspots[0].cones.budget_km3, rock));
+    // A take-back beyond what was handed: the tail adds its whole rock and carries the debt.
+    let (s2, world, lavas, _) = run(hotspot(hawaii, env.t_myr + 100.0, -c));
+    assert!(close(world.globals[hotspots::MAGMA_GLOBAL], r));
+    assert!(close(lavas, r * src::TAIL_EXTRUSIVE_SHARE));
+    assert_eq!(world.globals[hotspots::CONES_BY_ID_GLOBAL], 0.0);
+    assert_eq!(s2.hotspots[0].cones.handed_km3, -c);
+    // A step with no rock (the preset's tail under columns at its ceiling) nets nothing, of
+    // either sign, and carries what was handed.
+    for pending in [c, -c] {
+        let (s2, world, _, _) = run_on(hotspot(0.0, env.t_myr + 100.0, pending), true);
+        assert_eq!(world.globals[hotspots::TAIL_ROCK_GLOBAL], 0.0);
+        assert_eq!(world.globals[hotspots::CONES_BY_ID_GLOBAL], 0.0);
+        assert_eq!(s2.hotspots[0].cones.handed_km3, pending);
+        assert_eq!(s2.hotspots[0].cones.budget_km3, 0.0);
+    }
+    // A dead tail nets nothing: its record's cones leave it as unnetted, at its death and after
+    // (a caldera of one of its cones).
+    for (dies_myr, closed, pending) in [(env.t_myr - 0.5, false, c), (env.t_myr - 0.5, true, -c)] {
+        let mut h = hotspot(hawaii, dies_myr, pending);
+        h.closed = closed;
+        let (s2, world, lavas, intrusions) = run(h);
+        let cones = s2.hotspots[0].cones;
+        assert!(s2.hotspots[0].closed);
+        assert_eq!((cones.handed_km3, cones.handed_continental_km3), (0.0, 0.0));
+        assert_eq!(world.globals[hotspots::CONES_UNNETTED_GLOBAL], pending);
+        assert_eq!(world.globals[hotspots::CONES_BY_ID_GLOBAL], 0.0);
+        assert_eq!((lavas, intrusions), (0.0, 0.0));
+    }
+}
+
+/// The cone budget (PLT-803): the volcano stage hands the hotspots' budgeted cones apart
+/// (`surface/volcanic_hotspot_felsic_m`, `surface/volcanic_hotspot_mafic_m`), and the plate model
+/// adds them to its pools as it adds any cone's rock, but returns them among none of the cones the
+/// arcs and the kernels count inside their rates by place (an arc within reach of a continental
+/// hotspot's silicic centre netted its felsic rock a second time before, the tail having netted it
+/// by hotspot).
+#[test]
+fn a_budgeted_hotspots_cones_join_the_pools_but_no_rate_by_place() {
+    let p = preset(6000, 20.0, "supercontinent", 3);
+    let tectonics = p.tectonics.clone();
+    let run = |name: &str| {
+        let mut stage = PlatesStage::new(p.clone());
+        let env = stage.env(&tectonics, 1);
+        let (mut st, geo) = init::initial_state(&p, &env).unwrap();
+        stage.cache = Some(Cache {
+            geo,
+            coupling: None,
+        });
+        let grid = stage.l1_grid().unwrap();
+        let n = grid.cells();
+        let mut world = WorldState::new(1, 16_384, p.t_start_years());
+        for (field, x) in [(crate::surface::field::FEEDBACK, 0.0), (name, 10.0)] {
+            world.fields.insert(
+                field.to_owned(),
+                Field {
+                    grid: grid.clone(),
+                    data: vec![x; n],
+                },
+            );
+        }
+        let (cones, _, _) = stage
+            .apply_surface_feedback(&mut st, &mut world, &env, false)
+            .unwrap();
+        (st, world.globals, cones)
+    };
+    let (st, globals, cones) = run(crate::surface::field::VOLCANIC_FELSIC);
+    let (hot_st, hot_globals, hot_cones) = run(crate::surface::field::VOLCANIC_HOTSPOT_FELSIC);
+    assert!(cones.iter().any(|c| c[0] > 9.0), "the cones by place");
+    assert!(
+        hot_cones.iter().all(|c| *c == [0.0; 2]),
+        "a hotspot's cone counted by place"
+    );
+    for (a, b) in st.samples.iter().zip(&hot_st.samples) {
+        assert_eq!(a.pools, b.pools);
+        assert_eq!(a.elevation_m, b.elevation_m);
+    }
+    for g in [CONE_FELSIC_GLOBAL, CONE_CONTINENTAL_GLOBAL] {
+        assert!(globals[g] > 0.0);
+        assert_eq!(globals[g], hot_globals[g], "{g}");
+    }
+}
+
+/// A sourced plume head (PLT-795 to PLT-797): its province holds one of the record's volumes for
+/// the crust it rose under, over the head's 1,000 km; the plate model's dome takes the share of
+/// it the dome is of the volcano stage's plateau (0.514), the event carries the whole and the
+/// head's radius, and the head is the hot mantle the volcanic margins read (PLT-798).
+#[test]
+fn a_sourced_plume_head_erupts_a_recorded_province() {
+    use super::hotspots::sourced as src;
+    let mut p = preset(20_000, 20.0, "supercontinent", 5);
+    p.tectonics.plume_heads_sourced = true;
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (mut st, geo) = init::initial_state(&p, &env).unwrap();
+    let pos = geometry::positions(&st, &geo);
+    let tree = Tree::over(&pos, |_| true);
+    for continental in [true, false] {
+        let at = (0..pos.len())
+            .find(|&i| {
+                (st.samples[i].kind == CONTINENTAL) == continental && !st.samples[i].is_hidden()
+            })
+            .map(|i| pos[i])
+            .unwrap();
+        let mut s2 = st.clone();
+        let mut world = WorldState::new(1, 16_384, p.t_start_years());
+        let (event, radius) = hotspots::erupt(&mut s2, &mut world, &pos, &tree, &env, at).unwrap();
+        assert_eq!(radius, src::HEAD_RADIUS_KM);
+        let whole = world.globals[hotspots::LIP_GLOBAL];
+        let set: &[f64] = if continental {
+            &src::CONTINENTAL_LIPS_KM3
+        } else {
+            &src::OCEANIC_LIPS_KM3
+        };
+        assert!(
+            set.iter().any(|&v| (whole - v).abs() < 1e-6 * v),
+            "{whole} km³ is none of the record's"
+        );
+        let dome = world.globals[hotspots::MAGMA_GLOBAL];
+        eprintln!(
+            "head on {} crust: {whole:.3e} km³, dome {:.3}",
+            if continental {
+                "continental"
+            } else {
+                "oceanic"
+            },
+            dome / whole
+        );
+        assert!(
+            (dome / whole - (1.0 / 3.0) / 0.648).abs() < 0.03,
+            "{}",
+            dome / whole
+        );
+        let e = world.events.iter().find(|e| e.id == event).unwrap();
+        assert!(
+            matches!(e.params.get("radius_km"), Some(deeptime_format::ParamValue::Float(r)) if *r == 1000.0)
+        );
+        st.hotspots.clear();
+        s2.hotspots.push(state::Hotspot {
+            id: 0,
+            pos: at.to_array(),
+            born_myr: env.t_myr,
+            dies_myr: env.t_myr + 100.0,
+            uplift_mm_yr: 0.3,
+            lip_event: Some(event),
+            plates: Vec::new(),
+            track_km: 0.0,
+            closed: false,
+            flux_mg_s: 0.0,
+            magma_km3_yr: 0.0,
+            head_radius_km: radius,
+            cones: Default::default(),
+        });
+        let hot = hotspots::hot_mantle(&s2, &env);
+        assert_eq!(hot.len(), 1);
+        assert!((hot[0].radius_rad - env.norm.rad(1000.0)).abs() < 1e-12);
+        assert!(ridges::hot_mantle_at(&hot, at, env.t_myr + 19.0).is_some());
+        assert!(ridges::hot_mantle_at(&hot, at, env.t_myr + 21.0).is_none());
+    }
 }
