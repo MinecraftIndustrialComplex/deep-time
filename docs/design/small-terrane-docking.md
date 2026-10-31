@@ -3,8 +3,9 @@
 Status: **built behind a switch, off** (2026-10-30, the docking lane, a sub-agent of the coordinator's
 session) on the branch `small-terrane-docking`: `tectonics.terrane_docking_cover` (`shortening::advance`
 classes the front, `belts::stack` strips it); ledger PLT-760, PLT-761; plates.md "How small terranes
-dock". Its 8-run pool arm against `base34-s4` is the coordinator's to schedule (two other lanes hold the
-simulation slots). For the coast-with-high-ground lane (Ben, 2026-10-30: "Freeboard, then orogen
+dock". Its 8-run pool arm runs on the collision orogen's physics (origin/collision-orogen merged in,
+PLT-730, PLT-731 and PLT-740 set on) against the cached arm orog-cum ("Measuring it"). For the
+coast-with-high-ground lane (Ben, 2026-10-30: "Freeboard, then orogen
 (Recommended)", the advisor's third item; docs/research/notes/coast-high-ground-audit-2026-10-30.md).
 
 ## Why
