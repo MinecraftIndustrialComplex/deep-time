@@ -8,11 +8,13 @@
 //!   [`hydro::MAX_CELLS`] cells; a larger one (32k full: 134 M cells) is averaged 2 × 2 into grid
 //!   `L3h` first, and `water_level` is written on that grid (a layer names its own grid).
 //! - **Climate.** Precipitation and mean temperature bilinear from L1 at each cell, and the
-//!   warmest and coldest month from the twelve monthly layers (`climate/month/t_sl_c_*`: the
-//!   months' departures from their mean are the same at any height, so they are added to the
-//!   cell's mean; a folder without them takes ± 8 °C). [`hydro::HydroParams::budget`] turns them
-//!   into runoff, rain on a lake and its evaporation. Without a climate stage the surface stage's
-//!   zonal stand-in at sea level.
+//!   twelve months from the monthly layers (`climate/month/t_sl_c_*`: the months' departures
+//!   from their mean are the same at any height, so they are added to the cell's mean; a folder
+//!   without them takes ± 8 °C). [`hydro::HydroParams::budget`] turns them into runoff, rain on a
+//!   lake and its evaporation, the biotemperature by Holdridge's own method on the twelve months
+//!   (`hydro::Climate::thaw`; until 2026-10-31 a sinusoid between the warmest and the coldest
+//!   month, which dropped the mean). Without a climate stage the surface stage's zonal stand-in
+//!   at sea level.
 //! - **water_level.** Each lake's cells hold its level (1/16 block), nodata elsewhere; the game's
 //!   shore rule carries it a noise cell past the last wet cell. A full lake's level is its rim's
 //!   height, a terminal lake's the level of its water balance, below the rim. The layer means what
@@ -73,12 +75,11 @@ use crate::hydro::{self, delta, network};
 use crate::params::PlanetPreset;
 use crate::surface::climate::{zonal_precip, zonal_temperature};
 
-/// The warmest and the coldest month's departure from the year's mean, °C, per cell of the
-/// monthly layers' grid.
+/// The twelve months' departures from the year's mean, °C, per cell of the monthly layers' grid.
+// ledger: HYD-033
 struct Seasons {
     grid: GridDesc,
-    warm: Vec<f32>,
-    cold: Vec<f32>,
+    departures: Vec<[f32; 12]>,
 }
 
 impl Seasons {
@@ -88,27 +89,20 @@ impl Seasons {
             return None;
         }
         let (w, h) = (grid.w, grid.h);
-        let mut warm = Vec::with_capacity(grid.cells());
-        let mut cold = Vec::with_capacity(grid.cells());
+        let mut departures = Vec::with_capacity(grid.cells());
         for j in 0..h {
             for i in 0..w {
-                let (mut lo, mut hi, mut sum) = (f64::INFINITY, f64::NEG_INFINITY, 0.0);
-                for m in months {
-                    let t = m.desc.physical(m.raw_cell(i, j));
-                    lo = lo.min(t);
-                    hi = hi.max(t);
-                    sum += t;
-                }
-                let mean = sum / 12.0;
-                warm.push((hi - mean) as f32);
-                cold.push((lo - mean) as f32);
+                let t: [f64; 12] =
+                    std::array::from_fn(|m| months[m].desc.physical(months[m].raw_cell(i, j)));
+                let mean = t.iter().sum::<f64>() / 12.0;
+                departures.push(std::array::from_fn(|m| (t[m] - mean) as f32));
             }
         }
-        Some(Seasons { grid, warm, cold })
+        Some(Seasons { grid, departures })
     }
 
-    /// (warmest, coldest) departure at block (x, z), bilinear; NaN where the layers hold none.
-    fn at(&self, bx: f64, bz: f64) -> (f64, f64) {
+    /// The twelve departures at block (x, z), bilinear; NaN where the layers hold none.
+    fn at(&self, bx: f64, bz: f64) -> [f64; 12] {
         let g = &self.grid;
         let u = (bx - g.origin_block_x as f64) / f64::from(g.r);
         let v = (bz - g.origin_block_z as f64) / f64::from(g.r);
@@ -116,18 +110,18 @@ impl Seasons {
         let (fu, fv) = (u - fi, v - fj);
         let at = |i: i64, j: i64| g.clamp_j(j) as usize * g.w as usize + g.wrap_i(i) as usize;
         let (i0, j0) = (fi as i64, fj as i64);
+        let d = &self.departures;
         let k = [
-            at(i0, j0),
-            at(i0 + 1, j0),
-            at(i0, j0 + 1),
-            at(i0 + 1, j0 + 1),
+            &d[at(i0, j0)],
+            &d[at(i0 + 1, j0)],
+            &d[at(i0, j0 + 1)],
+            &d[at(i0 + 1, j0 + 1)],
         ];
-        let mix = |d: &[f32]| {
-            let a = f64::from(d[k[0]]) + f64::from(d[k[1]] - d[k[0]]) * fu;
-            let b = f64::from(d[k[2]]) + f64::from(d[k[3]] - d[k[2]]) * fu;
+        std::array::from_fn(|m| {
+            let a = f64::from(k[0][m]) + f64::from(k[1][m] - k[0][m]) * fu;
+            let b = f64::from(k[2][m]) + f64::from(k[3][m] - k[2][m]) * fu;
             a + (b - a) * fv
-        };
-        (mix(&self.warm), mix(&self.cold))
+        })
     }
 }
 
@@ -654,10 +648,10 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
                 (zonal_temperature(lat), zonal_precip(lat))
             }
         };
-        let (warm, cold) = seasons
-            .as_ref()
-            .map_or((f64::NAN, f64::NAN), |s| s.at(x, z));
-        hydro::Climate::of(pr, t, t + warm, t + cold)
+        match &seasons {
+            Some(s) => hydro::Climate::of_months(pr, t, &s.at(x, z)),
+            None => hydro::Climate::of(pr, t, f64::NAN, f64::NAN),
+        }
     };
     let sea_raw = s.sea_level_y * 16;
     let first = network::run(&network::Input {

@@ -342,17 +342,11 @@ fn lake_water(
             .map(|f| &f.data[..])
     };
     let (t, p) = (get(climate::T_FIELD)?, get(climate::P_FIELD)?);
-    let (warm, cold) = climate::months(world, n1);
-    let month = |m: Option<&[f32]>, c: usize| m.map_or(f64::NAN, |m| f64::from(m[c]));
+    let year = climate::months(world, n1);
     let (mut runoff, mut loss): (Vec<f32>, Vec<f32>) = (0..n1)
         .map(|c| {
-            let cw = climate::cell_water(
-                hydro,
-                f64::from(p[c]),
-                f64::from(t[c]),
-                month(warm, c),
-                month(cold, c),
-            );
+            let cl = climate::cell_climate(year.as_ref(), f64::from(p[c]), f64::from(t[c]), c);
+            let cw = climate::cell_water_of(hydro, &cl);
             (cw.runoff_m_yr as f32, cw.loss_m_yr as f32)
         })
         .unzip();
@@ -393,13 +387,13 @@ pub fn runoff_weights(
     let (Some(t), Some(p)) = (get(climate::T_FIELD), get(climate::P_FIELD)) else {
         return vec![1.0; n1];
     };
-    let (warm, cold) = climate::months(world, n1);
-    let month = |m: Option<&[f32]>, c: usize| m.map_or(f64::NAN, |m| f64::from(m[c]));
+    let year = climate::months(world, n1);
     (0..n1)
         .map(|c| {
             let (tc, pc) = (f64::from(t[c]), f64::from(p[c]));
             let runoff = if sp.runoff_budget {
-                climate::cell_water(hydro, pc, tc, month(warm, c), month(cold, c)).runoff_m_yr
+                let cl = climate::cell_climate(year.as_ref(), pc, tc, c);
+                climate::cell_water_of(hydro, &cl).runoff_m_yr
             } else {
                 climate::mean_t_runoff_m_yr(pc, tc)
             };
