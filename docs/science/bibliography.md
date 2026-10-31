@@ -6546,10 +6546,11 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 - Reference: Stern, R. J. (2010). The anatomy and ontogeny of modern intra-oceanic arc systems. In Kusky, T. M., Zhai, M.-G. and Xiao, W. (eds), The Evolving Continents: Understanding Processes of Continental Growth. Geological Society, London, Special Publications 338:7-34.
 - DOI or URL: 10.1144/SP338.2; author-hosted copy https://earthjay.com/earthquakes/20160729_mariana/stern_2010_anatomy_ontogeny_intraoceanic_arcs.pdf
 - Cited as: "Stern 2010".
-- Ledger ids: PLT-045, PLT-047
+- Ledger ids: PLT-045, PLT-047, PLT-760 (2026-10-31: the class by substrate)
 - Access: paywalled at the publisher; a copy is hosted openly.
 - Library (the project's source library, not distributed): fetched 2026-10-02 (the hosted copy). Text file: `Stern2010/Stern2010.txt` (pdftotext).
 - Read so far (by the project): full text, 2026-10-02. p. 9: "Because crustal thickness typically is reflected in elevation, intra-oceanic arcs are generally mostly below sea level"; Moho "at depths between 25 and 35 km. This is where IOASs are thickest, but is nevertheless significantly thinner than continental crust, which is typically c. 40 km thick. IOAS crust also differs from continental crust in being significantly faster (by 0.5-1.0 km s-1)", i.e. more mafic; the crust "thickens at a rate of several hundred metres per million years"; p. 26: "a crustal thickening rate of c. 500 m Ma-1. When IOAS crust thickens sufficiently to stabilize garnet in the lower crust (greater than c. 30 km thick)...".
+- Read in the crust-budget lane (2026-10-31, an author-site PDF through pdftotext, by a research sub-agent; pages inferred from the extracted text; PLT-760): pp. 7-8, "Arcs can be built on continental or oceanic lithosphere. Here the focus is on those arcs that are built on oceanic crust, which may be called intra-oceanic arc systems (IOASs). These can be distinguished from arcs built on continental crust, also known as 'Andean-type arcs'"; p. 8, "IOASs are built on oceanic crust, whereas Andean-type arcs are built on pre-existing continental crust"; a practical test, "if much of the volcanic front of a given arc system lies below sea level, it can usefully be described as an intra-oceanic arc"; pp. 8-9, de Ronde et al.'s middle class of "transitional or island arcs" is declined because it "requires more information about the nature of crustal substrate than is commonly available". No share of arc magma in the crust is used to class an arc.
 
 ### SternScholl2010
 - Reference: Stern, R. J. and Scholl, D. W. (2010). Yin and yang of continental crust creation and destruction by plate tectonic processes. International Geology Review 52(1):1-31.
@@ -8276,6 +8277,7 @@ Straume2019, Harris2014, SternScholl2010.
 - Library: not fetched.
 - Read so far (by the project): the abstract, 2026-10-22 (a research sub-agent): sediment subduction at 43,500 km of margin about 1.5 km^3 a year of solid, 1.0 over the long term; about 20 % of the incoming sediment accreted at margins with small to medium prisms, about 70 % subducted at margins with large prisms; subduction erosion about 1.1 km^3 a year.
 - Read in the trench-budget task (2026-10-22, the abstract on the USGS page through the Wayback Machine, by a research sub-agent; the page cuts the abstract off at "subcrustally subducted materia"): "type 2 margins (~19,000 km in global length)", where "effectively all incoming sediment is subducted"; at "small-to-medium-sized prisms ... (~16,300 km)" "approximately 20% of the incoming sediment is skimmed off ... and frontally accreted. The remaining 80% subducts"; at "margins bordered by large prisms (~8,200 km)" "roughly 70% of the incoming trench floor section is subducted"; "the contemporary rate of solid-volume sediment subduction at convergent ocean margins (~43,500 km) is calculated to be 1.5 km3/yr", long term 1.0; subduction erosion "long-term rates ... range from 25 to 50 km3/m.y. per kilometer of margin. A conservative long-term rate ... is 30 km3/km/m.y.", about 0.6 km3/yr on type 2 margins and 1.1 with type 1 sectors.
+- Read in the trench-input diagnosis (2026-10-31, the full text, by a Sonnet research sub-agent through `pdftotext` on a scan's text layer, so OCR noise is possible): p. 308, "the total solid-volume mass of ocean floor sediment (ocean basin and trench axis deposits) presently entering the approximately 43,500 km of convergent margins ... is 1.9 km³/yr", of which 0.9 is accreted or underplated and 1.0 bypasses the prism; type 2 margins, about 19,000 km, "dominantly pelagic and hemipelagic", a mean section of 0.4 km bulk (0.2 to 0.6), 0.24 km solid, 0.40 km³/yr; the Pacific trench wedges perhaps twice their pre-glacial thickness; p. 306, the long-term bypass of 0.7 km³/yr exceeds Hay et al. 1988's deep-basin figure (0.4, up to 0.5) by 0.2 to 0.3, put down to "subduction of axial turbidite deposits", which at 65 km/Myr "requires on average the bypass subduction of a 100-m-thick (solid-volume) section of axial deposits"; p. 313, "about 40% pelagic and 60% clastic deposits are subcrustally subducted at modern convergent margins", long term 56 and 44 %; p. 305, "70% of the sediment discharged by rivers to ocean basins is from two regions of intense tectonic uplift" (India and Asia, Australia and Indonesia; after Milliman & Meade 1983, not read). The sub-agent's arithmetic: 1.9 km³/yr over 43,500 km is about 44 km³/km/Myr incoming.
 
 ### SimpsonSimpson2018
 - Reference: Simpson and Simpson (2018), arXiv:1810.08658 (the authors' initials and the title not recorded by the sub-agent).
@@ -10033,6 +10035,127 @@ The sources of the old-floor lane (plates.md "Step 16"; build log 2026-10-27). T
 - Read for the weld by two Sonnet research sub-agents (2026-10-27; their reads, not the coordinator's, except Bird 2003 above). Plate mergers in reconstructions: no source gives a rate; Matthews2016 (read) 9 to 45 plates since 410 Ma; Morra2013 (read) names "Alaska-North America, East-West Antarctica and India-Australia plates merging" in the last 50 Myr; Seton et al. 2012 (Earth-Science Reviews 113:212, read by the agent) date the Wharton Basin's spreading (India-Australia) ceasing at 43 Ma, Greenland fused to North America at 33 Ma and Iberia "captured" by Eurasia at 28 Ma. Collisions go on converging: van Hinsbergen et al. 2011 (read by the agent) India-Asia from about 16 cm/yr at 50 Ma to 40 to 50 mm/yr since about 20 Ma; Africa-Eurasia 4.5 to 5.5 mm/yr today (Nocquet 2012, a search snippet only), onset about 83 Ma (a snippet citing Rosenbaum 2002). Trapped ocean floor: the Caribbean's captured Panthalassa and Farallon floor (Müller et al. 2016, Seton et al. 2012, read by the agent); remnant basins' areas from Wikipedia only (Herodotus 130,000 km², Levantine Sea 320,000 km², Black Sea 436,400 km²), not used for a value. Slow plate pairs kept apart: MORVEL (DeMets, Gordon and Argus 2010, Geophysical Journal International 181:1-80, read by the agent) keeps Sur-South America at 1.3 ± 0.6 mm/yr (Fig. 18 caption) and Lwandle-Somalia at 1.3 ± 0.5 mm/yr (section 5.5.3); Bird 2003 section 5.21 drops Capricorn, whose motion does not differ from zero. plates.md Step 19.
 
 
+## The sources of the crust-budget lane (2026-10-31)
+
+The continents' crust budget against Stern & Scholl 2010's Table 1, row by row (build log 2026-10-31, "Crust budget lane"; plates.md "The crust budget against Stern & Scholl 2010, row by row"; docs/design/crust-budget.md). Stern & Scholl 2010 and Clift et al. 2009 were read again by the lane agent in the source library's texts (`SternScholl2010/SternScholl2010.txt`, `Clift2009/Clift2009.txt`); the rest by one Sonnet research sub-agent, whose report the quotes below copy (it marked what it read and how; its own arithmetic is labelled).
+
+### Notes on entries above (2026-10-31)
+- SternScholl2010, the library text read again by the lane agent: Table 1 (p. 12) whole: additions intra-oceanic arcs 1.5, continental arc 1.0 (total 2.5; Clift et al. 2009 2.98), "Additions at crust-suturing subduction zones 0.2", "Additions at rifts, hotspots, and volcanic rifted margins 0.5", total 3.2; losses at ocean-margin subduction zones sediment subduction −1.1 and subduction erosion −1.4 (Clift 2009 1.65 and 1.33, "total for all convergent plate margins"), at crust-suturing zones sediment −0.1, erosion −0.3, continental crust −0.3 (Clift 0.4, "subduction of passive margins"), foundering "Unknown", total ">3.2". P. 13: "Magmatism also occurs at collisional orogens, but this is mostly crustal reworking. Some igneous activity in collision zones is juvenile, perhaps the 0.2 AU estimated by Scholl and von Huene (2007)." P. 13-14: volcanic rifted margins, "Break-up is often associated with eruption of thick piles of mostly mafic lava at the continent–ocean crustal boundary", and hotspots, "the models of Hawkesworth and Kemp (2006), who infer a mixture of 8% hotspot and 92% arc"; no rate for either. P. 15: "Sediment subduction averages approximately 15 km3/km-million years of trench at accreting (i.e. widening seaward) sediment-dominated margins. The average sediment subduction rate is estimated as twice this (approximately 30 km3/million years-km) at sediment-starved or landward-narrowing margins (Scholl and von Huene 2007, Table 2). This seeming incongruity is because large accretionary bodies at sediment-dominated margins sequester approximately 70% of all sediments entering subduction zones" (von Huene & Scholl 1991 put 70 % as the share subducted at large prisms; the research sub-agent judged the sentence garbled, and it is not used as a share). P. 23 (Figure 7's caption): growth "likely to be high following continental break-up (hot-spot activity and volcanic rifted margin formation; development of new subduction zones and arcs)" and destruction high during assembly. P. 24: arcs 2.7 AU and "all others sites at approximately 0.5 AU". Used for PLT-760 and PLT-763.
+- Clift2009, the library text read again by the lane agent: Table 1 (p. 82) whole, 32 margins, 40,225 km; printed totals delivered 1,768,761, sediment subducted 1,648,091, forearc eroded 1,331,600, total subducted 2,979,691 km³/my (the research sub-agent summed the delivered rows to about 1,926,000, about 278,000 accreted, against the abstract's "Accretion of sediment to active continental margins is a small contribution to crustal construction (ca. 0.3 km3/a)"); p. 83: "The difference between this value and the rate of sediment supply to the trench then yields the rate of sediment subduction (Table 1)"; abstract: "We estimate that during the Cenozoic the global rivers exported an average of 1.8 km3/a to the oceans, approximately balancing the subducted loss", "continental large igneous provinces (flood basalts) represent construction of only around 0.12 km3/a". Per km (the lane agent's arithmetic): delivered 44.0, subducted 41.0 km³/km/Myr on the printed totals; eroded 58.1 over the 19 erosive margins' 22,925 km. No ledger value changed; the readings in plates.md.
+- CliftVannucchi2004, read again (full text, the LSU repository copy through the Wayback Machine, by the research sub-agent): [8] "Accretion occurs because of the transfer of material from the subducting plate into the overriding plate, either by frontal off scraping at the trench axis or by underplating of the forearc wedge at greater depths"; [38] "In the case of accretionary margins the net rate of deep sediment subduction is represented by the difference between the rate of sediment delivery and the rate of growth of the accretionary prism"; [39] "... the remainder being subducted at least 50 km below the forearc wedge"; [31] the thickness is "the thickness of sediment (uncorrected for porosity) on the subducting plate at the trench axis"; [15] "The height of the trench sediment column was recalculated as a volume of equivalent rock after accounting for porosity ... the porosity-depth model of Sclater and Christie [1980] was used, assuming that the trench sediment represented an approximately even mixture between sand and shale"; Table 1's porosities 18 to 41 % at accretionary margins. The sub-agent's arithmetic over Tables 1 and 2: delivery about 1.90 km³ a year of rock, accreted about 0.28, subducted about 1.62; in-place thickness length-weighted 3.3 km at accretionary margins, 0.48 km at erosive ones. Used for PLT-762 (and PLT-660's 0.83 kept: their "subducted beneath the forearc wedge" is the delivery less the prism's growth).
+- vonHueneScholl1991, the abstract read in full (USGS record, by the research sub-agent): "Where small-to-medium-sized prisms have formed (~16,300 km), approximately 20% of the incoming sediment is skimmed off ... The remaining 80% subducts beneath the buttress and may either underplate older parts of the frontal body or bypass the prism entirely"; "At margins bordered by large prisms (~8,200 km), roughly 70% of the incoming trench floor section is subducted beneath the frontal accretionary body and its active buttress"; "the contemporary rate of solid-volume sediment subduction at convergent ocean margins (~43,500 km) is calculated to be 1.5 km³/yr. Correcting type 1 margins for high rates of terrigenous seafloor sedimentation during the past 30 m.y. or so sets the long-term rate of sediment subduction at 1.0 km³/yr."
+- ScholvonHuene2009, the abstract read again (USGS Publications Warehouse record pubs.usgs.gov/publication/70036630, by the research sub-agent): "During collisional suturing at fossil CSSZs, global arc magmatic addition is estimated at 0.2 AU. This assessment presumes that in the past the global length of crustal collision zones averaged c. 6000 km, which is one-half that under way since the early Tertiary"; "1 AU, or Armstrong Unit, = 1 km3 a-1 of solid material". Ledger ids: PLT-763 (2026-10-31). Scholl & von Huene 2007 (GSA Memoir 200:9-32, doi 10.1130/2007.1200(02)) not obtained.
+- SchollvonHuene2010, read again (through a library database, the research sub-agent): "OMSZs with wide middle prisms of accreted material constitute an important 25% of the global length of modern convergent margins"; "~75% of modern subduction zones are long-term erosive margins".
+- Franke2013, read again (the accepted manuscript, the research sub-agent): "Volcanic rifted margins, the majority of passive continental margins worldwide (Menzies et al., 2002; Skogseid, 2001), are characterized by thick wedges (up to 15 km) of volcanic flows"; "The magmatism occurs in geologically short time spans of ~2 Ma in the case of East Greenland and Western India"; "High-velocity lower crust is typically confined to a narrow zone in the range of about 50 km (White et al., 2008)". No share of margins given beyond "majority".
+- JichaJagoutz2015: still the abstract only ("Our revised magma production rates for active intraoceanic arcs are consistent with those calculated for mid-ocean ridge segments that have slow to moderate spreading rates"); through Chapman et al. 2021 (Lithos 398-399:106307, full text, read by the research sub-agent): "recent estimates for crust production rates in island arcs are generally 30–90 km3 km−1 Myr−1 (Dimalanta et al., 2002; Jicha and Jagoutz, 2015; Ratschbacher et al., 2019)", and "mantle-derived melt production rates for intraoceanic island arcs (160–290 km3 km−1 Myr−1)". No ledger value from it.
+
+### Stern2011
+- Reference: Stern, C. R. (2011). Subduction erosion: Rates, mechanisms, and its role in arc magmatism and the evolution of the continental crust and mantle. Gondwana Research 20:284-308.
+- DOI or URL: 10.1016/j.gr.2011.03.006; open copy at geode.colorado.edu (the faculty web folder "sternpdf").
+- Cited as: "Stern 2011" (Scholl & von Huene's margin lengths as it quotes them).
+- Ledger ids: none (plates.md's crust budget reading, 2026-10-31).
+- Access: open copy.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent): "Scholl and von Huene (2007, 2009) considered 31,250 km of nonaccreting margins to have an average subduction erosion rate of 42 km3/km/my, thereby subducting 1.3 AU of crust, and the other 11,000 km of accreting margins to have an average subduction erosion rate of 12 km3/km/my, thereby subducting 0.1 AU"; "They suggest that 2.5 AU of continental crust, consisting of sediment (1.1 AU) and forearc crust removed by subduction erosion (1.4 AU), are subducted into the mantle". With Stern & Scholl's 15 and 30 km³/km/Myr, 15 × 11,000 + 30 × 31,250 km gives 1.10 km³ a year (the sub-agent's arithmetic).
+
+### Heuret2012
+- Reference: Heuret, A., Conrad, C. P., Funiciello, F., Lallemand, S. and Sandri, L. (2012). Relation between subduction megathrust earthquakes, trench sediment thickness and upper plate strain. Geophysical Research Letters 39:L05304.
+- DOI or URL: 10.1029/2011GL050712 (HAL copy through the Wayback Machine)
+- Cited as: "Heuret et al. 2012".
+- Ledger ids: none (the trench pile's reading, 2026-10-31).
+- Access: HAL copy open.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent): 160 reflection lines over 44 trench sections, "40% of the total length of subduction zones"; "Tsed = 0.5 km is the mean value for the thickness of pelagic sediments ... and ... margins where Tsed ≥ 1.0 km commonly develop accretionary wedges"; in-place seismic thickness; no global mean in the text (the per-section tables in the supplement not obtained).
+
+### SchubertSandwell1989
+- Reference: Schubert, G. and Sandwell, D. (1989). Crustal volumes of the continents and of oceanic and continental submarine plateaus. Earth and Planetary Science Letters 92:234-246.
+- DOI or URL: 10.1016/0012-821X(89)90049-6; open copy https://topex.ucsd.edu/geodynamics/schubert_plateau_volumes.pdf
+- Cited as: "Schubert & Sandwell 1989" (the hotspots' addition, a design note).
+- Ledger ids: none (docs/design/crust-budget.md, 2026-10-31).
+- Access: open copy.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent): "An upper bound to the continental crust addition rate by the accretion of oceanic plateaus is 3.7 km3/yr, a value that assumes accretion of all oceanic plateaus ... on a 100 Myr time scale"; p. 244: "Reymer and Schubert [2] considered oceanic intraplate volcanism as a source of addition to the continental crust, but they estimated this addition rate as only 0.2 km3/yr. We believe this to be an underestimate".
+
+### KelemenHolbrook1995
+- Reference: Kelemen, P. B. and Holbrook, W. S. (1995). Origin of thick, high-velocity igneous crust along the U.S. East Coast Margin. Journal of Geophysical Research 100(B6):10077-10094.
+- DOI or URL: 10.1029/95JB00924
+- Cited as: "Kelemen & Holbrook 1995" (a volcanic margin's igneous addition, a design note).
+- Ledger ids: none (docs/design/crust-budget.md, 2026-10-31).
+- Access: paywalled; the abstract open (OpenAlex).
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31 (the research sub-agent): "thick (up to 25 km), high seismic velocity (νp of 7.2–7.3 km s−1) crust ... The total volume of igneous rocks in this zone ... may be as much as 2.7 × 10^6 km3"; "extending up to 2000 km along the margin but only for about 80–100 km seaward ... the thermal anomaly and relatively rapid upwelling lasted for only 5–8 m.y." About 1,350 km³ per km of margin (the sub-agent's arithmetic).
+
+### EldholmGrue1994
+- Reference: Eldholm, O. and Grue, K. (1994). North Atlantic volcanic margins: dimensions and production rates. Journal of Geophysical Research 99(B2):2955-2968.
+- DOI or URL: 10.1029/93JB02879
+- Cited as: "Eldholm & Grue 1994" (a volcanic margin's igneous addition, a design note).
+- Ledger ids: none (docs/design/crust-budget.md, 2026-10-31).
+- Access: paywalled; the abstract open (OpenAlex).
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31 (the research sub-agent): breakup "was accompanied by a transient (∼3 m.y.) igneous event"; "volcanic margins extend >2600 km along the early Eocene plate boundary"; "The total crustal volume is 6.6×10^6 km3, resulting in a mean crustal accretion rate of 2.2 km3/yr." About 2,500 km³ per km of margin, the onshore basalts included (the sub-agent's arithmetic).
+
+### ReymerSchubert1984
+- Reference: Reymer, A. and Schubert, G. (1984). Phanerozoic addition rates to the continental crust and crustal growth. Tectonics 3(1):63-77.
+- DOI or URL: 10.1029/TC003i001p00063
+- Cited as: "Reymer & Schubert 1984" (through Stern & Scholl 2010: the 35 km³/km/Myr continental arc rate, PLT-285).
+- Ledger ids: none directly (PLT-285 cites it through Stern & Scholl).
+- Access: paywalled; the abstract open (OpenAlex).
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31 (the research sub-agent): "Data for 17 arcs give addition rates per kilometer of arc in the range 20 to 40 km³ km−1 Ma−1. From these data we deduce a world‐wide addition rate of 1.65 km³ a−1 after adding other contributions to the formation of the continental crust, e.g., from hot spot volcanism."
+
+### LeatLarter2003
+- Reference: Leat, P. T. and Larter, R. D. (2003). Intra-oceanic subduction systems: introduction. In: Larter, R. D., Leat, P. T. (eds), Intra-Oceanic Subduction Systems: Tectonic and Magmatic Processes. Geological Society, London, Special Publications 219:1-17.
+- DOI or URL: 10.1144/GSL.SP.2003.219.01.01
+- Cited as: "Leat & Larter 2003" (what an intra-oceanic arc is built on, PLT-760).
+- Ledger ids: PLT-760.
+- Access: paywalled; the abstract open (Crossref).
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31 (the research sub-agent): intra-oceanic arcs "occur where overridding plates of subduction zones consist of oceanic rocks, contrasting with arcs built on continental margins".
+
+### Gerya2011
+- Reference: Gerya, T. V. (2011). Intra-oceanic subduction zones. In: Brown, D., Ryan, P. D. (eds), Arc-Continent Collision. Frontiers in Earth Sciences, Springer, pp. 23-51.
+- DOI or URL: 10.1007/978-3-540-88558-0_2
+- Cited as: "Gerya 2011" (its account of Leat & Larter 2003, PLT-760).
+- Ledger ids: PLT-760.
+- Access: paywalled; the introduction read.
+- Library: not kept.
+- Read so far (by the project): the introduction, 2026-10-31 (the research sub-agent): "Only one intra-oceanic arc (the Aleutian arc) is built on normal ocean crust. The others are built on basements comprising a range of oceanic lithologies, including ocean crust formed at back-arc spreading centres, earlier intra-oceanic arcs, accretionary complexes and oceanic plateaux."
+
+### Shillington2004
+- Reference: Shillington, D. J., Van Avendonk, H. J. A., Holbrook, W. S., Kelemen, P. B., Hornbach, M. J. (2004). Composition and structure of the central Aleutian island arc from arc-parallel wide-angle seismic data. Geochemistry, Geophysics, Geosystems 5(10):Q10006.
+- DOI or URL: 10.1029/2004GC000715
+- Cited as: "Shillington et al. 2004" (an island arc's crust is not continental by its thickness, PLT-760).
+- Ledger ids: PLT-760.
+- Access: the abstract open (Crossref).
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31 (the research sub-agent, verbatim through Crossref): the central Aleutian crust, 35-37 km thick, has "more mafic compositions, than average continental crust, implying that significant modifications would be required for this arc to be a suitable building block for continental crust".
+
+### PlankLangmuir1998
+- Reference: Plank, T. and Langmuir, C. H. (1998). Chemical Geology 145(3-4):325-394 (the title not recorded by the sub-agent).
+- DOI or URL: 10.1016/S0009-2541(97)00150-2
+- Cited as: "Plank & Langmuir 1998" (GLOSS: the sediment entering the trenches, the trench-input diagnosis in plates.md).
+- Ledger ids: none (a comparison only).
+- Access: paywalled; the full text was not reached (HTTP 403).
+- Library: not kept.
+- Read so far (by the project): search-engine snippets and the abstract through a secondary summary, 2026-10-31 (a Sonnet research sub-agent; not checked against the paper): section 7, "If applied over the global trench length, our total mass fluxes for sediment (1.8×10^15 g/year) and H2O- (0.86×10^15 g/year) also compare favorably to R&R's (1.4 and 0.9×10^15 g/year)", and "0.51 km^3/year for the 70% of the total trench length ... or about 0.73 km^3/year globally (not including any tectonic erosion)", bulk or solid not stated (the sub-agent's inference from 1.8e15 g over 0.73 km³, about 2.5 g/cm³: solid); Table 3, 1.30E+15 g/year over 2.97E+04 km, about 70 % of the trench length; the abstract, 76 wt% terrigenous, 7 wt% CaCO3, 10 wt% opal, 7 wt% mineral-bound H2O+. The sub-agent's arithmetic: about 17 km³/km/Myr of solid over about 42,400 km.
+
+### ReaRuff1996
+- Reference: Rea, D. K. and Ruff, L. J. (1996). Earth and Planetary Science Letters 140:1-12 (the title not recorded by the sub-agent).
+- DOI or URL: 10.1016/0012-821X(96)00036-2
+- Cited as: "Rea & Ruff 1996" (the trench-input diagnosis in plates.md).
+- Ledger ids: none (a comparison only).
+- Access: paywalled; the abstract read.
+- Library: not kept.
+- Read so far (by the project): the abstract through ResearchGate and search summaries, 2026-10-31 (a Sonnet research sub-agent): 1.4 x 10^15 g/yr of sediment entering the trenches, of it 1.1 x 10^15 terrigenous (about 79 %), with 0.9 x 10^15 g/yr of water; "an order of magnitude more sediment enters the ocean than leaves it via subduction".
+
+### MillimanSyvitski1992
+- Reference: Milliman, J. D. and Syvitski, J. P. M. (1992). Journal of Geology 100(5):525-544 (the title not recorded by the sub-agent).
+- DOI or URL: 10.1086/629606
+- Cited as: "Milliman & Syvitski 1992" (where the rivers' load reaches the sea, the trench-input diagnosis in plates.md).
+- Ledger ids: none (a comparison only).
+- Access: an open scan; the full text read through its text layer (OCR noise possible).
+- Library: not kept.
+- Read so far (by the project): the full text, 2026-10-31 (a Sonnet research sub-agent, `pdftotext` on the scan): the abstract, "sediment fluxes to the ocean from large rivers (nearly all of which discharge onto passive margins or marginal seas) have been overestimated, as some of the sediment load is subaerially sequestered in subsiding deltas", and the small mountainous rivers' flux "greatly underestimated ... perhaps by as much as a factor of three"; p. 541, the rivers of mountainous islands and of active or collision margins "are generally much smaller, but collectively they may transport similar amounts of sediment as do passive margin rivers", "Because these small rivers empty onto active margins, the deposits may be subducted", and "the sediment is more likely to escape the narrow shelves to deeper basins during both high and low stands of sea level"; p. 540, about 20 billion tons a year in the mid-20th century, "nearly half of this amount coming from Oceania and another third from southern Asia". No share reaching the trenches is given.
 ### TetreaultBuiter2012
 - Reference: Tetreault, J. L. and Buiter, S. J. H. (2012). Geodynamic models of terrane accretion: Testing the fate of island arcs, oceanic plateaus, and continental fragments in subduction zones. Journal of Geophysical Research: Solid Earth 117 (B8), article 2012JB009316 (the reference form from Crossref, as the read printed it).
 - DOI or URL: 10.1029/2012JB009316

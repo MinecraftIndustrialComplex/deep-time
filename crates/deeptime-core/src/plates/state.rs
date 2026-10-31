@@ -46,6 +46,12 @@ pub const SUBDUCTION_ZONE: u8 = 64;
 /// foreland basin this step (`belts.rs`): where the structure stage looks for foreland folds.
 pub const FORELAND: u8 = 128;
 
+/// Sample marks ([`Sample::marks`]), which last beyond a step: continental crust a collision took
+/// under, consumed at the next resampling ([`Sample::stacked`]) …
+pub const MARK_STACKED: u8 = 1;
+/// … and continental crust an island arc made over its ocean floor ([`Sample::island_arc_marked`]).
+pub const MARK_ISLAND_ARC: u8 = 2;
+
 /// Tectonic regime codes (the `plates/regime` L1 layer; `EVENTS.md` lists them too).
 pub mod regime {
     /// Oceanic plate interior.
@@ -183,8 +189,11 @@ pub struct Sample {
     /// sends it down with the slab (`belts.rs`), so a resampling consumes it instead of accreting
     /// it a second time to the column on top (`ridges::resample`; ledger PLT-276). It stays set
     /// while the crust stays hidden, after the collision ends too, and a terrane transfer or weld
-    /// leaves such crust where it is (ledger PLT-291).
-    pub stacked: bool,
+    /// leaves such crust where it is (ledger PLT-291). [`MARK_STACKED`], read and set through
+    /// [`Sample::stacked`] and [`Sample::set_stacked`]; and [`MARK_ISLAND_ARC`], the island-arc
+    /// class of continental crust ([`Sample::island_arc_marked`]). One byte for both: the struct
+    /// cannot grow (see `collision_onset`).
+    pub marks: u8,
     /// The part of `uplift_mm_yr` that is the column's own crust, mm/yr: the change of its pools'
     /// Airy height (`collapse::iso_height`) over the last step, crust gained (belts, arcs, the
     /// collapse's and the flow's receivers, accretion) or lost. The rest of the uplift moved a
@@ -244,7 +253,7 @@ impl Sample {
             uplift_mm_yr: 0.0,
             collision_mm_yr: 0.0,
             shortening_km: 0.0,
-            stacked: false,
+            marks: 0,
             crust_uplift_mm_yr: 0.0,
             lithosphere_km: 0.0,
             keel_km: 0.0,
@@ -348,6 +357,38 @@ impl Sample {
         }
         self.kind = OCEANIC;
         self.basement_m = 0.0;
+        self.set_island_arc(false);
+    }
+
+    /// Continental crust hidden under a contact in collision, consumed at the next resampling
+    /// ([`MARK_STACKED`]; ledger PLT-276, PLT-291).
+    pub fn stacked(&self) -> bool {
+        self.marks & MARK_STACKED != 0
+    }
+
+    pub fn set_stacked(&mut self, on: bool) {
+        self.set_mark(MARK_STACKED, on);
+    }
+
+    /// Continental crust an island arc made over its ocean floor ([`MARK_ISLAND_ARC`]): set where
+    /// an ocean column matures into continental crust under island-arc magma (PLT-047), cleared
+    /// where it is ocean floor again, and carried through a resampling from the nearest corner as
+    /// [`kind`](Sample::kind) is (`ridges::interpolate`), so the class is the substrate's and not
+    /// a blend's. ledger: PLT-760
+    pub fn island_arc_marked(&self) -> bool {
+        self.marks & MARK_ISLAND_ARC != 0
+    }
+
+    pub fn set_island_arc(&mut self, on: bool) {
+        self.set_mark(MARK_ISLAND_ARC, on);
+    }
+
+    fn set_mark(&mut self, mark: u8, on: bool) {
+        if on {
+            self.marks |= mark;
+        } else {
+            self.marks &= !mark;
+        }
     }
 
     /// The column's mafic rock, m.
@@ -485,6 +526,14 @@ pub struct Contact {
     /// young fronts' measure. ledger: PLT-669
     #[serde(default)]
     pub arc_onset_myr: Option<f64>,
+    /// Whether the contact's arc began intra-oceanic: at the step its onset was set, none of its
+    /// oceanic fronts had visible continental crust of the overriding plate within
+    /// `arc_distance_km` (PLT-370's test), so the arc stood on ocean floor. Set with
+    /// `arc_onset_myr` and cleared with it; with `tectonics.island_arc_own_crust` the arc keeps
+    /// the island law on the crust it made ([`super::subduction::island_arc_crust`]).
+    /// ledger: PLT-760
+    #[serde(default)]
+    pub arc_intra_oceanic: bool,
 }
 
 impl Contact {

@@ -416,7 +416,7 @@ pub fn collide(
         }
         for &i in &terrane {
             let s = &mut state.samples[i as usize];
-            if !s.stacked && s.is_hidden() {
+            if !s.stacked() && s.is_hidden() {
                 s.flags &= !HIDDEN;
                 super::shown::collided(state, i as usize);
             }
@@ -427,7 +427,7 @@ pub fn collide(
         let moving: Vec<u32> = moving
             .iter()
             .copied()
-            .filter(|&i| !state.samples[i as usize].stacked)
+            .filter(|&i| !state.samples[i as usize].stacked())
             .collect();
         for i in moving {
             let g = state.samples[i as usize].group;
