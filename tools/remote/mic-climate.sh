@@ -25,7 +25,7 @@
 
 set -euo pipefail
 
-HOST="${DEEPTIME_MAC:-ban@deeptime-test-ban.westus2.cloudapp.azure.com}"
+HOST="${DEEPTIME_MAC:-ban@deeptime-test-ban.eastus.cloudapp.azure.com}"
 SSD=/Volumes/Graphide/ban
 CACHE="$SSD/deeptime-cache"
 MODS=/home/greencheetah/Projects/mic/mods

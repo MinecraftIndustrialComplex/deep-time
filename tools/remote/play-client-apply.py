@@ -69,7 +69,7 @@ import sys
 import tempfile
 import uuid
 
-HOST = os.environ.get("DEEPTIME_MAC", "ban@deeptime-test-ban.westus2.cloudapp.azure.com")
+HOST = os.environ.get("DEEPTIME_MAC", "ban@deeptime-test-ban.eastus.cloudapp.azure.com")
 DEFAULT_INSTANCE = os.path.expanduser(
     "~/.var/app/org.prismlauncher.PrismLauncher/data/PrismLauncher/instances/MIC Deep Time Test/minecraft")
 PRISM_INSTANCES = os.path.expanduser("~/.var/app/org.prismlauncher.PrismLauncher/data/PrismLauncher/instances")
