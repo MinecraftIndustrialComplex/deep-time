@@ -198,6 +198,11 @@ pub struct Dynamics {
     /// written, and neither carries it.
     #[serde(skip)]
     pub onset_overlap: Vec<OnsetOverlap>,
+    /// Measurement only: the pairs (lower id first) whose contact `subduction::resolve` reversed
+    /// this step (`Resolved::reversed`), the onset trace's route 1, emptied by the step's record
+    /// as `onset_overlap` is.
+    #[serde(skip)]
+    pub onset_reversed: Vec<(u32, u32)>,
 }
 
 /// Measurement only (the resampling trace, 2026-10-31): how a resampling made each new sample
@@ -2142,7 +2147,10 @@ fn record_onsets(
         .collect();
     let hist: BTreeMap<(u32, u32), &PairHist> =
         d.pair_hist.iter().map(|h| ((h.lo, h.hi), h)).collect();
-    let was: BTreeSet<(u32, u32)> = d.prev_contacts.iter().copied().collect();
+    // A reversal is what `resolve` reversed this step, a dormant contact's too (PR #55's
+    // re-review; before, the old polarity had to be active the step before).
+    let reversed: BTreeSet<(u32, u32)> =
+        std::mem::take(&mut d.onset_reversed).into_iter().collect();
     let overlap: BTreeMap<(u32, u32), OnsetOverlap> = std::mem::take(&mut d.onset_overlap)
         .into_iter()
         .map(|o| ((o.lo, o.hi), o))
@@ -2157,7 +2165,7 @@ fn record_onsets(
             ..PairBound::default()
         });
         let h = hist.get(&key);
-        let route = if was.contains(&(c.over, c.under)) {
+        let route = if reversed.contains(&key) {
             1
         } else if pair_relation(&lives, c.under, c.over) == PAIR_INITIATION {
             2
