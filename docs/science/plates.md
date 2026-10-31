@@ -13700,9 +13700,10 @@ they fall on the step after one at five times the chance rate, on the gap's new 
 half the intra-oceanic front. But they are contacts between plates that converge: three in four
 converge across the boundary the resampling builds through the gap, and three in four go on to
 subduct, with longer slabs than the other onsets'. So the trace does not show the resampling
-making subduction zones out of plates that do not converge. It shows the scheme making crust only
-at resamplings (Cortial et al. 2019 §4.3: between two, a gap stays open): two plates converging
-across a gap meet when the gap is filled, on its new floor (a gap point's age is α times the time
+making subduction zones out of plates that do not converge. It shows the model's scheme making new
+floor only at a resampling (`ridges::resample`, the gap fill; between two resamplings a gap stays
+open, my reading of the code, not of Cortial et al. 2019): two plates converging across a gap
+meet when the gap is filled, on its new floor (a gap point's age is α times the time
 since the last resampling, PLT-502), so their first floor down is young. Why a pair whose
 boundary spread the step before converges on the next is not in the record (the boundary's class
 is its majority, and the stretch the gap fill builds need not be the stretch that spread). The
