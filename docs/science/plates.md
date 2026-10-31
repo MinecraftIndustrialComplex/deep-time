@@ -13956,6 +13956,92 @@ supercontinent 2).
 
 Not run yet: the arm oo-gate2 (the fixed gate, 8 runs against base35-s4) needs a simulation slot.
 
+### The gap fill and the intra-oceanic front (2026-10-31, a read)
+
+The coordinator's lead, from the arm oo-gate: the intra-oceanic excess is plates that converge
+meeting where the resampling fills the gap between them; on Earth the gap between converging
+plates does not open, so the model's contacts would begin on floor of zero age that Earth does
+not make. Nothing is built.
+
+**Runs and tool.** `tools/review/crustcycle/gapfronts.py` (no simulation) on the cached runs that
+carry the resampling and overlap traces: oo-gate (8 runs, the gate as built, before PR #55's fixes)
+and oo-overlap (2 runs, gate off, bit for bit base34's seed 1). base35 runs on master, which
+records no onsets, so on base35 only the maps' share can be read (0.488 of its intra-oceanic front
+on floor under 55 Myr, `oofronts.py`). Each onset is classed by the time since the last resampling,
+by its first front samples on the subducting side (gap fill for half or more, PLT-502; other; no
+front sample), and by its pair's history (`since_spread_myr`: the pair's boundary spread since the
+resampling before the fill, only earlier, or never). The maps' intra-oceanic front samples (as
+`oofronts.py` classes them, -950 to -50 Myr) are linked to their contact's onset by the pair (0.60
+on oo-gate), or by one side for a split's copies (0.38), 0.01 unlinked.
+
+**The share.** Of the young-floor intra-oceanic front (under 55 Myr, 8,740 km at a snapshot on
+oo-gate, 0.520 of it), contacts begun within two steps of a resampling on gap fill hold 0.333
+(0.275 the step after alone); on oo-overlap 0.333 too. Of the old-floor front (55 Myr or more)
+they hold 0.297 and 0.312. The step after a resampling holds 0.41 of both (oo-gate). Over the run
+(the onsets' `front_km_myr`), the step-after onsets on gap fill make 0.275 of the intra-oceanic
+front on oo-gate and 0.266 on oo-overlap. So these contacts make about a third of the
+intra-oceanic front whatever floor it now takes; they are not where the young-floor excess lies.
+
+**The floor they begin on is young, not zero.** The step-after onsets on gap fill (976 on oo-gate):
+the floor going under at the onset is 6.8 Myr old at the median (p10 3.8, p90 14.3); when the fill
+made it, 4.8 Myr (the fill's interval is 20 Myr, so alpha, PLT-502's share of the interval, is
+0.25 at the median, under 0.1 for 0.115 of them). oo-overlap: 6.6 and 4.6 Myr. Zero-age floor
+starts about a tenth of them.
+
+**Between plates that parted, or not.** Of those onsets, 0.42 (0.45 of their front) had a pair
+whose boundary spread since the resampling before: the fill closed their own spreading gap, and
+on the resampling's step the boundary was still spreading for 0.57 of them. 0.52 (0.50 of their
+front) never spread across a boundary they shared (not lattice neighbours on the old lattice for
+0.986 of them), so the gap between them was not theirs to open. Every one of them converges across
+its overlap at the onset (29 mm/yr median, the gate as built). oo-overlap: 0.42, 0.50 and 0.08
+(spread only earlier).
+
+**What the sources say** (Stern 2004 and Gurnis et al. 2004 read in full in the library, Hall et al.
+2003's abstract only, no open full text found; Crameri et al. 2020 main text, Supplementary Data 1
+and Notes; Bird 2003 [125] to [128] and Table 3; a Sonnet research sub-agent, 2026-10-31, copied as
+it printed). Earth's intra-oceanic zones start on an inherited weakness: "old fracture zones,
+transform faults, and extinct spreading centers and through polarity reversal behind active
+subduction zones" (Gurnis et al. 2004 [1]); "Successful nucleation of a subduction zone seems to
+require a pre-existing fault or other zone of lithospheric weakness" (Stern 2004, p. 279); the
+older plate sinks (Stern 2004, p. 285: "Two lithospheres of differing density are juxtaposed across
+a lithospheric weakness, either a transform fault or fracture zone"). Crameri et al.'s Table 1 has
+no event whose former setting is spreading or divergent; their subducting plates near the new
+trench were 1.6 to 38.1 Myr at the youngest and 31.7 to 61.2 Myr on average (Izu-Bonin, Tonga-
+Kermadec, Aleutian, South Sandwich). Young floor does take part: IBM's overriding plate was "0 to
+about 30 Myr along the strike of the nascent arc" (Gurnis et al. 2004 [22]), beside an active
+spreading centre. A ridge under compression "is unlikely to have a thermal structure with zero age
+lithosphere as there will always be some time interval between termination of spreading and
+initiation of compression", several Myr to 10 Myr at the northern Macquarie Ridge ([53]); a start
+with no lag "may be a possible scenario for a back arc environment" ([55]). Hall et al. 2003: a
+fracture zone "could be converted into a self-sustaining subduction zone after approximately 100
+km of convergence", IBM's nucleation tied to "a change in plate motion between 55 and 45 Ma"
+(abstract). Lithosphere is made only where plates part: Bird 2003's Table 3 creates area only on
+the divergent classes (oceanic spreading ridges +0.095 m²/s, continental rifts +0.012, oceanic
+transforms +0.001 within his 20-degree tolerance) and destroys it on the convergent ones (oceanic
+convergent boundaries -0.007, subduction zones -0.087).
+
+**Is a law wrong?** In part, and not the part that makes the young-floor excess.
+
+- The fill makes ridge floor (alpha times the interval, PLT-502's midline rule, which the segment
+  rule leaves to every pair that does not part) in a gap between two plates that never parted
+  across it: half the step-after onsets on gap fill begin on such floor. Earth makes lithosphere
+  only where plates diverge (Bird's Table 3), so that floor, and its age, is the model's. Its share
+  of the intra-oceanic front is small: the never-spread pairs hold 0.144 of the young-floor front
+  and 0.115 of the old (oo-gate; 0.146 and 0.096 on oo-overlap), about 1,260 km of the 8,740, against
+  an excess over Earth of about 4,900 to 6,500 km.
+- The pairs that did part begin a contact across the floor the fill just made, the step after the
+  fill, while their boundary spread on the fill's own step. On Earth a ridge turns into a trench
+  only after a lag of several to 10 Myr (Gurnis et al. [53]), except perhaps behind an arc ([55]).
+  The model has no such lag; but by the numbers this is a timing and a floor-age question for 0.17
+  of the young-floor front, not its length.
+- The floor at the onset is 4 to 7 Myr old, not zero, and these contacts make the same share of the
+  old-floor front. The young floor at the intra-oceanic fronts at any time is the subducting
+  plates' floor as it arrives, not the fill's: what feeds young floor to intra-oceanic trenches
+  for the life of a contact (young subducting plates, rift-born; the earlier diagnosis: 0.57 of the
+  intra-oceanic front belongs to contacts whose first floor down was under 12 Myr) is the next read.
+
+The tables: `gapfronts.py` on oo-gate and oo-overlap (the folders above).
+
 ## Hotspots, plume heads and volcanic margins from sources (2026-10-31)
 
 The coordinator's task after the crust budget's row by row reading: the row "rifts, hotspots,
