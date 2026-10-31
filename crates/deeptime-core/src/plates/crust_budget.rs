@@ -120,7 +120,7 @@ pub const EDGES_KM: [f64; 10] = [
 ];
 
 /// The globals each snapshot copies (cumulative over the run, km³ or km² Earth-normalized).
-const GLOBALS: [(&str, &str); 75] = [
+const GLOBALS: [(&str, &str); 76] = [
     ("flow_steps", super::flow::STEPS_GLOBAL),
     ("flow_substeps", super::flow::SUBSTEPS_GLOBAL),
     ("flow_short_myr", super::flow::SHORT_GLOBAL),
@@ -242,6 +242,7 @@ const GLOBALS: [(&str, &str); 75] = [
         super::subduction::ARC_CONES_CONTINENTAL_GLOBAL,
     ),
     ("arc_cones_o", super::subduction::ARC_CONES_OCEANIC_GLOBAL),
+    ("arc_s", super::subduction::ARC_SUTURE_GLOBAL),
     (
         "front_io",
         super::subduction::ARC_FRONT_INTRA_OCEANIC_GLOBAL,
