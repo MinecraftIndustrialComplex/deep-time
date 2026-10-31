@@ -1002,7 +1002,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Clark, M. K. and Royden, L. H. (2000). Topographic ooze: Building the eastern margin of Tibet by lower crustal flow. Geology 28(8):703-706.
 - DOI or URL: 10.1130/0091-7613(2000)28<703:TOBTEM>2.0.CO;2.
 - Cited as: (ERO, ISO, HYP) "Clark & Royden 2000, Geology 28(8):703-706" (spread.rs). (PLT) "Clark & Royden 2000, Geology 28:703".
-- Ledger ids: ISO-018, ISO-020, ISO-022; ISO-070 (from memory: the law is derived with local isostasy); PLT-300, PLT-301 (2026-10-20: the channel flow out of Tibet and its 15 km channel, from memory; verified 2026-10-25, p. 705); PLT-414 (2026-10-22: the channel viscosities, abstract); PLT-581 (2026-10-25: the flow goes where the crust is weak, Fig. 5 caption, p. 706)
+- Ledger ids: ISO-018, ISO-020, ISO-022; ISO-070 (from memory: the law is derived with local isostasy); PLT-300, PLT-301 (2026-10-20: the channel flow out of Tibet and its 15 km channel, from memory; verified 2026-10-25, p. 705); PLT-414 (2026-10-22: the channel viscosities, abstract); PLT-581 (2026-10-25: the flow goes where the crust is weak, Fig. 5 caption, p. 706); PLT-740 (2026-10-31: the plateau's margin thickened with little upper-crustal shortening, p. 703)
 - Access: paywalled (GeoScienceWorld 403). Full text read 2026-10-25 (the front lane, by a Sonnet sub-agent) from a course copy: http://basin.earth.ncu.edu.tw/Course/SeminarII/abstract2014_1/2014.10.02_Sun,%20Yuan-Cheng/Topographic%20ooze%20building%20the%20eastern%20margin%20fo%20Tibet%20by%20low%20crustal%20flow.pdf (not stored in the library). Read: p. 705 "We chose a channel thickness of 15 km"; p. 705, the best fit with the channel "uniformly weak at the initiation of flux into the channel, suggesting that the low-gradient margins of Tibet were already weak before the onset of crustal thickening"; p. 706, Fig. 5 caption, "lower crust escapes from beneath thickened, elevated central plateau through regions where crust is weak"; p. 706, "the strength of the crust beneath the Sichuan Basin inhibits flow of lower crustal material from central Tibet". [other sections: paywalled (GSA; not tested).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -1011,18 +1011,20 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Read in this pass: (ERO, ISO, HYP) not fetched. (PLT) metadata only.
 - Reference check: (ERO, ISO, HYP) Crossref matches title, authors, volume 28, issue 8, first page 703 (the end page 706 is not in the Crossref record, taken as written). Attribution of "D0 range 10^2 to 10^5" to this paper cannot be checked. (PLT) correct.
 - Read in the high-ground task (2026-10-22, PLT-414): the abstract from OpenAlex's record. "For an assumed 15-km-thick channel", viscosities of "10^18 Pa · s beneath the low-gradient margins, 10^21 Pa · s beneath the steep margins" and "an upper bound of 10^16 Pa · s beneath the plateau" (the record drops the exponents' superscripts). The 15 km channel of PLT-301 is now read in the abstract. The abstract gives no diffusivity: the 10^2 to 10^5 km²/Myr range follows from the channel law K = ρ g h³ / (12 μ) with these viscosities (2.4 × 10^5 km²/Myr at 10^18 Pa s, 240 at 10^21), the project's arithmetic (plates.md, "As a thin viscous sheet").
+- Read for PLT-740 (2026-10-31, the orogen lane, by a Sonnet sub-agent; the same course copy, also byte-identical in the Wayback Machine's snapshot 20220629095913): p. 703, abstract, "the lack of significant upper crustal shortening across much of the eastern plateau margin implies that the crustal thickening occurs mainly in the deep crust"; p. 703, "Unlike the southern plateau margin, where crustal thickening can be explained by shortening of the upper crust through faulting and folding, most of the eastern margin has been uplifted without significant shortening of the upper crust along large-magnitude thrust faults"; p. 705, where the lower crust is weak it "escapes and flows over distances of 1000-2000 km; the result is the lack of a distinct edge to the plateau margin and little shortening deformation in the upper crust". The paper does not discuss the interior's east-west extension.
 
 ### Royden1997
 - Reference: Royden, L. H., Burchfiel, B. C., King, R. W., Wang, E., Chen, Z., Shen, F. and Liu, Y. (1997). Surface deformation and lower crustal flow in eastern Tibet. Science 276(5313):788-790.
 - DOI or URL: 10.1126/science.276.5313.788.
 - Cited as: (ERO, ISO, HYP) "Royden et al. 1997, Science 276:788-790". (PLT) "Royden et al. 1997".
-- Ledger ids: ISO-018, ISO-020; PLT-300 (2026-10-20, as the channel flow's background; not fetched)
+- Ledger ids: ISO-018, ISO-020; PLT-300 (2026-10-20, as the channel flow's background; not fetched); PLT-740 (2026-10-31, the abstract)
 - Access: paywalled; not fetched. [other sections: paywalled (abstract only).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
 - Read so far (by the project): (ERO, ISO, HYP) bibliographic check only. (PLT) not stated; not in code.
 - Read in this pass: (ERO, ISO, HYP) not fetched. (PLT) abstract fetched.
 - Reference check: (ERO, ISO, HYP) Crossref matches title, volume 276, issue 5313, pages 788-790. (PLT) identifiable; correct.
+- Read for PLT-740 (2026-10-31, the orogen lane, by a Sonnet sub-agent): the abstract, the same text in the Crossref, OpenAlex and Europe PMC (PMID 9115202) records; the full text was blocked. "Field observations and satellite geodesy indicate that little crustal shortening has occurred along the central to southern margin of the eastern Tibetan plateau since about 4 million years ago"; the model has "the lower crust so weak that upper crustal deformation is decoupled from the motion of the underlying mantle" and "also predicts east-west extension on the high plateau".
 
 ### EnglandMcKenzie1982
 - Reference: England, P. and McKenzie, D. (1982). A thin viscous sheet model for continental deformation. Geophysical Journal of the Royal Astronomical Society 70(2):295-321 (now Geophysical Journal International). Correction: England, P. and McKenzie, D. (1983), 73(2):523-532.
@@ -4691,6 +4693,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Access: paywalled.
 - Library (the project's source library, not distributed): abstract only, 2026-10-02 (OpenAlex record of the GSW page): `Cloos1993/openalex.json`, text `Cloos1993/abstract.txt`.
 - Read so far (by the project): FRC-005 from memory (force-balance task 5, 2026-10-02). Abstract read 2026-10-02 (continental crust fix): "Oceanic lithosphere that is ~10 m.y. old is the youngest that is more dense than the asthenosphere"; "Lithosphere that is 100 km thick with a 30-km-thick granitic continental crust resists Subduction because it is ~0.09 gm/cm3 less dense than the asthenosphere"; "only bodies of continental and oceanic island arc crust that are > ~15 km thick make the lithosphere buoyant enough to jam a subduction zone. Oceanic island arc complexes built upon ocean crust typically must be active for more than ~20 m.y. to attain crustal thicknesses so that their attempted subduction causes collisional orogenesis." The reference agrees with the OpenAlex record.
+- Read again in the small-terrane docking lane (2026-10-30, the abstract in the OpenAlex record https://api.openalex.org/works/doi:10.1130/0016-7606(1993)105%3C0715:LBACOS%3E2.3.CO;2, by a research sub-agent; the full text could not be got; PLT-770): "Buoyancy analysis indicates that only bodies of continental and oceanic island are crust that are > ∼15 km thick make the lithosphere buoyant enough to jam a subduction zone" (the copy's typo); "Oceanic plateaus where basaltic crust as much as ∼17 km thick caps 100-km-thick lithosphere are inherenty subductable and actually less buoyant than normal oceanic lithosphere following subduction metamorphism. Basaltic plateaus must have crustal thicknesses >∼30 km to typically cause collisional orogenesis during subduction."; "Short subducting seamounts (<1-2 km tall) typically cause only temporary dents"; "The direct tectonic effect resulting from the subduction of most bathymetric highs is only a temporary isostatic uplift of the fore-arc region of as much as several kilometers, followed by subsidence to original elevations." The abstract gives thicknesses and ages, no size along the slab; PLT-770's reach is the project's reading of FRC-030's law built on this abstract's densities.
 
 ### Coblentz1994
 - Reference: Coblentz, D. D., Richardson, R. M., Sandiford, M. (1994). On the gravitational potential of the Earth's lithosphere. Tectonics 13(4):929-945.
@@ -6562,6 +6565,7 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 - Read in the M5 arcs research (2026-10-25, the library text, by a research sub-agent; no ledger value changed; plates.md "What sets the arc rate"), on what the arc rate depends on (page numbers from the text's running footers, perhaps off by one). p. 7: "the extent of subduction-related mantle melting (F) increases with increasing convergence rate owing to increased temperatures along the melting front (Cagnioncle 2007)", and "Other important controls on melt production rate are the position of isotherms above the wet solidus; this also varies with slab dip (Grove et al. 2009)"; no per-arc test. p. 11: "growth of intra-oceanic arc crust is dominated by a few million years of very rapid crustal growth - perhaps several hundred to as much as 500-600 km3/km-million years, roughly equivalent to a medium-rate spreading ridge", then "a few tens or less of km3/km-million years for mature, established arcs"; p. 12: the long-term intra-oceanic rate of about 100 is 500 for 10 Myr and 30 for 60 Myr; p. 25: "initial production (addition) rates are prodigious (300-500 km3/million years/km of arc) and equal to that of slow spreading centres", waning "by a factor of 10 or more" to "30-35 km3/million years/km" (p. 11 and p. 25 do not give the same initial figure). p. 13: the continental arcs' lower rate is put down to lifespan, "Andean-type margins seem to be longer-lived than intra-oceanic arcs, and because of this, less productive over their lives". No statement on slab age, sediment input or back-arc spreading as controls.
 - Used in the M5 arc-rate fix (2026-10-25, the library text, by the M5 lane; PLT-666): p. 11's intra-oceanic arcs, "Aleutian, South Sandwich, Kermadec, Tonga, Vanuatu, Solomon, New Britain, Izu-Bonin-Mariana, Banda, Lesser Antilles", 8 of which are among Clift & Vannucchi 2004's margins (Vanuatu, New Britain and Banda are not); their 11,450 km against S&S's "present 14,500 km of intra-oceanic arcs".
 - Read again for the front-loaded island arcs (2026-10-25, the library text, lines 590 to 680, by the M5 lane; PLT-668, PLT-669): p. 11, what drives the early pulse, "Early rapid growth reflects wholescale upwelling of asthenosphere up and over the sinking lithosphere (Hall et al. 2003), followed by a progressive diminution of upwelling as early slab sinking is replaced by the nearly down-dip motion of the slab, characteristic of true subduction"; "The SNSZ hypothesis predicts that seafloor spreading in what will become the forearc predates plate convergence and thus true subduction. Spreading leads to unusually high degrees of mantle melting due to combined effects of adiabatic decompression followed by a large flux of water from the sinking lithosphere"; after it, "the magmatic arc retreats to a position that is 100-200 km from the trench"; on induced initiations, "It is not yet clear whether INSZ early magma production rates are as great as those for SNSZ. There is no obvious increase in magma production associated with the Solomon Is. INSZ"; Stern and Bloomer 1992's Izu-Bonin-Mariana estimate, "approximately 120-180 km3/km-million years during the first 10 million years of subduction", and Scholl and von Huene 2009's Aleutians, "as fast as 500 km3/km-million years" in the first 10 Myr; the 500 and 30 law as PLT-045 quotes it, p. 11. The page numbers are the text's running heads.
+- Read in the small-terrane docking lane (2026-10-30, the library text, p. 22, by a research sub-agent; PLT-770's context, plates.md "How small terranes dock"): "Accretion accompanies collision, when a subduction zone is choked with buoyant crust and lithosphere (Cloos 1993), destroying the original subduction zone and perhaps forcing a new one to form elsewhere (Stern 2004)."; "In fact, many orogenies reflect such episodes of terrane accretion, which typically last 8–10 million years (Clift et al. 2009)."
 
 ### TetreaultBuiter2014
 - Reference: Tetreault, J. L. and Buiter, S. J. H. (2014). Future accreted terranes: a compilation of island arcs, oceanic plateaus, submarine ridges, seamounts, and continental fragments. Solid Earth 5:1243-1275.
@@ -6571,6 +6575,7 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 - Access: open.
 - Library (the project's source library, not distributed): fetched 2026-10-02 (publisher PDF). Text file: `TetreaultBuiter2014/TetreaultBuiter2014.txt`.
 - Read so far (by the project): full text, 2026-10-02. Abstract: "Island arcs have an average crustal thickness of 26 km, average bulk crustal density of 2.79 g cm-3"; section 3.1: "Cloos (1993) estimated that island arcs greater than 15 km in thickness are buoyant enough to collide with continental crust; however, the paucity of whole crustal sections of island arcs in the geologic record does not agree with this hypothesis (Condie and Kroner, 2013)."
+- Read in the small-terrane docking lane (2026-10-30, the publisher's PDF https://se.copernicus.org/articles/5/1243/2014/se-5-1243-2014.pdf, pages 1243-1257, 1259 and 1262-1265, by a research sub-agent; PLT-770, PLT-771): p. 1243, "most accreted terranes are thin crustal units sheared off of FATs and added onto the accretionary prism, with thicknesses on the order of hundreds of meters to a few kilometers", "We posit that rheologically weak crustal layers or shear zones that were formed when the FATs were produced can be activated as detachments during subduction, allowing parts of the FAT crust to accrete and others to subduct"; p. 1244, accretion "usually occurs by adding slivers of thrusted crustal units to the accretionary prism region ... rather than collision and addition of the entire crustal thickness to the continent"; p. 1245, underplating "is perhaps the most common type of terrane accretion"; p. 1246, docking "is often a collisional process (when subduction ceases) rather than an accretionary process (subduction continues after accretion)", "Many of the larger FATs such as oceanic plateaus and continental fragments are accreted by collision", arcs "about 100 km in width"; p. 1251, "in most cases only the upper 2–5 km of arc crust are accreted onto continents through thin-skinned thrusting and preserved. This most likely occurs when island arcs are on the subducting plate"; p. 1253, plateaus and ridges "approximately 21 ± 4 km"; p. 1259, continental fragments "∼ 24.8 ± 5.7 km"; p. 1265, "the force of the subducting slab drives subduction and can most likely overcome the buoyancy of small crustal units (Molnar and Gray, 1979; Cloos, 1993)", "Seamounts and submarine volcanics subduct easily if they are not incorporated into the accretionary prism". Pages 1258, 1260-1261 and the reference list not read.
 
 ### JichaJagoutz2015
 - Reference: Jicha, B. R. and Jagoutz, O. (2015). Magma production rates for intraoceanic arcs. Elements 11(2):105-111.
@@ -7235,6 +7240,7 @@ Stern & Scholl 2010 (the rates, PLT-045 and PLT-285) and Cloos 1993 (the arcs' m
 - Read in the collision-flux task (2026-10-21, the library text, section 5.1; PLT-401): the rifted margins lost in Cenozoic collisions, "In total these sum to almost 16,000 km of rifted margin (Table 2)", taken at "an average crustal thickness of 18 km (half normal continental (Christensen and Mooney, 1995))", "around 50% of the subducted margins were volcanic (50-km-wide continent-ocean transition (COT)) and the remainder non-volcanic (150-km-wide COT)"; "We calculate that around 28 × 10^6 km3 would have been subducted since 65 Ma, resulting in a long-term average loss of 0.43 km3/a", "as high as 0.65 km3/a" if all were non-volcanic. Figure 7's caption: Taiwan's collision is "transferring oceanic arc crust to the Asian margin (88%)".
 - Read in the M5 arcs research (2026-10-25, the library text, by a research sub-agent; no ledger value changed; plates.md "What sets the arc rate"). p. 84: the oceanic arcs' 40 % of the arc output is "calculated based on the premise that production rates are linked to the supply of aqueous fluids (Tatsumi et al., 1983), and thus to the rates of convergence (Clift and Vannucchi, 2004)", 37 % "based on the height of the melting column under the arc (Plank and Langmuir, 1988)"; Table 1's magmatic productivity is about 1.3 to 1.4 times its convergence rate in most rows (the sub-agent's check, not the paper's statement), so it carries the premise. p. 97: net addition "could occur in pulses of enhanced mafic accretion and associated intracrustal differentiation, which are associated with subduction initiation and arc-extension events. Steady state magmatism between these episodes appears to be much less productive", the Mariana arc split twice for back-arc basins "during which times magmatic productivity greatly increased"; no numbers. p. 98: the Izu-Bonin arc's "thin lithospheric lid that allows significant upwelling under the arc and thus more melting compared to a mature continental arc"; seismic rates Aleutians 55-82 and Izu 66, with forearc losses Izu-Bonin 106. p. 99: the required rates "are on the high side of what is tenable"; 2.0 km3/a (50 km3/Ma/km) at the low end. Slab age, dip and sediment input are not discussed as controls on the rate.
 - Checked in the M5 arc-rate fix (2026-10-25, the library text, by the M5 lane; PLT-666): Table 1's convergence column is Clift & Vannucchi 2004's full rate, not the orthogonal one (29 of 32 rows match the full rate; Costa Rica, Nicaragua and Guatemala match the orthogonal); the text gives Izu-Bonin 90 where the table has 95.
+- Read in the small-terrane docking lane (2026-10-30, the library text, the abstract and pp. 84-88, 95 and 98-99, by a research sub-agent; PLT-770): p. 85, "ca. 90% of the mass of the Luzon Arc is transferred to the edge of continental Asia" (the arc on the overriding side); p. 86, "The Luzon arc is not subducted but is detached from the Philippine Sea Plate", and in arc–arc collision "the oceanic arc is plastered to the edge of the continental mass, effectively as a coherent block with no opportunity for major crustal loss by subduction"; p. 95, "Even in accretionary plate margins volcanic seamounts are generally subducted, with only thin slices of basalts (<1 km thick) being offscraped into the wedge of trench sediment".
 
 ### Parcutela2023
 - Reference: Parcutela, N. E., Austria, R. S., Dimalanta, C. B., Valera, G. T. V., Gabo-Ratio, J. A. S., Payot, B. D., Armada, L. T., Sangalang, K. J. F. and Yumul, G. P. Jr. (2023). Enhanced arc magmatic productivity of the Western Pacific island arcs deduced from gravity-derived arc crustal growth rates. Frontiers in Earth Science 11:1107833.
@@ -10149,3 +10155,222 @@ The continents' crust budget against Stern & Scholl 2010's Table 1, row by row (
 - Access: an open scan; the full text read through its text layer (OCR noise possible).
 - Library: not kept.
 - Read so far (by the project): the full text, 2026-10-31 (a Sonnet research sub-agent, `pdftotext` on the scan): the abstract, "sediment fluxes to the ocean from large rivers (nearly all of which discharge onto passive margins or marginal seas) have been overestimated, as some of the sediment load is subaerially sequestered in subsiding deltas", and the small mountainous rivers' flux "greatly underestimated ... perhaps by as much as a factor of three"; p. 541, the rivers of mountainous islands and of active or collision margins "are generally much smaller, but collectively they may transport similar amounts of sediment as do passive margin rivers", "Because these small rivers empty onto active margins, the deposits may be subducted", and "the sediment is more likely to escape the narrow shelves to deeper basins during both high and low stands of sea level"; p. 540, about 20 billion tons a year in the mid-20th century, "nearly half of this amount coming from Oceania and another third from southern Asia". No share reaching the trenches is given.
+### TetreaultBuiter2012
+- Reference: Tetreault, J. L. and Buiter, S. J. H. (2012). Geodynamic models of terrane accretion: Testing the fate of island arcs, oceanic plateaus, and continental fragments in subduction zones. Journal of Geophysical Research: Solid Earth 117 (B8), article 2012JB009316 (the reference form from Crossref, as the read printed it).
+- DOI or URL: 10.1029/2012JB009316
+- Cited as: "Tetreault & Buiter 2012".
+- Ledger ids: PLT-770, PLT-771 (2026-10-30).
+- Access: paywalled (Wiley blocked the read; OpenAlex lists it closed).
+- Library: not kept.
+- Read so far (by the project): the abstract only, 2026-10-30 (the Crossref and OpenAlex metadata, https://api.crossref.org/works/10.1029/2012JB009316, by a research sub-agent): "(1) accretion of crustal units occurs when there is a weak detachment layer within the FAT, (2) the depth of detachment controls the amount of crust accreted onto the overriding plate, and (3) lithospheric buoyancy does not prevent FAT subduction during constant convergence."; "Island arcs, oceanic plateaus, and continental fragments will completely subduct, despite having buoyant lithospheric densities, if they have rheologically strong crusts." No numbers in the abstract.
+
+### Yan2021
+- Reference: Yan, Chen, Xiong, Wan and Xu (2021). Oceanic Plateau and Subduction Zone Jump: Two‐Dimensional Thermo‐Mechanical Modeling. Journal of Geophysical Research: Solid Earth 126(7), e2021JB021855. (The authors' initials were not recorded by the read.)
+- DOI or URL: not recorded by the read.
+- Cited as: "Yan et al. 2021".
+- Ledger ids: PLT-770 (2026-10-30: a comparison for the reach, no value taken).
+- Access: closed (abstract via OpenAlex or Crossref).
+- Library: not kept.
+- Read so far (by the project): the abstract only, 2026-10-30 (a research sub-agent): "Three distinct subduction styles are observed: (a) steep subduction without subduction zone reorganization, favored by a small‐sized (≤150 km) or lowly depleted oceanic plateau; (b) breakoff of subducting slab followed by flat‐slab subduction, which is conditional on a moderate‐sized (≥300 km) oceanic plateau with high degree depletion but relatively low strength; and (c) initiation of a new subduction zone behind the plateau (subduction zone jump), facilitated by a moderate‐sized oceanic plateau with a strongly depleted mantle root."; "the overriding lithosphere undergoes a tectonic force switch from compression to tension in ∼5 Myr as the subduction zone is reorganized."
+
+### Yan2022
+- Reference: Yan, Chen, Zuza, Tang, Wan and Meng (2022). The fate of oceanic plateaus: subduction versus accretion. Geophysical Journal International 231(2):1349-1362. (The authors' initials were not recorded by the read.)
+- DOI or URL: not recorded by the read.
+- Cited as: "Yan et al. 2022".
+- Ledger ids: none (docs/design/small-terrane-docking.md and plates.md, a comparison).
+- Access: closed (abstract via OpenAlex or Crossref).
+- Library: not kept.
+- Read so far (by the project): the abstract only, 2026-10-30 (a research sub-agent): "For the eclogite models, a relatively thin oceanic plateau (≤20 km thick) undergoes steep subduction, a moderate-scale plateau (25–30 km thick) favours flat-slab subduction and large-scale plateaus (≥35 km thick) are more susceptible to collide and accrete to the overriding upper plate."; "Either fast convergence rates (≥8 cm yr−1) or overthrusting of the overriding plate promotes the formation of flat-slab subduction."
+
+### Enkelmann2008
+- Reference: Enkelmann, E., Garver, J. I. and Pavlis, T. L. (2008). Rapid exhumation of ice-covered rocks of the Chugach–St. Elias orogen, Southeast Alaska. Geology 36(12):915-918.
+- DOI or URL: 10.1130/G2252A.1 (as the copy prints it); copy read https://minerva.union.edu/garverj/garver/pubs/enkelmann_et_al_geology_2008.pdf
+- Cited as: "Enkelmann et al. 2008".
+- Ledger ids: PLT-771 (2026-10-30).
+- Access: the authors' institution's copy open.
+- Library: not kept.
+- Read so far (by the project): pp. 915, 916 and part of 918, 2026-10-30 (a research sub-agent; p. 917 not read): p. 915, "Ongoing oblique collision and flat-slab subduction of the Yakutat terrane has produced Earth’s highest coastal mountain range, the Chugach–St. Elias orogen in Southeast Alaska."; p. 916, "The leading edge of the more continental part of the Yakutat terrane encountered the Aleutian trench between 10 and 5 Ma and has since collided obliquely", "Most of the Tertiary sedimentary cover to the Yakutat terrane has been scraped off basement rocks and accreted to the growing foldand-thrust belt."; p. 918, "In the frontal part of the orogenic belt, i.e., the active fold-and-thrust belt that involves cover to the Yakutat terrane, exhumation rates of exposed rock are 1.5–4.0 mm/yr in the past 2 m.y."
+
+### Morell2012
+- Reference: Morell, K. D., Kirby, E., Fisher, D. M. and van Soest, M. (2012). Geomorphic and exhumational response of the Central American Volcanic Arc to Cocos Ridge subduction. Journal of Geophysical Research 117, B04409.
+- DOI or URL: 10.1029/2011JB008969; copy read https://cdr.lib.unc.edu/downloads/xg94j014g
+- Cited as: "Morell et al. 2012".
+- Ledger ids: none (docs/design/small-terrane-docking.md and plates.md, a comparison).
+- Access: the university repository's copy open.
+- Library: not kept.
+- Read so far (by the project): pages 1-4, 6, 14, 16 and 18 of 23, 2026-10-30 (a research sub-agent): the abstract, "Reconstruction of pre-incision profiles suggests that rock uplift during the growth of the Cordillera de Talamanca is no greater than ∼2 km."; p. 3, the Cocos Ridge "subducting near-orthogonally under the Panama microplate at a rate of 85 mm/yr"; p. 4, the Cordillera de Talamanca "reaching elevations of 3800 m (Mt Chirripó, 3820 m), and extending 175 km along strike of the arc, coincident with the width of the Cocos Ridge"; p. 6, "the greatest shortening (40 km since the Pliocene) and largest number of thrust faults occur directly inboard of the Cocos Ridge axis"; p. 16, "a young (<3 Ma) collision of the Cocos Ridge and the Central American trench".
+
+## The collision orogen: plateau growth and plateau wear (PLT-740), added 2026-10-31
+
+Read for the orogen lane by a Sonnet research sub-agent (2026-10-31); the quotes are the agent's, from the copies
+named. Copies kept outside the repository only (temporary).
+
+### Vanderhaeghe2003
+- Reference: Vanderhaeghe, O., Medvedev, S., Fullsack, P., Beaumont, C. and Jamieson, R. A. (2003). Evolution of orogenic wedges and continental plateaux: insights from crustal thermal-mechanical models overlying subducting mantle lithosphere. Geophysical Journal International 153(1):27-51. (the initials and the title as the lane's request named them; the read confirms the surnames, journal, volume, pages and DOI)
+- DOI or URL: 10.1046/j.1365-246X.2003.01861.x; read at https://academic.oup.com/gji/article-pdf/153/1/27/1719393/153-1-27.pdf
+- Cited as: "Vanderhaeghe et al. 2003".
+- Ledger ids: PLT-740.
+- Access: open (the publisher's PDF).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. Model: 35 km crust, 1 cm/yr, 75 Myr, mantle subduction at S, the retro mantle stationary (Table 1). p. 27: "A reduction in the viscosity ratio (ηb/ηc ∼ 10−2) is sufficient to cause a transition of the central wedge region to a plateau"; "In most models, the plateaux grow laterally at constant thickness between characteristic edge peaks". pp. 28-29: "once a plateau develops (Ftb << Ftc), the plateau crustal thickness is insensitive to the properties of the weak basal layer (ηb and hb) and is determined mainly by the properties of the cold crust and parameters that limit value of Ftc (e.g. z*)". p. 30: "the hottest crust is located below the retro-plateau". p. 34: "The maximum thickness increases without limit" (uniform crust). p. 41: "it is the net retro-ward flow that accounts for retro-ward growth of the plateau"; the transition "does not result from a gradual decrease in surface slope ... Instead, two edge peak barriers are created and the plateau grows between them". p. 43: "By 45 Myr, TMoho > T* = 700°C across a significant zone retro-ward of S, leading to basal decoupling and the onset of the transition to a plateau"; a weaker upper crust (ca. 3 × 10^22 Pa s) gives elevations that "approach observations from Tibet and the Altiplano (ca. 5500 m)". pp. 39-40: at 75 Myr (750 km of convergence) "The plateau is now 300 km wide". The pro-side edge staying near S is the agent's reading of Fig. 11c. No pro/retro mass share is given.
+- Read again for PLT-740's structures (2026-10-31, a Sonnet sub-agent, the publisher's PDF; the figure panels not read): p. 40, at 75 Myr in model V(23/19)z(40/50) "the velocity field in the plateau region indicates pure shear thickening in the upper crust", with outward lower-crustal flow beneath the plateau; p. 42, "low deformation rates in the upper crust during the later, plateau stage"; p. 43, "After 60 Myr a plateau has formed and the orogen now widens rather than thickens"; p. 30, "Vertical advection is, however, negligible in the plateau crust because the thickness remains almost constant". The text does not say where in the plateau the pure-shear thickening is, and says nothing of folds or thrusts at the plateau's advancing edge.
+
+### Wolf2021
+- Reference: Wolf et al. (2021). Journal of Geophysical Research: Solid Earth 126:e2020JB021168 (the title and the full author list not recorded by the read: to complete from the copy).
+- DOI or URL: 10.1029/2020JB021168; read at https://diposit.ub.edu/bitstreams/03990b7d-7da6-4614-9357-02061c018e4a/download
+- Cited as: "Wolf et al. 2021".
+- Ledger ids: PLT-730 (the 60/40 pro- and retro-side partition, p. 13); PLT-740.
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. p. 13: "Convergence is partitioned to 60% pro- and 40% retro-side deformation after onset of retro-wedge shortening". p. 14: "The onset of plateau formation is dependent on viscous weakening resulting from crustal thickening and associated radioactive heating, and has a thermal equilibration timescale independent of convergence rate". p. 25 (conclusion 3): "If crustal shortening creates CA > ~12.5 × 10^9 m2, a large and hot plateau forms, located mostly on the retro-side as a consequence of underthrusting of the retro-mantle". p. 24: the present-day Indian S-point lies "below the accreted Tibetan terranes and not below thickened Indian crust".
+- Reference check: the first author, year, journal, DOI and article number as the agent printed them; the title and authors to complete.
+
+### MedvedevBeaumontPreprint
+- Reference: Medvedev and Beaumont. Growth of Continental Plateaus by Channel Injection: Constraints and Thermo-Mechanical Consistency. Preprint (later in a Geological Society of London Special Publication, pages not checked).
+- DOI or URL: http://geodynamics.oceanography.dal.ca/LHO/MB_Plateau_ChanFlow04.pdf (the host's TLS certificate does not match its name).
+- Cited as: "Medvedev & Beaumont (preprint)".
+- Ledger ids: PLT-740.
+- Access: open preprint.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (page numbers the preprint's). p. 3: "These models also predict that plateaus grow outward by tectonic thickening and accretion of adjacent crust in the transition zone between the plateau and the surrounding foreland"; pp. 3-4: weak mid- to lower crust cannot maintain long-wavelength topography, "and therefore plateaus flatten like pancake batter", while the flanking transition zones "laterally support (like bookends) the plateau".
+
+### BookhagenStrecker2012
+- Reference: Bookhagen, B., Strecker, M. R. (2012). Spatiotemporal trends in erosion rates across a pronounced rainfall gradient: Examples from the southern Central Andes. Earth and Planetary Science Letters 327-328:97-110.
+- DOI or URL: read at https://bodobookhagen.github.io/pdf/bookhagen12_central_Andes_erosion_rates.pdf
+- Cited as: "Bookhagen & Strecker 2012".
+- Ledger ids: none (design and plates.md "The collision orogen": a reference line for plateau wear, ERO-174's lead; docs/design/plateau-drainage.md and erosion-and-sediment.md "Internally drained basins", 2026-10-31).
+- Access: open (the author's copy).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. pp. 103-104: erosion rates "of basins immediately to the east of the Altiplano-Puna Plateau drainage divide are similar (0.02 ± 0.01 mm/yr, n = 5) to erosion rates on the internally drained plateau (0.02 ± 0.0004 mm/yr, n = 1)"; 0.50 ± 0.3 mm/yr on the wet, steep eastern orographic barriers. Again in full by a Sonnet research sub-agent of the plateau lane, 2026-10-31: p. 97, "This relation indicates that erosion rates (ER) scale with ER ~ SSP^1.4 on cosmogenic-nuclide time scales"; p. 103, "Erosion rates increase to 0.50 +/- 0.3 mm/yr (n = 15) at the steep east-facing orographic barriers, where mean annual rainfall rates are up to 2 m/yr"; the one internally drained plateau sample is STR-18 (Salinas Grandes, Table 1: 18 km2, mean elevation 3.88 km, 0.11 m/yr rainfall, 21 um/yr); p. 102, "We do not account for evapotranspiration, seasonal snowmelt, and groundwater loss"; the Fig. 4 label reads ± 0.004 against the text's ± 0.0004.
+
+### Strecker2009
+- Reference: Strecker, M. R., Alonso, R., Bookhagen, B., Carrapa, B., Coutand, I., Hain, M. P., Hilley, G. E., Mortimer, E., Schoenbohm, L., Sobel, E. R. (2009). Does the topographic distribution of the central Andean Puna Plateau result from climatic or geodynamic processes? Geology 37(7):643-646.
+- DOI or URL: 10.1130/G25545A.1; read at https://bodobookhagen.github.io/pdf/strecker09_topography_andes.pdf
+- Cited as: "Strecker et al. 2009".
+- Ledger ids: none (the orogen design's lead for plateau wear; docs/design/plateau-drainage.md, 2026-10-31).
+- Access: open (an author's copy).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. pp. 644-645: "the low internal plateau relief appears to result from the long-term climatic evolution of the plateau margin, which involves the creation and sustenance of an effective orographic barrier promoting internal drainage and protracted aridity ... the low internal relief reflects basin isolation from the foreland base level as erosional efficiency decreases in the arid plateau"; p. 644: the plateau interior's peak-to-basin relief "<0.7 km".
+
+### Sobel2003
+- Reference: Sobel, E. R., Hilley, G. E., Strecker, M. R. (2003). Formation of internally drained contractional basins by aridity-limited bedrock incision. Journal of Geophysical Research 108(B7):2344.
+- DOI or URL: 10.1029/2002JB001883; the abstract from https://api.openalex.org/works/doi:10.1029/2002JB001883; the full text from the Wayback Machine's capture (20250626205207) of Wiley's page, https://web.archive.org/web/2022/https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2002JB001883 (the live page returns 403)
+- Cited as: "Sobel, Hilley & Strecker 2003".
+- Ledger ids: ERO-217.
+- Access: paywalled; an archived copy of the publisher's page.
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31: "Low internal relief, aridity, and internal drainage characterize the Puna-Altiplano Plateau and the Tibetan Plateau and the Tarim basin"; "We hypothesize that these large, internally drained areas persist indefinitely when uplift overwhelms the fluvial systems and defeats the channel network"; "Most coupled tectonic-landscape development models prevent the development of internal drainage and so may overestimate the voracity of erosion in regimes that favor internal drainage, profoundly influencing predicted orogenic growth patterns". Full text (paragraphs [1] to [66], the equations from their images) by a Sonnet research sub-agent of the plateau lane, 2026-10-31: [26], "Internal drainage results when an integrated fluvial system is defeated by an uplifted barrier"; [60], "Channels connected to closed basins must eventually aggrade as the basin fills and base level continually rises"; [62], "where internally drained basins persist ... mass storage in the arid interior of the orogen prevents a steady state condition from developing"; [58], "arid areas in close proximity to large orographic gradients may represent transitional parts of the landscape in which efficient headward erosion allows external drainage to extend into the low-precipitation highlands"; [24], the low-relief internally drained region's boundary "approximately coincides with the 400 mm/yr isohyet". Their criterion (eq. 13) is the defeat of a river by an uplifting barrier, precipitation entering only through K and the transport coefficient; the paper has no lake balance (the agent's reading). The agent notes that the printed exponent on So in eq. 13 does not follow from eqs. 8 and 12.
+
+## Internally drained basins and plateau wear (ERO-217 to ERO-220), added 2026-10-31
+
+The plateau lane's sources (docs/design/plateau-drainage.md, erosion-and-sediment.md "Internally drained basins"). All read by one Sonnet research sub-agent on 2026-10-31, quotes machine-checked against the text it extracted; downloads kept outside the repository. Not fetched: Mason, Guzkowska, Rapley & Street-Perrott 1994 (Climatic Change 27:161-197, paywalled, no open copy) and Mifflin & Wheat 1979 (Nevada Bureau of Mines).
+
+### GarciaCastellanos2007
+- Reference: Garcia-Castellanos, D. (2007). The role of climate during high plateau formation. Insights from numerical experiments. Earth and Planetary Science Letters 257:372-390.
+- DOI or URL: 10.1016/j.epsl.2007.02.039; read from the author's publications page, https://sites.google.com/site/daniggcc/publications
+- Cited as: "Garcia-Castellanos 2007".
+- Ledger ids: ERO-217, ERO-218.
+- Access: an author's copy.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. p. 387, eq. 12: "In absence of significant underground flow, the level of a closed lake is determined by the water balance between precipitation and evaporation, which in a steady state situation can be written as P . Wcb = E . Wcl", P "represents only to the component collected as surface runoff"; "If the lake water level reaches the outlet, drainage becomes open and outlet incision leads to the integration of the lake into the drainage network (drainage capture). During capture, the output discharge of the lake is P . Wb - E . Wl"; "Previous computer models of long-term surface transport did not account for evaporation"; p. 380: "Closed drainage (or endorheism) implies that, although some precipitation occurs in the highlands, its effect in terms of mass removal from the orogen is null", "in M1 most of the eroded rock is trapped within the orogen"; p. 383 (Fig. 8 caption): "a high plateau develops only for precipitation values lower than evaporation, i.e., P < 800 mm/yr"; Table 1, p. 377: reference lake evaporation E0 = 1300 mm/yr. The agent notes the M3 values differ between the p. 382 text and the Fig. 7 caption.
+
+### GarciaCastellanos2006
+- Reference: Garcia-Castellanos, D. (2006). Long-term evolution of tectonic lakes: Climatic controls on the development of internally drained basins. Geological Society of America Special Paper 398:283-294.
+- DOI or URL: 10.1130/2006.2398(17); read from the author's publications page
+- Cited as: "Garcia-Castellanos 2006".
+- Ledger ids: ERO-217, ERO-218, ERO-219.
+- Access: an author's copy.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. pp. 285-286, eq. 2: "the water discharge leaving a lake is determined by the water balance between precipitation and evaporation, which for a steady-state water flow can be written as Qw(x = 0) = P . lb - E . ll"; "By definition, for a closed lake Qw(x = 0) = 0"; p. 283: "the evaporation rate at the lake surface is revealed as a key factor triggering drainage closure (endorheism) and significant lake life extension by preventing outlet erosion"; p. 285: "Even before drainage closure is reached by tectonic uplift, evaporation reduces water discharge across the uplifting area, limiting the erosion rates"; p. 288: "internal drainage only develops if the lake surface becomes large enough to evaporate the water discharge collected by the lake", and "the sediment delivered to the lake displaces its shore, so the lake's altitude must increase to preserve a length sufficient to evaporate the collected water"; pp. 284-285: "either a climate change to wetter climatic conditions, or the sediment overfill of the lake (both inducing lake level rise) or a basin capture undertaken by an adjacent river can trigger drainage opening"; p. 284: Lake Titicaca's "evaporation rate of 1100 mm/yr". The agent reads the printed "P/E = ll/lb < 0" as a typo for "< 1", and notes the Fig. 2 caption's times differ from the text's.
+
+### GarciaCastellanos2003
+- Reference: Garcia-Castellanos, D., et al. (2003). Interplay between tectonics, climate, and fluvial transport during the Cenozoic evolution of the Ebro Basin (NE Iberia). Journal of Geophysical Research 108(B7):2347.
+- DOI or URL: 10.1029/2002JB002073; read from the author's publications page
+- Cited as: "Garcia-Castellanos et al. 2003".
+- Ledger ids: none (a reference line in docs/design/plateau-drainage.md).
+- Access: an author's copy.
+- Library: not kept.
+- Read so far (by the project): the abstract, introduction, Table 1, the model description and paragraphs [12], [21] and [38], 2026-10-31. [2], p. 8-1: "Endorheic basins occupy 20% of the Earth's land surface but they collect only about 2% of global river runoff, showing that they develop mostly under arid conditions"; [38]: the closed lake's area is a third of its catchment at 1300 mm/yr of evaporation and 400 mm/yr of precipitation.
+
+### Langbein1961
+- Reference: Langbein, W. B. (1961). Salinity and Hydrology of Closed Lakes. U.S. Geological Survey Professional Paper 412.
+- DOI or URL: https://pubs.usgs.gov/pp/0412/report.pdf
+- Cited as: "Langbein 1961".
+- Ledger ids: ERO-217, ERO-219.
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): pp. 3-6, 12-13 and Table 1, 2026-10-31 (the equations from the page images). p. 3: "The one universal control on the existence of closed lakes is evaporation"; p. 4: "The balance is expressed by the equation I + P A_L = E' A_L where I is inflow from the tributary area ... P is precipitation on the lake surface ... A_L is area of the lake ... and E' is gross evaporation rate from the lake"; p. 13: "at hydrologic equilibrium r A_T = E A_L"; Table 1, p. 18: net evaporation of closed lakes, ft/yr, Great Salt Lake 2.7, Pyramid 3.7, Owens 5.0, Dead Sea 4.8, Aral 2.6, Caspian 2.8, Lake Van 2.0, Urmia 2.5, Lake Eyre 7.0.
+
+### Blodgett1997
+- Reference: Blodgett, T. A., Lenters, J. D., Isacks, B. L. (1997). Constraints on the origin of paleolake expansions in the central Andes. Earth Interactions 1(1).
+- DOI or URL: the authors' preprint, https://web.archive.org/web/2016id_/http://www.geo.cornell.edu/geology/eos/lake/laketext.pdf
+- Cited as: "Blodgett et al. 1997".
+- Ledger ids: none (a reference line for lake evaporation on the Altiplano).
+- Access: an archived preprint (no journal pages).
+- Library: not kept.
+- Read so far (by the project): sections 1.2 and 3.1 to 3.3 and Table 3, 2026-10-31. Section 3.1: the closed Altiplano's steady state "Pbas = Ew aw + El (1 - aw) = Ebas"; section 3.2: "The modern Lake Titicaca evaporation rate of Ew = 1270 mm/yr is calculated from the evaporation model"; section 1.2: the Titicaca-Uyuni-Coipasa-Poopo basin is 198,000 km2.
+
+### WangLakes2020
+- Reference: Wang et al. (2020). Quantifying the evaporation amounts of 75 high-elevation large dimictic lakes on the Tibetan Plateau. Science Advances 6(26):eaay8558.
+- DOI or URL: 10.1126/sciadv.aay8558; Europe PMC PMC7319769
+- Cited as: "Wang et al. 2020".
+- Ledger ids: none (a reference line: the model's lake evaporation against the plateau's).
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): full text, the results sections, 2026-10-31: "the average Eo (ranging from 350 to 1200 mm) and Ea (ranging from 650 to 1300 mm) are approximately 865 and 1000 mm, respectively" (Ea annual, with the winter's sublimation).
+
+### Hetzel2011
+- Reference: Hetzel, R., et al. (2011). Peneplain formation in southern Tibet predates the India-Asia collision and plateau uplift. Geology 39(10):983-986.
+- DOI or URL: 10.1130/G32069.1; read at http://www.sediment.uni-goettingen.de/thermochron/dunkl/zips/Hetzel-et-al-2011.pdf
+- Cited as: "Hetzel et al. 2011".
+- Ledger ids: none (a reference line for plateau wear beside ERO-174).
+- Access: an author's copy.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. p. 983: "low local and catchment-wide erosion rates of 6-11 m/m.y. and 11-16 m/m.y., respectively, which were derived from cosmogenic 10Be concentrations in bedrock, grus, and stream sediment"; p. 984: "All samples except one yield local erosion rates of only 6-8 m/m.y."; Table 2, p. 985: local 6.44 to 10.54, catchment-wide 10.66 to 16.29 m/m.y.
+
+### Strobl2012
+- Reference: Strobl, M., et al. (2012). Landscape evolution of a bedrock peneplain on the southern Tibetan Plateau revealed by in situ-produced cosmogenic 10Be and 21Ne. Geomorphology 153-154:192-204.
+- DOI or URL: 10.1016/j.geomorph.2012.02.024; the accepted manuscript at https://gfzpublic.gfz.de/rest/items/item_244902_1/component/file_244901/content?download=true
+- Cited as: "Strobl et al. 2012".
+- Ledger ids: none (a reference line for plateau wear).
+- Access: the accepted manuscript (no journal pages).
+- Library: not kept.
+- Read so far (by the project): full text of the manuscript, 2026-10-31. Abstract: local denudation rates "cluster between 5 and 11 m Ma-1 (mean = 8.1 m Ma-1)", small catchments "9 to 16 m Ma-1 (mean = 11.8 m Ma-1)"; section 5.3: "As the peneplain region belongs to the internally drained part of the plateau (Fig. 1), the sediment produced cannot leave the interior of the plateau"; section 2: "The climate in this region is cold and arid with a mean annual temperature of 0 C and an annual precipitation of ~300 mm".
+
+### Lal2003
+- Reference: Lal, D., Harris, N. B. W., Sharma, K. K., Gu, Z., Ding, L., Liu, T., Dong, W., Caffee, M. W., Jull, A. J. T. (2003). Erosion history of the Tibetan Plateau since the last interglacial: constraints from the first studies of cosmogenic 10Be from Tibetan bedrock. Earth and Planetary Science Letters 217:33-42.
+- DOI or URL: 10.1016/S0012-821X(03)00600-9; the abstract from a Wayback capture of https://oro.open.ac.uk/4074/
+- Cited as: "Lal et al. 2003".
+- Ledger ids: none (a reference line).
+- Access: paywalled; the abstract only.
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31: "low erosion rates of <30 mm/ka in southern and central Tibet during the last interglacial-glacial cycle that contrast strongly with unusually rapid erosion rates (60-2000 mm/ka) for Kunlun in northern Tibet during the Holocene".
+
+### Richardson2019
+- Reference: Richardson, P. W., Perron, J. T., Schurr, N. D. (2019). Influences of climate and life on hillslope sediment transport. Geology 47(5):423-426.
+- DOI or URL: 10.1130/G45305.1; the abstract from https://api.openalex.org/works/doi:10.1130/G45305.1
+- Cited as: "Richardson, Perron & Schurr 2019".
+- Ledger ids: none (a lead left open in docs/design/plateau-drainage.md).
+- Access: paywalled; the abstract only.
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31: "The compilation reveals an overall trend in which D increases strongly with increasing moisture among relatively dry sites and less strongly with increasing moisture among relatively wet sites".
+
+### Armijo1986
+- Reference: Armijo, Tapponnier, Mercier and Han (1986). Quaternary extension in southern Tibet: Field observations and tectonic implications. Journal of Geophysical Research 91(B14):13803-13872 (the initials not recorded by the read).
+- DOI or URL: 10.1029/JB091iB14p13803; the abstract from the Crossref and OpenAlex records.
+- Cited as: "Armijo et al. 1986".
+- Ledger ids: PLT-740 (the plateau's interior extends; not modelled).
+- Access: the abstract only.
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31 (the orogen lane, by a Sonnet sub-agent): "normal faulting has been the dominant tectonic regime north of the Himalayas in the last 2 ± 0.5 m.y."; extensional strains "principally localized within seven regularly spaced rift zones"; "The extension direction is determined to be N96° E ± 7°"; "The rate of Quaternary extension is about 1% m.y.-1 along an 1100-km-long ESE traverse across south Tibet".
+- Reference check: the surnames, title, journal, volume, issue, pages and DOI as the agent printed them from the records; the initials to complete.
+
+### Blisniuk2001
+- Reference: Blisniuk, P. M., Hacker, B. R., Glodny, J., Ratschbacher, L., Bi, S., Wu, Z., McWilliams, M. and Calvert, A. (2001). Normal faulting in central Tibet since at least 13.5 Myr ago. Nature 412(6847):628-632.
+- DOI or URL: 10.1038/35088045 (PMID 11493918); the abstract from the Europe PMC record.
+- Cited as: "Blisniuk et al. 2001".
+- Ledger ids: PLT-740 (the plateau's interior extends; not modelled).
+- Access: paywalled; the abstract only.
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31 (the orogen lane, by a Sonnet sub-agent): "observed east-west thinning of the upper crust"; "we report a minimum age of approximately 13.5 Myr for the onset of graben formation in central Tibet"; "Thinning of the upper crust is most plausibly the result of potential-energy increases resulting from spatially and temporally heterogeneous changes in thermal structure and density distribution within the crust and upper mantle beneath Tibet".
+- Reference check: as the agent printed it from the record.

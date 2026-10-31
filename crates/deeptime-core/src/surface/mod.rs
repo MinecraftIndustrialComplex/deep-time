@@ -66,6 +66,7 @@ pub mod advect;
 pub mod amplify;
 pub mod carbonate;
 pub mod climate;
+pub mod closed;
 pub mod cube;
 pub mod detail;
 pub mod diffusion;
@@ -300,6 +301,23 @@ pub struct Totals {
     /// Conjugate-gradient iterations of the diffusion solves.
     pub diffusion_iterations: u64,
     pub sinks: u64,
+    /// Lake-substeps whose water balance passed nothing on (closed basins, `closed.rs`; with
+    /// `closed_basins`, measurement only). The three lake counts are taken after the substep's
+    /// lakes the sediment filled were opened (`closed::open_until_stable`), so such a lake is in
+    /// neither this count nor the next, only in `filled_lakes`, …
+    #[serde(default)]
+    pub closed_lakes: u64,
+    /// … lake-substeps that passed part of their inflow (counted the same way), …
+    #[serde(default)]
+    pub partial_lakes: u64,
+    /// … the land draining to closed basins, km² × Myr (map; the same catchment, after the lakes
+    /// were opened), …
+    #[serde(default)]
+    pub closed_km2_myr: f64,
+    /// … and the lake-substeps the substep's sediment filled to their spill, which then passed all
+    /// their water: lakes that had passed nothing or part of their inflow, together.
+    #[serde(default)]
+    pub filled_lakes: u64,
     pub frames: u64,
     /// Land erosion by process and elevation band (`erosion_bands`).
     #[serde(default)]
@@ -1365,43 +1383,22 @@ impl SurfaceStage {
         let class_of = |st: &SurfaceState, c: usize| surface_class(&cls, &basement, st, c);
 
         // ledger: ISO-126
-        // What each cell gives and takes as water, for the lakes the flexure loads (`lakes.rs`):
-        // the bake's lake budget (`HydroParams::budget`) on the step's climate, the climate
-        // stage's seasons about the surface's own mean temperature.
+        // What each cell gives and takes as water, for the lakes the flexure loads (`lakes.rs`)
+        // and what the lakes pass on (`closed.rs`, ERO-217): the bake's lake budget
+        // (`HydroParams::budget`) on the step's climate, the climate stage's seasons about the
+        // surface's own mean temperature.
         let hydro_p = self.preset.hydro.unwrap_or_default();
-        let cell_water: Option<Vec<lakes::CellWater>> =
-            (p.flexure.active() && p.flexure.water_by_basin).then(|| {
-                let season = |name: &str| {
-                    world
-                        .fields
-                        .get(name)
-                        .filter(|f| f.data.len() == n)
-                        .map(|f| &f.data[..])
-                };
-                let warm = season(crate::climate::field::T_WARM);
-                let cold = season(crate::climate::field::T_COLD);
-                (0..n)
-                    .into_par_iter()
-                    .map(|c| {
-                        let t = f64::from(clim.t_c[c]);
-                        let half = match (warm, cold) {
-                            (Some(w), Some(k)) => 0.5 * f64::from(w[c] - k[c]),
-                            _ => f64::NAN,
-                        };
-                        let cl = crate::hydro::Climate::of(
-                            f64::from(clim.precip_mm[c]),
-                            t,
-                            t + half,
-                            t - half,
-                        );
-                        let b = hydro_p.budget(&cl);
-                        lakes::CellWater {
-                            runoff_m_yr: b.runoff_mm / 1000.0,
-                            loss_m_yr: (b.evaporation_mm - b.rain_mm) / 1000.0,
-                        }
-                    })
-                    .collect()
-            });
+        if self.done == 0 && p.closed_basins && !hydro_p.lake_balance {
+            // Every lake is full without the balance, so none closes (ERO-217).
+            ctx.log.push(
+                crate::log::Level::Warn,
+                "surface: surface.closed_basins is on but hydro.lake_balance is off, so every lake \
+                 stays full and passes all its water: no basin closes",
+            );
+        }
+        let flexure_water = p.flexure.active() && p.flexure.water_by_basin;
+        let cell_water: Option<Vec<lakes::CellWater>> = (flexure_water || p.closed_basins)
+            .then(|| climate::water_budget(world, &clim, &hydro_p));
         let mut water_levels: Option<lakes::Levels> = None;
 
         // 3. The LEM steps.
@@ -1478,6 +1475,12 @@ impl SurfaceStage {
         let mut peri_source_m_cells = 0.0f64;
         // The photic factory's limits over the step's substeps (cells; measurement only).
         let mut photic = [0.0f64; 3];
+        // The closed basins (`closed.rs`; measurement only): lakes that passed nothing and that
+        // passed a part, the land draining to closed basins (km² × Myr), and the last substep's
+        // cells that do (the erosion bands' closed flat high ground).
+        let (mut closed_lakes, mut partial_lakes, mut closed_km2_myr) = (0u64, 0u64, 0.0f64);
+        let mut filled_lakes = 0u64;
+        let mut closed_mask: Option<Vec<bool>> = None;
         let epoch = self.epoch();
         for sub in 0..subs {
             // The first substep's flood ran beside the setup (above).
@@ -1495,13 +1498,18 @@ impl SurfaceStage {
             routing::stack(&d, &sc.kind, &mut sc.routing);
             routing::accumulate(&d, &sc.routing, &sc.weight, &mut sc.area);
             self.time("routing", started);
-            // ledger: ISO-126
-            // The water the flexure loads: the last flood's open sea and lakes.
-            if sub + 1 == subs
+            // ledger: ERO-217, ERO-218
+            // What each lake passes on (`closed.rs`): the drainage area again, each lake's exit
+            // passing the share of its inflow its balance leaves, a closed basin's none. The
+            // levels are the flexure's (the same flood, routing and budget).
+            let mut balance: Option<lakes::Levels> = None;
+            // What the lakes pass on, kept past the solve (a lake its sediment fills opens).
+            let mut lake_outflow: Option<Vec<lakes::LakeOutflow>> = None;
+            if p.closed_basins
                 && let Some(cw) = &cell_water
             {
                 let started = Instant::now();
-                water_levels = Some(lakes::water_levels(
+                let lv = lakes::water_levels(
                     &d,
                     &sc.h,
                     &sc.filled,
@@ -1510,7 +1518,34 @@ impl SurfaceStage {
                     sea,
                     hydro_p.lake_balance,
                     &|c| cw[c],
-                ));
+                );
+                if let Some(pass) = closed::pass_shares(n, &lv.outflow) {
+                    routing::accumulate_passing(&d, &sc.routing, &sc.weight, &pass, &mut sc.area);
+                }
+                lake_outflow = Some(lv.outflow.clone());
+                balance = Some(lv);
+                self.time("closed", started);
+            }
+            // ledger: ISO-126
+            // The water the flexure loads: the last flood's open sea and lakes.
+            if sub + 1 == subs
+                && flexure_water
+                && let Some(cw) = &cell_water
+            {
+                let started = Instant::now();
+                water_levels = Some(match balance.take() {
+                    Some(lv) => lv,
+                    None => lakes::water_levels(
+                        &d,
+                        &sc.h,
+                        &sc.filled,
+                        &sc.kind,
+                        &sc.routing,
+                        sea,
+                        hydro_p.lake_balance,
+                        &|c| cw[c],
+                    ),
+                });
                 self.time("lakes", started);
             }
             // Under a glacier the ice erodes, not a river: K keeps the ice-free share of a cell.
@@ -1552,6 +1587,50 @@ impl SurfaceStage {
                 sc.kf_eff.copy_from_slice(&sc.kf);
             }
             let started = Instant::now();
+            let solve = |sc: &mut Scratch| {
+                let input = spl::SplInput {
+                    kind: &sc.kind,
+                    h0: &sc.h,
+                    filled: &sc.filled,
+                    base_z: &sc.base_z,
+                    area: &sc.area,
+                    kf: &sc.kf_eff,
+                };
+                spl::solve_cut(
+                    &d,
+                    &sc.routing,
+                    &input,
+                    &spl_p,
+                    &mut sc.h_new,
+                    &mut sc.qin,
+                    Some(&mut sc.cut),
+                )
+            };
+            let rep = solve(&mut sc);
+            iterations += rep.iterations as u64;
+            if let Some(outflow) = lake_outflow.as_mut() {
+                // ledger: ERO-217
+                // A lake the step's sediment filled to its spill passes all its water: the step
+                // is solved again with its area passed on, until no lake opens (opening one sends
+                // its water and sediment to the lakes below it, `closed::open_until_stable`).
+                filled_lakes += closed::open_until_stable(
+                    outflow,
+                    &mut sc,
+                    |sc, outflow| closed::open_filled(outflow, &sc.h_new, &sc.filled),
+                    |sc, outflow| {
+                        closed::accumulate(&d, &sc.routing, &sc.weight, outflow, &mut sc.area);
+                        let rep = solve(sc);
+                        iterations += rep.iterations as u64;
+                    },
+                ) as u64;
+                let catchment = closed::closed_catchment(&sc.routing, outflow);
+                let land: Vec<bool> = sc.kind.par_iter().map(|&k| k != BASE).collect();
+                let (shut, partial, cells) = closed::counts(outflow, &catchment, &land);
+                closed_lakes += shut;
+                partial_lakes += partial;
+                closed_km2_myr += cells as f64 * d.cell_area() / 1.0e6 * dts / 1.0e6;
+                closed_mask = Some(catchment);
+            }
             let input = spl::SplInput {
                 kind: &sc.kind,
                 h0: &sc.h,
@@ -1560,16 +1639,6 @@ impl SurfaceStage {
                 area: &sc.area,
                 kf: &sc.kf_eff,
             };
-            let rep = spl::solve_cut(
-                &d,
-                &sc.routing,
-                &input,
-                &spl_p,
-                &mut sc.h_new,
-                &mut sc.qin,
-                Some(&mut sc.cut),
-            );
-            iterations += rep.iterations as u64;
             if sub + 1 == subs {
                 spl::families(&d, &sc.routing, &input, &fam, dts, &sc.h_new, &mut sc.mix);
             }
@@ -2114,6 +2183,15 @@ impl SurfaceStage {
             .into_par_iter()
             .map(|c| sc.h[c] - h_start[c])
             .collect();
+        // The flat high ground's split by its water (measurement only): dry by its runoff weight,
+        // frozen by its mean temperature (below 0 °C).
+        // ledger: ERO-220
+        let dry_mask: Vec<bool> = sc
+            .weight
+            .par_iter()
+            .map(|&w| w <= erosion_bands::DRY_WEIGHT)
+            .collect();
+        let frozen_mask: Vec<bool> = clim.t_c.par_iter().map(|&t| t < 0.0).collect();
         st.totals.by_band.add(
             &d,
             &erosion_bands::StepErosion {
@@ -2125,6 +2203,9 @@ impl SurfaceStage {
                 diffusion: &parts.diffusion_eroded,
                 net: &net,
                 dt_myr,
+                closed: closed_mask.as_deref(),
+                dry: Some(&dry_mask),
+                frozen: Some(&frozen_mask),
             },
         );
         let mut kind_step = crate::alloc::filled(n, fields::KIND_NONE);
@@ -2585,6 +2666,10 @@ impl SurfaceStage {
         t.spl_iterations += iterations;
         t.diffusion_iterations += cg_iterations;
         t.sinks += sinks;
+        t.closed_lakes += closed_lakes;
+        t.partial_lakes += partial_lakes;
+        t.closed_km2_myr += closed_km2_myr;
+        t.filled_lakes += filled_lakes;
 
         let m_per_block_v = self.preset.scale.m_per_block_v;
         let sea_y = f64::from(self.preset.scale.sea_level_y);
