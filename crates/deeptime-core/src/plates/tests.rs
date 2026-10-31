@@ -321,6 +321,32 @@ fn finish(s: &Session) {
     panic!("the run never finished");
 }
 
+/// The overlap trace (measurement only, 2026-10-31): every contact `subduction::resolve` begins
+/// carries its plates' motion across its overlap (its overlapping samples, at least
+/// `MIN_CONTACT`, each in one class, for the pair of plates that met), and the step's record
+/// empties the measure, so no state between steps holds one.
+#[test]
+fn onsets_carry_their_plates_motion_across_the_overlap() {
+    let p = preset(8000, 100.0, "scattered_continents", 3);
+    let mut held = 0usize;
+    let world = run_stage(&p, |_, _, st| {
+        held += st.dynamics.as_ref().map_or(0, |d| d.onset_overlap.len());
+    });
+    assert_eq!(held, 0, "a step's overlap measure outlived its record");
+    let d = world.plates.as_ref().unwrap().dynamics.as_ref().unwrap();
+    let read = d.onsets.iter().filter(|o| o.overlap.n > 0).count();
+    assert!(read > 0, "no onset of {} with its overlap", d.onsets.len());
+    for o in &d.onsets {
+        let v = &o.overlap;
+        assert_eq!(v.converging + v.transform + v.parting + v.no_normal, v.n, "{v:?}");
+        if v.n > 0 {
+            assert_eq!((v.lo, v.hi), (o.under.min(o.over), o.under.max(o.over)));
+            assert!(v.n >= subduction::MIN_CONTACT, "{v:?}");
+            assert!(usize::from(v.pair_class) <= dynamics::OVERLAP_NO_NORMAL);
+        }
+    }
+}
+
 /// A run checkpointed mid-stage through bytes and resumed ends in exactly the straight run's world.
 #[test]
 fn resumed_run_is_identical() {

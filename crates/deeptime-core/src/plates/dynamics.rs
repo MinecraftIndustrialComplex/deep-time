@@ -192,6 +192,11 @@ pub struct Dynamics {
     /// so a resumed run is the same run; emptied at the run's last step, so the record keeps none.
     #[serde(default)]
     pub prov: Vec<u8>,
+    /// Measurement only (the overlap trace, 2026-10-31): the contacts begun this step, their
+    /// plates' motion across their overlaps ([`onset_overlaps`], set after `subduction::resolve`);
+    /// the step's record reads and empties it, so no state or record keeps one.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub onset_overlap: Vec<OnsetOverlap>,
 }
 
 /// Measurement only (the resampling trace, 2026-10-31): how a resampling made each new sample
@@ -232,6 +237,203 @@ pub struct OnsetProv {
     pub over_bits: [u32; PROV_BITS],
     pub under_bits: [u32; PROV_BITS],
     pub under_hidden: u32,
+}
+
+/// Measurement only (the overlap trace, 2026-10-31): a contact begun this step, the two plates'
+/// relative velocity at its overlapping samples against the boundary's normal there
+/// ([`onset_overlaps`], read in the step's first part, after `subduction::resolve`). Plates `lo`
+/// and `hi` by id; the overlapping samples, and of them how many converge across the boundary,
+/// move along it by PLT-311's test (Bird 2003: within 20 degrees of the boundary, or at rest),
+/// part, or have no normal (no sample of one of the two plates about them); the mean convergence
+/// across over those with a normal, mm/yr (positive converging, the samples of a transform at
+/// their normal part); and the pair's own reading: the samples' normals summed against the
+/// relative velocity at the overlap's centroid, mm/yr, and its class (`OVERLAP_CONVERGING` …).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct OnsetOverlap {
+    pub lo: u32,
+    pub hi: u32,
+    pub n: u32,
+    pub converging: u32,
+    pub transform: u32,
+    pub parting: u32,
+    pub no_normal: u32,
+    pub conv_mm_yr: f64,
+    pub pair_conv_mm_yr: f64,
+    pub pair_class: u8,
+}
+
+impl Default for OnsetOverlap {
+    fn default() -> OnsetOverlap {
+        OnsetOverlap {
+            lo: 0,
+            hi: 0,
+            n: 0,
+            converging: 0,
+            transform: 0,
+            parting: 0,
+            no_normal: 0,
+            conv_mm_yr: 0.0,
+            pair_conv_mm_yr: 0.0,
+            pair_class: OVERLAP_NO_NORMAL as u8,
+        }
+    }
+}
+
+/// [`OnsetOverlap`]'s classes of motion across the boundary (measurement only): converging …
+pub const OVERLAP_CONVERGING: usize = 0;
+/// … along it (PLT-311's transform, or at rest) …
+pub const OVERLAP_TRANSFORM: usize = 1;
+/// … parting …
+pub const OVERLAP_PARTING: usize = 2;
+/// … and no normal to read it against.
+pub const OVERLAP_NO_NORMAL: usize = 3;
+/// The nearest samples an overlapping sample's boundary normal is read from (measurement only,
+/// not physics: about two rings of the lattice, as `shortening::boundary_normal` reads two
+/// lattice steps; a pair that met since the last resampling has no lattice edge to read).
+const OVERLAP_NEAR: usize = 12;
+
+/// The boundary's unit normal at the overlapping sample `p`, from plate lo's side towards plate
+/// hi's: the tangent part at `p` of the mean position of the hi samples among `near` (each
+/// `(position, is hi)`) less that of the lo samples; zero without both (measurement only).
+fn overlap_normal(p: DVec3, near: impl IntoIterator<Item = (DVec3, bool)>) -> DVec3 {
+    let (mut sum, mut count) = ([DVec3::ZERO; 2], [0u32; 2]);
+    for (q, hi) in near {
+        sum[usize::from(hi)] += q;
+        count[usize::from(hi)] += 1;
+    }
+    if count[0] == 0 || count[1] == 0 {
+        return DVec3::ZERO;
+    }
+    let d = sum[1] / f64::from(count[1]) - sum[0] / f64::from(count[0]);
+    tangent(p, d).normalize_or_zero()
+}
+
+/// One overlapping sample's class of motion ([`OVERLAP_CONVERGING`] …) and its convergence
+/// across the boundary, mm/yr: `rel` plate lo's velocity less plate hi's there, `normal` the
+/// boundary's unit normal from lo towards hi ([`overlap_normal`]; zero: no normal). The
+/// transform test is PLT-311's (`shortening::is_transform`).
+fn overlap_class(rel: DVec3, normal: DVec3) -> (usize, f64) {
+    if normal == DVec3::ZERO {
+        return (OVERLAP_NO_NORMAL, 0.0);
+    }
+    let conv = rel.dot(normal);
+    let class = if shortening::is_transform(rel, normal) {
+        OVERLAP_TRANSFORM
+    } else if conv > 0.0 {
+        OVERLAP_CONVERGING
+    } else {
+        OVERLAP_PARTING
+    };
+    (class, conv)
+}
+
+/// One contact's [`OnsetOverlap`] as its overlapping samples are added (in the overlaps' order,
+/// so the sums are the same each run).
+struct OverlapAcc {
+    rec: OnsetOverlap,
+    normal: DVec3,
+    at: DVec3,
+    conv: f64,
+    with_normal: u32,
+}
+
+impl OverlapAcc {
+    fn new(lo: u32, hi: u32) -> OverlapAcc {
+        OverlapAcc {
+            rec: OnsetOverlap {
+                lo,
+                hi,
+                ..OnsetOverlap::default()
+            },
+            normal: DVec3::ZERO,
+            at: DVec3::ZERO,
+            conv: 0.0,
+            with_normal: 0,
+        }
+    }
+
+    /// An overlapping sample at `p` with its boundary normal and the plates' relative velocity
+    /// there (lo's less hi's, mm/yr).
+    fn add(&mut self, p: DVec3, normal: DVec3, rel: DVec3) {
+        let (class, conv) = overlap_class(rel, normal);
+        let r = &mut self.rec;
+        r.n += 1;
+        match class {
+            OVERLAP_CONVERGING => r.converging += 1,
+            OVERLAP_TRANSFORM => r.transform += 1,
+            OVERLAP_PARTING => r.parting += 1,
+            _ => r.no_normal += 1,
+        }
+        if class != OVERLAP_NO_NORMAL {
+            self.conv += conv;
+            self.with_normal += 1;
+        }
+        self.normal += normal;
+        self.at += p;
+    }
+
+    /// The record, with the pair's reading: `rel_at` the plates' relative velocity at a point.
+    fn finish(self, rel_at: impl Fn(DVec3) -> DVec3) -> OnsetOverlap {
+        let mut r = self.rec;
+        if self.with_normal > 0 {
+            r.conv_mm_yr = self.conv / f64::from(self.with_normal);
+        }
+        let c = self.at.normalize_or_zero();
+        let (class, conv) = overlap_class(rel_at(c), tangent(c, self.normal).normalize_or_zero());
+        r.pair_class = class as u8;
+        r.pair_conv_mm_yr = conv;
+        r
+    }
+}
+
+/// Measurement only (the overlap trace, 2026-10-31): each contact begun this step (a new one or
+/// a reversal's new onset), the two plates' motion across its overlapping samples
+/// ([`OnsetOverlap`]), from the step's overlaps (`subduction::overlaps`), the samples' positions
+/// and their tree; called after `subduction::resolve`, which reads nothing it writes.
+pub fn onset_overlaps(
+    st: &PlateState,
+    overlaps: &[subduction::Overlap],
+    pos: &[DVec3],
+    tree: &Tree,
+    env: &Env<'_>,
+) -> Vec<OnsetOverlap> {
+    let new: BTreeSet<(u32, u32)> = st
+        .contacts
+        .iter()
+        .filter(|c| c.onset_step == env.step)
+        .map(|c| (c.under.min(c.over), c.under.max(c.over)))
+        .collect();
+    if new.is_empty() {
+        return Vec::new();
+    }
+    let rel_at = |(lo, hi): (u32, u32), p: DVec3| {
+        let w = |id: u32| DVec3::from_array(st.plates[id as usize].omega);
+        env.norm.velocity_mm_yr(w(lo) - w(hi), p)
+    };
+    let mut acc: BTreeMap<(u32, u32), OverlapAcc> = BTreeMap::new();
+    for o in overlaps {
+        let a = st.plate_of(o.i as usize);
+        let b = st.groups[o.group as usize].plate;
+        let key = (a.min(b), a.max(b));
+        if !new.contains(&key) {
+            continue;
+        }
+        let p = pos[o.i as usize];
+        let near = tree
+            .nearest_n(p, OVERLAP_NEAR)
+            .into_iter()
+            .filter_map(|(j, _)| {
+                let q = st.plate_of(j as usize);
+                (q == key.0 || q == key.1).then_some((pos[j as usize], q == key.1))
+            });
+        let normal = overlap_normal(p, near);
+        acc.entry(key)
+            .or_insert_with(|| OverlapAcc::new(key.0, key.1))
+            .add(p, normal, rel_at(key, p));
+    }
+    acc.into_iter()
+        .map(|(key, a)| a.finish(|p| rel_at(key, p)))
+        .collect()
 }
 
 /// One step's state of the planet and its plates.
@@ -1257,6 +1459,10 @@ pub struct OnsetRec {
     pub front_km_myr: [f64; 2],
     #[serde(default)]
     pub last_myr: f64,
+    /// The overlap trace (2026-10-31): its plates' motion across its overlap at the onset
+    /// ([`OnsetOverlap`]; the default for a contact begun with no overlap).
+    #[serde(default)]
+    pub overlap: OnsetOverlap,
 }
 
 impl OnsetRec {
@@ -2092,6 +2298,10 @@ fn record_onsets(
     let hist: BTreeMap<(u32, u32), &PairHist> =
         d.pair_hist.iter().map(|h| ((h.lo, h.hi), h)).collect();
     let was: BTreeSet<(u32, u32)> = d.prev_contacts.iter().copied().collect();
+    let overlap: BTreeMap<(u32, u32), OnsetOverlap> = std::mem::take(&mut d.onset_overlap)
+        .into_iter()
+        .map(|o| ((o.lo, o.hi), o))
+        .collect();
     let mut new = Vec::new();
     for c in st.contacts.iter().filter(|c| c.onset_step == env.step) {
         let key = (c.under.min(c.over), c.under.max(c.over));
@@ -2133,6 +2343,7 @@ fn record_onsets(
             subducting_after_myr: -1.0,
             max_slab_km: 0.0,
             front_km_myr: [0.0; 2],
+            overlap: overlap.get(&key).cloned().unwrap_or_default(),
             last_myr: t,
         });
     }
@@ -2602,6 +2813,71 @@ mod tests {
     fn on_sphere(lon_deg: f64, lat_deg: f64) -> DVec3 {
         let (lo, la) = (lon_deg.to_radians(), lat_deg.to_radians());
         DVec3::new(la.cos() * lo.cos(), la.cos() * lo.sin(), la.sin())
+    }
+
+    /// The overlap trace (measurement only): an overlapping sample's boundary normal points from
+    /// the lower plate's samples about it towards the higher plate's, and the two plates' motion
+    /// across it is split by PLT-311's test (Bird 2003: within 20 degrees of the boundary is a
+    /// transform) into converging, a transform and parting; with no sample of one plate about it
+    /// there is no normal.
+    #[test]
+    fn the_overlap_trace_reads_the_motion_across_the_boundary() {
+        // Plate lo west of the meridian, plate hi east of it; the overlapping sample on it.
+        let p = on_sphere(0.0, 0.0);
+        let mut near = Vec::new();
+        for i in 1..=4 {
+            for j in -2..=2 {
+                let (x, y) = (0.5 * f64::from(i), 0.5 * f64::from(j));
+                near.push((on_sphere(-x, y), false));
+                near.push((on_sphere(x, y), true));
+            }
+        }
+        let n = overlap_normal(p, near.iter().copied());
+        let (east, north) = (on_sphere(90.0, 0.0), DVec3::Z);
+        assert!(n.dot(east) > 0.999, "{n}");
+        let close = |a: f64, b: f64| (a - b).abs() < 1e-9;
+        // Plate lo moving east into plate hi at 30 mm/yr converges; north, it slides past; west,
+        // it parts.
+        let (k, conv) = overlap_class(30.0 * east, n);
+        assert!(k == OVERLAP_CONVERGING && (conv - 30.0).abs() < 0.1, "{k} {conv}");
+        let (k, conv) = overlap_class(30.0 * north, n);
+        assert!(k == OVERLAP_TRANSFORM && conv.abs() < 0.1, "{k} {conv}");
+        let (k, conv) = overlap_class(-30.0 * east, n);
+        assert!(k == OVERLAP_PARTING && (conv + 30.0).abs() < 0.1, "{k} {conv}");
+        // 30 degrees off the boundary converges, 10 degrees off is a transform; plates at rest
+        // are a transform by the same test.
+        let off = |deg: f64| {
+            let r = deg.to_radians();
+            30.0 * (r.cos() * north + r.sin() * east)
+        };
+        assert_eq!(overlap_class(off(30.0), n).0, OVERLAP_CONVERGING);
+        assert_eq!(overlap_class(off(10.0), n).0, OVERLAP_TRANSFORM);
+        assert_eq!(overlap_class(DVec3::ZERO, n).0, OVERLAP_TRANSFORM);
+        // Only one plate about the sample: no normal.
+        let lone = overlap_normal(p, near.iter().copied().filter(|x| !x.1));
+        assert_eq!(lone, DVec3::ZERO);
+        let (k, conv) = overlap_class(30.0 * east, lone);
+        assert!(k == OVERLAP_NO_NORMAL && close(conv, 0.0), "{k} {conv}");
+        // A contact's record: its samples by class, the mean convergence over those with a
+        // normal, and the pair's own reading at the overlap's centroid.
+        let mut acc = OverlapAcc::new(1, 2);
+        for lat in [-0.5, 0.0, 0.5] {
+            acc.add(on_sphere(0.0, lat), n, 30.0 * east);
+        }
+        acc.add(on_sphere(0.0, 1.0), DVec3::ZERO, 30.0 * east);
+        acc.add(on_sphere(0.0, -1.0), n, 30.0 * north);
+        let r = acc.finish(|_| 30.0 * east);
+        assert_eq!(
+            (r.lo, r.hi, r.n, r.converging, r.transform, r.parting, r.no_normal),
+            (1, 2, 5, 3, 1, 0, 1)
+        );
+        assert!((r.conv_mm_yr - 22.5).abs() < 0.1, "{}", r.conv_mm_yr);
+        assert!(
+            r.pair_class == OVERLAP_CONVERGING as u8 && (r.pair_conv_mm_yr - 30.0).abs() < 0.1,
+            "{r:?}"
+        );
+        let r = OverlapAcc::new(1, 2).finish(|_| 30.0 * east);
+        assert_eq!((r.n, r.pair_class), (0, OVERLAP_NO_NORMAL as u8));
     }
 
     #[test]
