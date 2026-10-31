@@ -688,6 +688,196 @@ sea's 0.278 still over 0.25): the thicker continents shed more sediment and none
 ("Why the sea stands about 500 m over the datum at the end"), so the sea's height, not the
 taper, is what remains between the final frame and its target.
 
+### Freeboard: why the normal continent stands under the sea (2026-10-31)
+
+The coast-with-high-ground audit (docs/research/notes/coast-high-ground-audit-2026-10-30.md) found
+the sea standing about 150 m over the normal continental column, and Ben chose the order
+"Freeboard, then orogen (Recommended)" (decisions log 2026-10-30). This section measures why, on
+base33 (master 2abbc567, key 31c7c70bd7c7, 24 runs) and base32, with the M5 lane's tools on the
+cached runs (`tools/review/m5diag/m5sea.py`, `tools/review/seddiag/sedstock.py`,
+`tools/review/loss-budget.py`), and reads two arms of switches the M5 lane built and left off.
+
+**The sea's budget** (m5sea, final frame, medians): the sea stands 536 m over the datum on base32 and
+701 m on base33. With oceanic crust of 10 km and more at the bare floor's height for its age, it
+would stand at −253 and −219 m: the thick oceanic-labelled crust raises the sea by about 790 and 920
+m. From base32 to base33 (the reversal behind the overriding block, PLT-737) the filled sea rose 154
+m, of it 128 m from the oceanic floor's height (oceanic crust 15 to 25 km thick from 0.123 to 0.141
+of it, over 25 km from 0.045 to 0.056), while the floor's age alone (older) would have lowered it
+by 46 m.
+
+**The sea's sediment** (sedstock, base33, Earth-normalized km³, against GlobSed, Straume et al.
+2019):
+
+| region | model | GlobSed |
+|---|---|---|
+| the sea's sediment, all of it | 6.82 × 10⁸ | 3.37 × 10⁸ |
+| wet continental crust (the margins) | 6.38 × 10⁷ (pile 1,774 m) | 1.43 × 10⁸ (3,044 m) |
+| ocean floor within 200 km of continental crust | 2.97 × 10⁸ (4,061 m, over 7.1 × 10⁷ km²) | 7.6 × 10⁷ (2,049 m, over 3.7 × 10⁷ km²) |
+| ocean floor beyond 200 km | 3.14 × 10⁸ (1,385 m) | 1.13 × 10⁸ (404 m) |
+| young open floor (under 82 Myr, beyond 200 km) | 466 m, 3.45 times GlobSed's eq. 2a | |
+
+Of the 6.15 × 10⁸ km³ on oceanic crust, 5.27 × 10⁸ is terrigenous, and 5.2 × 10⁸ lies on floor within
+500 km of a passive margin (0.457 of the wet oceanic floor, a 3,591 m pile). With Earth's floor ages
+the oceanic part would be 0.82 of itself: the old floor is a small part of the excess.
+
+**The crust cycle** (loss-budget.py, km³ a year over 1,000 Myr, base33's seeds 1 to 4, against
+Stern & Scholl 2010's Table 1): arcs 1.85 (Earth 2.5), rifts, hotspots and rifted margins 0.04
+(0.5), crust-suturing zones 0 (0.2); sediment subduction 1.27 (1.1, PLT-440's 0.12 calibrated to
+it), subduction erosion 0.51 (1.4); the net change of the continental volume −0.66 (Earth about 0).
+The surface stage carries 6.6 km³ a year off the continents, and resamplings accrete 6.4 km³ a year
+of ocean-floor rock back onto the columns on top, the model's main return path.
+
+**Arm sedsub** (`tectonics.sediment_subduction_sourced`, PLT-660 alone, Clift & Vannucchi 2004's
+shares; 8 runs, key 31c7c70bd7c7, argkey 10c53dc8, against base33-s4, base33's seeds 1 to 4): the
+sea after 100 Myr and at the end 541 / 687 to 157 / −148 m; the continental crust's net change
+−0.033 to −0.116 (p < 0.001); land 0.300 to 0.253 (p 0.007); coast with high ground 0.114 to 0.134
+(p 0.72); land under ice 0.101 to 0.053 (p 0.007); the guard clean (worst 10,416 m). The slab takes
+4.23 km³ a year (Earth 1.1) and the net change of the continental volume is −3.08 km³ a year: at
+Clift & Vannucchi's shares the trenches take four times Earth's flux, because the ocean's stock
+reaches them, and the resamplings' return falls from 6.4 to 2.4 km³ a year. As on 2026-10-22
+(sub80, above), sediment subduction alone drains the continents.
+
+**Arm sedmargin** (PLT-660 with `tectonics.margin_sediment_continental`, PLT-661 and PLT-662; the
+class blend PLT-663 closed since 2026-10-25; argkey 5818ecce, against base33-s4):
+
+| measure, medians of 8 | base33-s4 | sedmargin | p |
+|---|---|---|---|
+| sea over the datum, after 100 Myr / at the end, m | 541 / 687 | 174 / 169 | |
+| continental crust, share of the planet (m5sea) | 0.388 | 0.487 | |
+| its mean thickness, km (p10) | 38.1 (33.3) | 29.9 (18.7) | |
+| continental crust under the sea (target ≤ 0.56) | 0.267 | 0.527 | < 0.001 |
+| land | 0.300 | 0.238 | 0.002 |
+| land above 2 km | 0.046 | 0.013 | 0.050 |
+| coast with high ground (target ≤ 0.11) | 0.114 | 0.064 | 0.038 |
+| collisions per 100 Myr | 3.90 | 5.00 | 0.040 |
+| the guard's worst, m from the sea | 10,518 | 9,964 | 0.038 |
+| crust 30 to 35 km: share, plate height over the sea p50 | 0.081, −264 m | 0.540, +41 m | |
+| crust 35 to 40 km: share, plate height over the sea p50 | 0.602, +136 m | 0.114, +591 m | |
+| the open floor beyond 200 km: pile (GlobSed 404 m) | 1,385 m | 416 m | |
+| the sea's sediment, km³ (on continental crust) | 6.82 × 10⁸ | 6.92 × 10⁸ (3.8 × 10⁸) | |
+| sediment subduction, km³ a year (Earth 1.1) | 1.27 | 2.60 | |
+| net change of the continental volume, km³ a year | −0.66 | −0.98 | |
+
+So the two together give the normal continent Earth's freeboard (the shoreline at 30 to 35 km of
+crust, as Earth's 31 km) and the open ocean Earth's sediment, but the converted margins spread the
+continents' volume over a quarter more area (0.388 × 38.1 against 0.487 × 29.9 km), so the land is
+lower and thinner, and the sea's sediment is relabelled onto converted margin crust rather than
+removed (1.24 × 10⁸ km² of wet continental crust against GlobSed's margins' 4.69 × 10⁷).
+
+**The high ground with the margins converted** (the advisor's maps script,
+`/data/ban/deeptime-cache/advisor/adv_maps.py`, on both arms' maps 50 Myr before the end): the land's
+mean height 562 to 373 m, its p99 3.46 to 2.87 km; the land above 2 km a median 253 to 186 km from
+the sea, beyond 400 km 0.244 to 0.050 of it (Earth 0.74); the high coasts on landmasses under 1
+million km² 0.073 to 0.232. The interiors thin as well as the margins (crust 35 to 40 km thick 0.602
+to 0.114 of the continental crust), and the crust cycle's rows move together: the transition adds
+0.59 km³ a year to the continents (−0.47 on base33-s4), the thickening limit 0.78 (−0.01), erosion
+takes 3.82 (6.61), collapse adds 0.30 (1.43); no one row explains the thinning (traced below,
+"Why the continents thin with the margin's sediment continental").
+
+**Neither switch goes on by default** (the coordinator, 2026-10-31): PLT-660 alone drains the
+continents, and with PLT-661 the planet loses most of its high ground and its interiors, through a
+path not yet traced, while the stock it was meant to clear is relabelled rather than removed. What
+the arms do show: the sea's height is the ocean's sediment stock, and Earth's freeboard comes back
+when the margin's sediment is continental crust and the trenches take Clift & Vannucchi's share.
+
+#### Why the continents thin with the margin's sediment continental (traced 2026-10-31)
+
+Ben turned both switches on ("Turn both on now", decisions log 2026-10-31) with the thinning
+untraced. This traces it on the cached runs alone (no simulation): `tools/review/freeboard/thinning.py`
+over the crust-budget maps every 100 Myr of base33-s4 (both off), sedmargin (both on) and sedsub
+(PLT-660 alone), 8 runs each, medians. It splits the continental crust into the converted margins
+(under 10 km of crystalline crust of its own, PLT-661's line), the edges (the rest within 300 km of a
+margin or ocean sample) and the interiors (300 km and more in), and counts every sample's rock
+whatever its label.
+
+**The interiors follow the sea.** A continental column 300 km or more from the edge that no orogeny
+raised loses crust only to erosion, which works on its height over the sea (the surface's feedback
+strips the column from the top; Cortial's ε_c·(z/z_c) on the plate step, PLT-127, PLT-128). The other
+movers do not reach it: the collapse takes from columns an orogeny raised, or thicker than 50 km, or,
+with the sheet on crust no orogeny raised (PLT-581), standing above the room column's height, 525 m
+over the sea, which these interiors' medians do not reach; the lower-crustal flow and the founder
+take from crust over 50 and 70 km, the thickening limit from columns past the step's ceiling, the
+transition within W/2 of the edge (one ring on the quick planet), and the resampling's class blend
+(PLT-663) averages like columns. The interiors start at 35.1 km and 501 m over a sea at the datum:
+
+| interiors no orogeny raised | base33-s4 | sedmargin | sedsub |
+|---|---|---|---|
+| the sea at the end, m over the datum | 687 | 169 | −148 |
+| height over the sea, m: t−900, −700, −500, −300, end | 296, 162, 149, 137, 158 | 401, 154, 115, 66, 90 | 181 (t−800), 220, 317 (t−200), 372 |
+| thickness at the end, km | 38.2 | 33.1 | 32.9 |
+| T − 7 (z − S), the column at the sea (PLT-281), km | 36.0 | 32.4 | 30.1 |
+| T_n + 7 (S − z_0), z_0 = 525 m | 36.2 | 32.6 | 30.4 |
+| all interiors: thickness, km (height over the sea, m) | 39.2 (+356) | 34.0 (+101) | 33.3 (+439) |
+
+On base33-s4 the sea rose to 687 m and the interiors rose with it: deposits, and the collapse's room
+column T_n + 7 S (PLT-412), 39.9 km under that sea, the column the collapse fills its room up to and
+at which it turned ocean floor continental. The interiors made from ocean floor (an ocean basement of
+3.4 km on average) end at 40.0 km and +467 m, at that column's +525 m. On sedmargin the sea stays
+under 210 m, the room column is 36.3 km, and the interiors erode down to the sea: 35-40 km becomes
+30-35 km because base level moved 518 m (3.6 km of crust at 7.0 m a metre), and the interiors
+stand 90 to 160 m over the sea on both arms. It holds run by run: those interiors end at 37.6 to 38.8
+km on every base33-s4 run and 32.7 to 34.0 km on every sedmargin run, 10 to 380 m over their own sea,
+and the column at the sea follows each run's sea (sedmargin's scattered_continents-1, a sea 20 m
+over the datum: 31.4 km against T_n + 7 (S − z_0) = 31.6). On sedsub the sea falls through the run and the interiors
+lag it: as thin as sedmargin's but 372 m over their sea. This is Airy isostasy with erosion and
+deposition to base level, laws the model had: base33's thick interiors were its high sea's.
+
+**The edges** (sedmargin against base33-s4, the end; height over the sea p50):
+
+| | base33-s4 | sedmargin |
+|---|---|---|
+| converted margins: share of the planet, thickness | 0.003, 15.2 km | 0.076, 17.1 km (own crystalline 3.4, sediment 6.3, basement 7.4), −2,902 m |
+| edge under 100 km in | 35.9 km, −28 m, land 0.45 | 28.3 km, −1,079 m, land 0.15 |
+| edge 100 to 200 km | 39.2 km, +241 m | 32.4 km, −79 m |
+| edge 200 to 300 km | 40.1 km, +331 m | 33.8 km, +27 m |
+| share of the edges on an ocean basement | 0.90 | 0.89 |
+
+The ring beside the margin is the taper's continental side (PLT-261, PLT-475), whose target at 35 km
+in is 26.5 km of crystalline crust. On sedmargin it holds 22.0 km of its own over 4.7 km of basement,
+26.6 km: the profile. On base33-s4 it held 33.2 km. There the collapse refilled it towards the room
+column faster than the taper thinned it: the collapse moved 5.7 × 10⁹ km³ over the run against 2.2 ×
+10⁹, and the transition passed 0.43 km³ a year of the continents' rock to the ocean side as ocean
+crust (PLT-294) against 0.28. So on sedmargin the continent ends at the sea in a slope 1 km down
+where base33's ended at the shore.
+
+**The rock, whatever its label** (the felsic family, metamorphic, felsic plutonic and volcanic, and
+the sediment and sedimentary rock, planet-mean km): 12.93 at the start; 13.56 on base33-s4 at the
+end, 11.54 on sedmargin, 8.76 on sedsub. The crust budget's parts give the same change (the felsic
+family's parts sum to +0.40 and −0.71 km³ a year), so no rock is counted twice or lost by a label
+flip, PLT-667's turnbacks included (1.18 × 10⁹ km³ of margins' own crust turned back to ocean floor
+over a sedmargin run). The 2.0 km between the two arms is the slab: sediment subduction takes 2.58
+× 10⁹ km³ over a run against 1.27 × 10⁹. The trenches' floor carries a pile of 1.1 to 1.3 km (p90 4.0
+to 4.3) against base33-s4's 1.9 to 2.0, a quarter to a third of it on floor that holds continental
+crystalline rock (sediment margins turned back, PLT-667, or a spread's receivers under the ocean
+label).
+
+**The area.** The continental label covers 0.487 of the planet against 0.389: the converted margins
+(0.076) and ocean floor that crust spread onto, continental at once under PLT-662 (supercontinent-1's
+ocean floor made continental over the run, as shares of the planet: the thickening limit's releases
+0.267 with 12.7 km of crust over the basement, 2,776 m down, the collapse's 0.055 with 14.6 km,
+against base33's 0.123 with 28.2 km and 0.227 with 31.6 km, filled to the normal or room column
+first).
+
+**The mean thickness, 38.5 to 30.0 km**: the converted margins in the count take 2.4 km of it
+(the rest, 0.413 of the planet, is 32.5 km); the interiors give 39.2 to 34.0 km and the edges 38.0 to
+31.0 km.
+
+**The high ground.** Collisions take the edges first, and on sedmargin those are the slope at 28 km,
+the shelf at 32 km and the converted margins at 17 km (all continental crust, so they collide): the
+crust crossing the fronts is 24.1 km against 32.9 (crossed 9.9 against 11.8 × 10⁹ km³ over a run, over
+4.1 against 3.6 × 10⁸ km²), the belts stack thinner crust, and the collapse, fed by the belts, moves
+2.6 times less.
+
+**Reading.** No code path moves crust from the interiors to the margins, and no label flip counts
+rock twice or drops it. The interiors thin by erosion to a sea 518 m lower, and lose the collapse's
+fill that base33's high sea set (its room column 3.6 km thicker). The edges sit at the taper's
+profile, a slope, with no refill. Both are the model's sourced laws once the sea is Earth's; they
+are not an interaction of the margin switch, so nothing was built to undo them. What the arm does
+lose for real is rock: 2.0 km of it planet-mean down the slab over the run (the continents' net change
+−0.98 km³ a year against −0.66, arcs 1.65 against Earth's 2.5 and sediment subduction 2.6 against 1.1
+to 1.65, Stern & Scholl 2010's Table 1 with Clift et al. 2009's figures as it quotes them). That drain and the belts built
+from the slope's crust are the two leads it leaves (the build log of 2026-10-31).
+
 ## Simplifications and limits
 
 - The fill uses the ground at the step's start; the floor's answer to the new water load comes in
