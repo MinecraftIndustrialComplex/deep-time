@@ -12732,7 +12732,9 @@ beneath the frontal accretionary body" at large prisms, 80 % at small and medium
 as the delivery less the prism's growth ([38]), and Clift et al. 2009's Table 1 sends 0.93 of the
 delivery down. The model's 0.90 is that share. The difference from Earth is how much reaches the
 trench: 55,180 km of oceanic front (Bird 2003's subduction zones 51,310) at 1.2 times Clift's
-delivery per km. The sources disagree by 1.6 times between themselves (von Huene & Scholl's
+delivery per km (corrected below, "Clift et al. 2009's sediment numbers, in rock": Clift's delivery
+is in place with its pore space, the model's is rock, and in rock the model's trenches take about
+twice Clift's per km). The sources disagree by 1.6 times between themselves (von Huene & Scholl's
 long-term 1.0 km³/yr corrects for "high rates of terrigenous seafloor sedimentation during the past
 30 m.y."). Nothing is changed in the share. The trench's input is the land's export: 3.8 to 4.2 km³
 a year off the continents against Clift et al.'s Cenozoic rivers' 1.8 (their abstract), the surface
@@ -12971,4 +12973,55 @@ the substrate alone: ocean floor, or continental crust over an ocean basement (P
   km³ a year (late half −1.14 to −0.63), the felsic rock's late-half loss 1.70 to 1.15 km
   planet-mean, the sea 169 to 348 m, the criteria 6.5 to 6 (p 0.35), the guard clean. What still
   drains the continents is sediment subduction (2.95 km³ a year in the late half), fed by the
-  continents' export (4.07 off them against Clift et al.'s rivers' 1.8): the surface lane's lead.
+  continents' export (4.28 off them in the late half, 4.07 over the whole run, against Clift et
+  al.'s rivers' 1.77; see the next section for what that comparison is): the surface lane's lead.
+
+### Clift et al. 2009's sediment numbers, in rock (2026-10-31, a correction)
+
+The comparisons above put the model's solid rock beside Clift et al. 2009's numbers as if they were
+one kind. Read again in the library text, they are two kinds:
+
+- **The rivers' export, 1.77 km³ a year** (p. 93; the abstract rounds it to 1.8), is the whole
+  export of the continents to the ocean, not the part that reaches trenches: "sediment ... exported
+  to the global ocean from the continents by rivers during the Cenozoic". It is solid rock: the
+  Cenozoic sediment masses of the margins and fans of 14 river systems and orogens, "calculated from
+  the volumes of sedimentary rock using a suitable porosity correction estimate" (Sclater & Christie
+  1980) and corrected for carbonate, then extrapolated to all the continents by area (17 % orogenic,
+  83 % stable). It leaves out what stays on land ("we are only concerned with the volumes of sediment
+  reaching the continental margin that are subductable"). It is a Cenozoic mean: the paper sets it
+  beside Milliman (1997)'s modern 6.5 km³ a year, which it reads as unrepresentative of long periods
+  (a more mountainous Earth since the High Andes and Tibet, rivers still adjusting after the Last
+  Glacial Maximum, agriculture), and beside "the 1.6 km³/a estimated for the sediment flux to the
+  trenches", "suggestive that the total amount of sediment in the oceans should be close to
+  equilibrium".
+- **Table 1's delivery to the trenches, 1,768,761 km³ a Myr** over 40,225 km (44.0 per km; the rows
+  sum to 1,926,202), is each margin's trench sediment thickness times its convergence. Clift &
+  Vannucchi 2004 give that thickness "uncorrected for porosity" ([31]), and Clift et al. 2009 state
+  no porosity correction for Table 1 while they state one for the rivers. This page's reading: the
+  delivery and the subducted 1,648,091 are volumes in place, pore space included.
+
+This page's derivation, not the paper's: with each row's thickness as its delivery rate over its
+convergence and the model's own porosity law (ERO-215, Kominz et al. 2011's ocean-floor sediment,
+the law PLT-762 reads the 1 km line with), the solid share of Table 1's delivery is 0.60 by volume.
+In rock Earth's trenches then take 1.06 to 1.16 km³ a year (the printed total and the rows), 26 to
+29 km³ per km a Myr, and the subducted 1.65 is about 1.0 in rock.
+
+The like-for-like comparisons (the model's pools are rock):
+
+| | the model | Earth |
+|---|---|---|
+| export to the ocean floor, rock, km³/yr (`off the continents by the surface stage`) | 3.82 (base34-s4, whole run), 4.00 (late half); cb-cum2 4.07, 4.28 | 1.77 (Clift et al. 2009, Cenozoic mean); 6.5 modern (Milliman 1997, as Clift et al. quote it) |
+| delivered to the trenches, rock, km³/km/Myr | 52.7 on 55,180 km (base34-s4), 61.0 (cb-cum2's late half) | 26 to 29 on 40,225 km (this page's derivation from Table 1's 44.0 in place) |
+| sediment subducted, rock, km³/yr | 2.60 (base34-s4), 2.72 (cb-cum2) | about 1.0 (this page's derivation from Table 1's 1.65 in place) |
+| the trench-bound share of the export (reaching the trenches over the export) | 0.76 and 0.79 (base34-s4, whole run and late half), 0.75 and 0.78 (cb-cum2) | 0.60 to 0.65 (this page's derivation: 1.06 to 1.16 over 1.77) |
+
+So two findings above are corrected. "Sediment subduction is Clift's per km, on a longer trench":
+in rock the model's trenches take about twice Clift's per km, on a trench 1.37 times as long, so
+about 2.5 times Earth's in all; the share that goes down at the trench (0.90 against 0.93) stands.
+And "the continents' export, 3.8 to 4.2 against 1.8": the model's export is like for like with
+Clift's 1.77 in kind (rock, onto the ocean floor) but not in time (a Cenozoic mean against modern
+loads several times larger), so whether the export itself is high is open until a reference rate is
+chosen; the excess the comparisons fix is at the trenches. The model's trench input is also an upper
+bound for the continents' share: it holds the sediment the ocean floor's own arcs and seamounts shed
+and the one-way slab's 0.33 to 0.38. (In the verdicts above, cb-cum2's export is 4.07 km³ a year
+over the whole run and 4.28 over the late half.)
