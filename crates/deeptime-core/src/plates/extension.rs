@@ -157,6 +157,8 @@ pub struct RiftRecord {
     pub taken_km2: f64,
     /// Crust moved into the fill, m summed over samples.
     pub stretched_m: f64,
+    /// A sample's area, km².
+    pub sample_km2: f64,
     /// Plate `a`'s side, then plate `b`'s.
     pub sides: [SideRecord; 2],
 }
@@ -387,6 +389,7 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Exte
             length_km,
             speed_mm_yr: speed,
             asked_km2: speed * length_km * env.dt_myr,
+            sample_km2: area,
             ..RiftRecord::default()
         };
         // The columns that take part on each side, along their own plate's continental crust,

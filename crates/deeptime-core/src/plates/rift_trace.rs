@@ -43,7 +43,7 @@ const SIDE_FIELDS: [&str; 13] = [
 ];
 
 /// `steps.tsv`'s columns before the two sides'.
-pub const STEP_FIELDS: [&str; 9] = [
+pub const STEP_FIELDS: [&str; 10] = [
     "t_myr",
     "step",
     "a",
@@ -53,6 +53,7 @@ pub const STEP_FIELDS: [&str; 9] = [
     "asked_km2",
     "taken_km2",
     "stretched_m",
+    "sample_km2",
 ];
 
 /// `lays.tsv`'s columns.
@@ -113,6 +114,7 @@ pub fn step_row(t_myr: f64, step: u64, r: &RiftRecord) -> String {
         format!("{:.3}", r.asked_km2),
         format!("{:.3}", r.taken_km2),
         format!("{:.1}", r.stretched_m),
+        format!("{:.3}", r.sample_km2),
     ];
     for s in &r.sides {
         f.extend(side_cells(s));
