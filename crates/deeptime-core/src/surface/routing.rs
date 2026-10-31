@@ -257,6 +257,56 @@ pub fn accumulate<G: SurfaceGrid>(d: &G, r: &Routing, weight: &[f32], area: &mut
     }
 }
 
+/// [`accumulate`] with only a share of each cell's area passed on to its receiver, `pass[c]`
+/// (0 to 1; 1 on almost every cell, a lake's exit passing what its water balance lets out,
+/// `closed.rs`, ERO-218): area_i = w_i × a_i + Σ over its donors d of pass_d × area_d. With every
+/// share 1 it is [`accumulate`] to the bit.
+pub fn accumulate_passing<G: SurfaceGrid>(
+    d: &G,
+    r: &Routing,
+    weight: &[f32],
+    pass: &[f32],
+    area: &mut Vec<f64>,
+) {
+    area.clear();
+    area.par_extend(
+        weight
+            .par_iter()
+            .enumerate()
+            .map(|(c, &w)| f64::from(w) * d.area(c)),
+    );
+    let f = &r.forest;
+    let acc = SharedF64::new(f.len(), 0.0);
+    let passed = |dp: u32| {
+        let p = pass[r.stack[dp as usize] as usize];
+        if p == 1.0 {
+            acc.get(dp as usize)
+        } else {
+            acc.get(dp as usize) * f64::from(p)
+        }
+    };
+    {
+        let own: &[f64] = area;
+        f.up(SUM_CHUNK, |i| {
+            let mut s = own[r.stack[i] as usize];
+            for &dp in &f.dpos[f.dptr[i] as usize..f.dptr[i + 1] as usize] {
+                s += passed(dp);
+            }
+            acc.set(i, s);
+        });
+    }
+    for (i, &c) in r.stack.iter().enumerate() {
+        area[c as usize] = acc.get(i);
+    }
+    for (k, &o) in f.outlets.iter().enumerate() {
+        let mut s = area[o as usize];
+        for &dp in &f.opos[f.optr[k] as usize..f.optr[k + 1] as usize] {
+            s += passed(dp);
+        }
+        area[o as usize] = s;
+    }
+}
+
 /// Follows receivers from every cell; true when every path reaches a root within `n` steps.
 pub fn check_acyclic(r: &Routing) -> bool {
     let n = r.rcv.len();

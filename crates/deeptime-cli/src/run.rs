@@ -496,7 +496,8 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
          flexure_solves={:.0} flexure_iterations_per_solve={:.2} flexure_unconverged={:.0} \
          flexure_yielded_cells={:.0} flexure_dry_below_sea/wet_above_sea_cells={:.0}/{:.0} \
          guard_worst_m={:.0} guard_steps_over_1/2/3/6_reliefs={:.0}/{:.0}/{:.0}/{:.0} \
-         step_rise/fall_polar_m={:.0}/{:.0} step_rise/fall_rest_m={:.0}/{:.0}",
+         step_rise/fall_polar_m={:.0}/{:.0} step_rise/fall_rest_m={:.0}/{:.0} \
+         closed_lake_steps={} partial_lake_steps={} closed_km2_myr={:.3e} filled_lake_steps={}",
         t.steps,
         land / n,
         peak,
@@ -556,6 +557,11 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
         global(deeptime_core::surface::guard::STEP_GLOBALS[1]),
         global(deeptime_core::surface::guard::STEP_GLOBALS[2]),
         global(deeptime_core::surface::guard::STEP_GLOBALS[3]),
+        // The closed basins (`surface::closed`, with `surface.closed_basins`).
+        t.closed_lakes,
+        t.partial_lakes,
+        t.closed_km2_myr,
+        t.filled_lakes,
     ))
 }
 
@@ -978,6 +984,15 @@ fn erosion_bands_line(world: &deeptime_core::world::WorldState) -> Option<String
     }
     parts.push(one("flat".into(), &b.high_flat));
     parts.push(one("steep".into(), &b.high_steep));
+    for (name, p) in [
+        ("flatc", &b.high_flat_closed),
+        ("flatd", &b.high_flat_dry),
+        ("flatf", &b.high_flat_frozen),
+    ] {
+        if p.area_km2_myr > 0.0 {
+            parts.push(one(name.into(), p));
+        }
+    }
     for (i, p) in b.by_relief.iter().enumerate() {
         let lo = if i == 0 {
             0.0

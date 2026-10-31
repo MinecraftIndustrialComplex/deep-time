@@ -41,6 +41,10 @@ pub const BANDS: usize = 5;
 pub const BAND_M: f64 = 1000.0; // ledger: ERO-175 (game-choice, diagnostic class)
 /// High ground for the flat / steep split, m above the sea.
 pub const HIGH_M: f64 = 2000.0; // ledger: ERO-175 (game-choice, diagnostic class)
+/// The runoff weight (`surface/mod.rs`, ERO-010: runoff over `runoff_ref_m_yr`) at or below which
+/// a flat high cell counts as dry: 0.1, 50 mm of runoff a year at the presets' 0.5 m, twice
+/// ERO-011's floor (the plateau lane's split of the flat high ground; a diagnostic class).
+pub const DRY_WEIGHT: f32 = 0.1; // ledger: ERO-220 (game-choice, diagnostic class)
 /// Relief of a 3 × 3 neighbourhood below which high ground counts as flat (a plateau), m: a
 /// diagnostic class, not a physical threshold (a 4.8-km cell at 16k quick; 500 m over two cells
 /// is a mean slope of about 3°).
@@ -120,6 +124,13 @@ pub struct ErosionBands {
     pub bands: [ProcessSums; BANDS],
     pub high_flat: ProcessSums,
     pub high_steep: ProcessSums,
+    /// The flat high ground whose water ended in a closed basin (a part of `high_flat`; with
+    /// `surface.closed_basins`, ERO-217), …
+    pub high_flat_closed: ProcessSums,
+    /// … whose runoff weight is at most [`DRY_WEIGHT`], …
+    pub high_flat_dry: ProcessSums,
+    /// … and whose mean temperature is below 0 °C (each a part of `high_flat`; the parts overlap).
+    pub high_flat_frozen: ProcessSums,
     /// All land by local relief (`relief5`), classes from 0 and [`RELIEF_FROM_M`].
     pub by_relief: [ProcessSums; RELIEF_BINS],
     /// The land of region windows by their land's mean local relief, the same classes.
@@ -143,6 +154,13 @@ pub struct StepErosion<'a> {
     /// Net change of the step (end − start), m.
     pub net: &'a [f64],
     pub dt_myr: f64,
+    /// The cells whose water ended in a closed basin (`closed.rs`), when the step had any.
+    pub closed: Option<&'a [bool]>,
+    /// The cells whose runoff weight is at most [`DRY_WEIGHT`] (the stream power's dry ground).
+    pub dry: Option<&'a [bool]>,
+    /// The cells whose mean temperature is below 0 °C (where the surface's runoff is all of P,
+    /// `surface/climate.rs`).
+    pub frozen: Option<&'a [bool]>,
 }
 
 impl ErosionBands {
@@ -191,7 +209,18 @@ impl ErosionBands {
             win[wi].2 += rz;
             add(&mut win[wi].3);
             match high {
-                Some(true) => add(&mut self.high_flat),
+                Some(true) => {
+                    add(&mut self.high_flat);
+                    if s.closed.is_some_and(|m| m[c]) {
+                        add(&mut self.high_flat_closed);
+                    }
+                    if s.dry.is_some_and(|m| m[c]) {
+                        add(&mut self.high_flat_dry);
+                    }
+                    if s.frozen.is_some_and(|m| m[c]) {
+                        add(&mut self.high_flat_frozen);
+                    }
+                }
                 Some(false) => add(&mut self.high_steep),
                 None => {}
             }
@@ -216,6 +245,9 @@ impl ErosionBands {
         }
         m.insert("high_flat".into(), self.high_flat.json());
         m.insert("high_steep".into(), self.high_steep.json());
+        m.insert("high_flat_closed".into(), self.high_flat_closed.json());
+        m.insert("high_flat_dry".into(), self.high_flat_dry.json());
+        m.insert("high_flat_frozen".into(), self.high_flat_frozen.json());
         let land: f64 = self.bands.iter().map(|b| b.area_km2_myr).sum();
         for (i, b) in self.by_relief.iter().enumerate() {
             let lo = if i == 0 { 0.0 } else { RELIEF_FROM_M[i - 1] };
@@ -316,6 +348,9 @@ mod tests {
                 diffusion: &one,
                 net: &net,
                 dt_myr: 2.0,
+                closed: None,
+                dry: None,
+                frozen: None,
             },
         );
         // 1 km² cells for 2 Myr: 1 m in 2 Myr is 0.5 m/Myr.
@@ -380,6 +415,9 @@ mod tests {
                 diffusion: &zero,
                 net: &net,
                 dt_myr: 1.0,
+                closed: None,
+                dry: None,
+                frozen: None,
             },
         );
         // The lowland has no relief, the range 1,200 m and more between its ridges and valleys:
