@@ -12,6 +12,6 @@ if [ "$mode" = full ]; then
     deeptime-admit run --kind cargo:test -- cargo test -p deeptime-core 2>&1 | grep -E '^test result|FAILED|panicked|failures:' | head -40
 else
     deeptime-admit run --kind cargo:clippy -- cargo clippy -p deeptime-core -p deeptime-cli --all-targets -- -D warnings && echo "clippy-ok"
-    deeptime-admit run --kind cargo:test -- cargo test -p deeptime-core --lib -- closed plateau lakes erosion_bands routing --nocapture 2>&1 \
+    deeptime-admit run --kind cargo:test -- cargo test -p deeptime-core --lib -- closed plateau lakes erosion_bands routing surface::climate --nocapture 2>&1 \
         | grep -E 'm/Myr over|interior|^test result|FAILED|panicked|assertion' | head -60
 fi

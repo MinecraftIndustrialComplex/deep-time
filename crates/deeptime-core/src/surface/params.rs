@@ -128,6 +128,13 @@ pub struct SurfaceParams {
     /// Needs the hydrology's lake balance (`hydro.lake_balance`). Off by default (the plateau
     /// lane, 2026-10-31): every lake passes all of its inflow, as before. ledger: ERO-217, ERO-218
     pub closed_basins: bool,
+    /// The stream power's runoff from the bake's water budget (`HydroParams::budget`, the lake
+    /// balance's): rain only in the thawed share of the year, snow melted by its degree-days,
+    /// evapotranspiration on the liquid water with PET from the biotemperature, about the
+    /// climate stage's seasons. Off by default (the runoff lane, 2026-10-31): PET is 60 mm/°C x
+    /// the mean annual temperature, 0 below 0 °C, and all of the precipitation of a land below
+    /// freezing runs off, as before. ledger: ERO-221
+    pub runoff_budget: bool,
     /// How the stage's solvers run (P1-19): numerics that change no law.
     pub numerics: Numerics,
 }
@@ -262,6 +269,7 @@ impl Default for SurfaceParams {
             flexure: super::flexure::FlexureParams::default(),
             held_offsets: true,   // ledger: ISO-125
             closed_basins: false, // ledger: ERO-217 (off: the plateau lane, 2026-10-31)
+            runoff_budget: false, // ledger: ERO-221 (off: the runoff lane, 2026-10-31)
             numerics: Numerics::default(),
         }
     }

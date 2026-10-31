@@ -454,6 +454,9 @@ struct Setup {
     basement: Vec<u16>,
     class0: Vec<u16>,
     fam: Vec<u8>,
+    /// The bake's water budget per cell (`climate::water_budget`), when the lakes or the
+    /// runoff need it.
+    cell_water: Option<Vec<lakes::CellWater>>,
 }
 
 /// The rock a cell shows and erodes: regolith only where it is thick (a few metres of soil are
@@ -1137,6 +1140,8 @@ impl SurfaceStage {
         // flood took 32.7 s of the full 16k gate run on one core, after all of the carry and the
         // setup). The parallel flood (`surface.numerics.flood`, ERO-184) shares the pool with them.
         let beside = Instant::now();
+        let hydro_p = self.preset.hydro.unwrap_or_default();
+        let flexure_water = p.flexure.active() && p.flexure.water_by_basin;
         let fam_of = &self.fam;
         let erod = &self.erod;
         let Scratch {
@@ -1235,6 +1240,13 @@ impl SurfaceStage {
                 let started = Instant::now();
                 let h_start = crate::alloc::copied(sc_h);
                 let clim = climate::snapshot(world, &d, &lat_of, sc_h, sea);
+                // ledger: ISO-126, ERO-221
+                // What each cell gives and takes as water under the bake's budget
+                // (`HydroParams::budget`), for the lakes the flexure loads (`lakes.rs`), what
+                // the lakes pass on (`closed.rs`, ERO-217) and, with `surface.runoff_budget`, the
+                // stream power's runoff.
+                let cell_water = (flexure_water || p.closed_basins || p.runoff_budget)
+                    .then(|| climate::water_budget(world, &clim, &hydro_p));
                 let ela_z = if gp.active() {
                     glacial::ela_z_from(
                         world
@@ -1302,7 +1314,12 @@ impl SurfaceStage {
                     .enumerate()
                     .for_each(|(c, (kf, weight))| {
                         *kf = p.k_spl * erod[usize::from(class0[c])];
-                        *weight = (clim.runoff_m_yr[c] / p.runoff_ref_m_yr as f32).max(0.05);
+                        // ledger: ERO-010, ERO-011, ERO-221
+                        let runoff = match &cell_water {
+                            Some(cw) if p.runoff_budget => cw[c].runoff_m_yr as f32,
+                            _ => clim.runoff_m_yr[c],
+                        };
+                        *weight = (runoff / p.runoff_ref_m_yr as f32).max(0.05);
                     });
                 let setup = Setup {
                     h_start,
@@ -1316,6 +1333,7 @@ impl SurfaceStage {
                     basement,
                     class0,
                     fam,
+                    cell_water,
                 };
                 (setup, carry_ms, started.elapsed().as_secs_f64() * 1000.0)
             },
@@ -1340,49 +1358,10 @@ impl SurfaceStage {
             basement,
             class0,
             fam,
+            cell_water,
         } = setup;
         let class_of = |st: &SurfaceState, c: usize| surface_class(&cls, &basement, st, c);
 
-        // ledger: ISO-126
-        // What each cell gives and takes as water, for the lakes the flexure loads (`lakes.rs`)
-        // and what the lakes pass on (`closed.rs`, ERO-217): the bake's lake budget
-        // (`HydroParams::budget`) on the step's climate, the climate stage's seasons about the
-        // surface's own mean temperature.
-        let hydro_p = self.preset.hydro.unwrap_or_default();
-        let flexure_water = p.flexure.active() && p.flexure.water_by_basin;
-        let cell_water: Option<Vec<lakes::CellWater>> =
-            (flexure_water || p.closed_basins).then(|| {
-                let season = |name: &str| {
-                    world
-                        .fields
-                        .get(name)
-                        .filter(|f| f.data.len() == n)
-                        .map(|f| &f.data[..])
-                };
-                let warm = season(crate::climate::field::T_WARM);
-                let cold = season(crate::climate::field::T_COLD);
-                (0..n)
-                    .into_par_iter()
-                    .map(|c| {
-                        let t = f64::from(clim.t_c[c]);
-                        let half = match (warm, cold) {
-                            (Some(w), Some(k)) => 0.5 * f64::from(w[c] - k[c]),
-                            _ => f64::NAN,
-                        };
-                        let cl = crate::hydro::Climate::of(
-                            f64::from(clim.precip_mm[c]),
-                            t,
-                            t + half,
-                            t - half,
-                        );
-                        let b = hydro_p.budget(&cl);
-                        lakes::CellWater {
-                            runoff_m_yr: b.runoff_mm / 1000.0,
-                            loss_m_yr: (b.evaporation_mm - b.rain_mm) / 1000.0,
-                        }
-                    })
-                    .collect()
-            });
         let mut water_levels: Option<lakes::Levels> = None;
 
         // 3. The LEM steps.
