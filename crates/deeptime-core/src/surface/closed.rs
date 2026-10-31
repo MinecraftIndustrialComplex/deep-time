@@ -198,12 +198,14 @@ mod tests {
     }
 
     /// A humid climate: 0.5 m of runoff, a lake losing 0.1 m a year net of the rain on it.
+    // ledger: ERO-219
     const WET: CellWater = CellWater {
         runoff_m_yr: 0.5,
         loss_m_yr: 0.1,
     };
     /// An arid one: 20 mm of runoff, a lake losing 1 m a year (Langbein 1961, p. 18, Table 1: the
     /// net evaporation of closed lakes in arid basins, 2.0 to 7.0 ft a year).
+    // ledger: ERO-219
     const ARID: CellWater = CellWater {
         runoff_m_yr: 0.02,
         loss_m_yr: 1.0,

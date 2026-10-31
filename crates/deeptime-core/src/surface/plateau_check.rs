@@ -59,6 +59,7 @@ struct Case {
 
 /// The wet outer flank's water budget for the balance: 0.5 m of runoff (`runoff_ref_m_yr`, weight
 /// 1), its open water losing 0.1 m a year net of the rain on it.
+// ledger: ERO-219
 const OUTER_WATER: lakes::CellWater = lakes::CellWater {
     runoff_m_yr: 0.5,
     loss_m_yr: 0.1,
@@ -66,6 +67,7 @@ const OUTER_WATER: lakes::CellWater = lakes::CellWater {
 /// An arid interior's: 25 mm of runoff (ERO-011's floor, weight 0.05 of `runoff_ref_m_yr`), a
 /// lake losing 1 m a year (Langbein 1961, p. 18, Table 1: 2.0 to 7.0 ft a year net in arid
 /// basins; Titicaca 1.1 m gross, Garcia-Castellanos 2006, p. 284).
+// ledger: ERO-219
 const ARID_WATER: lakes::CellWater = lakes::CellWater {
     runoff_m_yr: 0.025,
     loss_m_yr: 1.0,
