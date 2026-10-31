@@ -61,6 +61,12 @@ pub const LIP_GLOBAL: &str = "plates/lip_km3";
 pub const LIP_CONTINENTAL_GLOBAL: &str = "plates/lip_continental_km3";
 pub const LIP_DOME_CONTINENTAL_GLOBAL: &str = "plates/lip_dome_continental_km3";
 pub const LIP_COUNT_GLOBAL: &str = "plates/lips";
+/// World globals (measurement, the cone budget; ledger: PLT-804), with
+/// `tectonics.hotspot_cone_budget`: the cones the tails netted by their own hotspot, km³
+/// (Earth-normalized), and of them on continental cells; the tails' rock before netting.
+pub const CONES_BY_ID_GLOBAL: &str = "plates/hotspot_cones_by_id_km3";
+pub const CONES_BY_ID_CONTINENTAL_GLOBAL: &str = "plates/hotspot_cones_by_id_continental_km3";
+pub const TAIL_ROCK_GLOBAL: &str = "plates/hotspot_tail_rock_km3";
 
 fn kernel(d: f64, r: f64) -> f64 {
     if d >= r {
@@ -86,6 +92,10 @@ pub fn step(
     let mut magma_m = 0.0;
     // Measurement (ledger: PLT-761): the basalt on continental crust, the cones counted inside.
     let (mut magma_continental_m, mut cones_m, mut cones_continental_m) = (0.0, 0.0, 0.0);
+    // The cone budget (ledger: PLT-803, measurement PLT-804), km³.
+    let budget = k.hotspot_cone_budget;
+    let km3_per_m = norm.sample_area_km2() / 1000.0;
+    let (mut by_id_km3, mut by_id_continental_km3, mut tail_rock_km3) = (0.0, 0.0, 0.0);
     // Births.
     let (births_per_myr, mut expected) = if k.hotspots_sourced {
         let b = sourced::births_per_myr(); // ledger: PLT-790
@@ -133,6 +143,7 @@ pub fn step(
                 flux_mg_s: flux,
                 magma_km3_yr: flux * sourced::MAGMA_KM3_YR_PER_MG_S,
                 head_radius_km: 0.0,
+                cones: Default::default(),
             };
             if lip {
                 let (event, radius_km) = erupt(state, world, pos, tree, env, at)?;
@@ -213,18 +224,76 @@ pub fn step(
             }
         }
         cones_m += built;
-        let q = if rock > 0.0 {
-            (rock - built).max(0.0) / rock
+        // The lavas' share of the tail's rock (PLT-794; the preset's rock is all lava, PLT-115).
+        let lavas_share = if tail_km3_yr > 0.0 {
+            sourced::TAIL_EXTRUSIVE_SHARE
         } else {
             1.0
         };
+        // The cone budget (ledger: PLT-803): the cones the hotspot's own volcanoes handed the pools
+        // since the last step, wherever they stand, are its lavas, netted now up to the step's rock
+        // (a step with no visible column under the tail nets none and carries them on).
+        let netted_km3 = if budget {
+            let pending = state.hotspots[h].cones.handed_km3;
+            if pending > 0.0 {
+                pending.min(rock * km3_per_m)
+            } else {
+                pending
+            }
+        } else {
+            0.0
+        };
+        let (q, extrusive) = if budget {
+            // The tail adds the rest of its rock, its intrusions whole (a shortfall from the
+            // step's lag comes off them). The cones on the kernel are among the handed ones, not
+            // netted again by place.
+            let handed = netted_km3 / km3_per_m;
+            let left = (rock - handed).max(0.0);
+            let lavas = (lavas_share * rock - handed).max(0.0);
+            (
+                if rock > 0.0 { left / rock } else { 1.0 },
+                if left > 0.0 {
+                    lavas / left
+                } else {
+                    lavas_share
+                },
+            )
+        } else {
+            let q = if rock > 0.0 {
+                (rock - built).max(0.0) / rock
+            } else {
+                1.0
+            };
+            (q, sourced::TAIL_EXTRUSIVE_SHARE)
+        };
+        if budget {
+            // The budget of the next frame: the step's lavas, none for a tail that dies before
+            // the next step (nothing would net them).
+            let lives_on = t + env.dt_myr < state.hotspots[h].dies_myr;
+            let c = &mut state.hotspots[h].cones;
+            let netted_c = if c.handed_km3 != 0.0 {
+                c.handed_continental_km3 * netted_km3 / c.handed_km3
+            } else {
+                0.0
+            };
+            by_id_km3 += netted_km3;
+            by_id_continental_km3 += netted_c;
+            c.handed_km3 -= netted_km3;
+            c.handed_continental_km3 -= netted_c;
+            c.budget_km3 = if lives_on {
+                lavas_share * rock * km3_per_m
+            } else {
+                0.0
+            };
+            tail_rock_km3 += rock * km3_per_m;
+        }
         for (i, w, dz) in lifts {
             let s = &mut state.samples[i];
             let added = if tail_km3_yr > 0.0 {
                 // Lavas over intrusions in the tail's share, the height by the model's isostasy
                 // (ledger: PLT-794).
                 let m = dz * q;
-                add_magma(s, m, sourced::TAIL_EXTRUSIVE_SHARE, env);
+                add_magma(s, m, extrusive, env);
                 m
             } else {
                 s.elevation_m = (f64::from(s.elevation_m) + dz) as f32;
@@ -258,6 +327,16 @@ pub fn step(
         (CONES_CONTINENTAL_GLOBAL, cones_continental_m),
     ] {
         *world.globals.entry(name.to_owned()).or_insert(0.0) += m * norm.sample_area_km2() / 1000.0;
+    }
+    if budget {
+        // ledger: PLT-804 (measurement)
+        for (name, v) in [
+            (CONES_BY_ID_GLOBAL, by_id_km3),
+            (CONES_BY_ID_CONTINENTAL_GLOBAL, by_id_continental_km3),
+            (TAIL_ROCK_GLOBAL, tail_rock_km3),
+        ] {
+            *world.globals.entry(name.to_owned()).or_insert(0.0) += v;
+        }
     }
     Ok(())
 }

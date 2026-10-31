@@ -205,6 +205,10 @@ pub struct Volcano {
     pub segment: u64,
     /// Set when it left the catalogue.
     pub gone: Option<Gone>,
+    /// With `tectonics.hotspot_cone_budget` (PLT-803): the part of `built_m` its rock backs in
+    /// the plate model's pools, m (the rest is relief over the column's own rock).
+    #[serde(default)]
+    pub rock_m: f64,
 }
 
 impl Volcano {
@@ -490,6 +494,34 @@ pub fn cell_extent_m(grid: &GridDesc, mh: f64, j: usize) -> (f64, f64) {
     }
 }
 
+/// The rock a metre over one L1 cell holds, km³ Earth-normalized: L1 is Lambert's cylindrical
+/// equal-area projection, so every cell covers `cell_m`² of the planet's sphere (radius
+/// `planet_radius_m`), scaled to the plate model's sphere (`model_radius_km`), whose units the
+/// plate model's budgets are in (the cone budget; ledger: PLT-803).
+pub fn cell_km3_per_m(cell_m: f64, planet_radius_m: f64, model_radius_km: f64) -> f64 {
+    let scale = model_radius_km * 1000.0 / planet_radius_m;
+    (cell_m * scale / 1000.0).powi(2) / 1000.0
+}
+
+/// The share of its growth's rock a hotspot's cones hand the pools under the cone budget (ledger:
+/// PLT-803): all of it while the tail's lavas cover it, else the lavas over the growth.
+pub fn cone_share(built_km3: f64, budget_km3: f64) -> f64 {
+    if built_km3 > 0.0 {
+        (budget_km3.max(0.0) / built_km3).min(1.0)
+    } else {
+        1.0
+    }
+}
+
+/// World globals (measurement, the cone budget; ledger: PLT-804), km³ Earth-normalized, over the
+/// run: the rock the hotspots' cones would hand at full (their growth net of calderas), and what
+/// they handed (all of it without `tectonics.hotspot_cone_budget`), and of that on continental
+/// cells.
+pub const HOTSPOT_CONES_BUILT_GLOBAL: &str = "volcanoes/hotspot_cones_built_km3";
+pub const HOTSPOT_CONES_HANDED_GLOBAL: &str = "volcanoes/hotspot_cones_handed_km3";
+pub const HOTSPOT_CONES_HANDED_CONTINENTAL_GLOBAL: &str =
+    "volcanoes/hotspot_cones_handed_continental_km3";
+
 /// How far past a shape's reach (m) a footprint must look for every cell whose
 /// [`shape::cell_weight`] points (3/8 of the cell's extent either way from its centre) reach into
 /// it: one Lambert cell side (as before 2026-10-23), or the half-diagonal of those points in the
@@ -725,6 +757,18 @@ impl VolcanoStage {
                     .map(|e| (c.over, DVec3::from_array(c.centroid), e))
             })
             .collect();
+        // The cone budget (ledger: PLT-803): what each hotspot's cones may hand this frame.
+        let cone_budget = self.preset.tectonics.hotspot_cone_budget;
+        let budgets: BTreeMap<u32, f64> = if cone_budget {
+            plates
+                .hotspots
+                .iter()
+                .map(|h| (h.id, h.cones.budget_km3))
+                .collect()
+        } else {
+            BTreeMap::new()
+        };
+        let km3_per_m = cell_km3_per_m(cell_m, s.radius_m(), self.preset.tectonics.model_radius_km);
         let hotspot_ref = self.preset.tectonics.hotspot_uplift_mm_yr.max(1e-9);
         let lip_radius_m = self.preset.tectonics.lip_radius_km
             / self.preset.tectonics.model_radius_km
@@ -1052,6 +1096,7 @@ impl VolcanoStage {
                     cause: lip,
                     segment: 0,
                     gone: None,
+                    rock_m: 0.0,
                 };
                 *chain += 1;
                 st.next_id += 1;
@@ -1158,6 +1203,7 @@ impl VolcanoStage {
                     cause,
                     segment: segment_key(cause, plate),
                     gone: None,
+                    rock_m: 0.0,
                 });
                 st.next_id += 1;
                 st.counts.strato_born += 1;
@@ -1244,7 +1290,14 @@ impl VolcanoStage {
                 .collect()
         };
         let mut bases: Vec<f64> = Vec::new();
-        for (v, footprint) in st.volcanoes.iter_mut().zip(footprints) {
+        // The hotspots' cones' growth this frame, held for the cone budget (volcano, cell, metres).
+        let mut held: Vec<(usize, usize, f32)> = Vec::new();
+        let mut held_dh: Vec<(usize, f64)> = Vec::new();
+        // Per hotspot, km³ Earth-normalized: the rock its cones would hand at full; what they
+        // handed, and of it on continental cells (measurement, PLT-804).
+        let mut hot_built: BTreeMap<u32, f64> = BTreeMap::new();
+        let mut hot_handed: BTreeMap<u32, [f64; 2]> = BTreeMap::new();
+        for (vi, (v, footprint)) in st.volcanoes.iter_mut().zip(footprints).enumerate() {
             if !v.active() {
                 continue;
             }
@@ -1302,10 +1355,24 @@ impl VolcanoStage {
             // Stratovolcanoes and silicic centres are felsic volcanic rock, shields mafic.
             // ledger: PLT-286
             let kind = usize::from(v.kind == Kind::Shield);
+            let hold = cone_budget && v.hotspot.is_some();
             for (c, wgt) in cells {
                 let dz = (dh * wgt) as f32;
                 l1.delta[c] += dz;
-                l1.rock[c][kind] += dz;
+                if hold {
+                    held.push((vi, c, dz));
+                } else {
+                    l1.rock[c][kind] += dz;
+                    if let Some(hid) = v.hotspot {
+                        let r = f64::from(dz) * km3_per_m;
+                        *hot_built.entry(hid).or_insert(0.0) += r;
+                        let e = hot_handed.entry(hid).or_insert([0.0; 2]);
+                        e[0] += r;
+                        if crust[c] as u8 == CONTINENTAL {
+                            e[1] += r;
+                        }
+                    }
+                }
                 vol += f64::from(dz);
                 for (class, share) in layers {
                     if share > 0.0 {
@@ -1314,6 +1381,11 @@ impl VolcanoStage {
                 }
             }
             st.counts.built_km3 += vol * cell_km2 / 1000.0;
+            if hold {
+                held_dh.push((vi, dh));
+            } else if v.hotspot.is_some() {
+                v.rock_m += dh;
+            }
             v.height_m += dh;
             v.kept_m = v.kept_m.max(v.height_m);
             v.built_m += dh;
@@ -1347,6 +1419,48 @@ impl VolcanoStage {
             if let Some(seg) = st.arcs.get_mut(&v.segment) {
                 seg.last_myr = t;
                 seg.peak_m = seg.peak_m.max(v.peak_m);
+            }
+        }
+        if cone_budget {
+            // The cone budget (ledger: PLT-803): a hotspot's cones hand the pools at most its tail's
+            // lavas of the last step, wherever they stand; the rest of their growth is relief.
+            let mut grown: BTreeMap<u32, f64> = BTreeMap::new();
+            for &(vi, _, dz) in &held {
+                let hid = st.volcanoes[vi]
+                    .hotspot
+                    .expect("held cones are a hotspot's");
+                *grown.entry(hid).or_insert(0.0) += f64::from(dz) * km3_per_m;
+            }
+            let share: BTreeMap<u32, f64> = grown
+                .iter()
+                .map(|(&hid, &b)| {
+                    (
+                        hid,
+                        cone_share(b, budgets.get(&hid).copied().unwrap_or(0.0)),
+                    )
+                })
+                .collect();
+            for (&hid, &b) in &grown {
+                *hot_built.entry(hid).or_insert(0.0) += b;
+            }
+            for &(vi, c, dz) in &held {
+                let v = &st.volcanoes[vi];
+                let hid = v.hotspot.expect("held cones are a hotspot's");
+                let f = share[&hid];
+                let kind = usize::from(v.kind == Kind::Shield);
+                let rock = (f * f64::from(dz)) as f32;
+                l1.rock[c][kind] += rock;
+                let r = f64::from(rock) * km3_per_m;
+                let e = hot_handed.entry(hid).or_insert([0.0; 2]);
+                e[0] += r;
+                if crust[c] as u8 == CONTINENTAL {
+                    e[1] += r;
+                }
+            }
+            for &(vi, dh) in &held_dh {
+                let v = &mut st.volcanoes[vi];
+                let hid = v.hotspot.expect("held cones are a hotspot's");
+                v.rock_m += share[&hid] * dh;
             }
         }
         self.time("build", started);
@@ -1383,10 +1497,34 @@ impl VolcanoStage {
             let mut removed = 0.0;
             let diff = |r: f64| before.body(r) - after.body(r);
             let kind = usize::from(v.kind == Kind::Shield);
+            // A hotspot's cone takes back, and spreads in its ignimbrite, only the rock it holds:
+            // all of it at full, its share under the cone budget (ledger: PLT-803).
+            let rock_share = if cone_budget && v.hotspot.is_some() {
+                if v.built_m > 0.0 {
+                    (v.rock_m / v.built_m).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                }
+            } else {
+                1.0
+            };
+            // The rock the collapse and its sheet move, at full and as handed (km³ Earth-normalized).
+            let mut moved = [0.0f64; 2];
+            let mut moved_c = 0.0f64;
             for (c, wgt) in l1.render(v.x, v.z, v.radius_m, 1.0, &diff) {
                 let dz = (h * wgt) as f32;
                 l1.delta[c] -= dz;
-                l1.rock[c][kind] -= dz;
+                if rock_share == 1.0 {
+                    l1.rock[c][kind] -= dz;
+                } else {
+                    l1.rock[c][kind] -= (rock_share * f64::from(dz)) as f32;
+                }
+                let r = f64::from(dz) * km3_per_m;
+                moved[0] -= r;
+                moved[1] -= rock_share * r;
+                if crust[c] as u8 == CONTINENTAL {
+                    moved_c -= rock_share * r;
+                }
                 removed += f64::from(dz);
                 log_ops.push((c, -dz, 0));
             }
@@ -1404,7 +1542,17 @@ impl VolcanoStage {
                         let th = (t0 * (1.0 - (r - rc) / span)) as f32;
                         if th > 0.0 {
                             l1.delta[c] += th;
-                            l1.rock[c][0] += th;
+                            if rock_share == 1.0 {
+                                l1.rock[c][0] += th;
+                            } else {
+                                l1.rock[c][0] += (rock_share * f64::from(th)) as f32;
+                            }
+                            let r = f64::from(th) * km3_per_m;
+                            moved[0] += r;
+                            moved[1] += rock_share * r;
+                            if crust[c] as u8 == CONTINENTAL {
+                                moved_c += rock_share * r;
+                            }
                             log_ops.push((c, th, rocks.tuff));
                         }
                     } else {
@@ -1425,6 +1573,12 @@ impl VolcanoStage {
                 }
             } else {
                 st.counts.summit_calderas += 1;
+            }
+            if let Some(hid) = v.hotspot {
+                *hot_built.entry(hid).or_insert(0.0) += moved[0];
+                let e = hot_handed.entry(hid).or_insert([0.0; 2]);
+                e[0] += moved[1];
+                e[1] += moved_c;
             }
             v.caldera = Some(Caldera {
                 t_myr: t,
@@ -1528,6 +1682,30 @@ impl VolcanoStage {
             if v.kind != Kind::Strato || v.caldera.is_some() {
                 st.gone.push(v);
             }
+        }
+
+        // The hotspots' cones: what each handed, for its tail to net at the next plate step (the
+        // cone budget, ledger: PLT-803), and the measurement (PLT-804).
+        if cone_budget && let Some(ps) = world.plates.as_mut() {
+            for (&hid, e) in &hot_handed {
+                if let Some(h) = ps.hotspots.iter_mut().find(|h| h.id == hid) {
+                    h.cones.handed_km3 += e[0];
+                    h.cones.handed_continental_km3 += e[1];
+                }
+            }
+        }
+        for (name, v) in [
+            (HOTSPOT_CONES_BUILT_GLOBAL, hot_built.values().sum::<f64>()),
+            (
+                HOTSPOT_CONES_HANDED_GLOBAL,
+                hot_handed.values().map(|e| e[0]).sum::<f64>(),
+            ),
+            (
+                HOTSPOT_CONES_HANDED_CONTINENTAL_GLOBAL,
+                hot_handed.values().map(|e| e[1]).sum::<f64>(),
+            ),
+        ] {
+            *world.globals.entry(name.to_owned()).or_insert(0.0) += v;
         }
 
         // Apply: the surface (offset, elevation, its fields) and the plate feedback; the log.

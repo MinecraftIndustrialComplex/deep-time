@@ -4757,6 +4757,7 @@ fn hotspot_cones_are_counted_inside_the_hotspot_rate() {
         flux_mg_s: 0.0,
         magma_km3_yr: 0.0,
         head_radius_km: 0.0,
+        cones: Default::default(),
     });
     let n = st.samples.len();
     let run = |cone_m: f64| {
@@ -7460,6 +7461,7 @@ fn a_rift_over_a_head(
             flux_mg_s: 0.0,
             magma_km3_yr: 0.0,
             head_radius_km: head_km,
+            cones: Default::default(),
         });
     }
     let new = ridges::resample(
@@ -7649,6 +7651,7 @@ fn a_sourced_tail_adds_its_buoyancy_fluxs_magma() {
         flux_mg_s: 8.7,
         magma_km3_yr: 8.7 * src::MAGMA_KM3_YR_PER_MG_S,
         head_radius_km: 0.0,
+        cones: Default::default(),
     });
     let n = st.samples.len();
     let run = |cone_m: f64| {
@@ -7693,6 +7696,108 @@ fn a_sourced_tail_adds_its_buoyancy_fluxs_magma() {
     assert!(seen >= 1, "{seen} columns took magma");
     let (_, with) = run(1.0);
     assert!(with < km3, "the cones are counted inside the rate");
+}
+
+/// The cone budget (PLT-803): a tail nets the cones its own volcanoes handed the pools, wherever
+/// they stand, as its lavas: a Hawaii tail of rock R adds R − C, its lavas R / 7 − C over its
+/// intrusions 6 R / 7 whole; the cones on its kernel are not netted again by place; it leaves its
+/// lavas R / 7 as the next frame's budget, and none when it dies before the next step. A preset
+/// tail's rock is all lava, so its budget is all of it.
+#[test]
+fn a_budgeted_tail_nets_its_cones_by_their_hotspot() {
+    use super::hotspots::sourced as src;
+    let mut p = preset(6000, 20.0, "supercontinent", 3);
+    p.tectonics.hotspot_births_per_100myr = 0.0;
+    p.tectonics.hotspot_cone_budget = true;
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (mut st, geo) = init::initial_state(&p, &env).unwrap();
+    st.hotspots.clear();
+    let pos = geometry::positions(&st, &geo);
+    let tree = Tree::over(&pos, |_| true);
+    let n = st.samples.len();
+    let km3_per_m = env.norm.sample_area_km2() / 1000.0;
+    let hotspot = |magma_km3_yr: f64, dies_myr: f64, handed_km3: f64| state::Hotspot {
+        id: 0,
+        pos: pos[0].to_array(),
+        born_myr: env.t_myr - 1.0,
+        dies_myr,
+        uplift_mm_yr: 0.3,
+        lip_event: None,
+        plates: Vec::new(),
+        track_km: 0.0,
+        closed: false,
+        flux_mg_s: if magma_km3_yr > 0.0 { 8.7 } else { 0.0 },
+        magma_km3_yr,
+        head_radius_km: 0.0,
+        cones: state::HotspotCones {
+            budget_km3: 0.0,
+            handed_km3,
+            handed_continental_km3: 0.25 * handed_km3,
+        },
+    };
+    let run = |h: state::Hotspot| {
+        let mut s2 = st.clone();
+        s2.hotspots.push(h);
+        let mut world = WorldState::new(1, 16_384, p.t_start_years());
+        // Cones on every sample: the kernel's are among the handed ones, not netted again.
+        let mut cones = vec![[0.0, 1.0]; n];
+        hotspots::step(&mut s2, &mut world, &pos, &tree, &env, &mut cones).unwrap();
+        let gained = |k: usize| -> f64 {
+            st.samples
+                .iter()
+                .zip(&s2.samples)
+                .map(|(a, b)| f64::from(b.pools[k] - a.pools[k]))
+                .sum::<f64>()
+                * km3_per_m
+        };
+        let lavas = gained(state::pool::MAFIC_VOLCANIC);
+        let intrusions = gained(state::pool::MAFIC_PLUTONIC);
+        (s2, world, lavas, intrusions)
+    };
+    let hawaii = 8.7 * src::MAGMA_KM3_YR_PER_MG_S;
+    let r = hawaii * env.dt_yr;
+    let c = 0.25 * r * src::TAIL_EXTRUSIVE_SHARE;
+    let (s2, world, lavas, intrusions) = run(hotspot(hawaii, env.t_myr + 100.0, c));
+    let g = |k: &str| world.globals[k];
+    let close = |a: f64, b: f64| (a - b).abs() < 1e-4 * b.abs().max(1e-6);
+    assert!(
+        close(g(hotspots::MAGMA_GLOBAL), r - c),
+        "{} against {}",
+        g(hotspots::MAGMA_GLOBAL),
+        r - c
+    );
+    assert!(
+        close(lavas, r * src::TAIL_EXTRUSIVE_SHARE - c),
+        "lavas {lavas}"
+    );
+    assert!(
+        close(intrusions, r * (1.0 - src::TAIL_EXTRUSIVE_SHARE)),
+        "intrusions {intrusions}"
+    );
+    assert!(close(g(hotspots::CONES_BY_ID_GLOBAL), c));
+    assert!(close(g(hotspots::CONES_BY_ID_CONTINENTAL_GLOBAL), 0.25 * c));
+    assert!(close(g(hotspots::TAIL_ROCK_GLOBAL), r));
+    let cones = s2.hotspots[0].cones;
+    assert!(
+        close(cones.budget_km3, r * src::TAIL_EXTRUSIVE_SHARE),
+        "{cones:?}"
+    );
+    assert_eq!((cones.handed_km3, cones.handed_continental_km3), (0.0, 0.0));
+    // Cones past the step's lavas (the frame's lag): the rest comes off the intrusions.
+    let big = 2.0 * r * src::TAIL_EXTRUSIVE_SHARE;
+    let (_, world, lavas, intrusions) = run(hotspot(hawaii, env.t_myr + 100.0, big));
+    assert!(close(world.globals[hotspots::MAGMA_GLOBAL], r - big));
+    assert!(lavas.abs() < 1e-6 * r && close(intrusions, r - big));
+    // A tail that dies before the next step leaves no budget.
+    let (s2, _, _, _) = run(hotspot(hawaii, env.t_myr + 0.5 * env.dt_myr, 0.0));
+    assert_eq!(s2.hotspots[0].cones.budget_km3, 0.0);
+    // The preset's tail: its rock (three times the rise) is all lava, all of it the budget.
+    let (s2, world, lavas, intrusions) = run(hotspot(0.0, env.t_myr + 100.0, 0.0));
+    let rock = world.globals[hotspots::TAIL_ROCK_GLOBAL];
+    assert!(rock > 0.0 && close(world.globals[hotspots::MAGMA_GLOBAL], rock));
+    assert!(close(lavas, rock) && intrusions.abs() < 1e-9);
+    assert!(close(s2.hotspots[0].cones.budget_km3, rock));
 }
 
 /// A sourced plume head (PLT-795 to PLT-797): its province holds one of the record's volumes for
@@ -7763,6 +7868,7 @@ fn a_sourced_plume_head_erupts_a_recorded_province() {
             flux_mg_s: 0.0,
             magma_km3_yr: 0.0,
             head_radius_km: radius,
+            cones: Default::default(),
         });
         let hot = hotspots::hot_mantle(&s2, &env);
         assert_eq!(hot.len(), 1);

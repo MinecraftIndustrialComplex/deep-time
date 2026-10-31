@@ -400,6 +400,7 @@ fn test_volcano(kind: Kind, oceanic: bool) -> Volcano {
         cause: None,
         segment: 0,
         gone: None,
+        rock_m: 0.0,
     }
 }
 
@@ -994,4 +995,76 @@ fn threads_and_a_resume_leave_the_volcanoes_unchanged() {
     for d in [dir, dir2] {
         let _ = std::fs::remove_dir_all(d);
     }
+}
+
+/// The cone budget's arithmetic (PLT-803): L1 is Lambert's equal-area projection, so its cells,
+/// each `cell_m`² of the game's sphere scaled to the plate model's, cover the model sphere (to the
+/// grid's rounding of its height); a hotspot's cones hand all their growth's rock while the budget
+/// covers it, else the budget over the growth, and nothing from no budget.
+#[test]
+fn the_l1_cells_cover_the_model_sphere_and_cones_hand_at_most_their_budget() {
+    let grid = GridDesc::for_planet("L1", 16_384, 16).unwrap();
+    let mh = 300.0;
+    let cell_m = f64::from(grid.r) * mh;
+    let planet_m = 16_384.0 * mh / std::f64::consts::TAU;
+    let model_km = 6370.0;
+    let km2 = grid.cells() as f64 * cell_km3_per_m(cell_m, planet_m, model_km) * 1000.0;
+    let sphere = 4.0 * std::f64::consts::PI * model_km * model_km;
+    assert!(
+        (km2 / sphere - 1.0).abs() < 0.01,
+        "{km2} km² against {sphere}"
+    );
+    assert_eq!(cone_share(0.0, 5.0), 1.0);
+    assert_eq!(cone_share(10.0, 20.0), 1.0);
+    assert!((cone_share(10.0, 2.5) - 0.25).abs() < 1e-12);
+    assert_eq!(cone_share(10.0, 0.0), 0.0);
+    assert_eq!(cone_share(10.0, -1.0), 0.0);
+}
+
+/// The cone budget on the coupled pipeline (PLT-803, PLT-804), with Sleep's tails (PLT-790 to
+/// PLT-794): the cones the tails netted by their hotspot are at most a seventh of the tails' rock
+/// (their lavas), the hotspots' cones handed less than they built at the game's size, the tails'
+/// basalt and their cones together the tails' rock, and the tails netted no more than the cones
+/// handed.
+#[test]
+fn a_hotspots_cones_hand_the_pools_at_most_its_tails_lavas() {
+    let mut v: serde_json::Value = serde_json::from_str(&pipeline_json(20_000, 60.0, 5)).unwrap();
+    v["tectonics"]["hotspots_sourced"] = serde_json::json!(true);
+    v["tectonics"]["hotspot_cone_budget"] = serde_json::json!(true);
+    // No plume heads: their domes join the hotspots' basalt global.
+    v["tectonics"]["lip_probability"] = serde_json::json!(0.0);
+    let dir = temp_dir("cone-budget");
+    let s = session(&v.to_string(), &dir, 2);
+    finish(&s);
+    let world = s.checkpoint().unwrap().world;
+    let g = |k: &str| world.globals.get(k).copied().unwrap_or(f64::NAN);
+    let rock = g(crate::plates::hotspots::TAIL_ROCK_GLOBAL);
+    let by_id = g(crate::plates::hotspots::CONES_BY_ID_GLOBAL);
+    let magma = g(crate::plates::hotspots::MAGMA_GLOBAL);
+    let built = g(HOTSPOT_CONES_BUILT_GLOBAL);
+    let handed = g(HOTSPOT_CONES_HANDED_GLOBAL);
+    let lavas = rock * crate::plates::hotspots::sourced::TAIL_EXTRUSIVE_SHARE;
+    eprintln!(
+        "tails' rock {rock:.4e} km³, lavas {lavas:.4e}, cones built {built:.4e}, handed \
+         {handed:.4e}, netted {by_id:.4e}, the tails' basalt {magma:.4e}"
+    );
+    assert!(rock > 0.0 && handed > 0.0, "no tails or no cones");
+    assert!(
+        by_id <= lavas * (1.0 + 1e-9),
+        "{by_id} netted against lavas {lavas}"
+    );
+    assert!(
+        handed < built,
+        "the budget never bound: {handed} of {built}"
+    );
+    assert!(
+        (magma + by_id - rock).abs() < 1e-3 * rock,
+        "{magma} + {by_id} against {rock}"
+    );
+    assert!(
+        by_id <= handed * (1.0 + 1e-9) + 1e-9,
+        "{by_id} netted of {handed} handed"
+    );
+    assert!(g(crate::plates::CONE_CONTINENTAL_GLOBAL) >= 0.0);
+    let _ = std::fs::remove_dir_all(dir);
 }
