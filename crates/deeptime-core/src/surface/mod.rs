@@ -1329,7 +1329,7 @@ impl SurfaceStage {
                 // ledger: ISO-126, ERO-221
                 // What each cell gives and takes as water under the bake's budget, when the
                 // lakes or the stream power read it.
-                let cell_water = step_water(world, &clim, &hydro_p, p);
+                let cell_water = step_water(world, &clim, &hydro_p, &p);
                 let ela_z = if gp.active() {
                     glacial::ela_z_from(
                         world
@@ -1398,7 +1398,7 @@ impl SurfaceStage {
                     .for_each(|(c, (kf, weight))| {
                         *kf = p.k_spl * erod[usize::from(class0[c])];
                         // ledger: ERO-010, ERO-011, ERO-221
-                        *weight = runoff_weight(p, &clim, cell_water.as_deref(), c);
+                        *weight = runoff_weight(&p, &clim, cell_water.as_deref(), c);
                     });
                 let setup = Setup {
                     h_start,
@@ -1447,7 +1447,7 @@ impl SurfaceStage {
             for c in (0..n).filter(|&c| sc.h[c] > sea) {
                 let (u, o) = (
                     f64::from(sc.weight[c]),
-                    f64::from(runoff_weight(p, &clim, None, c)),
+                    f64::from(runoff_weight(&p, &clim, None, c)),
                 );
                 let hi = if sc.h[c] - sea > 2000.0 { 1.0 } else { 0.0 };
                 for (s, v) in runoff_weight_sums

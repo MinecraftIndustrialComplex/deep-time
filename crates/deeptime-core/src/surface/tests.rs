@@ -957,8 +957,8 @@ fn the_runoff_budget_reaches_the_stream_power_s_weight() {
     let on = weights(&params(true, false));
     eprintln!("weights off {off:?}, the lakes' budget only {lakes_only:?}, on {on:?}");
     // Off: a mean below freezing runs off all of P (0.3 m over the reference 0.5 m).
-    for c in 0..3 {
-        assert!((off[c] - 0.6).abs() < 1.0e-6, "cell {c}: {}", off[c]);
+    for (c, w) in off.iter().enumerate().take(3) {
+        assert!((w - 0.6).abs() < 1.0e-6, "cell {c}: {w}");
     }
     assert_eq!(lakes_only, off, "the lakes' budget alone leaves the weight");
     // On: ground that never thaws, and the polar desert's year as the stage gave it, at the floor.
