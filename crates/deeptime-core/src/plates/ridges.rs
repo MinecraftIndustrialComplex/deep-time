@@ -469,7 +469,7 @@ pub fn volcanic_margin_column(excess_k: f64, share: f64) -> Option<[f32; pool::C
     let ocean = f64::from(thickness(&oceanic_column()));
     let h = ocean
         + share.clamp(0.0, 1.0) * (super::hotspots::sourced::igneous_crust_m(excess_k) - ocean);
-    if !(h > ocean) {
+    if h.is_nan() || h <= ocean {
         return None;
     }
     let mut p = [0.0f32; pool::COUNT];
@@ -487,7 +487,7 @@ pub fn volcanic_margin_column(excess_k: f64, share: f64) -> Option<[f32; pool::C
 /// straight margin the shares give the width at any lattice spacing: on the 16k quick planet
 /// (71 km) the first row takes all of its cell and the second a quarter of it for 90 km.
 pub fn margin_share(d1_rad: f64, width_rad: f64, spacing_rad: f64) -> f64 {
-    if !(spacing_rad > 0.0) {
+    if spacing_rad.is_nan() || spacing_rad <= 0.0 {
         return 0.0;
     }
     ((d1_rad.min(width_rad) - (d1_rad - spacing_rad).max(0.0)) / spacing_rad).clamp(0.0, 1.0)
@@ -1217,7 +1217,10 @@ pub fn resample(
     if k.volcanic_margins {
         // ledger: PLT-799 (measurement)
         for (name, v) in [
-            (VOLCANIC_MARGIN_GLOBAL, margin_m * norm.sample_area_km2() / 1000.0),
+            (
+                VOLCANIC_MARGIN_GLOBAL,
+                margin_m * norm.sample_area_km2() / 1000.0,
+            ),
             (VOLCANIC_MARGIN_SAMPLES_GLOBAL, margin_n as f64),
         ] {
             *world.globals.entry(name.to_owned()).or_insert(0.0) += v;

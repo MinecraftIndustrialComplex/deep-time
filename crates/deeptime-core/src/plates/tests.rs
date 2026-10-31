@@ -7516,10 +7516,15 @@ fn a_breakup_over_a_plume_head_makes_a_volcanic_margin() {
     // its width at any spacing.
     for s_km in [50.0, 71.4, 159.0, 300.0] {
         let (w, s) = (env.norm.rad(90.0), env.norm.rad(s_km));
-        let rows: f64 = (1..6).map(|r| ridges::margin_share(r as f64 * s, w, s) * s).sum();
+        let rows: f64 = (1..6)
+            .map(|r| ridges::margin_share(r as f64 * s, w, s) * s)
+            .sum();
         assert!((rows - w).abs() < 1e-12, "{s_km} km: {rows} against {w}");
     }
-    assert_eq!(ridges::margin_share(env.norm.rad(71.4), env.norm.rad(90.0), env.norm.rad(71.4)), 1.0);
+    assert_eq!(
+        ridges::margin_share(env.norm.rad(71.4), env.norm.rad(90.0), env.norm.rad(71.4)),
+        1.0
+    );
     eprintln!(
         "volcanic margin: {} gap points, {h:.0} m of igneous crust each",
         vrm.len()
@@ -7531,7 +7536,10 @@ fn a_breakup_over_a_plume_head_makes_a_volcanic_margin() {
     let mut own = 0.0;
     for &i in &vrm {
         let s = &st.samples[i];
-        assert!(pts[i].angle_between(at) <= reach + 1e-9, "beyond the head's spread");
+        assert!(
+            pts[i].angle_between(at) <= reach + 1e-9,
+            "beyond the head's spread"
+        );
         assert!(pts[i].y < 0.0, "on the opening side");
         // Within the margin's width of the continent's edge, the equator's turned image: the
         // continent's samples are where z > 0, so the gap begins at z = 0.
@@ -7577,11 +7585,19 @@ fn the_hotspot_constants_are_their_sources() {
     let hawaii_m3_s = 8.7 * s::MAGMA_KM3_YR_PER_MG_S * 1.0e9 / 3.155_76e7;
     assert!((hawaii_m3_s - 4.0).abs() < 1e-9, "{hawaii_m3_s}");
     assert!((s::head_share(s::births_per_myr()) - (1.0 / 15.0) / 0.296).abs() < 1e-12);
-    assert!((s::head_share(0.03) - 1.0).abs() < 1e-12, "at most every birth");
+    assert!(
+        (s::head_share(0.03) - 1.0).abs() < 1e-12,
+        "at most every birth"
+    );
     let continental: f64 = s::CONTINENTAL_LIPS_KM3.iter().sum();
     assert!((continental - 30_463_152.0).abs() < 0.5);
     assert!((continental / 250.0e6 - 0.122).abs() < 0.001);
-    for (k, m) in [(0.0, 7000.0), (120.0, 17_000.0), (200.0, 26_000.0), (-50.0, 7000.0)] {
+    for (k, m) in [
+        (0.0, 7000.0),
+        (120.0, 17_000.0),
+        (200.0, 26_000.0),
+        (-50.0, 7000.0),
+    ] {
         assert!((s::igneous_crust_m(k) - m).abs() < 1e-9, "{k} K");
     }
     assert!((s::igneous_crust_m(s::HEAD_EXCESS_K) - 20_375.0).abs() < 1e-9);
@@ -7601,7 +7617,11 @@ fn a_sourced_tail_adds_its_buoyancy_fluxs_magma() {
     let stage = PlatesStage::new(p.clone());
     let env = stage.env(&p.tectonics, 1);
     let (mut st, geo) = init::initial_state(&p, &env).unwrap();
-    assert_eq!(st.hotspots.len(), src::COUNT, "the catalogue's count at the start");
+    assert_eq!(
+        st.hotspots.len(),
+        src::COUNT,
+        "the catalogue's count at the start"
+    );
     for h in &st.hotspots {
         assert!(h.born_myr <= env.t_myr - env.dt_myr && h.dies_myr > env.t_myr - env.dt_myr);
         assert!(h.dies_myr - h.born_myr <= src::LIFETIME_MYR[1] + env.dt_myr + 1e-9);
@@ -7643,17 +7663,31 @@ fn a_sourced_tail_adds_its_buoyancy_fluxs_magma() {
     assert!((km3 - want).abs() < 1e-9 * want, "{km3} km³ against {want}");
     let mut seen = 0;
     for (a, b) in st.samples.iter().zip(&s2.samples) {
-        let gained: f64 = b.pools.iter().zip(&a.pools).map(|(x, y)| f64::from(x - y)).sum();
+        let gained: f64 = b
+            .pools
+            .iter()
+            .zip(&a.pools)
+            .map(|(x, y)| f64::from(x - y))
+            .sum();
         if gained <= 0.0 {
             continue;
         }
         seen += 1;
-        let lava = f64::from(b.pools[state::pool::MAFIC_VOLCANIC] - a.pools[state::pool::MAFIC_VOLCANIC]);
+        let lava =
+            f64::from(b.pools[state::pool::MAFIC_VOLCANIC] - a.pools[state::pool::MAFIC_VOLCANIC]);
         assert!((lava - gained * src::TAIL_EXTRUSIVE_SHARE).abs() < 1e-3 * gained.max(1.0));
         let dry = pools::isostatic_change_m(&a.pools, &b.pools, env.gravity);
-        let wet = if a.elevation_m < 0.0 { settle::WATER_LOADED } else { 1.0 };
+        let wet = if a.elevation_m < 0.0 {
+            settle::WATER_LOADED
+        } else {
+            1.0
+        };
         let rise = f64::from(b.elevation_m - a.elevation_m);
-        assert!((rise - dry * wet).abs() < 0.01 + 1e-3 * rise.abs(), "{rise} against {}", dry * wet);
+        assert!(
+            (rise - dry * wet).abs() < 0.01 + 1e-3 * rise.abs(),
+            "{rise} against {}",
+            dry * wet
+        );
     }
     // On this 6,000-sample planet (spacing about 290 km) the 150 km kernel holds its centre.
     assert!(seen >= 1, "{seen} columns took magma");
@@ -7677,7 +7711,9 @@ fn a_sourced_plume_head_erupts_a_recorded_province() {
     let tree = Tree::over(&pos, |_| true);
     for continental in [true, false] {
         let at = (0..pos.len())
-            .find(|&i| (st.samples[i].kind == CONTINENTAL) == continental && !st.samples[i].is_hidden())
+            .find(|&i| {
+                (st.samples[i].kind == CONTINENTAL) == continental && !st.samples[i].is_hidden()
+            })
             .map(|i| pos[i])
             .unwrap();
         let mut s2 = st.clone();
@@ -7697,12 +7733,22 @@ fn a_sourced_plume_head_erupts_a_recorded_province() {
         let dome = world.globals[hotspots::MAGMA_GLOBAL];
         eprintln!(
             "head on {} crust: {whole:.3e} km³, dome {:.3}",
-            if continental { "continental" } else { "oceanic" },
+            if continental {
+                "continental"
+            } else {
+                "oceanic"
+            },
             dome / whole
         );
-        assert!((dome / whole - (1.0 / 3.0) / 0.648).abs() < 0.03, "{}", dome / whole);
+        assert!(
+            (dome / whole - (1.0 / 3.0) / 0.648).abs() < 0.03,
+            "{}",
+            dome / whole
+        );
         let e = world.events.iter().find(|e| e.id == event).unwrap();
-        assert!(matches!(e.params.get("radius_km"), Some(deeptime_format::ParamValue::Float(r)) if *r == 1000.0));
+        assert!(
+            matches!(e.params.get("radius_km"), Some(deeptime_format::ParamValue::Float(r)) if *r == 1000.0)
+        );
         st.hotspots.clear();
         s2.hotspots.push(state::Hotspot {
             id: 0,
