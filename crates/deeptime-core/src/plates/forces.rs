@@ -1629,10 +1629,21 @@ fn balance_step(
     // the trench for `slab_breakoff_myr`; a slab no front feeds hangs and pulls along the shared
     // boundary for `slab_breakoff_myr` and is then gone.
     let mut fronts: BTreeMap<usize, FrontSum> = BTreeMap::new();
+    // ledger: PLT-770. A terrane its slab drags down whole (`Collision::subducting`) goes down
+    // with the slab: its front feeds the slab as ocean floor does and does not block it, so the
+    // slab neither stops lengthening nor breaks off under it (FRC-019's block time is for crust
+    // that jams the trench).
+    let goes_down = |ci: usize| {
+        k.terrane_docking_cover
+            && st.contacts[ci]
+                .collision
+                .as_ref()
+                .is_some_and(|c| c.subducting)
+    };
     for e in &edges {
         if let Some(sf) = e.front {
             let f = fronts.entry(sf.contact).or_default();
-            if samples[sf.u as usize].kind == CONTINENTAL {
+            if samples[sf.u as usize].kind == CONTINENTAL && !goes_down(sf.contact) {
                 f.continental += 1;
             } else {
                 f.oceanic += 1;

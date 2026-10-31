@@ -253,15 +253,19 @@ fn run_lakes(case: &Case) -> ([[f64; 4]; 2], Vec<lakes::LakeOutflow>) {
         };
         solve(&area, &mut out, &mut qin, &mut cut);
         // ledger: ERO-217
-        // A lake its sediment filled passes all its water, as on the surface (`closed::open_filled`).
-        if let Some(outflow) = outflow.as_mut()
-            && closed::open_filled(outflow, &out, &filled) > 0
-        {
-            match closed::pass_shares(n, outflow) {
-                Some(pass) => routing::accumulate_passing(&d, &r, &weight, &pass, &mut area),
-                None => routing::accumulate(&d, &r, &weight, &mut area),
-            }
-            solve(&area, &mut out, &mut qin, &mut cut);
+        // A lake its sediment filled passes all its water, as on the surface
+        // (`closed::open_until_stable`).
+        if let Some(outflow) = outflow.as_mut() {
+            let mut state = (&mut out, &mut qin, &mut cut);
+            closed::open_until_stable(
+                outflow,
+                &mut state,
+                |(out, _, _), outflow| closed::open_filled(outflow, out, &filled),
+                |(out, qin, cut), outflow| {
+                    closed::accumulate(&d, &r, &weight, outflow, &mut area);
+                    solve(&area, out, qin, cut);
+                },
+            );
         }
         for c in 0..n {
             if kind[c] == BASE {

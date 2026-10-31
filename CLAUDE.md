@@ -81,9 +81,12 @@ align with earth by introducing extremely weird forcing functions").
 
 ## Rules
 - **The test machine is the Azure VM `deeptime-test`** (Ben, 2026-10-01; D32as_v7, 32 vCPU, 125 GiB,
-  x86_64 Ubuntu 24.04, West US 2, resource group `deeptime-test`, pay-as-you-go). Rebuilt from scratch 2026-10-16 after the resource group was deleted (Ben: "feel free to bring
-  it back up"); the scripts reach it by the DNS name `deeptime-test-ban.westus2.cloudapp.azure.com`,
-  which a rebuild can keep, and the gate batch is `tools/remote/vm/gate-batch.sh`. The `tools/remote/`
+  x86_64 Ubuntu 24.04, East US zone 1, resource group `deeptime-test`, pay-as-you-go). Rebuilt from scratch 2026-10-16 after the resource group was deleted (Ben: "feel free to bring
+  it back up"); moved from West US 2 to East US on 2026-10-31 (Ben: "move yourself to EastUS if you get the chance
+  or some region which is further away / cheaper. (Graphide needs more vCPU capacity on wetus)"; decisions log
+  2026-10-31; its disks copied by snapshot, so the system and /data are the same). The scripts reach it by the DNS
+  name `deeptime-test-ban.eastus.cloudapp.azure.com`, which a rebuild in the same region can keep (a move to another
+  region changes it: every script's default host), and the gate batch is `tools/remote/vm/gate-batch.sh`. The `tools/remote/`
   scripts and `tools/viewer/mac-watch.sh` default to it (`DEEPTIME_MAC` overrides); its data disk is
   mounted at `/data` with `/Volumes/Graphide -> /data`, so every `/Volumes/Graphide/ban/...` path in
   this file and in tools/ holds there. Where this file says "the Mac", read this machine.
