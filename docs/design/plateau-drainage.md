@@ -5,7 +5,9 @@ branch `plateau-drainage` on `collision-orogen`, built and off; branch `plateau-
 review's fixes, R3 and "The review"). `surface.closed_basins` (`crates/deeptime-core/src/surface/closed.rs`;
 ERO-217, ERO-218), with a split of the flat high ground by its water (ERO-220). The controlled plateau is ERO-219. The
 arm plat-cb0 against orog-cum ("The arm"): the law is sound and cheap and gives the planets internally drained land,
-but it does not keep the plateaus; their flat tops wear on frozen ground, whose runoff is the next lead.
+but it does not keep the plateaus; their flat tops wear on frozen ground, whose runoff is the next lead. The arm after
+the review's fixes, plat-cb1 ("The arm after the fixes"), keeps that verdict: the ground draining to closed basins
+wears at 31 m/Myr against 53, and 0.10 of the land drains to them.
 
 ## Why
 
@@ -448,3 +450,86 @@ changed (199c51b1 and after):
    the solve's are; the bake draws lakes of 1 km² and a block deep, which is about the world, not the water; a shallow
    closed pit the sediment reaches fills and opens within its step (closed.rs, "Simplifications"). The 0 °C line of the
    frozen flat high ground carries `// ledger: ERO-220`; the "spills (today)" labels are "spills (no balance)".
+
+## The arm after the fixes: plat-cb1 (2026-10-31)
+
+`pool.sh run plat-cb1 --seeds 1,2,3,4 +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps` ran on
+`plateau-drainage-on` at 5a8082ff (key 6c199eaeaab7, argkey cd665cef, 8 runs) with the branch's defaults: closed basins,
+the orogen's two wedges and retro plateau, and the docking cover. The reads are plat-cb0's, plus
+`tools/review/plateau/words.py` for the summary's lake words and timings. They were run against plat-cb0, orog-cum and
+small-terrane (key dcf0d7480ef3, argkey 35ce6e09: the docking cover on the orogen's physics, the nearest plate control).
+
+**What it can and cannot separate.**
+- plat-cb1 differs from plat-cb0 by the review's fixes and by the plates' changes merged with small-terrane-on
+  (c03afd9a): the docking cover (PLT-770), PR #50's review and the continental heat flow for crust made continental late
+  in a step (PLT-469).
+- small-terrane has the docking cover but not the other two, so no cached arm is plat-cb1 without the law. Plate-side
+  rows are read against small-terrane, surface rows against plat-cb0.
+- The pool's runs stop before the young landscape (`young=0.0s/0steps` in the timings), so fix 1 is not in these
+  numbers. The young step's tests pass with it, but none of them holds a closed basin: a test that does is a follow-up.
+
+**The pool's tables (8 runs each; p against orog-cum unless said).**
+- **V1:** land 0.218 (p 0.51), largest landmass 0.083 (p 0.65), crust under the sea 0.577 (p 0.65), land above 2 km
+  0.019 (p 0.38), coast with high ground 0.102 (p 0.13; small-terrane 0.091), land under ice 0.047 (p 0.44). Criteria
+  met: a median 5.5 against 6 (p 0.38). The sea over the datum at the end: 154 m against plat-cb0's 259, orog-cum's 203
+  and small-terrane's 184.
+- **The guard:**
+  - the worst is 10,504 m against small-terrane's 10,154 (p 0.38; against orog-cum p 0.065);
+  - 0 steps beyond one Earth relief;
+  - the plates' peak is 4,566 m against small-terrane's 4,700 (p 0.80).
+
+  So plat-cb0's larger worst and higher peak against orog-cum are not the law's: the plates' changes give the same.
+- **collcoast's "belt not elongated":** 0.147 against small-terrane's 0.170 (p 0.80). plat-cb0's 0.256 is not
+  repeated. The docking cover alone gives this column's rise against orog-cum.
+
+**The closed basins (medians of 8 runs; plat-cb1 | plat-cb0 | orog-cum).**
+
+| read | plat-cb1 | plat-cb0 | orog-cum |
+|---|---|---|---|
+| land draining to a basin that passes nothing, over the run (`closedshare.py`) | 0.101 (0.081 to 0.163) | 0.127 (0.093 to 0.148) | 0 |
+| lake-substeps closed, a run | 2.75e4 | 3.59e4 | |
+| lake-substeps passing part of their inflow | 1.67e4 | 6.34e4 | |
+| lakes opened because their sediment filled them (R3, `filled_lake_steps`) | 4.78e4 | | |
+| flat high ground, net m/Myr (per run) | 123.9 (106 to 177) | 141.4 (114 to 196) | 134.3 (114 to 228) |
+| its stream-power shares, without the cut and the cut | 0.351, 0.334 | 0.372, 0.316 | 0.366, 0.316 |
+| draining to a closed basin: part of the flat, net m/Myr (per run) | 0.26, 30.6 (23 to 42) | 0.30, 52.8 (47 to 84) | |
+| of it stream power, diffusion, ice | 3.8, 23.2, 5.7 | 24.6, 28.5, 9.2 | |
+| dry: part, net | 0.24, 35.3 | 0.22, 37.6 | |
+| frozen: part, net | 0.62, 125.2 | 0.67, 140.8 | |
+| cohorts above 3 km: thinning = plates + top, m/Myr | 100.8 = 47.0 + 53.8 | 105.3 = 47.6 + 57.7 | 112.5 = 58.9 + 53.6 |
+| cohorts above 4 km | 128.5 = 75.7 + 52.8 | 152.5 = 81.0 + 71.5 | 172.1 = 119.5 + 52.6 |
+| land above 2, 3, 4 km, mean over the maps after 100 Myr | 0.0235, 0.0078, 0.0013 | 0.0232, 0.0086, 0.0010 | 0.0245, 0.0091, 0.0012 |
+| the same, the run's largest | 0.060, 0.031, 0.0092 | 0.062, 0.030, 0.0101 | 0.076, 0.040, 0.0085 |
+| to the sea; laid in lakes, km³ a year | 3.41; 0.252 | 3.36; 0.285 | 3.03; 0.242 |
+| regions of 500 m relief or more; 1,000 m or more; all land, m/Myr (`recal.txt`) | 200.9; 379.8; 38.3 | 219.9; 394.2; 37.5 | 218.2; 400.9; 38.1 |
+| the closed step's own time; the surface's, s a run | 3.7; 464 | 3.85; 452 | |
+
+What changed:
+- **The ground draining to a closed basin wears at 31 m/Myr, against 53.** The runs' ranges do not overlap. Its stream
+  power fell from 24.6 to 3.8 m/Myr, and diffusion is now 0.72 of its wear. That is Lal et al. 2003's bound ("<30
+  mm/ka") and 2 to 3 times Hetzel et al. 2011's catchment rates (11 to 16 m/Myr), against 3 to 5 times before. This arm
+  cannot split the fixes from the plates' changes. Those changes are not expected to cut a surface class's stream power
+  six-fold, but that is not shown here.
+- **Less land drains to a closed basin** (0.101 against 0.127, ranges overlapping). R3 opens the basins their sediment
+  fills, about 4.8e4 lake-substeps a run, more than the 2.7e4 that stay closed. So most lakes the balance would close
+  are reached by sediment that fills them first. Earth: "Endorheic basins occupy 20% of the Earth's land surface"
+  (Garcia-Castellanos et al. 2003, p. 8-1).
+- **The lakes passing part of their inflow fell from 6.3e4 to 1.7e4 substeps a run.** The false exits had counted a
+  lake's shoals as exits.
+
+What did not change:
+- **The plateaus.** The flat high ground as a whole wears at 124 against 141 and 134 m/Myr, within the runs' spread.
+  Its frozen part, 0.62 of it, wears at 125 m/Myr. The high ground's area and the cohorts' thinning are within
+  plat-cb0's and orog-cum's spread. The verdict of "The arm" stands: the law does not keep the plateaus, and their
+  frozen tops are the lead. That lead is the surface's runoff from the bake's budget (`surface.runoff_budget`, ERO-221,
+  branch `surface-runoff-budget`).
+- **K's calibration.** All land erodes at 38.3 m/Myr against 38.1. The regions of 500 and 1,000 m relief or more erode
+  at 0.92 and 0.95 of orog-cum's (Montgomery & Brandon's 210 and 525 for those classes).
+- **The cost.** The closed step takes 3.7 s of the surface's 464 s. The surface is 12 s slower than plat-cb0's: the
+  re-solve after R3 and the plates' changes together, not timed apart.
+
+**Verdict:** the fixes keep the law sound and on by default:
+- the guard is clean against the nearest plate control;
+- K is intact;
+- the belt-shape and guard differences of plat-cb0 are the plates', not the law's;
+- the ground draining to closed basins wears at Lal's bound.
