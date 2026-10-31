@@ -48,7 +48,9 @@ def main(argv):
         a, b = base / name, trace / name
         fa = leaves(json.loads((a / "state.json").read_text()))
         fb = leaves(json.loads((b / "state.json").read_text()))
-        diff = sorted(k for k in set(fa) | set(fb) if fa.get(k) != fb.get(k) and "globals.json" not in k)
+        # The top-level sha256 is the hash over every file's, globals.json included, so it is left out with it.
+        diff = sorted(k for k in set(fa) | set(fb) if fa.get(k) != fb.get(k) and "globals.json" not in k
+                      and k != "/sha256")
         ra, rb = record(a, drop), record(b, drop)
         same_rec = ra == rb
         bad += bool(diff) or not same_rec

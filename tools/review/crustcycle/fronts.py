@@ -19,9 +19,9 @@ to the end, as the median and range of the runs:
   split by an initiation, rifted, neither);
   the front's turnover (`gain`, `loss`, km a Myr, by setting and state);
   and, in records made since the intra-oceanic fronts diagnosis (2026-10-31), the subducting fronts by their arc's age
-  (`arc_age`, the contact's PLT-669 onset, which a polarity reversal resets; `no_arc`), by their contact's slab age at
-  its onset (`onset_slab`), and the ocean-ocean front by the ocean left on the subducting side (`oo_age_ocean`,
-  `oo_arc_ocean`) and by its contact's age against the overriding floor's age at the front (`oo_over_floor`).
+  (`arc_age`, the contact's PLT-669 onset, which a polarity reversal resets), by their contact's slab age at its onset
+  (`onset_slab`), and the ocean-ocean front by its contact's age against the overriding floor's age at the front
+  (`oo_over_floor`).
 
 Earth: Bird 2003, subduction zones 51,310 km; Stern & Scholl 2010, intra-oceanic arcs 14,500 km and continental arcs
 27,500; Clift et al. 2009's Table 1, 40,225 km, of it 13,550 intra-oceanic by the crust-budget lane's split.
@@ -37,7 +37,6 @@ SHARE = ["0-1%", "1-5%", "5-15%", "15-30%", "30-50%", ">50%"]
 NORMAL = ["0-5", "5-10", "10-20", "20-40", "40-80", ">80"]
 COAST = ["0-150", "150-300", "300-600", "600-1200", "1200-2400", ">2400/none"]
 PAIR = ["initiation", "rift", "other"]
-OCEAN = ["<500", "500-1500", "1500-3000", ">3000/none"]
 
 
 def runs_of(folder):
@@ -81,19 +80,17 @@ def one(run, t_from):
                 for i, lab in enumerate(labels):
                     add(f"{key}_{lab}", row[i])
         # The trace's fields (the intra-oceanic fronts diagnosis, 2026-10-31; absent from older records): the
-        # subducting fronts by their arc's age and with no arc onset, by their contact's slab age at the onset, and
-        # the ocean-ocean front by the ocean left on the subducting side against its contact's and its arc's age,
-        # and by its contact's age against the overriding floor's age at the front.
+        # subducting fronts by their arc's age and by their contact's slab age at the onset, and the ocean-ocean front
+        # by its contact's age against the overriding floor's age at the front. (The trace oo-trace, key 28820e933ba1,
+        # also wrote no_arc, always 0, and oo_age_ocean and oo_arc_ocean, the ocean left from the subducting side's
+        # lattice neighbour, which is mostly a sample gone under and so mostly read "none"; both dropped.)
         for key in ("arc_age", "onset_slab"):
             rows = fb.get(key)
             if rows:
                 for i, lab in enumerate(AGE):
                     add(f"oo_{key}_{lab}", rows[0][i])
                     add(f"oc_{key}_{lab}", rows[1][i])
-        if fb.get("no_arc"):
-            add("oo_no_arc", fb["no_arc"][0])
-            add("oc_no_arc", fb["no_arc"][1])
-        for key, labels in (("oo_age_ocean", OCEAN), ("oo_arc_ocean", OCEAN), ("oo_over_floor", AGE)):
+        for key, labels in (("oo_over_floor", AGE),):
             m = fb.get(key)
             if m:
                 for i, row_lab in enumerate(labels):

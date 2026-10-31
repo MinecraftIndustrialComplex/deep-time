@@ -15,7 +15,9 @@ the strip the youngest floor lies. A strip that is youngest at the front grew at
 the continent opened behind the arc (a back-arc basin); one about as old throughout is ocean the trench was set in.
 Behind the arc, for every ocean-ocean front sample: the floor's age at the first oceanic sample 200 to 600 km along
 the same great circle, whatever plate holds it but the one going under (as earth_fronts.py reads Seton et al. 2020's
-floor behind Earth's fronts; young floor there is a back-arc basin's). Of the walks that leave the plate first it prints the distance, whether the plate met is the one going under, and
+floor behind Earth's fronts; young floor there is a back-arc basin's), and the distance along it, every 20 km to
+2,400 km, to the first continental crust of any plate but the one going under (earth_fronts.py's distance bands,
+which read no plate outlines either). Of the walks that leave the plate first it prints the distance, whether the plate met is the one going under, and
 the floor's age on both sides of that edge (young floor on both is a ridge: the overriding plate is a strip between
 its trench and a ridge).
 Shares of the ocean-ocean front, pooled over the snapshots and runs (each front sample one lattice spacing).
@@ -87,6 +89,19 @@ def snapshot(run, t):
         if norm == 0.0:
             continue
         n /= norm
+        # Along the normal, any plate but the subducting one: the first continental crust, as earth_fronts.py reads
+        # CRUST1.0 behind Earth's fronts (every 20 km to 2,400 km).
+        first = None
+        for dist in np.arange(20.0, 2400.0 + 10.0, 20.0):
+            ang = dist / R_KM
+            _, k = tree.query(p[i] * np.cos(ang) + n * np.sin(ang))
+            if cont[k] and plate[k] != plate[other[0]]:
+                first = dist
+                break
+        band = "none" if first is None else next(
+            f"{lo:.0f}-{hi:.0f}" for lo, hi in ((0, 200), (200, 300), (300, 600), (600, 1200), (1200, 2400))
+            if lo < first <= hi)
+        rec[f"normal_first_{band}"] = rec.get(f"normal_first_{band}", 0.0) + 1.0
         # Behind the arc: the first oceanic floor 200 to 600 km out, on any plate but the subducting one.
         behind = None
         for dist in np.arange(200.0, 600.0 + STEP_KM / 2, STEP_KM):
