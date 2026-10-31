@@ -236,8 +236,8 @@ balance closes them.
 Unit tests: `surface::closed` (an arid basin is closed and passes no water; a humid one spills less its lake's
 evaporation, the share against an independent count; passing everything is the plain accumulation to the bit) and
 `surface::plateau_check::an_arid_plateau_behind_its_rim_keeps_its_rock` (the table above). Gate on the branch (VM,
-`tools/review/plateau/gate.sh`): fmt and clippy clean, the lane's 41 tests pass; the full deeptime-core suite in the
-build log.
+`tools/review/plateau/gate.sh full`, on c4fd3e38): fmt and clippy (workspace, all targets) clean, deeptime-core 1,150
+passed and 12 ignored, its integration tests passed.
 
 **The arm (one cumulative 8-run arm; to be queued by the coordinator).** On base35-s4 (the next 24-run base, after
 `collision-orogen-on` lands, so with the two orogen switches on by default): merge `origin/master` into this branch,
@@ -247,7 +247,7 @@ then from it
     tools/review/pool/pool.sh table --base base35-s4 --arm plat-cb
 
 and `tools/review/plateau/wear.sh platcb=<its folder> base35=<base35's folder>` with `tools/review/orogen/hiseries.py`
-over both. If it is wanted before base35: from this branch as it is (key ac166ca7c665 at c4fd3e38, the orogen switches
+over both. If it is wanted before base35: from this branch as it is (key e751b2344693 at d8cdbea2, the orogen switches
 off by default), `pool.sh run plat-cb0 --seeds 1,2,3,4 --set tectonics.collision_two_wedges=true --set
 tectonics.collision_retro_plateau=true --set surface.closed_basins=true` with the same two environment words, against
 orog-cum (the switch off is orog-cum's physics: `pool.sh alias HEAD f2d6412d801f --check-seed 1` first, which runs one

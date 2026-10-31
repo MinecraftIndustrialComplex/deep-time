@@ -152,6 +152,46 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 
 ## Build log
 
+### 2026-10-31: What wears the plateaus, measured on cached runs; lakes that pass on what their water balance leaves, built and off (`surface.closed_basins`, ERO-217 to ERO-220) (the plateau lane, worktree agent-a4e92fd13092b08b0, branch `plateau-drainage` on origin/collision-orogen 0e8a5ac9; not merged)
+
+- **Why.** The orogen lane's O4 (docs/design/collision-orogen.md): Tibet-class high ground forms and is gone 100 Myr
+  later, its flat top wearing at 109 to 129 m/Myr though arid or polar; the follow-up "High plateaus still wear too
+  fast" (κ alone and S_c's scale already tried). Design: docs/design/plateau-drainage.md; science page:
+  erosion-and-sediment.md "Internally drained basins".
+- **Measured, no simulation** (`tools/review/plateau/`: bands.py, cohort.py, climate.py, closed.py, wear.sh, gate.sh;
+  VM, `tools/remote/mac.sh -- tools/remote/detach.sh start plateau-wear --kind light bash tools/review/plateau/wear.sh
+  orogcum=<folder> base34=<folder>`; outputs in /data/ban/deeptime-runs/plateau/) on base34 (122e4803cded/cd665cef, 24
+  runs) and orog-cum (f2d6412d801f/d3261b0a, 8). The flat high ground's gross lowering: stream power without the cut
+  0.37, the critical slope's cut 0.32 to 0.34, diffusion 0.21 to 0.24, ice 0.06 to 0.07 (net 137.8 and 134.3 m/Myr).
+  "Flat" is classed at the step's start, so its cut follows the receiver's lowering in the same solve: stream power
+  through the plateau's drainage, with the cut it drives, is 0.69 to 0.71 of the wear. Below 0 °C without ice: 0.004
+  and 0.029 of it (the cold part is under the climate's ice). 0.34 and 0.54 of it drains into a depression at a run's
+  end, all of which spill (ERO-080). After its collision a plateau's crust goes 0.57 (above 3 km) to 0.69 (above 4 km)
+  to the plates' collapse and flow (in proportion, read from the maps' rock pools), 0.31 to 0.43 to the surface's top.
+  The plateaus' own wear is 1 to 2 % of the land's mean lowering (40.1 and 37.1 m/Myr; 3.86 and 3.03 km³/yr to the sea,
+  Earth-normalized): not the continent-wide excess the crust-budget lane found.
+- **Sources** (one Sonnet research sub-agent; what each read is in bibliography.md): full texts of Garcia-Castellanos
+  2006 and 2007 (a lake's outflow and the closed-lake balance), Strecker et al. 2009, Bookhagen & Strecker 2012, Hetzel
+  et al. 2011, Wang et al. 2020 and Strobl et al. 2012 (the accepted manuscript); Langbein 1961 pp. 3-6, 12-13 and Table
+  1; Blodgett et al. 1997 (an archived preprint) sections 1.2, 3.1 to 3.3; Garcia-Castellanos et al. 2003 in parts;
+  Sobel et al. 2003, Lal et al. 2003 and Richardson et al. 2019 abstracts only.
+- **Built** (behind `surface.closed_basins`, off; c4fd3e38, d8cdbea2): the stream power's drainage area leaves each
+  lake's exit at the share of its inflow its balance lets out (Garcia-Castellanos 2006, eq. 2; ERO-218), none from a lake
+  that cannot fill to its spill (ERO-217); the balance is the flexure's (ISO-126) on the bake's budget. `lakes.rs`
+  records each lake's outflow, `routing::accumulate_passing`, `surface/closed.rs`; the erosion bands split the flat high
+  ground by closed, dry and frozen water (`flatc`, `flatd`, `flatf`) and the surface line counts the closed lakes
+  (ERO-220, measurement only). Tests: three in `surface::closed`, and the controlled plateau (ERO-219: an arid interior
+  behind its rim 3.8 m/Myr spilling, 0.5 closed; the flank 121.2 and 111.7; a humid interior 129.9 and 134.7). Gate
+  (VM, `gate.sh full` on c4fd3e38): fmt and clippy clean, deeptime-core 1,150 passed, 12 ignored.
+- **Ledger**: ERO-217 and ERO-218 `verified`, ERO-219 and ERO-220 `game-choice`; claims.md recounted (ERO 198 rows; PLT
+  375, the orogen lane's PLT-740 counted). Bibliography: Sobel2003, Strecker2009 and BookhagenStrecker2012 completed;
+  ten new entries.
+- **Next.** The coordinator's: one cumulative 8-run arm when a slot frees. On base35-s4 (after collision-orogen-on
+  lands): merge origin/master into this branch, then `tools/review/pool/pool.sh run plat-cb --seeds 1,2,3,4 --set
+  surface.closed_basins=true +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`, `pool.sh table --base
+  base35-s4 --arm plat-cb`, and wear.sh and hiseries.py over both. Before base35: key e751b2344693 (d8cdbea2) with the
+  two orogen `--set`s against orog-cum, after `pool.sh alias HEAD f2d6412d801f --check-seed 1`.
+
 ### 2026-10-31: the collision orogen as a doubly vergent wedge, measured on the freeboard; the plateau's retro-ward growth behind a switch (PLT-740) (the orogen lane, worktree agent-a52784a4e4ef20e33, branch `collision-orogen`)
 
 - **Why.** Ben's order "Freeboard, then orogen (Recommended)" (decisions log 2026-10-30); the audit
