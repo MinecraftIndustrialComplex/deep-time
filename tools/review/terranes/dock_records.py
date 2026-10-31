@@ -21,6 +21,10 @@ Over each run after its first 100 Myr (the pool's measures' window), every colli
   (`peak_uplift_m`: the front's largest uplift of each step summed; partings: `peak_height_m`, the belt's
   highest mean height), the belt's footprint, and how the hand-off ended (stalled, sutured, transference:
   a continent that did not suture).
+With `tectonics.terrane_docking_cover` (PLT-760): per class, the states that stripped crust
+(`stripped_km2_m` > 0: their terrane went down with its slab for at least one step) per 100 Myr and
+their stripped crust (km2 x m, quartiles); per run, the crust stripped over the whole run (cb_globals
+`stripped`, km3) and its rate (km3 a year).
 Quartiles are p25 / p50 / p75 over the pooled states; counts are medians over runs.
 """
 import json
@@ -79,7 +83,7 @@ def one(run):
             "stalled": bool(c.get("stalled")), "sutured": bool(c.get("sutured")),
             "transf": bool(c["frac"] >= 0.1 and not c.get("sutured")),
             "conv_end": c.get("convergence_mm_yr"), "conv_on": c.get("onset_convergence_mm_yr"),
-            "pair": (c["under"], c["over"]),
+            "pair": (c["under"], c["over"]), "stripped": float(c.get("stripped_km2_m") or 0.0),
         })
     for p in parts:
         a = float(p.get("area_km2") or 0.0)
@@ -88,8 +92,11 @@ def one(run):
             "short": p["shortening_km"], "front": p["front_km"], "area": a, "terr": None,
             "share_x": None, "vol": a * h_km * kept, "uplift": p.get("peak_height_m"),
             "stacked": p.get("stacked_km2_m"), "pair": (p["under"], p["over"]),
+            "stripped": float(p.get("stripped_km2_m") or 0.0),
         })
-    return {"run": run.name, "span": span, "h_km": h_km, "kept": kept, "rows": rows}
+    run_myr = max(t_end - rec["t0_myr"], 1e-9)
+    return {"run": run.name, "span": span, "h_km": h_km, "kept": kept, "rows": rows,
+            "stripped_km3": g.get("stripped", 0.0), "stripped_km3_yr": g.get("stripped", 0.0) / (run_myr * 1e6)}
 
 
 def table(runs):
@@ -116,6 +123,10 @@ def table(runs):
             "crossed_km2": q([x["area"] for x in xs]),
             "kept_km3": q([x["vol"] for x in xs]),
             "uplift_m": q([x["uplift"] for x in xs]),
+            "stripped_per100_median": float(np.median([
+                100.0 * sum(1 for x in r["rows"] if x["cls"] == cls and x["stripped"] > 0) / r["span"]
+                for r in runs])),
+            "stripped_km2_m": q([x["stripped"] for x in xs if x["stripped"] > 0]),
         }
         if not cls.startswith("part_"):
             o.update({
@@ -152,6 +163,8 @@ def table(runs):
     out["handoffs_per_pair"] = q(reps)
     out["h_km_median"] = float(np.median([r["h_km"] for r in runs]))
     out["kept_share_median"] = float(np.median([r["kept"] for r in runs]))
+    out["stripped_km3"] = q([r["stripped_km3"] for r in runs])
+    out["stripped_km3_yr"] = q([r["stripped_km3_yr"] for r in runs])
     return out
 
 
