@@ -869,8 +869,12 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // PLT-585 off and suction saturating): 1, 3, 6, 11, 18, 20 to 22 and 24, seed 4 no more, so
     // seed 1; from the supercontinent 8, 11, 14, 15, 19 and 22, seed 8 three times; 4 of seeds 1
     // to 24 with the interior as a 2-D sheet on by default, PLT-733, the same day: 8, 19, 21 and
-    // 23, seed 1 no more, so seed 8; from the supercontinent 6, 8, 10, 13 and 17 to 20).
-    let mut p = preset(8000, 300.0, "scattered_continents", 8);
+    // 23, seed 1 no more, so seed 8; from the supercontinent 6, 8, 10, 13 and 17 to 20; 14 of
+    // seeds 1 to 24 with sediment subduction by margin type and the margin's sediment continental
+    // on by default, PLT-660 to PLT-662, 2026-10-31: 1 to 4, 6, 11, 12, 15, 16, 18, 20 to 22 and
+    // 24, seed 8 no more, so seed 1; from the supercontinent 1, 4, 6, 8, 10, 12, 14, 18, 20, 22
+    // and 24).
+    let mut p = preset(8000, 300.0, "scattered_continents", 1);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: under Forsyth & Uyeda's
     // balance on this small planet, whose ridge push is several times Earth's
     // (`plates_quick_16k`, ridge -1,000 m, floor -10,000 m), the speed guard bound on every
@@ -1064,8 +1068,11 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // guard binding on none but 20, seed 3 the first after seed 1; seed 19 since the interior as
     // a 2-D sheet went on by default, PLT-733, the same day, when seed 3 no longer welds: the
     // sweep's welding seeds 8, 19, 21 and 23, the guard binding on none, seed 19 the first after
-    // seed 8).
-    let mut p = preset(8000, 300.0, "scattered_continents", 19);
+    // seed 8; seed 2 since sediment subduction by margin type and the margin's sediment
+    // continental went on by default, PLT-660 to PLT-662, 2026-10-31, when seed 19 no longer
+    // welds: the sweep's welding seeds 1 to 4, 6, 11, 12, 15, 16, 18, 20 to 22 and 24, the guard
+    // binding on none, seed 2 the first after seed 1).
+    let mut p = preset(8000, 300.0, "scattered_continents", 2);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: the guard asserted below
     // bound under Forsyth & Uyeda's balance on every welding seed of 1 to 24 of this small planet
     // but supercontinent 11, whose ridge push is several times Earth's (`plates_quick_16k`, ridge
@@ -5260,6 +5267,8 @@ fn an_eroding_margin_retreats_at_scholl_and_von_huenes_rate() {
 #[test]
 fn a_resampling_subducts_its_share_of_the_slabs_sediment() {
     let mut p = preset(20_000, 20.0, "supercontinent", 5);
+    // PLT-440's flat share (PLT-660's shares by margin type replace it when on).
+    p.tectonics.sediment_subduction_sourced = false;
     let stage = PlatesStage::new(p.clone());
     let (mut st, geo, pos) = two_plates(&p, &stage.env(&p.tectonics, 1), 0.1);
     for s in st.samples.iter_mut().filter(|s| s.is_hidden()) {

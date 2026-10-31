@@ -110,7 +110,7 @@
 //! (−W/2 < d < 0, T* from 20 km to 7 km, β from 1.65 to 4.7) is where Earth's rifted margins
 //! have their necking and hyper-extended domains: continental crust thinned to under 10 km over
 //! 70 to 200 km (Brune et al. 2014). The plate model labels it ocean floor. With
-//! `margin_sediment_continental` (off by default) a sample there that holds rock from the
+//! `margin_sediment_continental` (on by default since 2026-10-31) a sample there that holds rock from the
 //! continents, sediment and sedimentary rock beyond the open ocean's pile for the floor's age
 //! and latitude (GlobSed's eq. 2a less its pore water, `surface::pelagic::open_floor_solid_m`;
 //! the surface's pelagic rain lies under it, and what is beyond came down from the land), becomes
@@ -1069,6 +1069,7 @@ mod tests {
         let base = Fx::new(MODEL_KM).k;
         let k = TectonicParams {
             transition_ocean_crust: true,
+            margin_sediment_continental: false,
             ..base
         };
         let on = Fx::with(TectonicParams {
