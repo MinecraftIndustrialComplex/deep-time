@@ -13,7 +13,9 @@ For each front sample it reads the subducting plate at the map's time:
   the distance from the front sample to the plate's nearest floor within 5 Myr of the planet's youngest floor (its
   spreading ridge's flank: new floor is made only at resamplings, so between them the youngest floor ages; great
   circle, Earth-normalized km; none when the plate has no floor that young: no ridge spread on it at the last
-  resampling), and the plate's own youngest floor's age over the planet's (its ridge's age); and the spreading rate that
+  resampling), the plate across that ridge (the overriding plate itself: the pair spreads along one stretch of its
+  boundary and converges along another; another plate; within 1,000 km), and the plate's own youngest floor's age over
+  the planet's (its ridge's age); and the spreading rate that
   distance implies with the floor's age at the front (km / Myr = mm/yr, a half rate: the floor's age over its path
   from the ridge, where the plate's ridge has not moved);
 
@@ -95,12 +97,18 @@ def snapshot(run, t, lives, onsets=None, by_pair=None):
                         float((plate == u).sum()) / len(a),
                         float(ages.min()) - youngest if len(ages) else np.nan)
             young = np.nonzero(m & (age < youngest + RIDGE_MYR))[0]
-            ridges[u] = cKDTree(p[young]) if len(young) else None
+            ridges[u] = (cKDTree(p[young]), young) if len(young) else None
         p50, p90, share, own_young = stats[u]
         ridge_km = np.inf
+        partner = "none"
         if ridges[u] is not None:
-            dd, _ = ridges[u].query(p[i])
+            dd, kk = ridges[u][0].query(p[i])
             ridge_km = oofronts.arc_km(dd)
+            # The plate across that ridge: the nearest sample of another plate to the ridge sample.
+            r = ridges[u][1][kk]
+            _, ks2 = all_tree.query(p[r], k=12)
+            across = [int(plate[k2]) for k2 in np.atleast_1d(ks2) if plate[k2] != u]
+            partner = "none" if not across else ("overriding" if across[0] == q else "other")
         slab_age = float(age[k])
         life = lives.get(u, {})
         contact_age, first_floor = np.nan, np.nan
@@ -121,6 +129,7 @@ def snapshot(run, t, lives, onsets=None, by_pair=None):
             "plate_share": share,
             "own_young": own_young,
             "ridge_km": ridge_km,
+            "partner": partner,
             "rate": ridge_km / slab_age if np.isfinite(ridge_km) and slab_age > 0 else np.inf,
         })
     return out, spacing
@@ -173,6 +182,13 @@ def main(argv):
                 order = [band_name(edges, e) for e in edges] + ["none"]
                 print(f"    {title:28s} " + "  ".join(f"{b} {acc.get(b, 0.0) / max(tot, 1e-9):.3f}"
                                                      for b in order if b in acc))
+            acc = {}
+            for x in sel:
+                if x["ridge_km"] < 1000.0:
+                    acc[x["partner"]] = acc.get(x["partner"], 0.0) + x["km"]
+            near = sum(acc.values())
+            print(f"    {'across the ridge (<1000 km)':28s} " + "  ".join(
+                f"{k} {acc.get(k, 0.0) / max(near, 1e-9):.3f}" for k in ("overriding", "other", "none")))
             acc = {}
             for x in sel:
                 acc[x["origin"]] = acc.get(x["origin"], 0.0) + x["km"]
