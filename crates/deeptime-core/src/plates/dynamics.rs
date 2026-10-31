@@ -194,8 +194,9 @@ pub struct Dynamics {
     pub prov: Vec<u8>,
     /// Measurement only (the overlap trace, 2026-10-31): the contacts begun this step, their
     /// plates' motion across their overlaps ([`onset_overlaps`], set after `subduction::resolve`);
-    /// the step's record reads and empties it, so no state or record keeps one.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// the step's record reads and empties it, so it is empty whenever a state or record is
+    /// written, and neither carries it.
+    #[serde(skip)]
     pub onset_overlap: Vec<OnsetOverlap>,
 }
 
@@ -2839,11 +2840,17 @@ mod tests {
         // Plate lo moving east into plate hi at 30 mm/yr converges; north, it slides past; west,
         // it parts.
         let (k, conv) = overlap_class(30.0 * east, n);
-        assert!(k == OVERLAP_CONVERGING && (conv - 30.0).abs() < 0.1, "{k} {conv}");
+        assert!(
+            k == OVERLAP_CONVERGING && (conv - 30.0).abs() < 0.1,
+            "{k} {conv}"
+        );
         let (k, conv) = overlap_class(30.0 * north, n);
         assert!(k == OVERLAP_TRANSFORM && conv.abs() < 0.1, "{k} {conv}");
         let (k, conv) = overlap_class(-30.0 * east, n);
-        assert!(k == OVERLAP_PARTING && (conv + 30.0).abs() < 0.1, "{k} {conv}");
+        assert!(
+            k == OVERLAP_PARTING && (conv + 30.0).abs() < 0.1,
+            "{k} {conv}"
+        );
         // 30 degrees off the boundary converges, 10 degrees off is a transform; plates at rest
         // are a transform by the same test.
         let off = |deg: f64| {
@@ -2868,7 +2875,15 @@ mod tests {
         acc.add(on_sphere(0.0, -1.0), n, 30.0 * north);
         let r = acc.finish(|_| 30.0 * east);
         assert_eq!(
-            (r.lo, r.hi, r.n, r.converging, r.transform, r.parting, r.no_normal),
+            (
+                r.lo,
+                r.hi,
+                r.n,
+                r.converging,
+                r.transform,
+                r.parting,
+                r.no_normal
+            ),
             (1, 2, 5, 3, 1, 0, 1)
         );
         assert!((r.conv_mm_yr - 22.5).abs() < 0.1, "{}", r.conv_mm_yr);

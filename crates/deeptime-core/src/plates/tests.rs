@@ -338,7 +338,11 @@ fn onsets_carry_their_plates_motion_across_the_overlap() {
     assert!(read > 0, "no onset of {} with its overlap", d.onsets.len());
     for o in &d.onsets {
         let v = &o.overlap;
-        assert_eq!(v.converging + v.transform + v.parting + v.no_normal, v.n, "{v:?}");
+        assert_eq!(
+            v.converging + v.transform + v.parting + v.no_normal,
+            v.n,
+            "{v:?}"
+        );
         if v.n > 0 {
             assert_eq!((v.lo, v.hi), (o.under.min(o.over), o.under.max(o.over)));
             assert!(v.n >= subduction::MIN_CONTACT, "{v:?}");
