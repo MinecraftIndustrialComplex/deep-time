@@ -7984,3 +7984,95 @@ fn a_sourced_plume_head_erupts_a_recorded_province() {
         assert!(ridges::hot_mantle_at(&hot, at, env.t_myr + 21.0).is_none());
     }
 }
+
+/// The lid's constants against their sources (PLT-805 to PLT-808): Katz et al. 2003's solidus met
+/// by a 0.3 °C/km adiabat at 30 km per GPa begins melting at 56 km for 1300 °C and 120 km for
+/// 1500 °C (Fitton et al. 2020: no melt "when lithosphere thickness exceeds 57 km" at 1300 °C,
+/// "∼120 km" at 1500 °C), at 139 km for Hawaii's 1550 °C (Herzberg et al. 2007); the tail's melt
+/// is Hawaii's under Hawaii's plate (90 km, its 72 km mechanical boundary layer, Humphreys & Niu
+/// 2009, White & McKenzie 1989's 18 km), none under a craton's 200 km keel (Manglik & Christensen
+/// 2006: no melting "beneath the cratonic root"), more under the 60 km a plume heats a keel-less
+/// continent to, and Hawaii's where there is no thermal state.
+#[test]
+fn the_lid_constants_are_their_sources() {
+    use super::hotspots::sourced as src;
+    let z1300 = src::melt_onset_km(1300.0);
+    let z1500 = src::melt_onset_km(1500.0);
+    assert!((z1300 - 57.0).abs() < 1.5, "{z1300} km");
+    assert!((z1500 - 120.0).abs() < 2.0, "{z1500} km");
+    let z0 = src::melt_onset_km(src::PLUME_TP_C);
+    assert!((z0 - 138.9).abs() < 0.05, "{z0} km");
+    assert!((src::lid_factor(src::HAWAII_MBL_KM + src::PLATE_LESS_MBL_KM) - 1.0).abs() < 1e-12);
+    assert!((src::lid_factor(90.0) - 1.0).abs() < 1e-12);
+    assert_eq!(src::lid_factor(200.0), 0.0);
+    assert_eq!(src::lid_factor(z0 + src::PLATE_LESS_MBL_KM), 0.0);
+    assert!((src::lid_factor(60.0) - (z0 - 42.0) / (z0 - 72.0)).abs() < 1e-12);
+    assert!(src::lid_factor(60.0) > 1.4 && src::lid_factor(60.0) < 1.5);
+    assert!(
+        (src::lid_factor(10.0) - z0 / (z0 - 72.0)).abs() < 1e-12,
+        "no lid above the ridge"
+    );
+    assert_eq!(src::lid_factor(0.0), 1.0, "no thermal state");
+}
+
+/// The lid (PLT-805): with `hotspots_sourced`, the tails' magma is Hawaii's per unit of flux times
+/// the lid's share under the columns they melt into: the same under Hawaii's 90 km plate as with no
+/// thermal state, f(60) times it under a keel-less continent's 60 km, f(115) under 115 km, none
+/// under a craton's 200 km. Without the switch a sourced tail makes Sleep's 4 m³/s under any lid.
+#[test]
+fn a_tail_melts_less_under_a_thicker_lid() {
+    use super::hotspots::sourced as src;
+    let mut p = preset(6000, 20.0, "supercontinent", 3);
+    p.tectonics.hotspots_sourced = true;
+    // No plume heads: a head's province is the record's, not the lid's.
+    p.tectonics.lip_probability = 0.0;
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (mut st, geo) = init::initial_state(&p, &env).unwrap();
+    st.hotspots.clear();
+    let pos = geometry::positions(&st, &geo);
+    let tree = Tree::over(&pos, |_| true);
+    let n = st.samples.len();
+    st.hotspots.push(state::Hotspot {
+        id: 0,
+        pos: pos[0].to_array(),
+        born_myr: env.t_myr - 1.0,
+        dies_myr: env.t_myr + 100.0,
+        uplift_mm_yr: 0.3,
+        lip_event: None,
+        plates: Vec::new(),
+        track_km: 0.0,
+        closed: false,
+        flux_mg_s: 8.7,
+        magma_km3_yr: 8.7 * src::MAGMA_KM3_YR_PER_MG_S,
+        head_radius_km: 0.0,
+        cones: Default::default(),
+    });
+    // Every column under the same lid: the step's births (the same in every run, from the same
+    // generator) melt under it too, so the magma scales by the lid's share whatever they are.
+    let run = |l_km: f32, env: &Env| {
+        let mut s2 = st.clone();
+        for s in &mut s2.samples {
+            s.lithosphere_km = l_km;
+        }
+        let mut world = WorldState::new(1, 16_384, p.t_start_years());
+        let mut cones = vec![[0.0, 0.0]; n];
+        hotspots::step(&mut s2, &mut world, &pos, &tree, env, &mut cones).unwrap();
+        world.globals[hotspots::MAGMA_GLOBAL]
+    };
+    let hawaii = run(90.0, &env);
+    assert!(hawaii > 0.0);
+    let close = |a: f64, b: f64| (a - b).abs() < 1e-9 * b.abs().max(1e-12);
+    assert!(close(run(0.0, &env), hawaii), "no thermal state: Hawaii's");
+    assert!(close(run(60.0, &env), src::lid_factor(60.0) * hawaii));
+    assert!(close(run(115.0, &env), src::lid_factor(115.0) * hawaii));
+    assert_eq!(run(200.0, &env), 0.0, "a craton's keel melts nothing");
+    // Without the switch (no births either): Sleep's 4 m³/s under the craton.
+    let mut off = p.clone();
+    off.tectonics.hotspots_sourced = false;
+    off.tectonics.hotspot_births_per_100myr = 0.0;
+    let env_off = stage.env(&off.tectonics, 1);
+    let want = 4.0 * 3.155_76e7 / 1.0e9 * env_off.dt_yr;
+    let got = run(200.0, &env_off);
+    assert!((got - want).abs() < 1e-9 * want, "{got} km³ against {want}");
+}

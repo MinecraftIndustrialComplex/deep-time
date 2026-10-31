@@ -202,7 +202,14 @@ pub fn step(
                 0.0
             };
             for l in &mut lifts {
-                l.2 = rock_m * l.1 / sum_w.max(1e-300);
+                // With `hotspots_sourced`, the lid: the melt per unit of flux under each column's
+                // lithosphere as a share of Hawaii's (ledger: PLT-805).
+                let lid = if k.hotspots_sourced {
+                    sourced::lid_factor(f64::from(state.samples[l.0].lithosphere_km))
+                } else {
+                    1.0
+                };
+                l.2 = rock_m * l.1 * lid / sum_w.max(1e-300);
             }
         }
         // The cones the volcano stage built over the hotspot (its shields and silicic centres,
@@ -692,4 +699,64 @@ pub mod sourced {
     /// (1995, abstract), the US East Coast's "only for about 80–100 km seaward" (the middle of
     /// the range).
     pub const MARGIN_WIDTH_KM: f64 = 90.0; // ledger: PLT-802
+
+    // The lid (docs/design/hotspot-lid.md; the sources in bibliography.md "The sources of the
+    // hotspot lane's lid").
+
+    /// A tail's plume's potential temperature, °C: Hawaii's, "Our calculated potential
+    /// temperature below Hawaii is ∼1550°C" (Herzberg et al. 2007, para. 68, full text); Watson
+    /// & McKenzie (1991, abstract): "a central potential temperature of 1558 °C". Applied to
+    /// every tail. ledger: PLT-806
+    pub const PLUME_TP_C: f64 = 1550.0;
+    /// The anhydrous peridotite solidus, T = A1 + A2 P + A3 P² (°C, P in GPa): Katz, Spiegelman &
+    /// Langmuir (2003, eq. 4 and Table 2, full text): 1085.7 °C, 132.9 °C/GPa, −5.1 °C/GPa².
+    /// ledger: PLT-808
+    pub const SOLIDUS_C: [f64; 3] = [1085.7, 132.9, -5.1];
+    /// The plume's adiabat, °C per km (Fitton et al. 2020's melting model, read through the
+    /// fetch tool's summary), and depth per pressure, km per GPa (Korenaga, Kelemen & Holbrook
+    /// 2002: P_f = (H + b) / 30, full text). ledger: PLT-808
+    pub const ADIABAT_C_PER_KM: f64 = 0.3;
+    pub const KM_PER_GPA: f64 = 30.0;
+    /// The mechanical boundary layer under the thermal lithosphere's base, km: White & McKenzie
+    /// (1989, Fig. 3 caption, full text): "mechanical boundary layer thicknesses of 70, 100, and
+    /// 130 km correspond to plate thicknesses of 87, 118, and 149 km" (17, 18, 19 km). ledger:
+    /// PLT-807
+    pub const PLATE_LESS_MBL_KM: f64 = 18.0;
+    /// Hawaii's mechanical boundary layer, km, the lid Sleep's magma per flux (PLT-793) melts
+    /// under: its plate "≥90 km thick" (Humphreys & Niu 2009, full text) less
+    /// [`PLATE_LESS_MBL_KM`]; Watson & McKenzie (1991, abstract): "the mechanical boundary layer
+    /// is 72 km thick". ledger: PLT-807
+    pub const HAWAII_MBL_KM: f64 = 72.0;
+
+    /// The depth where a plume `tp_c` hot begins to melt, km: where its adiabat crosses the
+    /// solidus (the agent's construction from PLT-808; 56 km at 1300 °C and 120 km at 1500 °C,
+    /// Fitton et al.'s 57 and ∼120). ledger: PLT-808
+    pub fn melt_onset_km(tp_c: f64) -> f64 {
+        let [a1, a2, a3] = SOLIDUS_C;
+        // T_p + g z = a1 + a2 P + a3 P², z = k P: a3 P² + (a2 − g k) P + (a1 − T_p) = 0.
+        let b = a2 - ADIABAT_C_PER_KM * KM_PER_GPA;
+        let c = a1 - tp_c;
+        let disc = b * b - 4.0 * a3 * c;
+        if disc < 0.0 {
+            return f64::INFINITY;
+        }
+        // The shallower root (a3 < 0: the solidus bends over at depth).
+        let p = (-b + disc.sqrt()) / (2.0 * a3);
+        (p * KM_PER_GPA).max(0.0)
+    }
+
+    /// A tail's melt per unit of flux under a thermal lithosphere `l_km` deep, as a share of
+    /// Hawaii's (PLT-793's): the interval it rises through above the solidus to its lid, the
+    /// mechanical boundary layer (L − [`PLATE_LESS_MBL_KM`], at least 0), over Hawaii's (Fitton et
+    /// al.'s F_max at the lid's base; Niu 2021's linear scaling of the melting interval): 1 under
+    /// Hawaii's lid, 0 under a lid at or below the onset (a craton's keel). 1 with no thermal
+    /// state (`l_km` 0 or less). ledger: PLT-805
+    pub fn lid_factor(l_km: f64) -> f64 {
+        if l_km.is_nan() || l_km <= 0.0 {
+            return 1.0;
+        }
+        let z0 = melt_onset_km(PLUME_TP_C);
+        let lid = (l_km - PLATE_LESS_MBL_KM).max(0.0);
+        ((z0 - lid) / (z0 - HAWAII_MBL_KM)).max(0.0)
+    }
 }

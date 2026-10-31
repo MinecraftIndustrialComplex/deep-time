@@ -25,6 +25,7 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | the crust budget against Stern & Scholl 2010, row by row: the island law on an intra-oceanic arc's own crust, the additions measured whole, the trench sediment line in place, arc magma at sutures (section "The crust budget against Stern & Scholl 2010, row by row", 2026-10-31; switches, off by default) | PLT-760 to PLT-763 (4) |
 | [PLT](ledger/PLT.md) | hotspots, plume heads and volcanic rifted margins from sources: Sleep's 37 tails, a head every 15 Myr with the record's provinces, the igneous crust at breakup over a head's hot mantle (section "Hotspots, plume heads and volcanic margins from sources", 2026-10-31; switches, off by default) | PLT-790 to PLT-802 (13) |
 | [PLT](ledger/PLT.md) | the cone budget: a hotspot's cones hand the pools at most its tail's lavas, counted by the cone's own hotspot, and the cones' measures (section "Hotspots, plume heads and volcanic margins from sources", subsection "The cone budget", 2026-10-31; on by default since 2026-10-31) | PLT-803 to PLT-804 (2) |
+| [PLT](ledger/PLT.md) | the lid: a plume tail's melt under its lithosphere, from the solidus's crossing to the mechanical boundary layer, Hawaii's per flux times the interval's share (section "Hotspots, plume heads and volcanic margins from sources", subsection "The lid", 2026-10-31; with `hotspots_sourced`, off) | PLT-805 to PLT-808 (4) |
 
 Rows by status (after the ocean–continent transition, 2026-10-04): `verified` 17, `cited-unverified` 46, `from-memory` 4, `abstract-only` 19, `calibrated` 14, `game-choice` 79, `uncited` 42; `pending-rewrite` 151; `not-yet-coded` 8; `merged` (not counted) 33.
 
@@ -13283,3 +13284,21 @@ continents still gain (+0.53 km³ a year, the sea 679 m, the criteria 4.5): the 
 year on continental crust, nearly Stern & Scholl's whole row, because Hawaii's melt per unit of
 flux applies under every lid. The lid (Courtillot et al. 2003: weak plumes "would not melt beneath
 old lithosphere"; White & McKenzie's Fig. 3) is the sourced step before `hotspots_sourced` goes on.
+
+### The lid (PLT-805 to PLT-808; 2026-10-31)
+
+With the cone budget the sourced tails still put 0.43 km³ a year on continental crust (hs-cum2), because
+every tail made Hawaii's magma per unit of flux under any lithosphere. The coordinator's next step: how much
+a tail melts under thick lithosphere, from sources (docs/design/hotspot-lid.md; bibliography.md "The sources
+of the hotspot lane's lid"). The law, with `hotspots_sourced` only (branch `hotspot-lid`): a tail's plume is
+Hawaii's 1550 °C (Herzberg et al. 2007); it begins to melt where its 0.3 °C/km adiabat crosses Katz et al.
+2003's solidus, 138.9 km down (the construction gives Fitton et al. 2020's 57 km at 1300 °C and ∼120 km at
+1500 °C); it melts up to its lid, the mechanical boundary layer 18 km above the thermal lithosphere's base
+(White & McKenzie 1989's caption); its melt per unit of flux is Hawaii's (PLT-793) times the interval over
+Hawaii's (72 km lid; Niu 2021's linear scaling, Fitton et al.'s F_max at the lid's base). So a tail under a
+craton's 200 km keel melts nothing (Manglik & Christensen 2006: none "beneath the cratonic root"), under old
+ocean floor (the model's L 104 to 110 km at 80 to 90 Myr) about 0.75 of Hawaii's, under the 60 km a plume
+heats a keel-less continent to 1.45 times. Against Wang & Li 2021's 3-D models (a 300 °C excess) the law's fall
+from 100 to 160 km of lithosphere is 1, 0.74, 0.48, 0.22 against their 1, 0.71, 0.32, 0.12 (the agent's
+check). Tests: `the_lid_constants_are_their_sources`, `a_tail_melts_less_under_a_thicker_lid`. The arm
+(hs-lid) runs against base35-s4 once it exists.

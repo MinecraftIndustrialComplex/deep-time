@@ -10334,3 +10334,171 @@ named. Copies kept outside the repository only (temporary).
 - Library: not kept.
 - Read so far (by the project): the abstract, 2026-10-31 (the orogen lane, by a Sonnet sub-agent): "observed east-west thinning of the upper crust"; "we report a minimum age of approximately 13.5 Myr for the onset of graben formation in central Tibet"; "Thinning of the upper crust is most plausibly the result of potential-energy increases resulting from spatially and temporally heterogeneous changes in thermal structure and density distribution within the crust and upper mantle beneath Tibet".
 - Reference check: as the agent printed it from the record.
+
+## The sources of the hotspot lane's lid (2026-10-31)
+
+A plume tail's melt under its lithosphere (build log 2026-10-31, "Hotspot lane"; docs/design/hotspot-lid.md;
+ledger PLT-805 to PLT-808). One Sonnet research sub-agent read them; what it printed is below. It fetched the
+mantleplumes.org copies with certificate checking off (the site's chain does not verify), and read some OUP pages
+through the fetch tool's summary rather than their raw text (marked so).
+
+### Notes on entries above (2026-10-31, the hotspot lane's lid)
+
+- WhiteMcKenzie1989, Fig. 3 read again (the page image, pixel-measured by the sub-agent, ±0.4 km): the caption,
+  "Curves are shown for initial thicknesses of the mechanical boundary layer of 70, 100, and 130 km, with thinning by
+  factors of 2, 5, and 50"; "Annotated mechanical boundary layer thicknesses of 70, 100, and 130 km correspond to plate
+  thicknesses of 87, 118, and 149 km, respectively"; no curve for β under 2. At β = 2: 0, 3.6 and 11.6 km of melt at
+  1280, 1380 and 1480 °C under 70 km; 0, 1.0, 7.1 under 100 km; 0, 0, 3.2 under 130 km. p. 7690: "Beneath Archaean
+  shields the lithospheric thickness may reach 200 km or more". Ledger ids: PLT-807.
+- Courtillot2003b, p. 296 read again: "plumes coming from the bottom of the mantle with a buoyancy flux of less than
+  10³ kg s⁻¹ should have cooled so much that they would not melt beneath old lithosphere" (citing Albers &
+  Christensen 1996, not read). Ledger ids: PLT-805, PLT-806 (not modelled).
+- Sleep1990, p. 6719 read again: "The volume flux Qp of the plume is about 300 m³ s⁻¹ ... the flux Qv of magmas
+  implaced in the crust or erupted is about 4 m³ s⁻¹ ... The average fraction of plume material which melts Qv/Qp is
+  about 1/10 that of Iceland. Most of the plume material beneath Hawaii remains at lower lithospheric depths where
+  extensive melting does not occur"; p. 6716, Iceland's "volume flux of magma Qv is 8 m³ s⁻¹" of a 63 m³/s plume.
+  Ledger ids: PLT-805.
+
+### Katz2003
+- Reference: Katz, R. F., Spiegelman, M. & Langmuir, C. H. (2003). A new parameterization of hydrous mantle melting.
+  Geochemistry, Geophysics, Geosystems 4(9):1073.
+- DOI or URL: 10.1029/2002GC000433; open copy at Harvard DASH.
+- Cited as: "Katz, Spiegelman & Langmuir 2003".
+- Ledger ids: PLT-808.
+- Access: open copy.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent; Table 2 from the page image): eq. (4),
+  "T_solidus = A1 + A2 P + A3 P²", pressure in GPa; A1 = 1085.7 °C, A2 = 132.9 °C/GPa, A3 = −5.1 °C/GPa²; the
+  lherzolite liquidus B1 1475.0, B2 80.0, B3 −3.2; ΔS 300 J/kg/K, cP 1000 J/kg/K, ρs 3.30 × 10³, ρf 2.90 × 10³ kg/m³.
+
+### Korenaga2002
+- Reference: Korenaga, J., Kelemen, P. B. & Holbrook, W. S. (2002). Methods for resolving the origin of large igneous
+  provinces from crustal seismology. Journal of Geophysical Research 107(B9):2178.
+- DOI or URL: 10.1029/2001JB001030; open copy at LDEO.
+- Cited as: "Korenaga, Kelemen & Holbrook 2002".
+- Ledger ids: PLT-808.
+- Access: open copy.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent): the solidus "T0 = 1150 + 120 P0",
+  "Tp = T0 − 20 P0", F = (∂F/∂P)S (P0 − P) with 12 %/GPa as the "standard model", the final pressure "Pf = (H +
+  b)/30" (30 km per GPa); "A preexisting lid has similar but larger effects on melting pressure and melt fraction,
+  and a reverse effect on crustal thickness".
+
+### Fitton2020
+- Reference: Fitton, J. G. et al. (2020). Journal of Petrology 61(11-12):egaa111 (the decompression melting model of
+  their paper; title as the sub-agent printed it not recorded).
+- DOI or URL: 10.1093/petrology/egaa111 (open access).
+- Cited as: "Fitton et al. 2020".
+- Ledger ids: PLT-805, PLT-808.
+- Access: open access; read through the fetch tool's summary of the OUP HTML (cited-unverified for exact wording).
+- Library: not kept.
+- Read so far (by the project): 2026-10-31 (the research sub-agent, through the fetch tool): "Increasing lithosphere
+  thickness suppresses melting such that no melt can form in volatile-free mantle with Tp = 1300 °C when lithosphere
+  thickness exceeds 57 km, whereas it would take a lithosphere thickness of ∼120 km to prevent melting of mantle with
+  Tp = 1500 °C"; "Here we use a value of 1·2 % kbar–1 (0·4 % km–1)"; "Fmax is the melting reached at the base of the
+  lithosphere"; the model uses the Katz dry solidus and a 0.3 °C/km adiabat (the sub-agent's summary).
+
+### Herzberg2007
+- Reference: Herzberg, C. et al. (2007). Temperatures in ambient mantle and plumes: constraints from basalts, picrites,
+  and komatiites. Geochemistry, Geophysics, Geosystems 8:Q02006.
+- DOI or URL: 10.1029/2006GC001390; open copy at CaltechAUTHORS.
+- Cited as: "Herzberg et al. 2007".
+- Ledger ids: PLT-806.
+- Access: open copy.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent): para. [67], "ambient mantle
+  temperatures at normal oceanic ridges are 1280-1400°C"; para. [68], "Our calculated potential temperature below
+  Hawaii is ∼1550°C"; para. [69], "present-day Iceland is about 1460°C"; abstract, "thermal anomalies that can be
+  200-300°C above this background".
+
+### HumphreysNiu2009
+- Reference: Humphreys, E. R. & Niu, Y. (2009). On the composition of ocean island basalts (OIB): the effects of
+  lithospheric thickness variation and mantle metasomatism. Lithos 112:118-136.
+- DOI or URL: 10.1016/j.lithos.2009.04.038; a Durham mirror.
+- Cited as: "Humphreys & Niu 2009".
+- Ledger ids: PLT-807.
+- Access: open copy.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent): abstract, "beneath a thin
+  lithosphere, a parcel of mantle rises to a shallow level, and thus melts more by decompression ... beneath a thick
+  lithosphere has restricted amount of upwelling, and thus melts less"; section 3.2, "T = 11 * t^1/2", "a constant
+  thickness of ~ 90 km ... for older lithosphere"; section 4, Hawaiian lavas erupted "on lithosphere of full
+  thickness (>70 Ma, and hence ≥90 km thick)".
+
+### Niu2021
+- Reference: Niu, Y. (2021). Earth-Science Reviews 217:103614 (a review of the lid effect; a published comment by
+  Lustrino et al. disputes it, seen only as a search summary).
+- DOI or URL: 10.1016/j.earscirev.2021.103614.
+- Cited as: "Niu 2021".
+- Ledger ids: PLT-805.
+- Access: open copy (mantleplumes.org).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent): p. 20, "If PO ≈ 100 km, then the
+  decompression melting interval would be PO-PF[Iceland] ≈ 80 km > PO-PF[Hawaii] ≈ 10 km. Hence, the extent of
+  melting beneath the thin lithosphere in Iceland can be up to 8 times greater than that beneath the thick
+  lithosphere in Hawaii (linear scaling is assumed here for conceptual clarity)"; p. 22, plumes "will not melt
+  beneath thickened cratonic lithosphere lid".
+
+### WangLi2021
+- Reference: Wang, (initials not printed) & Li, (initials not printed) (2021). Geophysical Journal International
+  225:906 (3-D plume models with the Katz melting scheme).
+- DOI or URL: an open copy at par.nsf.gov.
+- Cited as: "Wang & Li 2021".
+- Ledger ids: PLT-805 (the check).
+- Access: open copy.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent): Table 2, plume radius 300 km and
+  excess temperature 300 °C, melt production dM/dt 0.41, 0.29, 0.13 and 0.049 km³ a year under lithosphere 100, 120,
+  140 and 160 km thick; at 120 km, excess 200, 250, 300 and 350 °C give 0.0, 0.013, 0.29 and 1.20; "The melt
+  production rate is also sensitive to the lithospheric thickness with an inverse correlation".
+
+### ManglikChristensen2006
+- Reference: Manglik, A. & Christensen, U. R. (2006). Geophysical Journal International 164:259.
+- DOI or URL: the OUP page.
+- Cited as: "Manglik & Christensen 2006".
+- Ledger ids: PLT-805.
+- Access: read through the fetch tool's summary of the OUP page (cited-unverified for exact wording).
+- Library: not kept.
+- Read so far (by the project): 2026-10-31 (the research sub-agent, through the fetch tool): normal lithosphere 48 km,
+  a 300 °C plume anomaly over a 1300 °C mantle; without a root melt production "rises to approximately 0.3 km3 yr−1
+  within 3 Myr"; with a 200 km root, "We do not observe any partial melting beneath the cratonic root because the
+  root is thick enough (200 km)".
+
+### WatsonMcKenzie1991
+- Reference: Watson, S. & McKenzie, D. (1991). Melt generation by plumes: a study of Hawaiian volcanism. Journal of
+  Petrology 32:501-537.
+- Cited as: "Watson & McKenzie 1991".
+- Ledger ids: PLT-806, PLT-807.
+- Access: abstract only (the OUP page through the fetch tool and a search snippet).
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31: "The plume has a central potential temperature of 1558 °C
+  and the mechanical boundary layer is 72 km thick. An average of 6·6% melting occurs in a melt-producing region which
+  has a vertical extent of ∼ 55 km and a radial extent of ∼ 130 km to produce 0·16 km^3/y of melt."
+
+### RibeChristensen1999
+- Reference: Ribe, N. M. & Christensen, U. R. (1999). The dynamical origin of Hawaiian volcanism. Earth and Planetary
+  Science Letters 171:517-531.
+- Cited as: "Ribe & Christensen 1999".
+- Ledger ids: PLT-807.
+- Access: abstract only (OpenAlex).
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31: "Assuming 1500°C<θi<1600°C, the observed values of M, H and
+  W can only be matched if zl≤89 km, 2200 kg s−1 ≤B≤3500 kg s−1, and ηp≥5×10^17 Pa s"; "All the material that melts
+  comes from the hottest central part of the plume". Their scaling law, as Sobolev et al. 2005's supplement prints
+  it, could not be reproduced by the sub-agent.
+
+### McKenzieBickle1990
+- Reference: McKenzie, D. & Bickle, M. J. (1990). Journal of Physics of the Earth 38:511-515 (a note on their 1988
+  parameterization).
+- Cited as: "McKenzie & Bickle 1990".
+- Ledger ids: none (context for McKenzie & Bickle 1988, whose full text was not obtained).
+- Access: full text (J-STAGE).
+- Library: not kept.
+- Read so far (by the project): p. 514, 2026-10-31: "A potential temperature of 1,280°C now generates a total of 8.2 km
+  of melt, compared with 7.0 km before, and 1,480°C produces 27.3 km compared with 26.7 km from the original
+  calculation."
+
+Not obtained: McKenzie & Bickle 1988's full text (solidus, tables), Watson & McKenzie 1991, Ribe & Christensen 1999 and
+Niu et al. 2011 beyond their abstracts, Albers & Christensen 1996, White & McKenzie 1995, Putirka 2005 (abstract only:
+Hawaii 1688 °C, Iceland 1637 °C, ridges 1453 to 1475 °C, a scale higher than Herzberg's), any continental hotspot's melt
+flux with its lid.
