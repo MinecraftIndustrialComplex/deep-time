@@ -7,6 +7,14 @@ built on 2026-10-29 and kept off; this design reads them again on the freeboard 
 Defaults are the coordinator's call on the lane's report. plates.md "The collision orogen (PLT-740)" holds the
 arms' tables.
 
+**Measured** (2026-10-31): the cumulative arm orog-cum (O1 + O2, 8 runs) against base34-s4 and base34: the guard
+clean; the plateau rule placed a median 0.0005 of the kept crust (it binds only in the largest collisions); both
+two-wedge arms shrink the largest landmass (0.094 on base34 to 0.075 and 0.074), raise the continental crust under the
+sea (0.540 to 0.590 and 0.605, over the check's 0.56) and the crust's net change (+0.063 to +0.100 and +0.094), and
+lower the high ground through time (above 2 km 0.030 to 0.022 and 0.024; above 4 km 0.0023 to 0.0008 and 0.0012); the
+coast with high ground is not resolved (0.101 and 0.067 against base34's 0.078: two arms of the same physics but for a
+thousandth of the crust differ by more than either differs from the base).
+
 ## Why
 
 The coast-with-high-ground audit (docs/research/notes/coast-high-ground-audit-2026-10-30.md) found 96 % of the
