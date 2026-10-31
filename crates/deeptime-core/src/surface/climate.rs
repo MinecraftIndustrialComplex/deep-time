@@ -24,6 +24,8 @@
 use rayon::prelude::*;
 
 use super::grid::{Dims, box_blur};
+use super::lakes::CellWater;
+use crate::hydro::{Climate, HydroParams};
 use crate::world::WorldState;
 
 /// Field names the climate stage writes (P1-05, `crate::climate::field`) and this module reads.
@@ -160,7 +162,7 @@ pub fn snapshot(
                 sst[i] = if out.from_stage { tc } else { t0 } as f32;
                 p[i] = pc as f32;
                 pet[i] = e as f32;
-                ro[i] = ((pc - fu_et(pc, e)).max(0.0) / 1000.0) as f32;
+                ro[i] = mean_t_runoff_m_yr(pc, tc) as f32;
                 ar[i] = if e > 0.0 {
                     (pc / e).min(10.0) as f32
                 } else {
@@ -169,6 +171,61 @@ pub fn snapshot(
             }
         });
     out
+}
+
+/// The snapshot's own runoff, m/yr, for precipitation `precip_mm` (mm/yr) and the mean annual
+/// temperature `t_c` (°C): P less Fu's evapotranspiration with PET = 60 mm/°C x T, 0 below 0 °C
+/// (MOI-067, HYD-034), so a land below freezing sends all of P to its rivers. The stream power's
+/// runoff unless `surface.runoff_budget` (ERO-010).
+pub fn mean_t_runoff_m_yr(precip_mm: f64, t_c: f64) -> f64 {
+    let e = (60.0 * t_c).max(0.0);
+    (precip_mm - fu_et(precip_mm, e)).max(0.0) / 1000.0
+}
+
+/// One cell's water a year under the bake's budget (`HydroParams::budget`, HYD-035 to HYD-038):
+/// precipitation `precip_mm` (mm/yr), the mean annual temperature `t_c` (°C) and half the range
+/// between the warmest and the coldest month `half_c` (°C; not finite: the ±8 °C of HYD-032).
+/// Its runoff is what the lakes are fed with (ISO-126, ERO-217) and, with
+/// `surface.runoff_budget`, what the stream power's area counts (ERO-221).
+// ledger: ERO-221
+pub fn cell_water(hydro: &HydroParams, precip_mm: f64, t_c: f64, half_c: f64) -> CellWater {
+    let cl = Climate::of(precip_mm, t_c, t_c + half_c, t_c - half_c);
+    let b = hydro.budget(&cl);
+    CellWater {
+        runoff_m_yr: b.runoff_mm / 1000.0,
+        loss_m_yr: (b.evaporation_mm - b.rain_mm) / 1000.0,
+    }
+}
+
+/// [`cell_water`] for every cell of the step's climate `clim`: the climate stage's seasons
+/// (`climate/t_warm_c`, `climate/t_cold_c`) as departures about the surface's own mean
+/// temperature (HYD-033), none without the stage.
+pub fn water_budget(world: &WorldState, clim: &Snapshot, hydro: &HydroParams) -> Vec<CellWater> {
+    let n = clim.t_c.len();
+    let season = |name: &str| {
+        world
+            .fields
+            .get(name)
+            .filter(|f| f.data.len() == n)
+            .map(|f| &f.data[..])
+    };
+    let warm = season(crate::climate::field::T_WARM);
+    let cold = season(crate::climate::field::T_COLD);
+    (0..n)
+        .into_par_iter()
+        .map(|c| {
+            let half = match (warm, cold) {
+                (Some(w), Some(k)) => 0.5 * f64::from(w[c] - k[c]),
+                _ => f64::NAN,
+            };
+            cell_water(
+                hydro,
+                f64::from(clim.precip_mm[c]),
+                f64::from(clim.t_c[c]),
+                half,
+            )
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -187,5 +244,56 @@ mod tests {
             assert!(et <= p.min(e) + 1e-9 && et > 0.0);
         }
         assert!((fu_et(100.0, 1e6) - 100.0).abs() < 1.0);
+    }
+
+    // ledger: ERO-221
+    /// Where no month freezes, the bake's budget is the surface's own runoff: biotemperature is
+    /// the mean temperature, all of P is rain, and PET is the same 60 mm/°C (HYD-029).
+    #[test]
+    fn without_frost_the_budget_is_the_surface_s_runoff() {
+        let hydro = HydroParams::default();
+        for (p, t, half) in [
+            (2000.0, 26.0, 2.0),
+            (800.0, 15.0, 10.0),
+            (300.0, 21.0, 14.0),
+            (1200.0, 8.0, 8.0),
+            (50.0, 30.0, 5.0),
+        ] {
+            let budget = cell_water(&hydro, p, t, half).runoff_m_yr;
+            let own = mean_t_runoff_m_yr(p, t);
+            assert!(
+                (budget - own).abs() < 1.0e-12,
+                "P {p} T {t} ±{half}: budget {budget}, own {own}"
+            );
+        }
+    }
+
+    // ledger: ERO-221, HYD-036, HYD-038
+    /// Ground whose warmest month is below freezing sends nothing to its rivers under the
+    /// budget (its snow stays, the glaciers' to move), and all of P under the surface's own rule.
+    #[test]
+    fn ground_that_never_thaws_runs_off_nothing() {
+        let hydro = HydroParams::default();
+        for (p, t, half) in [(300.0, -20.0, 10.0), (100.0, -30.0, 15.0), (800.0, -8.0, 6.0)] {
+            assert_eq!(cell_water(&hydro, p, t, half).runoff_m_yr, 0.0);
+            assert!((mean_t_runoff_m_yr(p, t) - p / 1000.0).abs() < 1.0e-12);
+        }
+    }
+
+    // ledger: ERO-221, HYD-035
+    /// A land below freezing on the year with a thawed summer evaporates in it: it runs off
+    /// less than all of P, and more than nothing.
+    #[test]
+    fn a_cold_land_with_a_summer_evaporates_in_it() {
+        let hydro = HydroParams::default();
+        for (p, t, half) in [(400.0, -2.0, 12.0), (250.0, -8.0, 18.0), (600.0, -1.0, 8.0)] {
+            let budget = cell_water(&hydro, p, t, half).runoff_m_yr;
+            let own = mean_t_runoff_m_yr(p, t);
+            assert!((own - p / 1000.0).abs() < 1.0e-12);
+            assert!(
+                budget > 0.0 && budget < 0.9 * own,
+                "P {p} T {t} ±{half}: budget {budget}, own {own}"
+            );
+        }
     }
 }
