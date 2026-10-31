@@ -147,7 +147,8 @@ off until the lid is built.
 ## 6. The review's fixes (an Opus review of 4d9ea6f5, 2026-10-31)
 
 - **Netted twice.** `fronts_finish` runs before the hotspots and nets every felsic cone within
-  `subduction_distance_km` of an oceanic slab's front into the arc's rate; silicic centres and every
+  `subduction_distance_km` of a front (800 km in every shipped preset, 1,800 the Rust default; an
+  oceanic slab's front or a suture's) into the arc's rate; silicic centres and every
   caldera's ignimbrite are felsic, so a continental hotspot's near a front was netted by the arc and
   by its tail (on hs-budget 0.004 to 0.007 km³ a year, about a fifth of what the tails netted by id,
   the reviewer's reading; loss-budget.py counted it in both `arc_cones_c` and `hot_by_id_c`, cones.py
@@ -163,3 +164,13 @@ off until the lid is built.
 
 These change the runs with the budget on (none of the arms above is bit for bit after them); the
 default without the budget is unchanged.
+
+Follow-ups the re-review of d127d3ae named (not built yet):
+
+- A caldera's take-back can make rock from nothing when erosion removed the cone's rock first:
+  `apply_surface_feedback` clamps the pool at what it holds, but the hotspot's pending keeps the
+  full take-back, so the tail adds back rock the pools never lost.
+- An end-to-end wiring test on the pipeline: the hotspots' cones as handed
+  (`volcanoes/hotspot_cones_handed_km3`) equal what the tails netted by id, plus the unnetted, plus
+  what the hotspots' records still hold (`handed_km3`); and a carry case where the pending exceeds
+  the step's rock.
