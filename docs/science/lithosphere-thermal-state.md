@@ -67,7 +67,8 @@ settling, when this step's flags are all set. For each visible continental sampl
    onto it), and the new continental sample starts from it with no keel.
 4. **The start.** The continents the planet starts with begin at L = L_ref (the frame below) with a
    keel K = min(K_0, L) (K_0 = `thermal_keel_km`, 200 km; 0 gives no keels). A continental sample that appears later with no state (none is set) takes
-   L_ref and no keel.
+   its floor's lithosphere at the floor's age, at least its lid's floor, and no keel (PLT-821,
+   since 2026-10-31; L_ref until then).
 
 A resampling copies both numbers from the nearest corner of the sample's kind (`ridges.rs`
 `interpolate` keeps the major corner's values).
@@ -158,8 +159,9 @@ the rule the resampling already follows, heat flow belongs to the crust's kind: 
 leaves no heat flow (`Sample::make_continental` sets 0), and the pass gives a continental sample
 with none its law's full value, as `finish_samples` would (`continental_heat_flow`, the one law
 both call: the proxy with its terms; the state over the sample's own lithosphere, the floor's
-2.32 √(κt) where `thermal::step` set it, the frame's depth for floor the resampling made that step,
-which has no state yet). Test: `young_floor_made_continental_after_the_step_takes_the_continental_law`.
+2.32 √(κt) where `thermal::step` set it, and for floor the resampling made that step, which has no
+state yet, the frame's depth until 2026-10-31, since then its floor's at least its lid's floor,
+PLT-821). Test: `young_floor_made_continental_after_the_step_takes_the_continental_law`.
 
 Master has the same fault without the orogen. A scan of the plate stage alone on the test's preset
 (`pipeline_quick_16k` at 3,000 samples, the release pace on, 60 Myr, scattered_continents and
@@ -241,28 +243,43 @@ geothermal fields"; Poort & Klerkx 2004: the Baikal rift's 300 to 35,000 mW/m² 
 than 2 to 4 km in diameter").
 
 The rule (PLT-820). A continental column's thermal lithosphere reaches no shallower than where the
-law's own conductive geotherm (T_m = 1,350 °C at L, linear through the lid, as q_m = B / L reads it;
-ISO-138) puts its Moho at the crust's basal solidus T_s = 1,080 °C (PLT-822): L ≥ z_Moho × T_m / T_s
-= 1.25 z_Moho, with z_Moho the column's rock (`thermal::lid_floor_km`). A lithosphere thinned to that
-floor has its crust on the asthenosphere, and the law there is Lachenbruch et al.'s static value:
-q = 26 + (B / T_m) T_s / z_Moho = 26 + 2,700 / z_Moho before PLT-468's magmatic terms (141 mW/m² over
-the Salton Trough's 23.5 km, PLT-823; 103 over a 35 km crust; 412 over the ocean column's 7 km, a
-spreading centre's). It is applied where L is set (a floor made continental; every step's heating
-and cooling, `thermal::step`, hidden samples included; stage 2's stretch, in place of its 1 km) and
-where the laws read it (`thermal::sample_l_km`: `continental_heat_flow` and the final pass, PLT-469).
-Crust with no state takes its floor's 2.32 √(κt) at the floor's age, at least the floor (PLT-821), in
-place of the frame's 225 km. Not a cap: no heat flow is clipped; the lid cannot be thinner than its
-crust allows, and the bound follows from it.
+plate model's own steady geotherm (ISO-138, `thermal::geotherm_share`: the crust's radiogenic heat
+decaying as e^(−z/h_r) over the mantle's B / L, T_m = 1,350 °C at L) puts its Moho at the crust's
+basal solidus T_s = 1,080 °C (PLT-822): T(z_Moho) = T_s, solved for L by bisection
+(`thermal::lid_floor_km`), with z_Moho the column's rock: 1.254 z_Moho over the ocean's 7 km column,
+1.268 over 23.5 km, 1.274 over 70 km. (The mantle part alone, linear through the lid, would put T_s
+at 1.25 z_Moho, the first build's floor; the radiogenic part heats the Moho beyond that.) A
+lithosphere thinned to that floor has its crust on the asthenosphere, as Lachenbruch et al.'s Salton
+Trough has it, and the law there is 26 + B / L_floor before PLT-468's magmatic terms: 139.3 mW/m²
+over the Salton Trough's 23.5 km (PLT-823), 101.8 over a 35 km crust, 410.4 over the ocean column's
+7 km, a spreading centre's. Over 23.5 km that is 113.3 from the mantle and 26 from the crust,
+against Lachenbruch et al.'s ~125 reduced (their static conductive q*, which implies K ≈ 2.72 W/m/K
+by the agent's arithmetic, against the law's 2.69) and "about 15 mW m-2" from crustal radioactivity:
+the totals agree (139 against ~140), the parts do not, so the law has their form and not their
+value (the comparison is the agent's). It is applied where L is set (a floor made continental; every
+step's heating and cooling, `thermal::step`, hidden samples included, its targets raised to the
+floor; stage 2's stretch, in place of its 1 km; the final pass after the resampling, which stores it)
+and where the laws read it (`thermal::sample_l_km`: `continental_heat_flow` and the final pass,
+PLT-469). Crust with no state takes its floor's 2.32 √(κt) at the floor's age, at least the floor
+(PLT-821), in place of the frame's 225 km. Not a cap on the law: the lid cannot be thinner than its
+crust allows, and the bound follows from it; a resampled column's blend is held to its own law's
+ceiling (PLT-824, below).
 
-What it changes, by the code (the arm below): a column of crust thicker than 48 km under an arc's, a
-hotspot's, a subduction zone's or a rift's heating keeps 1.25 times its crust (a 70 km belt 87.5 km,
-not 60: 105 mW/m² with the arc's 40 against 122; its thermal age 37 Myr, not 0, so its thin sheet
-stiffer, η_0 / η 0.55 at τ_s 62.8, ISO-112); floor made continental under more than 14.4 km of rock
-keeps 1.25 times its column (16.3 km on 2.4 Myr floor: 20.4 km, 192 mW/m², not 213); crust on
-brand-new floor is hot and young (11 to 25 km, not 225), its thin sheet weak; a stretch binds only
-where L was already under 1.25 times the stretched crust. A column of normal crust under no heating
-(L 225, 35 km) is unchanged. Test: `a_continental_lithosphere_reaches_down_to_at_least_its_moho`
-(plates/tests.rs). The magmatic terms (PLT-468, uncited) and the crust's radiogenic share, 26
+What it changes, by the code (the arms below): a column of crust thicker than 47.1 km under an
+arc's, a hotspot's, a subduction zone's or a rift's heating e-folds towards its lid's floor, not
+L_hot's 60 km (a 70 km belt towards 89.2 km: 103.8 mW/m² with the arc's 40 against 122; its thermal
+age 39.6 Myr, not 0, so its thin sheet stiffer, η_0 / η 0.53 at τ_s 62.8, ISO-112); stage 3's
+drop-off e-folds towards the floor, 1.27 times the crust, not to the Moho; floor made continental
+under more than 14.3 km of rock keeps its column's floor (a 16.3 km column on 2.4 Myr floor:
+20.6 km, 190 mW/m², not 213); crust on brand-new floor is hot and young (8.8 km over the ocean's
+7 km column to about 25 km, not 225), its thin sheet weak; a stretch binds only where L was already
+under the stretched crust's floor. A column of normal crust under no heating (L 225, 35 km) is
+unchanged. Under thermal isostasy (ISO-110, off by default; on in
+`the_thermal_state_bakes_its_own_heat_flow`) PLT-821 lifts crust with no state from a thermal height
+of 0 (L 225) to E (225 − L) / 165, +1.9 to +2.1 km at E = 1,600 m, and the floor lowers a heated
+70 km belt's from 1,600 m to 1,317 m. Tests: `a_continental_lithosphere_reaches_down_to_at_least_its_moho`
+and `the_final_frame_holds_every_continental_column_to_its_lid_floor` (plates/tests.rs),
+`the_lid_floor_puts_the_moho_at_the_crusts_basal_solidus` (thermal.rs). The magmatic terms (PLT-468, uncited) and the crust's radiogenic share, 26
 mW/m² over any crust (McKenzie 1978: Fc / β after stretching; Jaupart & Mareschal 2007, p. 239: the
 thinned crust's heat flux "will reflect the smaller amount of radioactive elements"), stay as they
 were.
@@ -280,7 +297,8 @@ to 204.5 of the young-floor scan above, its samples now traced. In the full pipe
 lithosphere). Both are the law at the floor's age, and the floor bounds them: the most the state
 gives is its law over the thinnest crust the model makes continental, the ocean's 7 km column (floor
 made continental starts from it; a stretch leaves a source at least its target crust, PLT-261) at
-its 8.75 km floor, 412 mW/m² before the magmatic terms and 492 with both. The bake tests now hold the
+its floor, 8.78 km on the plate model's geotherm (8.75 on the first build's linear one), 410 mW/m²
+before the magmatic terms and 490 with both (412 and 492 on the first build). The bake tests now hold the
 state to that ceiling (`state_heat_flow_ceiling` in bake/tests.rs) in place of the proxy's 200.1,
 which held for their planets, not for the law; the release-pace test, with the proxy, keeps 200.1.
 Those columns are not Earth's continental crust of PLT-823's regional maxima (100 to 150): a 7 to 15
@@ -301,9 +319,30 @@ kept, its 8 worlds bit-identical to base35-s4's by the state's sha256): median 4
 the share of continental cells over 150 mW/m² 0.015 % against 0.004 % (0.050); over 200, 0.0005 to
 0.0023 % in 4 runs and none in any base run (0.032). The tail rises, as the trace above has it:
 crust with no state takes its young floor's lithosphere (PLT-821) where it took 225 km. A cell at
-406.7 is, by the law's arithmetic, a column of at most 7.1 km at its lid's floor or on floor at most
-0.6 Myr old (the cells were not traced: the runs keep no checkpoint), under the 412 the floor allows
-over the ocean's 7 km.
+406.7 is, by the law's arithmetic (the cells were not traced: the runs keep no checkpoint), a column
+of at most 7.1 km at its lid's floor or on floor at most 0.58 Myr old with no magmatic term, at most
+7.9 km or 0.72 Myr with the arc's 40, at most 8.9 km or 0.93 Myr with both; or a column of any
+thickness that the resampling blended with a hotter corner of its kind, which the final pass let
+stand (PR #58's review, below; the class blend and the column's ceiling since).
+
+**PR #58's review (2026-10-31; PLT-824).** The review found four gaps in the first build, fixed on
+the branch. (1) The resampling blended heat flow over the corners of the sample's kind, so a thick
+column took a share of thin or young-floor crust's heat flow (a 50 km column with a 0.4 weight of
+231 mW/m² baked about 125, over its own bound of 80 before the magmatic terms), and the final pass
+only raised values. The blend now runs over the corners of the sample's class, as the pools do
+(`ridges.rs`, the kind and hyper-extension, PLT-293 and PLT-663), and the final pass holds every
+continental sample's heat flow to its column's ceiling, its law at its lid's floor with an arc's and
+a hotspot's terms (`thermal::column_ceiling_mw_m2`, PLT-824): a blend of a hotter corner is not the
+column's. (2) The floor clamped the heating's and stage 3's approaches partway (a 70 km belt reached
+87.5 km after 21.8 Myr and stopped there); every target is now raised to the floor, so the approach
+e-folds to it (PLT-460, PLT-477): the floor is where the lid can be. (3) The laws that read the
+stored L (the flexure's thermal age, the strength laws) saw a resampled column under its floor until
+the next step; the final pass now stores the floored L, and rifting's weakness reads crust with no
+state through PLT-821 (PLT-506). (4) The floor was the mantle part's linear geotherm, not ISO-138's,
+which the rule cited; it is now solved on ISO-138's geotherm (the rule above), the Salton Trough's
+bound 139.3 with its parts the agent's comparison (PLT-823), and T_s is labelled one place's value
+(PLT-822). The final-frame test runs the plate stage and fails with either PLT-820 or PLT-821
+reverted.
 
 ### The order of the stages
 
@@ -405,8 +444,10 @@ Measured below as the switch `tectonics.root_removal`, removed when it went on b
   "would only occur after there had already been substantial thickening of the lithosphere"; Kay &
   Kay 1993: "a critical amount of shortening is required"), so the collapse's own threshold is
   reused. An Andean range's lithosphere is the arc's (stage 1 already heats it).
-- **What happens.** Its lithosphere relaxes towards max(L_hot, K, its crust) with an e-folding time
-  of 10 Myr: the thickened mantle lithosphere drops off to the Moho, 63 % of the way in the first
+- **What happens.** Its lithosphere relaxes towards max(L_hot, K, its crust, its lid's floor) with an
+  e-folding time of 10 Myr: the thickened mantle lithosphere drops off to the lid's floor (where its
+  Moho stands at the crust's basal solidus, 1.27 times the crust, PLT-820; to the Moho until
+  2026-10-31), 63 % of the way in the first
   10 Myr (Houseman & Molnar 1997: "between 50 (for rheological parameters representative of dry
   olivine) and 75 per cent (for wet olivine) of the lithospheric mantle would be involved in an
   instability whose duration is of the order of 10 Myr"; Conrad 2000: "The hottest 60 per cent of
@@ -430,7 +471,7 @@ Measured below as the switch `tectonics.root_removal`, removed when it went on b
 
 | Ledger id | Quantity | As coded | Units | Source | Status |
 |---|---|---|---|---|---|
-| PLT-460 | the state and its update | L ← L* + (L − L*) e^(−δt/τ) per step; heated: τ_h, L* = max(L_hot, K) (convective) or L_hot (rift, then K ← min(K, L)); else τ_c, L* = L_cold | km | McKenzie 1978 (the plate), Jordan 1978 (the keel); the relaxation form is the agent's | `game-choice` (the form; its constants are the rows below) |
+| PLT-460 | the state and its update | L ← L* + (L − L*) e^(−δt/τ) per step; heated: τ_h, L* = max(L_hot, K) (convective) or L_hot (rift, then K ← min(K, L)); else τ_c, L* = L_cold; every L* raised to the column's lid floor (PLT-820, since 2026-10-31) | km | McKenzie 1978 (the plate), Jordan 1978 (the keel); the relaxation form is the agent's | `game-choice` (the form; its constants are the rows below) |
 | PLT-461 | L_hot, a hot back-arc's lithosphere | 60 | km | Hyndman, Currie & Mazzotti 2005 ("50-60 km"), Currie & Hyndman 2006 ("1200°C at 60 km") | `verified` |
 | PLT-462 | L_cold, an old craton's lithosphere | 225 | km | Sleep 2003 (full text, abstract: "relatively uniform, 225 km"); Jaupart et al. 1998 200-250 km as Rolandone et al. 2002 cite it | `verified` |
 | PLT-463 | K_0, the start's keel | 200 | km | Jaupart & Mareschal 1999 as Rolandone et al. 2002 cite it ("unlikely to be smaller than 200 km") | `abstract-only` |
@@ -443,12 +484,13 @@ Measured below as the switch `tectonics.root_removal`, removed when it went on b
 | PLT-470 | the backstop | a source's share of the cordillera's strain w = e^(−t_eq / τ_s), τ_s = 62.8 (PLT-415) | none | Hyndman, Currie & Mazzotti 2005 (back-arcs weaker than cratons "by more than a factor of 10"); the weight is PLT-415's law | `game-choice` |
 | PLT-475 | stage 2's margin profile | T* = T_o + (T_n − T_o) S(1/2 + d / W), S(s) = 3s² − 2s³ (PLT-261's S(s) = s until 2026-10-23) | km | Manatschal & Chenin 2023 (the proximal, necking and hyperextended domains; full text); Montadert et al. 1979 (the Moho 25 km at the shelf break, 12 km on the lower margin; full text) | `game-choice` (the form) |
 | PLT-476 | stage 2's lithosphere | a source thinned to `keep`: L ← max(L · keep, its lid's floor, PLT-820; until 2026-10-31 1 km), K ← min(K · keep, L) | km | McKenzie 1978 (uniform stretching of the lithosphere and its crust by β; eq. 1 and Table 2 read); Lang, ten Brink & Makovsky 2026 (the mantle stretches more; full text) | `verified` |
-| PLT-477 | stage 3's drop-off | heated towards max(L_hot, K, crust) at e-folding 10 Myr; the founder sinks 1 − e^(−δt/10) of its no-room excess a step | Myr | Houseman & Molnar 1997 ("between 50 ... and 75 per cent ... of the lithospheric mantle", "of the order of 10 Myr"; full text); Conrad 2000 (60 %; abstract); Houseman, McKenzie & Molnar 1981 (under 30-50 m.y.; abstract) | `verified` |
+| PLT-477 | stage 3's drop-off | heated towards max(L_hot, K, crust, the lid's floor) at e-folding 10 Myr; the founder sinks 1 − e^(−δt/10) of its no-room excess a step | Myr | Houseman & Molnar 1997 ("between 50 ... and 75 per cent ... of the lithospheric mantle", "of the order of 10 Myr"; full text); Conrad 2000 (60 %; abstract); Houseman, McKenzie & Molnar 1981 (under 30-50 m.y.; abstract) | `verified` |
 | PLT-478 | stage 3's trigger | a Himalayan orogeny's continental column with crust > `collapse_thickness_km` (50) | km | England & Houseman 1989, Kay & Kay 1993 (a threshold exists, no number; abstracts) | `game-choice` (the threshold is PLT-256's) |
-| PLT-820 | the lid's floor | a continental L ≥ z_Moho T_m / T_s = 1.25 z_Moho, where L is set and read | km | Lachenbruch, Sass & Galanis 1985 (the crust on the asthenosphere at the basalt solidus; full text); Jaupart & Mareschal 2007 (the thermal lithosphere, the conductive lid; full text) | `verified` (the form, the law's own geotherm, the agent's) |
+| PLT-820 | the lid's floor | a continental L ≥ L_floor, where ISO-138's geotherm puts the Moho at T_s (bisection; 1.254 to 1.274 z_Moho), where L is set and read | km | Lachenbruch, Sass & Galanis 1985 (the crust on the asthenosphere at the basalt solidus; full text); Jaupart & Mareschal 2007 (the thermal lithosphere, the conductive lid; full text) | `verified` (the crust on the asthenosphere at the solidus; the floor's form on the model's own geotherm, the agent's) |
 | PLT-821 | crust with no state | L ← max(2.32 √(κt) at the floor's age, the lid's floor), no keel | km | PLT-466's law | `game-choice` |
-| PLT-822 | T_s, the crust's base on the asthenosphere | 1,080 | °C | Lachenbruch et al. 1985, Fig. 18's caption (the Salton Trough's 23.5 km crust) | `verified` |
-| PLT-823 | the bound against Earth | 26 + 2,700 / 23.5 = 141 against the Imperial Valley's ~140; regional maxima 100 to 150 | mW/m² | Lachenbruch et al. 1985; Hasterok & Chapman 2011; Blackwell 1983; Davies 2013; Jaupart & Mareschal 2007 (full texts) | `verified` (a check) |
+| PLT-822 | T_s, the crust's base on the asthenosphere | 1,080 (one place's value, a basalt crust at 23.5 km; for every Moho depth and crust, the agent's extrapolation) | °C | Lachenbruch et al. 1985, Fig. 18's caption (the Salton Trough's 23.5 km crust; the symbol lost to the copy's OCR) | `verified` (the value; its use everywhere the agent's) |
+| PLT-823 | the bound against Earth | 26 + 3,375 / 29.8 = 139.3 (113.3 + 26) against the Imperial Valley's ~140 (~125 reduced + about 15 from crustal radioactivity); regional maxima 100 to 150 | mW/m² | Lachenbruch et al. 1985; Hasterok & Chapman 2011; Blackwell 1983; Davies 2013; Jaupart & Mareschal 2007 (full texts) | `verified` (a check: the values read; the comparison, the totals alike and the parts apart, the agent's) |
+| PLT-824 | a resampled column's heat flow | blended over the corners of its class (kind and hyper-extension), at most its column's ceiling, 26 + B / L_floor + 80 | mW/m² | PLT-820's law; the class is PLT-293's and PLT-663's | `game-choice` |
 | ISO-110 | thermal isostasy | z_th = E (L_ref − L) / (L_cold − L_hot), E = 1,600 | m | Hyndman & Currie 2011 ("about 1,600 m at equal thickness") | `verified` |
 | ISO-111 | L_ref, the frame | 225 (craton frame) or 187 (Hyndman & Currie's frame) | km | the model's Airy line against HC2011's two sea-level crusts (below) | `game-choice` (a calibration) |
 | ISO-112 | the thermal age | t_eq = τ_c ln((L_cold − L_hot) / (L_cold − L)) into PLT-415 and ISO-051 | Myr | the inverse of PLT-460's cooling; the coupling is the agent's | `game-choice` |
@@ -811,7 +853,7 @@ base run (master 84b8ee03, key 7f9d8f115049, argkey 2a53566b, pass off).
   equals the base byte for byte), so an A/A control would only repeat the on arm. With the
   lithosphere's thermal state on (the default since 2026-10-23) the pass runs whatever its switch
   says, and the state's own heat flow (PLT-467) reaches the plates by the same path.
-- **The continental law over a young floor's lithosphere had no ceiling** (a follow-up from PR #50's review, 2026-10-31). Answered the same day ("The lid's floor (2026-10-31)", PLT-820 to PLT-823): the bound belongs in L. A continental column's thermal lithosphere reaches no shallower than where the law's conductive geotherm puts its Moho at the crust's basal solidus, 1,080 °C (Lachenbruch, Sass & Galanis 1985, the Salton Trough's crust on the asthenosphere), 1.25 times its crust; the law is then at most 26 + 2,700 / z_Moho before the magmatic terms (141 mW/m² over 23.5 km against the Imperial Valley's ~140), the 1 km clamp is out of reach, and crust with no state takes its floor's lithosphere, not the frame's 225 km. Left open: the crust's radiogenic share over thin crust (26 mW/m² over any column) and the magmatic terms (PLT-468, uncited).
+- **The continental law over a young floor's lithosphere had no ceiling** (a follow-up from PR #50's review, 2026-10-31). Answered the same day ("The lid's floor (2026-10-31)", PLT-820 to PLT-824): the bound belongs in L. A continental column's thermal lithosphere reaches no shallower than where the plate model's own geotherm (ISO-138) puts its Moho at the crust's basal solidus, 1,080 °C (Lachenbruch, Sass & Galanis 1985, the Salton Trough's crust on the asthenosphere), 1.254 to 1.274 times its crust (PR #58's review; 1.25 on the first build's linear geotherm); the law is then at most 26 + B / L_floor before the magmatic terms (139.3 mW/m² over 23.5 km against the Imperial Valley's ~140), the 1 km clamp is out of reach, and crust with no state takes its floor's lithosphere, not the frame's 225 km. Left open: the crust's radiogenic share over thin crust (26 mW/m² over any column) and the magmatic terms (PLT-468, uncited).
 - The land share's top. The strength moves the largest landmass and the drowned crust towards
   Earth and pushes seven of 24 runs over 0.32 land: the crust it keeps from spreading under the sea
   stands on land instead. Under Ben's rule this is a realism check, not a reason to turn it off: if

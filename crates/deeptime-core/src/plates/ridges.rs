@@ -183,11 +183,6 @@ fn interpolate(src: &[Sample], c: &Cover, rot: DQuat, m: u32) -> Sample {
         (0..3).map(|k| w[k] * f64::from(f(corners[k]))).sum::<f64>() as f32
     };
     s.elevation_m = lerp(&|x| x.elevation_m);
-    // The corners of the sample's own kind and their weight (the nearest corner is one of them).
-    let same_kind: f64 = (0..3)
-        .filter(|&k| corners[k].kind == s.kind)
-        .map(|k| w[k])
-        .sum();
     // The corners of the sample's own class, the kind and, on continental crust, whether it is
     // hyper-extended (under 10 km of its own crystalline crust, Brune et al. 2014), and their
     // weight; the nearest corner is one of them, so the weight is never 0. A blend over a class is
@@ -248,17 +243,22 @@ fn interpolate(src: &[Sample], c: &Cover, rot: DQuat, m: u32) -> Sample {
     s.oxidation = lerp(&|x| x.oxidation);
     s.uplift_mm_yr = lerp(&|x| x.uplift_mm_yr);
     s.crust_uplift_mm_yr = lerp(&|x| x.crust_uplift_mm_yr);
-    // Heat flow belongs to the kind of crust (the sea floor's age law against the continental
-    // sum), so only the corners of the sample's own kind are blended: a continental sample on the
-    // coast must not take the young ridge crust's 300 mW/m² from an oceanic corner. (The next
-    // step sets every sample's heat flow again; this only matters for what is read right after
-    // a resampling, the final snapshot among them: the bake's `meta/heat_flow_mw_m2`.)
-    if same_kind > 0.0 {
+    // Heat flow belongs to the column (the sea floor's age law against the continental sum over
+    // the column's own lithosphere and crust), so it is blended over the corners of the sample's
+    // own class, as the pools are: a continental sample on the coast must not take the young
+    // ridge crust's 300 mW/m² from an oceanic corner, nor a thick column a hyper-extended
+    // margin's or crust on young floor's (PLT-821) heat flow from a thin corner (PR #58's review;
+    // until 2026-10-31 over the kind's corners). The final pass then holds each continental
+    // column to its own law's ceiling (`thermal::refresh_heat_flow`, PLT-824). (The next step
+    // sets every sample's heat flow again; this only matters for what is read right after a
+    // resampling, the final snapshot among them: the bake's `meta/heat_flow_mw_m2`.)
+    // ledger: PLT-824
+    if class_w > 0.0 {
         let blend: f64 = (0..3)
-            .filter(|&k| corners[k].kind == s.kind)
+            .filter(|&k| same_class(corners[k]))
             .map(|k| w[k] * f64::from(corners[k].heat_flow_mw_m2))
             .sum();
-        s.heat_flow_mw_m2 = (blend / same_kind) as f32;
+        s.heat_flow_mw_m2 = (blend / class_w) as f32;
     }
     if s.kind == OCEANIC {
         let (mut sw, mut sf) = (0.0, 0.0);
