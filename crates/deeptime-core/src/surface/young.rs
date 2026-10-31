@@ -1804,8 +1804,8 @@ mod tests {
         let off = runoff_weights(&world, &sp(false), &hydro, n1);
         let on = runoff_weights(&world, &sp(true), &hydro, n1);
         eprintln!("young weights off {:?}, on {:?}", &off[..4], &on[..4]);
-        for c in 0..3 {
-            assert!((off[c] - 0.6).abs() < 1.0e-6, "cell {c}: {}", off[c]);
+        for (c, w) in off.iter().enumerate().take(3) {
+            assert!((w - 0.6).abs() < 1.0e-6, "cell {c}: {w}");
         }
         assert_eq!((on[0], on[1]), (0.05, 0.05));
         assert!(on[2] > 0.05 && on[2] < 0.9 * off[2], "{}", on[2]);
@@ -1822,12 +1822,11 @@ mod tests {
             let p = sp(budget);
             let water = super::super::step_water(&world, &clim, &hydro, &p);
             let young = runoff_weights(&world, &p, &hydro, n1);
-            for c in 0..4 {
+            for (c, y) in young.iter().enumerate().take(4) {
                 let l1 = super::super::runoff_weight(&p, &clim, water.as_deref(), c);
                 assert!(
-                    (young[c] - l1).abs() < 1.0e-6,
-                    "budget {budget}, cell {c}: young {} against L1 {l1}",
-                    young[c]
+                    (y - l1).abs() < 1.0e-6,
+                    "budget {budget}, cell {c}: young {y} against L1 {l1}"
                 );
             }
         }
