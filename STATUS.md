@@ -203,7 +203,8 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
     0.609, criteria median 6 (5), sea at the end 462 m (339); the guard as the base's (worst 10,554 m).
   - The plateau reads (`tools/review/plateau/arm_rb1.sh`): runoff weight above 2 km 0.433 against the own 0.969; the
     flat high ground 110.0 m/Myr against rb-months' 146.5, on 1.3 times the land; land above 2 km over the run
-    0.0280 against 0.0238; K's regions 8 to 18 % slower than rb-months', all inside Montgomery & Brandon's lines.
+    0.0280 against 0.0238; K's regions 8 to 18 % slower than rb-months': inside Montgomery & Brandon's lines at 500 m of relief and more, above
+    both at 100 and 250 m as on the base (corrected after the re-review; the first reading said all inside).
   - The young stage is outside the pool's runs; its unit check is the read.
 - **Verdict: default-on.** Flipped on this branch (the coordinator's call, decisions log 2026-10-31):
   `surface.runoff_budget` true in `SurfaceParams::default`, ERO-010, ERO-221 and ERO-222 noted, the design's status and
@@ -295,7 +296,8 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
     is 1.7 times as much of it.
   - **High ground over time:** land above 4 km 0.0022 against 0.0010, above 3 km 0.0105 against 0.0086.
   - **K's regions** (corrected after the review): 250 to 500 m of relief -11 %, 500 m and more -19 %, 1,000 m and
-    more -16 %, 1,500 m and more -8 %, still inside Montgomery & Brandon's lines; under 100 m +8 %, 100 to 250 m -4 %.
+    more -16 %, 1,500 m and more -8 %, still inside Montgomery & Brandon's lines at 500 m and more; under 100 m +8 %,
+    100 to 250 m -4 % (above both lines there, as on the base).
   - **The export** to the sea is 3.34 against 3.36 km³ a year, and the land's mean lowering 38.9 against 36.8 m/Myr.
   - **Guard:** 10.5 km, 0 steps beyond one relief. The criteria median 6.
 
