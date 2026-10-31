@@ -1392,4 +1392,7 @@ K's regions wear 11 % slower at 250 to 500 m of relief, 19 and 16 % at 500 and 1
 more, inside Montgomery & Brandon's lines; the export to the sea does not move (3.34 against 3.36 km³ a year). The
 verdict then was default-on. The runoff law's review (2026-10-31) held it: the young stage and the amplifier kept the
 old rule (the pool's runs never reach them), the months were centred on the mean, and no test went through the switch.
-All three are fixed; the law is to be armed again on base35-s4.
+All three are fixed. Armed again on base35-s4 (rb1, 8 runs): the guard the base's, the flat high ground 110 against
+146.5 m/Myr (the months' correction alone, rb-months), the land above 2 km a sixth more over the run, K's regions 8 to
+18 % slower and inside Montgomery & Brandon's lines, the criteria a median of 6 against 5. The months' correction alone
+moves no column. Verdict: default-on.
