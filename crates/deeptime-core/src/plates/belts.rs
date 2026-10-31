@@ -2254,7 +2254,7 @@ mod tests {
     #[test]
     fn a_terrane_its_slab_drags_down_subducts_stripped_of_its_cover() {
         use crate::plates::pools::oceanic_column;
-        let run = |docking: bool, rows: f64, slab: bool| {
+        let run = |docking: bool, rows: f64, slab: bool, hidden: f64| {
             let mut fx = Fixture::new();
             // Under the step's 40 km of shortening: the terrane would transfer at once.
             fx.preset.tectonics.collision_threshold_km = 30.0;
@@ -2277,6 +2277,10 @@ mod tests {
                     s.pools[pool::FELSIC_PLUTONIC] += arc * 5.0 / 6.0;
                     s.basement_m = 7000.0;
                     s.elevation_m = -2000.0;
+                    // Rows already under the overriding plate: the front's crust is hidden.
+                    if fx.norm.km(pts[i].x.asin()) <= hidden * spacing {
+                        s.flags |= HIDDEN;
+                    }
                 } else {
                     s.kind = crate::plates::state::OCEANIC;
                     s.elevation_m = -4000.0;
@@ -2313,7 +2317,7 @@ mod tests {
         };
         assert!((shortening::dragged_length_km(700.0, 15_000.0) - 329.4).abs() < 0.1);
         // One row wide: the slab drags it down, stripped to its cover; no transfer.
-        let (share, s, added, plutonic, subducting, fired) = run(true, 1.0, true);
+        let (share, s, added, plutonic, subducting, fired) = run(true, 1.0, true, 0.0);
         assert!(subducting, "{s:?}");
         assert_eq!(fired, 0, "a terrane going down does not transfer");
         assert!(s.crossed_km2 > 0.0, "{s:?}");
@@ -2331,8 +2335,12 @@ mod tests {
             "no plutonic rock stays: {plutonic}"
         );
         // Five rows wide, the switch off, no slab: a collision as before.
+        // The terrane is read through its crust already under the overriding plate: five rows
+        // with the first hidden still jam the slab.
+        let (_, s, _, _, subducting, fired) = run(true, 5.0, true, 1.0);
+        assert!(!subducting && fired == 1, "{s:?}");
         for (docking, rows, slab) in [(true, 5.0, true), (false, 1.0, true), (true, 1.0, false)] {
-            let (share, s, added, plutonic, subducting, fired) = run(docking, rows, slab);
+            let (share, s, added, plutonic, subducting, fired) = run(docking, rows, slab, 0.0);
             assert!(!subducting, "{docking} {rows} {slab}");
             assert_eq!(fired, 1, "{docking} {rows} {slab}: it transfers at the threshold");
             let whole = share * s.crossed_km2 * s.thickness_m;

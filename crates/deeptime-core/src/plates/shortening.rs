@@ -683,9 +683,9 @@ pub fn dragged_length_km(slab_km: f64, thickness_m: f64) -> f64 {
 /// Whether the slab of a contact, `slab_km` long, drags the terrane at its front `f` down whole
 /// (ledger PLT-760): the terrane's extent across the front, the collision's `shortening_km` so
 /// far plus the visible area of the incoming plate's continental crust connected to the front's
-/// crust over the front's length, is within [`dragged_length_km`] of the slab (up to
-/// `slab_depth_km`, PLT-184) for the front crust's mean thickness. The fill stops once the area
-/// would carry the extent past the reach.
+/// crust (through its crust already under the overriding plate too) over the front's length, is
+/// within [`dragged_length_km`] of the slab (up to `slab_depth_km`, PLT-184) for the front crust's
+/// mean thickness. The fill stops once the area would carry the extent past the reach.
 pub fn drags_whole(
     state: &PlateState,
     geo: &Geo,
@@ -710,12 +710,12 @@ pub fn drags_whole(
     if room_km <= 0.0 {
         return false;
     }
-    // The most samples the rest of the terrane may hold.
+    // The most visible samples the rest of the terrane may hold. The fill is `collide`'s (the
+    // plate's continental samples, hidden or not, along lattice edges): the front's crust may be
+    // the crust already under the overriding plate, which joins the rest; only the visible part,
+    // the rest, counts.
     let most = room_km * length_km / env.norm.sample_area_km2();
-    let ours = |i: usize| {
-        let s = &state.samples[i];
-        state.plate_of(i) == under && s.kind == CONTINENTAL && !s.is_hidden()
-    };
+    let ours = |i: usize| state.plate_of(i) == under && state.samples[i].kind == CONTINENTAL;
     let mut seen = std::collections::BTreeSet::new();
     let mut stack: Vec<u32> = Vec::new();
     for &s in &f.crust {
@@ -723,11 +723,13 @@ pub fn drags_whole(
             stack.push(s);
         }
     }
-    let mut found = 0_usize;
+    let mut rest = 0_usize;
     while let Some(v) = stack.pop() {
-        found += 1;
-        if found as f64 > most {
-            return false;
+        if !state.samples[v as usize].is_hidden() {
+            rest += 1;
+            if rest as f64 > most {
+                return false;
+            }
         }
         for (u, _) in geo.edges(v) {
             if ours(u as usize) && seen.insert(u) {
