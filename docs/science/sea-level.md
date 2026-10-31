@@ -688,6 +688,98 @@ sea's 0.278 still over 0.25): the thicker continents shed more sediment and none
 ("Why the sea stands about 500 m over the datum at the end"), so the sea's height, not the
 taper, is what remains between the final frame and its target.
 
+### Freeboard: why the normal continent stands under the sea (2026-10-31)
+
+The coast-with-high-ground audit (docs/research/notes/coast-high-ground-audit-2026-10-30.md) found
+the sea standing about 150 m over the normal continental column, and Ben chose the order
+"Freeboard, then orogen (Recommended)" (decisions log 2026-10-30). This section measures why, on
+base33 (master 2abbc567, key 31c7c70bd7c7, 24 runs) and base32, with the M5 lane's tools on the
+cached runs (`tools/review/m5diag/m5sea.py`, `tools/review/seddiag/sedstock.py`,
+`tools/review/loss-budget.py`), and reads two arms of switches the M5 lane built and left off.
+
+**The sea's budget** (m5sea, final frame, medians): the sea stands 536 m over the datum on base32 and
+701 m on base33. With oceanic crust of 10 km and more at the bare floor's height for its age, it
+would stand at −253 and −219 m: the thick oceanic-labelled crust raises the sea by about 790 and 920
+m. From base32 to base33 (the reversal behind the overriding block, PLT-737) the filled sea rose 154
+m, of it 128 m from the oceanic floor's height (oceanic crust 15 to 25 km thick from 0.123 to 0.141
+of it, over 25 km from 0.045 to 0.056), while the floor's age alone (older) would have lowered it
+by 46 m.
+
+**The sea's sediment** (sedstock, base33, Earth-normalized km³, against GlobSed, Straume et al.
+2019):
+
+| region | model | GlobSed |
+|---|---|---|
+| the sea's sediment, all of it | 6.82 × 10⁸ | 3.37 × 10⁸ |
+| wet continental crust (the margins) | 6.38 × 10⁷ (pile 1,774 m) | 1.43 × 10⁸ (3,044 m) |
+| ocean floor within 200 km of continental crust | 2.97 × 10⁸ (4,061 m, over 7.1 × 10⁷ km²) | 7.6 × 10⁷ (2,049 m, over 3.7 × 10⁷ km²) |
+| ocean floor beyond 200 km | 3.14 × 10⁸ (1,385 m) | 1.13 × 10⁸ (404 m) |
+| young open floor (under 82 Myr, beyond 200 km) | 466 m, 3.45 times GlobSed's eq. 2a | |
+
+Of the 6.15 × 10⁸ km³ on oceanic crust, 5.27 × 10⁸ is terrigenous, and 5.2 × 10⁸ lies on floor within
+500 km of a passive margin (0.457 of the wet oceanic floor, a 3,591 m pile). With Earth's floor ages
+the oceanic part would be 0.82 of itself: the old floor is a small part of the excess.
+
+**The crust cycle** (loss-budget.py, km³ a year over 1,000 Myr, base33's seeds 1 to 4, against
+Stern & Scholl 2010's Table 1): arcs 1.85 (Earth 2.5), rifts, hotspots and rifted margins 0.04
+(0.5), crust-suturing zones 0 (0.2); sediment subduction 1.27 (1.1, PLT-440's 0.12 calibrated to
+it), subduction erosion 0.51 (1.4); the net change of the continental volume −0.66 (Earth about 0).
+The surface stage carries 6.6 km³ a year off the continents, and resamplings accrete 6.4 km³ a year
+of ocean-floor rock back onto the columns on top, the model's main return path.
+
+**Arm sedsub** (`tectonics.sediment_subduction_sourced`, PLT-660 alone, Clift & Vannucchi 2004's
+shares; 8 runs, key 31c7c70bd7c7, argkey 10c53dc8, against base33-s4, base33's seeds 1 to 4): the
+sea after 100 Myr and at the end 541 / 687 to 157 / −148 m; the continental crust's net change
+−0.033 to −0.116 (p < 0.001); land 0.300 to 0.253 (p 0.007); coast with high ground 0.114 to 0.134
+(p 0.72); land under ice 0.101 to 0.053 (p 0.007); the guard clean (worst 10,416 m). The slab takes
+4.23 km³ a year (Earth 1.1) and the net change of the continental volume is −3.08 km³ a year: at
+Clift & Vannucchi's shares the trenches take four times Earth's flux, because the ocean's stock
+reaches them, and the resamplings' return falls from 6.4 to 2.4 km³ a year. As on 2026-10-22
+(sub80, above), sediment subduction alone drains the continents.
+
+**Arm sedmargin** (PLT-660 with `tectonics.margin_sediment_continental`, PLT-661 and PLT-662; the
+class blend PLT-663 closed since 2026-10-25; argkey 5818ecce, against base33-s4):
+
+| measure, medians of 8 | base33-s4 | sedmargin | p |
+|---|---|---|---|
+| sea over the datum, after 100 Myr / at the end, m | 541 / 687 | 174 / 169 | |
+| continental crust, share of the planet (m5sea) | 0.388 | 0.487 | |
+| its mean thickness, km (p10) | 38.1 (33.3) | 29.9 (18.7) | |
+| continental crust under the sea (target ≤ 0.56) | 0.267 | 0.527 | < 0.001 |
+| land | 0.300 | 0.238 | 0.002 |
+| land above 2 km | 0.046 | 0.013 | 0.050 |
+| coast with high ground (target ≤ 0.11) | 0.114 | 0.064 | 0.038 |
+| collisions per 100 Myr | 3.90 | 5.00 | 0.040 |
+| the guard's worst, m from the sea | 10,518 | 9,964 | 0.038 |
+| crust 30 to 35 km: share, plate height over the sea p50 | 0.081, −264 m | 0.540, +41 m | |
+| crust 35 to 40 km: share, plate height over the sea p50 | 0.602, +136 m | 0.114, +591 m | |
+| the open floor beyond 200 km: pile (GlobSed 404 m) | 1,385 m | 416 m | |
+| the sea's sediment, km³ (on continental crust) | 6.82 × 10⁸ | 6.92 × 10⁸ (3.8 × 10⁸) | |
+| sediment subduction, km³ a year (Earth 1.1) | 1.27 | 2.60 | |
+| net change of the continental volume, km³ a year | −0.66 | −0.98 | |
+
+So the two together give the normal continent Earth's freeboard (the shoreline at 30 to 35 km of
+crust, as Earth's 31 km) and the open ocean Earth's sediment, but the converted margins spread the
+continents' volume over a quarter more area (0.388 × 38.1 against 0.487 × 29.9 km), so the land is
+lower and thinner, and the sea's sediment is relabelled onto converted margin crust rather than
+removed (1.24 × 10⁸ km² of wet continental crust against GlobSed's margins' 4.69 × 10⁷).
+
+**The high ground with the margins converted** (the advisor's maps script,
+`/data/ban/deeptime-cache/advisor/adv_maps.py`, on both arms' maps 50 Myr before the end): the land's
+mean height 562 to 373 m, its p99 3.46 to 2.87 km; the land above 2 km a median 253 to 186 km from
+the sea, beyond 400 km 0.244 to 0.050 of it (Earth 0.74); the high coasts on landmasses under 1
+million km² 0.073 to 0.232. The interiors thin as well as the margins (crust 35 to 40 km thick 0.602
+to 0.114 of the continental crust), and the crust cycle's rows move together: the transition adds
+0.59 km³ a year to the continents (−0.47 on base33-s4), the thickening limit 0.78 (−0.01), erosion
+takes 3.82 (6.61), collapse adds 0.30 (1.43); no one row explains the thinning, and it is not
+traced yet.
+
+**Neither switch goes on by default** (the coordinator, 2026-10-31): PLT-660 alone drains the
+continents, and with PLT-661 the planet loses most of its high ground and its interiors, through a
+path not yet traced, while the stock it was meant to clear is relabelled rather than removed. What
+the arms do show: the sea's height is the ocean's sediment stock, and Earth's freeboard comes back
+when the margin's sediment is continental crust and the trenches take Clift & Vannucchi's share.
+
 ## Simplifications and limits
 
 - The fill uses the ground at the step's start; the floor's answer to the new water load comes in
