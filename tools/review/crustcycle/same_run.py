@@ -7,7 +7,8 @@
 For each run folder the two arm folders share (start-seed), compares the hashes of the run's saved state (state.json,
 every file but fields/globals.json, which a new global changes) and the step records (rec.json) with the named
 front_bands fields taken out of every step (the fields the trace adds). Prints one line a run: the state files that
-differ and whether the records match.
+differ and whether the records match. A named field is taken out of every step's front_bands and from the
+record's top level alike.
 """
 import json
 import sys
@@ -29,6 +30,8 @@ def leaves(x, p="", out=None):
 
 def record(run, drop):
     rec = json.loads((run / "rec.json").read_text())
+    for k in drop:
+        rec.pop(k, None)
     for s in rec.get("steps") or []:
         fb = s.get("front_bands")
         if isinstance(fb, dict):
