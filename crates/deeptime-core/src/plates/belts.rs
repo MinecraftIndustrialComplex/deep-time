@@ -221,7 +221,7 @@ pub const STAYS_GLOBAL: &str = "plates/collision_noroom_stays_km3";
 /// bounds the belt at all. Zero without `collision_belt_taper`.
 pub const TOE_GLOBAL: &str = "plates/collision_taper_toe_km3";
 /// The crust that terranes docking stripped to their cover sent down with the slab instead of
-/// stacking it, km³ Earth-normalized (`tectonics.terrane_docking_cover`, ledger PLT-760; written
+/// stacking it, km³ Earth-normalized (`tectonics.terrane_docking_cover`, ledger PLT-770; written
 /// only with the switch; measurement only).
 pub const STRIPPED_GLOBAL: &str = "plates/collision_stripped_km3";
 /// With `collision_retro_plateau` (PLT-740): the crust the two wedges' retro plateau took beyond
@@ -318,7 +318,7 @@ pub struct Stacked {
     /// (its excess over the normal column where this collision stamped it), m (PLT-400).
     pub restack_m: f64,
     /// The crossing crust's supracrustal cover (`pools::COVER` of its own crust), m, and, where
-    /// the slab drags the terrane down whole (`tectonics.terrane_docking_cover`, PLT-760), the
+    /// the slab drags the terrane down whole (`tectonics.terrane_docking_cover`, PLT-770), the
     /// share of the crust under the cover that the slab took instead of the belt, km² × m of
     /// crust (beside PLT-242's own loss; measurement only).
     pub cover_m: f64,
@@ -424,7 +424,7 @@ pub fn stack(
         let col = state.contacts[c].collision.as_ref().expect("in collision");
         let (conv, normal) = (col.convergence_mm_yr, DVec3::from_array(col.normal));
         let sides = read_sides(state, env, f, &fields, sea_m);
-        // ledger: PLT-760. A terrane its slab drags down whole (`shortening::advance` classes
+        // ledger: PLT-770. A terrane its slab drags down whole (`shortening::advance` classes
         // the front, `Collision::subducting`) keeps only its cover; the slab takes the rest.
         let stripped = env.k.terrane_docking_cover && col.subducting;
         let step = stack_front(
@@ -626,7 +626,7 @@ struct Side {
     /// When the collision began, Myr.
     onset_myr: f64,
     /// The incoming terrane is one its slab drags down whole, stripped of its cover
-    /// (`tectonics.terrane_docking_cover`, `Collision::subducting`; ledger PLT-760).
+    /// (`tectonics.terrane_docking_cover`, `Collision::subducting`; ledger PLT-770).
     stripped: bool,
 }
 
@@ -755,7 +755,7 @@ fn stack_front(
         let n = f.crust.len() as f64;
         (a / n, r / n, w / n)
     };
-    // The crossing crust's cover (ledger: PLT-761), of its own crust (the basement apart).
+    // The crossing crust's cover (ledger: PLT-771), of its own crust (the basement apart).
     let cover_m = if f.crust.is_empty() {
         0.0
     } else {
@@ -765,7 +765,7 @@ fn stack_front(
             .sum::<f64>()
             / f.crust.len() as f64
     };
-    // ledger: PLT-760. A terrane its slab drags down keeps its cover (scraped off at the front)
+    // ledger: PLT-770. A terrane its slab drags down keeps its cover (scraped off at the front)
     // and the crust this collision stacked on it (its wedge's, PLT-400); the slab takes the rest.
     // Otherwise all of it.
     let kept_m = if side.stripped {
@@ -825,7 +825,7 @@ fn stack_front(
         .max(0.5 * 2.0 / 3.0 * belt_km * f.length_km());
 
     // The rock that stays: the consumed crust's own mix, its sediments buried and metamorphosed.
-    // ledger: PLT-248. Docking stripped, its cover's (ledger: PLT-761).
+    // ledger: PLT-248. Docking stripped, its cover's (ledger: PLT-771).
     let mut mix = [0.0f64; pool::COUNT];
     for &j in &f.crust {
         for (p, (m, &x)) in mix
@@ -2340,7 +2340,7 @@ mod tests {
     }
 
     /// A terrane its slab drags down whole subducts stripped of its cover (`terrane_docking_cover`,
-    /// ledger PLT-760, PLT-761): an island arc of 8 km on 7 km of ocean crust (15 km, Cloos 1993's
+    /// ledger PLT-770, PLT-771): an island arc of 8 km on 7 km of ocean crust (15 km, Cloos 1993's
     /// jamming thickness) one row of samples wide across the front, against a 700 km slab, whose
     /// reach is 700 / (1 + 2.25 × 15 / 30) = 329 km. Of its crossing crust only its cover stays
     /// (its own lavas and tuffs, a sixth of the arc: 1.33 km), by PLT-242's share and as the

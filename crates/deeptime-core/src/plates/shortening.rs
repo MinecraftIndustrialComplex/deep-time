@@ -606,7 +606,7 @@ pub fn advance(
             }
         }
     }
-    // ledger: PLT-760. A front whose terrane its slab drags down whole subducts it: the belts
+    // ledger: PLT-770. A front whose terrane its slab drags down whole subducts it: the belts
     // strip its crossing crust to the cover, and it does not transfer at the threshold. Read on
     // each front of this step against the slab of the pair (the last balance's, as the jam).
     if env.k.terrane_docking_cover {
@@ -642,7 +642,7 @@ pub fn advance(
         let stalled = col
             .stalled_since_myr
             .is_some_and(|t0| env.t_myr - t0 >= env.k.weld_after_myr - 1e-9);
-        // A terrane its slab drags down goes on down: no transfer on shortening (ledger PLT-760).
+        // A terrane its slab drags down goes on down: no transfer on shortening (ledger PLT-770).
         if !stalled && (col.shortening_km < threshold || col.subducting) {
             continue;
         }
@@ -665,7 +665,7 @@ pub fn advance(
 }
 
 /// How much buoyant lithosphere a slab `slab_km` long can drag down with it, km, when the crust
-/// on it is `thickness_m` thick (ledger PLT-760). The model's collision buoyancy (FRC-030: the
+/// on it is `thickness_m` thick (ledger PLT-770). The model's collision buoyancy (FRC-030: the
 /// dragged length S pushes back with R (T / T_c) times the pull of the same length of slab, R and
 /// T_c from Cloos 1993's densities, FRC-028 and FRC-029) against the pull of the dense slab left
 /// in the slab's length L, F_sp (L − S) / D: the two balance at S* = L / (1 + R T / T_c). A
@@ -681,7 +681,7 @@ pub fn dragged_length_km(slab_km: f64, thickness_m: f64) -> f64 {
 }
 
 /// Whether the slab of a contact, `slab_km` long, drags the terrane at its front `f` down whole
-/// (ledger PLT-760): the terrane's extent across the front, the collision's `shortening_km` so
+/// (ledger PLT-770): the terrane's extent across the front, the collision's `shortening_km` so
 /// far plus the visible area of the incoming plate's continental crust connected to the front's
 /// crust (through its crust already under the overriding plate too) over the front's length, is
 /// within [`dragged_length_km`] of the slab (up to `slab_depth_km`, PLT-184) for the front crust's
@@ -912,7 +912,7 @@ mod tests {
         p.y > 0.866
     }
 
-    /// The slab's reach against a terrane's buoyancy (ledger PLT-760): the pull of the dense slab
+    /// The slab's reach against a terrane's buoyancy (ledger PLT-770): the pull of the dense slab
     /// left, F (L − S)/D, against FRC-030's buoyancy of the dragged length S, 2.25 F (T/30 km) S/D,
     /// balance at S* = L / (1 + 2.25 T/30 km): 215 km of a full 700 km slab under Cloos's 30 km
     /// continental crust, 329 km under 15 km of arc crust, all of a slab under none, and half of

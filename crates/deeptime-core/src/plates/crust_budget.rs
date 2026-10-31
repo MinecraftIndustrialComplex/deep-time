@@ -140,7 +140,7 @@ const GLOBALS: [(&str, &str); 71] = [
     ("noroom_clipped", super::belts::CLIPPED_GLOBAL),
     ("noroom_stays", super::belts::STAYS_GLOBAL),
     ("taper_toe", super::belts::TOE_GLOBAL),
-    // Terranes docking stripped to their cover (ledger: PLT-760; zero without the switch).
+    // Terranes docking stripped to their cover (ledger: PLT-770; zero without the switch).
     ("stripped", super::belts::STRIPPED_GLOBAL),
     // The two wedges' retro plateau beyond the belt's reach (ledger: PLT-740; zero without the
     // switch).

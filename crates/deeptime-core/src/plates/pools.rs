@@ -138,7 +138,7 @@ const EROSION_ORDER: [usize; 6] = [
 /// terrane's "sedimentary cover ... has been scraped off basement rocks and accreted to the
 /// growing fold-and-thrust belt" (Enkelmann et al. 2008, p. 916). Taking the cover's base as the
 /// detachment is the project's reading ("rheologically weak crustal layers ... can be activated
-/// as detachments", Tetreault & Buiter 2014, p. 1243). ledger: PLT-761
+/// as detachments", Tetreault & Buiter 2014, p. 1243). ledger: PLT-771
 pub const COVER: [usize; 4] = [
     pool::SEDIMENT,
     pool::SEDIMENTARY,
@@ -385,7 +385,7 @@ pub fn ocean_heat_flow(age_myr: f64) -> f64 {
 mod tests {
     use super::*;
 
-    /// A column's cover (ledger PLT-761) is its layered rock on the basement: the continental
+    /// A column's cover (ledger PLT-771) is its layered rock on the basement: the continental
     /// column's 0.1 km of sediment, 2 km of sedimentary and 1.5 km of volcanic rock; an island
     /// arc of 15 km on 7 km of ocean crust (its basement, PLT-331) keeps its own lavas and tuffs,
     /// a sixth of its magma (PLT-046), not the ocean floor's: 2.5 km, inside Tetreault & Buiter

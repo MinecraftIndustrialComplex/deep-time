@@ -542,7 +542,7 @@ pub struct Collision {
     /// The contact's slab drags the incoming terrane down whole: its extent across the front
     /// (the shortening so far and the rest's area over the front's length) is within the slab's
     /// reach against its buoyancy (`shortening::dragged_length_km`). Set each step with a front
-    /// by `shortening::advance` (only with `tectonics.terrane_docking_cover`, ledger PLT-760): such
+    /// by `shortening::advance` (only with `tectonics.terrane_docking_cover`, ledger PLT-770): such
     /// a terrane is stripped to its cover at the front and does not transfer at the threshold.
     #[serde(default)]
     pub subducting: bool,
@@ -579,7 +579,7 @@ pub struct Belt {
     pub stacked_km2_m: f64,
     pub wedge_km2_m: f64,
     /// The crust a terrane docking stripped to its cover sent down with the slab instead of
-    /// stacking it, km² × m (`tectonics.terrane_docking_cover`, ledger PLT-760; measurement only).
+    /// stacking it, km² × m (`tectonics.terrane_docking_cover`, ledger PLT-770; measurement only).
     #[serde(default)]
     pub stripped_km2_m: f64,
     /// The uplift at the front summed over the steps (the largest uplift of each step), m: the
