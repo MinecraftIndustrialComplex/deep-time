@@ -2241,8 +2241,7 @@ fn how_resamplings_roughen_a_boundary() {
                 st.recount(&pos);
                 let tree = Tree::over(&pos, |_| true);
                 let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env);
-                resolve_turned(&mut st, &mut world, &geo, &overlaps, &pos, &tree, &env)
-                    .unwrap();
+                resolve_turned(&mut st, &mut world, &geo, &overlaps, &pos, &tree, &env).unwrap();
             }
         }
     }
