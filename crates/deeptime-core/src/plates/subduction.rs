@@ -556,7 +556,8 @@ pub fn resolve(
             // Once stacked it stays so while it is under (ledger: PLT-291): the belt counted it
             // when it crossed the front, and a collision that ends (a parting, a transfer, a weld)
             // does not make it crust to accrete again.
-            s.stacked |= own.is_some() && s.kind == CONTINENTAL;
+            let stacked = s.stacked() || (own.is_some() && s.kind == CONTINENTAL);
+            s.set_stacked(stacked);
             if let Some(was) = &was_hidden
                 && s.kind == CONTINENTAL
                 && !was[o.i as usize]
@@ -586,7 +587,8 @@ pub fn resolve(
         }
     }
     for s in &mut state.samples {
-        s.stacked &= s.is_hidden();
+        let stacked = s.stacked() && s.is_hidden();
+        s.set_stacked(stacked);
     }
     // Held ocean floor that turned continental this step (`make_continental` above) is let go:
     // from the next step on it is judged as continental crust.
@@ -884,6 +886,11 @@ struct Source {
     /// The front is incipient (PLT-610): its slab has not yet sunk far enough to melt an arc, or
     /// its oceanic slab comes in too slowly for a slab to form (PLT-681).
     incipient: bool,
+    /// Continental crust at the front that is no crust-suturing front: a terrane its contact's
+    /// slab drags down whole (PLT-770, `Collision::subducting`), which goes down instead of
+    /// suturing, so PLT-763's suture magma and the suture fronts leave it out (PR #53's
+    /// re-review).
+    dragged: bool,
 }
 
 /// World global: arc crust added to continental crust over the run, km³ (Earth-normalized).
@@ -991,9 +998,12 @@ pub const ARC_CONES_OCEANIC_GLOBAL: &str = "plates/arc_cones_oceanic_km3";
 pub const ARC_FRONT_INTRA_OCEANIC_GLOBAL: &str = "plates/arc_front_intra_oceanic_km_myr";
 /// World globals: the collision fronts (the subducting plate's continental crust at the front)
 /// over the run, km × Myr, and of them those past incipient, where PLT-763's suture magma can
-/// act: its contact's slab at PLT-611's 100 km or more, which `forces::grow_slab` sets to 0 once
-/// continental crust has held half the contact's front for `slab_breakoff_myr` (FRC-019), so the
-/// suture's arcs end with the breakoff (measurement; ledger: PLT-763).
+/// act: its contact's slab at PLT-611's 100 km or more. `forces::grow_slab` sets the slab to 0
+/// only once continental crust has held at least half the contact's front for
+/// `slab_breakoff_myr` (FRC-019), and any oceanic front sample lengthens it again, so the
+/// breakoff does not end the suture's arcs: a mostly oceanic contact never breaks off, and the
+/// magma resumes once the slab is back at 100 km. The second over the first is the share of the
+/// collision front where the magma acts (measurement; ledger: PLT-763).
 pub const SUTURE_FRONT_GLOBAL: &str = "plates/suture_front_km_myr";
 pub const SUTURE_FRONT_ACTIVE_GLOBAL: &str = "plates/suture_front_active_km_myr";
 /// World globals: where the arcs' magma went by its law, its arc's setting at onset and the crust
@@ -1002,8 +1012,10 @@ pub const SUTURE_FRONT_ACTIVE_GLOBAL: &str = "plates/suture_front_active_km_myr"
 /// crust: its island-arc magma above its continental-arc magma, and some), so the split reads
 /// against `tools/review/crustcycle/probe.py MODE=arcs`. In order, the continental arcs' law:
 /// on island-arc crust under an arc that began at a continent; on island-arc crust under an arc
-/// that began intra-oceanic where `island_arc_crust` says no (no ocean basement); the same where
-/// it says yes (only with `island_arc_own_crust` off: the magma PLT-760 moves to the island law);
+/// that began intra-oceanic where `island_arc_crust` says no (crust not marked as an island arc's:
+/// a continent's own crust that took island-arc magma, and before PR #53's re-review a matured
+/// arc's edge that a resampling blended under the 8 km line, its leak B); the same where it says
+/// yes (only with `island_arc_own_crust` off: the magma PLT-760 moves to the island law);
 /// on other continental crust; a suture's magma on island-arc crust; on other crust; then the
 /// island arcs' law on continental crust (PLT-760's own). (The trace runs of 2026-10-31, before
 /// `island_arc_crust` read the basement alone, had an eighth: of the second, the part with an
@@ -1019,21 +1031,29 @@ pub const ARC_SPLIT_GLOBALS: [&str; 7] = [
 ];
 
 /// Crust an intra-oceanic arc is built on: ocean floor, or an earlier intra-oceanic arc, the
-/// continental crust an island arc made over its ocean floor (PLT-047: an ocean basement under it,
-/// PLT-331, and island-arc crust past the maturity line, the 8 km that turned it), against a
-/// continent's own crust. Stern 2010 (GSL Spec. Publ. 338, p. 8, read in full by the research
-/// sub-agent): "IOASs are built on oceanic crust, whereas Andean-type arcs are built on
-/// pre-existing continental crust"; their basements include "earlier intra-oceanic arcs,
-/// accretionary complexes and oceanic plateaux" (Gerya 2011's account of Leat & Larter 2003).
-/// The other columns with an ocean basement are a continent's crust on ocean floor, not an arc's
-/// basement: a sediment margin (PLT-661, the continents' sediment at a passive margin, where an
-/// arc would be Andean-type), crust stacked to a continent's column at a contact (PLT-289) and a
-/// spread's receiver (PLT-662, an orogen's crust). A basement alone is no test: the resampling
-/// blends it over the continental corners (`ridges::resample`), so a continent beside an accreted
-/// arc takes a share of one. Until 2026-10-31 a game-choice line ("own crystalline crust at most
-/// twice the island-arc magma") stood here, then any basement. ledger: PLT-760
-pub fn island_arc_crust(s: &super::state::Sample, k: &crate::params::TectonicParams) -> bool {
-    s.kind != CONTINENTAL || (s.basement() > 0.0 && s.arc_oceanic_m >= mature_arc_m(k))
+/// continental crust an island arc made over its ocean floor, against a continent's own crust.
+/// Stern 2010 (GSL Spec. Publ. 338, p. 8, read in full by the research sub-agent): "IOASs are
+/// built on oceanic crust, whereas Andean-type arcs are built on pre-existing continental crust";
+/// their basements include "earlier intra-oceanic arcs, accretionary complexes and oceanic
+/// plateaux" (Gerya 2011's account of Leat & Larter 2003). The rule takes the first and leaves
+/// out the other two: this model has no oceanic plateaux, and its accretionary crust is a
+/// continent's (the trench sediment accreted to the overriding plate). The class is the column's
+/// mark (`Sample::island_arc_marked`): set where an ocean column matured into continental crust
+/// under island-arc magma (PLT-047, its ocean crust its basement, PLT-331), and carried through a
+/// resampling from the nearest corner as the kind is (`ridges::interpolate`). The other columns
+/// with an ocean basement are a continent's crust on ocean floor, not an arc's basement: a
+/// sediment margin (PLT-661, the continents' sediment at a passive margin, where an arc would be
+/// Andean-type), ocean floor thickened at a contact to a continental column's crystalline crust
+/// and turned continental (PLT-289) and a spread's receiver (PLT-662, an orogen's crust); none is
+/// marked. Until the review of PR #53 (2026-10-31) the class was read from the column's basement
+/// and island-arc crust against the 8 km line, which a resampling blends differently (the arc
+/// crust over all three corners, ocean floor included; the basement over the column's own class):
+/// a matured arc's edge beside its ocean flank fell under the line and read as a continent's own
+/// crust, and a continent's own column beside an accreted arc took a share of both and passed.
+/// Before that, a game-choice line ("own crystalline crust at most twice the island-arc magma"),
+/// then any basement. ledger: PLT-760
+pub fn island_arc_crust(s: &super::state::Sample) -> bool {
+    s.kind != CONTINENTAL || s.island_arc_marked()
 }
 
 /// The island-arc crust that turns an ocean column continental, m (PLT-047): `arc_mature_crust_km`
@@ -1054,7 +1074,7 @@ pub fn arc_is_island(
     intra_oceanic: bool,
     s: &super::state::Sample,
 ) -> bool {
-    s.kind != CONTINENTAL || (k.island_arc_own_crust && intra_oceanic && island_arc_crust(s, k))
+    s.kind != CONTINENTAL || (k.island_arc_own_crust && intra_oceanic && island_arc_crust(s))
 }
 /// World global: crust shortened into the arcs' cordilleras over the run, km³ (moved, not made).
 pub const CORDILLERA_GLOBAL: &str = "plates/cordillera_shortened_km3";
@@ -1754,6 +1774,11 @@ pub fn fronts_finish(
             } else {
                 0.0
             };
+            let dragged = su.kind == CONTINENTAL
+                && state.contacts[c]
+                    .collision
+                    .as_ref()
+                    .is_some_and(|col| col.subducting);
             info.push(Source {
                 contact: c,
                 rel,
@@ -1765,8 +1790,9 @@ pub fn fronts_finish(
                 sediment: f64::from(su.pools[pool::SEDIMENT]),
                 oceanic_slab: su.kind != CONTINENTAL,
                 incipient: incipient_here,
+                dragged,
             });
-            if su.kind == CONTINENTAL {
+            if su.kind == CONTINENTAL && !dragged {
                 suture_front[0] += len_km * env.dt_myr;
                 if !incipient_here {
                     suture_front[1] += len_km * env.dt_myr;
@@ -1799,7 +1825,7 @@ pub fn fronts_finish(
                             v as u32,
                             arc_steps,
                             |u| state.samples[u].is_hidden(),
-                            |s| s.kind == CONTINENTAL && !island_arc_crust(s, k),
+                            |s| s.kind == CONTINENTAL && !island_arc_crust(s),
                         )
                     } else {
                         continent_near
@@ -1896,7 +1922,7 @@ pub fn fronts_finish(
             if !src.oceanic_slab {
                 // … unless `collision_arc_magma`: Scholl & von Huene's arc addition during
                 // suturing, over the same band, at any convergence (ledger: PLT-763).
-                if !(k.collision_arc_magma && slab_arc(i) && !src.incipient) {
+                if !(k.collision_arc_magma && slab_arc(i) && !src.incipient && !src.dragged) {
                     return Plan::default();
                 }
                 let axis = SUTURE_ARC_KM3_PER_KM_MYR / band_km * 1000.0 * env.dt_myr;
@@ -2132,7 +2158,7 @@ pub fn fronts_finish(
                     && s.arc_oceanic_m > s.arc_continental_m
                     && s.arc_oceanic_m > 0.0;
                 let io_onset = contacts[src.contact].arc_intra_oceanic;
-                let own_island = island_arc_crust(s, k);
+                let own_island = island_arc_crust(s);
                 // By the arc's law: the column's label, or with `island_arc_own_crust` the island
                 // law on the crust an intra-oceanic arc made (ledger: PLT-760).
                 if !plan.island {

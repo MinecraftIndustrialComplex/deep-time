@@ -1759,8 +1759,10 @@ fn finish_samples(st: &mut PlateState, geo: &Geo, z0: &[f32], env: &Env<'_>) {
             && s.arc_oceanic_m > 0.0
             && s.arc_oceanic_m >= mature_m
         {
-            // The ocean crust under the arc stays under it, as its basement (ledger: PLT-331).
+            // The ocean crust under the arc stays under it, as its basement (ledger: PLT-331), and
+            // the crust is an island arc's (ledger: PLT-760).
             s.make_continental();
+            s.set_island_arc(true);
             s.flags |= EMERGED;
             if s.orogeny != OROGENY_HIMALAYAN {
                 s.orogeny = OROGENY_ANDEAN;

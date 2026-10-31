@@ -13230,13 +13230,15 @@ the onset read another test than the law.)
   "correct as built"). The design expected about 0.6 km³ a year (33.3 km³/km/Myr on 18,411 km of
   collision front at any time). The magma needs a front past incipient (`!src.incipient` in
   `subduction::fronts_finish`): the contact's slab at PLT-611's 100 km or more, and
-  `forces::grow_slab` breaks the slab off (length 0) once continental crust has held half the
-  contact's front for `slab_breakoff_myr` (FRC-019; PLT-184, 10 Myr), after which it grows again
-  only from the contact's oceanic front samples. So each collision's suture magma runs at most
-  about 10 Myr while a collision lasts tens of Myr (the review's 20 to 50; arc-continent collision
-  orogeny about 20 to 50 My, Brown et al. 2011, a search snippet through the research sub-agent):
-  a front three times Scholl & von Huene's 6,000 km for about a third of the time. 0.18 is a
-  product of two departures, not a match. The arcs' front
+  `forces::grow_slab` breaks the slab off (length 0) only once continental crust has held at
+  least half the contact's front for `slab_breakoff_myr` (FRC-019; PLT-184, 10 Myr); any oceanic
+  front sample lengthens it again by the oceanic front's convergence (100 km in a few Myr at tens
+  of mm/yr) and the magma resumes, and a contact whose front is mostly oceanic never breaks off
+  (corrected at PR #53's re-review: an earlier version of this paragraph had each collision's
+  suture magma run at most about 10 Myr). So the breakoff does not bound it, and that the magma
+  acts on about a third of a front three times Scholl & von Huene's 6,000 km (0.18 against 0.6)
+  is a hypothesis, which `suture_front_on` against `suture_front` can now test. 0.18 is not a
+  match. The arcs' front
   measure now records the collision fronts and those past incipient (`plates/suture_front_km_myr`,
   `plates/suture_front_active_km_myr`, the crust budget's `suture_front` and `suture_front_on`;
   `loss-budget.py` prints the per-km rate over the latter), so the next arm reads the rate per km
@@ -13457,8 +13459,9 @@ in the code, and what changed:
   (`subduction::island_arc_crust`), but the onset's setting read PLT-370's test, any continental
   column within the arc's distance, matured island arcs included. Behind a matured intra-oceanic
   arc (a polarity reversal's new arc, PLT-056, or PLT-737's behind the overriding block) a new arc
-  was classed as begun at a continent and took the continental law on old intra-oceanic crust: the
-  trace's 0.13 to 0.15 km³ a year of "arc began at a continent" is that path. Stern 2010, as
+  was classed as begun at a continent and took the continental law on old intra-oceanic crust: a
+  path inside the trace's 0.13 to 0.15 km³ a year of "arc began at a continent" (how much of it is
+  unmeasured; the first version of this bullet said all). Stern 2010, as
   Gerya 2011 gives Leat & Larter 2003, counts arcs built on earlier intra-oceanic arcs as
   intra-oceanic. With the switch on the onset now reads a continent's own crust
   (`continent_within_by` with `!island_arc_crust`); off, the old test, so the switch-off path is
@@ -13473,18 +13476,21 @@ in the code, and what changed:
   8 km that turned it, `subduction::mature_arc_m`, shared with PLT-047). The cases decided: a
   matured island arc is an intra-oceanic arc's basement (Stern 2010's "earlier intra-oceanic
   arcs"); a sediment margin (PLT-661, the continents' sediment on a passive margin's ocean floor),
-  crust stacked to a continent's column at a contact (PLT-289) and a spread's receiver (PLT-662,
-  an orogen's crust) are a continent's crust on ocean floor, where an arc is Andean-type ("built
+  ocean floor thickened at a contact to a continental column's crystalline crust and turned
+  continental (PLT-289) and a spread's receiver (PLT-662, an orogen's crust) are a continent's crust
+  on ocean floor, where an arc is Andean-type ("built
   on pre-existing continental crust"); a blended trace of a basement on a continent's own crust
   is no arc. This reads two existing fields and keeps the resampling's basement blend as it is
   (its other readers, the belts, the transition and the collapse, are unchanged); a `Sample` has
   no free byte for a substrate flag (144 bytes, the full preset's memory cap). The dropped half
   line had excluded the PLT-289 and PLT-662 columns too, by their arc magma share; the rule now
   excludes them by what the crust is.
-- **PLT-763 runs about a third of the time.** The suture magma acts past incipient only, and the
-  slab breaks off after 10 Myr of continental crust on half the front (the verdicts above,
-  corrected). The collision fronts and those past incipient are now measured, so the next arm
-  reads the rate per km where it acts. The 0.18 to 0.19 km³ a year is no evidence of a match.
+- **Where PLT-763 acts.** The suture magma acts past incipient only. The slab breaks off after
+  10 Myr of continental crust on at least half the front, but any oceanic front sample regrows it
+  and the magma resumes, and a mostly oceanic contact never breaks off (the re-review's
+  correction: this bullet first said it runs about a third of the time). The collision fronts and
+  those past incipient are now measured, so the next arm reads the share where it acts and the
+  rate per km there. The 0.18 to 0.19 km³ a year is no evidence of a match.
 - **Small ones.** PLT-762's row and probe.py: 1 km of rock needs 1.62 km in place under ERO-215,
   not 1.78 (the 536 m line was right). `island_arc_own_crust`'s doc in params.rs now says the
   substrate rule. PLT-763's "at any convergence" is a game-choice in its row. The suture magma

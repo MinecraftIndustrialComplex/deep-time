@@ -2282,7 +2282,7 @@ fn a_resampling_accretes_hidden_continent_once() {
     for stacked in [false, true] {
         let mut s2 = st.clone();
         for s in s2.samples.iter_mut().filter(|s| s.is_hidden()) {
-            s.stacked = stacked;
+            s.set_stacked(stacked);
         }
         let mut world = WorldState::new(1, 16_384, p.t_start_years());
         ridges::resample(
@@ -2359,7 +2359,7 @@ fn a_resampling_consumes_the_visible_crust_a_collision_took() {
         s.kind = CONTINENTAL;
         s.pools = pools::continental_column();
         s.thickness_m = pools::thickness(&s.pools);
-        s.stacked = false;
+        s.set_stacked(false);
     }
     let k = st
         .contacts
@@ -5054,10 +5054,11 @@ fn an_intra_oceanic_arc_keeps_the_island_law_on_the_crust_it_made() {
         p.tectonics.island_arc_own_crust = switch;
         for s in st.samples.iter_mut().filter(|s| s.group == 0) {
             s.make_continental();
+            s.set_island_arc(true);
             s.pools[pool::FELSIC_PLUTONIC] += 9000.0;
             s.arc_oceanic_m = 9000.0;
             s.thickness_m = pools::thickness(&s.pools);
-            assert!(subduction::island_arc_crust(s, &p.tectonics));
+            assert!(subduction::island_arc_crust(s));
         }
         for c in &mut st.contacts {
             c.arc_intra_oceanic = io;
@@ -5101,7 +5102,7 @@ fn an_intra_oceanic_arc_keeps_the_island_law_on_the_crust_it_made() {
         st.samples
             .iter()
             .filter(|s| s.group == 0)
-            .all(|s| !subduction::island_arc_crust(s, &p.tectonics))
+            .all(|s| !subduction::island_arc_crust(s))
     );
     let cont = arc_step(&p, &mut st, &geo, &pos, 1).0;
     assert!(cont.arc_continental_km3 > 0.0);
@@ -5109,11 +5110,12 @@ fn an_intra_oceanic_arc_keeps_the_island_law_on_the_crust_it_made() {
 
     // The substrate decides (Stern 2010: IOASs "are built on oceanic crust", their basements
     // "earlier intra-oceanic arcs"): an island arc matured over its ocean floor (an ocean basement
-    // and PLT-047's 8 km of island-arc crust) is crust an intra-oceanic arc builds on, whatever
-    // else it took; a continent's crust on ocean floor (a sediment margin, PLT-661; crust stacked
-    // or spread onto the floor, PLT-289 and PLT-662: an ocean basement, no arc) is not, nor is a
-    // continent's own crust, whatever island-arc magma it took, nor a continent that took a
-    // share of a basement from an accreted arc beside it at a resampling.
+    // and PLT-047's 8 km of island-arc crust, marked where it matured) is crust an intra-oceanic
+    // arc builds on, whatever else it took; a continent's crust on ocean floor (a sediment margin,
+    // PLT-661; ocean floor thickened or spread onto, PLT-289 and PLT-662: an ocean basement, no
+    // arc) is not, nor is a continent's own crust, whatever island-arc magma it took, nor a
+    // continent that took a share of a basement from an accreted arc beside it at a resampling
+    // (none of them is marked; `ridges::tests` has the resampling).
     let k = &crate::params::TectonicParams::default();
     let mature = subduction::mature_arc_m(k);
     assert_eq!(mature, 8000.0);
@@ -5121,29 +5123,30 @@ fn an_intra_oceanic_arc_keeps_the_island_law_on_the_crust_it_made() {
     arc.pools = pools::oceanic_column();
     arc.arc_oceanic_m = mature;
     arc.make_continental();
+    arc.set_island_arc(true);
     arc.pools[pool::FELSIC_PLUTONIC] += mature;
     arc.thickness_m = pools::thickness(&arc.pools);
     assert!(arc.basement() > 0.0);
-    assert!(subduction::island_arc_crust(&arc, k));
+    assert!(subduction::island_arc_crust(&arc));
     let mut margin = state::Sample::blank(0);
     margin.pools = pools::oceanic_column();
     margin.make_continental();
     margin.pools[pool::FELSIC_PLUTONIC] += 20_000.0;
     margin.thickness_m = pools::thickness(&margin.pools);
     assert!(margin.basement() > 0.0 && margin.arc_oceanic_m == 0.0);
-    assert!(!subduction::island_arc_crust(&margin, k));
+    assert!(!subduction::island_arc_crust(&margin));
     let mut own = state::Sample::blank(0);
     own.kind = CONTINENTAL;
     own.pools = pools::continental_column();
     own.arc_oceanic_m = 30_000.0;
     own.thickness_m = pools::thickness(&own.pools);
     assert!(own.basement() <= 0.0);
-    assert!(!subduction::island_arc_crust(&own, k));
+    assert!(!subduction::island_arc_crust(&own));
     let mut traced = own;
     traced.basement_m = 500.0;
     traced.arc_oceanic_m = 0.3 * mature;
     assert!(traced.basement() > 0.0);
-    assert!(!subduction::island_arc_crust(&traced, k));
+    assert!(!subduction::island_arc_crust(&traced));
 
     // The setting at the onset: over ocean floor intra-oceanic, at a continent's own crust not;
     // behind an earlier intra-oceanic arc (the overriding plate's samples a matured island arc)
@@ -5160,9 +5163,10 @@ fn an_intra_oceanic_arc_keeps_the_island_law_on_the_crust_it_made() {
             for s in st.samples.iter_mut().filter(|s| s.group == 0) {
                 s.arc_oceanic_m = 9000.0;
                 s.make_continental();
+                s.set_island_arc(true);
                 s.pools[pool::FELSIC_PLUTONIC] += 9000.0;
                 s.thickness_m = pools::thickness(&s.pools);
-                assert!(subduction::island_arc_crust(s, &p.tectonics));
+                assert!(subduction::island_arc_crust(s));
             }
         }
         arc_step(&p, &mut st, &geo, &pos, 1);
@@ -5219,6 +5223,26 @@ fn a_collision_front_adds_scholl_and_von_huenes_suture_arc() {
     );
     assert_eq!(on.arc_continental_km3 + on.arc_oceanic_km3, 0.0);
     assert!((fast.arc_suture_km3 - on.arc_suture_km3).abs() < 1e-9 * want);
+    assert!(on.suture_front_km_myr[0] > 0.0 && on.suture_front_km_myr[1] > 0.0);
+    // A terrane its slab drags down whole (PLT-770, `Collision::subducting`) is no crust-suturing
+    // front (PR #53's re-review): it takes no suture magma and is no suture front.
+    let (mut p, mut st, geo, pos) = arc_fixture(true, false, 150.0, Some(20.0), 50.0);
+    p.tectonics.collision_arc_magma = true;
+    for s in st.samples.iter_mut().filter(|s| s.group == 1) {
+        s.kind = CONTINENTAL;
+        s.pools = pools::continental_column();
+        s.elevation_m = 400.0;
+        s.thickness_m = pools::thickness(&s.pools);
+    }
+    for c in &mut st.contacts {
+        c.collision = Some(state::Collision {
+            subducting: true,
+            ..a_collision()
+        });
+    }
+    let dragged = arc_step(&p, &mut st, &geo, &pos, 1).0;
+    assert_eq!(dragged.arc_suture_km3, 0.0);
+    assert_eq!(dragged.suture_front_km_myr, [0.0; 2]);
 }
 
 /// Clift & Vannucchi's trench sediment line in place (PLT-762): 1 km of sediment uncorrected
@@ -5989,7 +6013,7 @@ fn accreted_crust_stands_up_by_its_airy_height() {
     for stacked in [false, true] {
         let mut s2 = st.clone();
         for s in s2.samples.iter_mut().filter(|s| s.is_hidden()) {
-            s.stacked = stacked;
+            s.set_stacked(stacked);
         }
         let mut world = WorldState::new(1, 16_384, p.t_start_years());
         ridges::resample(
