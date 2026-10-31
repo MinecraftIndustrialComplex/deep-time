@@ -196,11 +196,16 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
   executable): fmt and clippy (core and cli, all targets) clean, the lane's 80 tests passed. The full gate
   (`gate.sh full` on b20d0e3d's tree, job rb-fix-full): fmt and workspace clippy clean, `cargo test --workspace` 1,474
   passed, 0 failed, 13 ignored.
-- **Next.** The two arms on base35-s4 once it exists (the coordinator's message):
-  `pool.sh run rb-months --seeds 1,2,3,4` (the branch's default: the months' correction alone) and
-  `pool.sh run rb1 --seeds 1,2,3,4 --set surface.runoff_budget=true`, both with `+DEEPTIME_CRUST_BUDGET=1
-  +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`, then `pool.sh table --base base35-s4 --arm rb-months --arm rb1` and the
-  plateau reads (`wear.sh`, `recal.sh`). The young stage is outside the pool's runs; its unit check is the read.
+- **The arms on base35-s4** (key c9be4b8a512c, 8 runs each; design "The arms after the review"):
+  - rb-months (the branch's default, the months' correction): no column moves (land 0.215, crust under the sea 0.605,
+    criteria median 5; p 0.21 or more). It can land as a correction.
+  - rb1 (`surface.runoff_budget=true`): land 0.220, largest landmass 0.083 (0.048, p 0.083), crust under the sea
+    0.609, criteria median 6 (5), sea at the end 462 m (339); the guard as the base's (worst 10,554 m).
+  - The plateau reads (`tools/review/plateau/arm_rb1.sh`): runoff weight above 2 km 0.433 against the own 0.969; the
+    flat high ground 110.0 m/Myr against rb-months' 146.5, on 1.3 times the land; land above 2 km over the run
+    0.0280 against 0.0238; K's regions 8 to 18 % slower than rb-months', all inside Montgomery & Brandon's lines.
+  - The young stage is outside the pool's runs; its unit check is the read.
+- **Verdict: default-on** (the coordinator's flip).
 
 ### 2026-10-31: The continents' export is set by the plates' uplift, not by the erosion law (a diagnosis from cached runs; the runoff lane, worktree agent-a4e92fd13092b08b0, branch `surface-runoff-budget`; nothing built)
 

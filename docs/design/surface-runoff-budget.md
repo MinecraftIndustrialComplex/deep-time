@@ -1,6 +1,6 @@
 # The surface's runoff from the bake's water budget: design
 
-Status: **built behind a switch, off; its review's fixes built; to be armed again on base35-s4 before any default**
+Status: **built behind a switch, off; its review's fixes built; armed again on base35-s4 (rb1): verdict default-on**
 (2026-10-31, the runoff lane, branch `surface-runoff-budget` on `plateau-drainage` 7df49df8). The switch is
 `surface.runoff_budget` (`crates/deeptime-core/src/surface/climate.rs`, ERO-221). The checks against cold basins are
 ERO-222. The arm plat-rb0 ran on the closed basins ("The arm's results"): the flat high ground wears a third less, the
@@ -316,6 +316,52 @@ fixes"). It met the project's rule:
 It replaces the snapshot's rule that a land below freezing evaporates nothing (MOI-067's PET for the runoff), which the
 bake dropped on 2026-10-01, so the rivers and the lakes then share one budget. It does not reach Tibet's 6 to 16 m/Myr.
 The plateaus' flat tops now wear by the edge's cut and by diffusion, not by runoff.
+
+## The arms after the review (rb-months and rb1 on base35-s4, 2026-10-31)
+
+The head after the review's fixes (b20d0e3d's code, key c9be4b8a512c), 8 runs each on base35-s4's starts and seeds, the
+crust budget's words as the base's. rb-months is the branch's default (the months' correction alone, the switch off);
+rb1 has `surface.runoff_budget=true`. No alias: the correction changes the default on cold ground.
+
+**The table** (medians of 8, Mann-Whitney p against base35-s4):
+
+| | land | largest landmass | continental crust under the sea | land above 2 km | coast with high ground | land under ice | collisions per 100 Myr | crust's net change | criteria median, mean | sea after 100 Myr / end, m |
+|---|---|---|---|---|---|---|---|---|---|---|
+| base35-s4 | 0.216 | 0.048 | 0.594 | 0.009 | 0.071 | 0.062 | 4.85 | +0.113 | 5, 5.38 | 280 / 339 |
+| rb-months | 0.215 (0.51) | 0.053 (0.38) | 0.605 (0.65) | 0.015 (0.38) | 0.103 (0.51) | 0.061 (0.72) | 4.70 (0.96) | +0.117 (0.96) | 5, 4.75 (0.21) | 332 / 386 |
+| rb1 | 0.220 (0.96) | 0.083 (0.083) | 0.609 (0.72) | 0.015 (0.38) | 0.078 (0.72) | 0.066 (0.65) | 4.65 (0.92) | +0.127 (0.23) | 6, 5.62 (0.36) | 365 / 462 |
+
+**The guard** (`measure guard`): worst 10,256 m (rb-months) and 10,554 (rb1) against 10,304; no step beyond two Earth
+reliefs; the largest one-step rise 7,486 and 6,959 against 7,144 m; the highest plate 4,461 and 4,490 against 4,413.
+
+**The plateau reads** (`tools/review/plateau/arm_rb1.sh`: `recal.sh` and `wear.sh`; base35's read covers its 24
+runs, the arms' 8):
+- runoff weight on rb1: land 0.748 used against the snapshot's own 0.835, above 2 km 0.433 against 0.969;
+- the flat high ground: rb1 110.0 m/Myr net on 0.0039 of the land (per run 81 to 137), rb-months 146.5 on 0.0029,
+  base35 133.3 on 0.0029; of it below 0 C on the year (`flatf`) 0.72, 0.73 and 0.67;
+- land above 2 / 3 / 4 km, each run's mean over its maps: rb1 0.0280 / 0.0098 / 0.00115, rb-months 0.0238 / 0.0083 /
+  0.00110, base35 0.0239 / 0.0084 / 0.00115;
+- K's regions (8 x 8-cell windows by their mean relief, m/Myr; Montgomery & Brandon's power law and quiet-land line in
+  brackets): 100 m and more 47.0 (rb-months 50.9, base35 50.0; 15 and 35), 250 m and more 95.7 (109.8, 104.6; 60 and
+  75), 500 m and more 183.0 (224.0, 215.7; 210 and 150), 1,000 m and more 329.5 (399.8, 389.6; 525 and 250), 1,500 m
+  and more 498.3 (572.6, 534.8; 963 and 350). Against rb-months the law wears them 8 to 18 % slower, each still
+  between the two lines;
+- the land's mean net lowering 38.3 m/Myr (rb-months 38.6, base35 38.1).
+
+**Reading.**
+- **The months' correction is neutral on the planet:** no column moves (p 0.21 or more). It can land as a correction
+  of master's default.
+- **The law** behaves as plat-rb0 did, on the new base: the high ground's runoff weight halves, the flat high ground
+  wears a quarter less (110 against 146.5 m/Myr) and there is 1.3 times as much of it, the land above 2 km is a sixth
+  more over the run, K's regions stay inside Montgomery & Brandon's lines, the land's mean lowering does not move, and
+  the guard is the base's. The largest landmass and the criteria rise (0.083, p 0.083; a median of 6 against 5); the
+  sea ends higher (462 against 339 m).
+- **The young stage** is outside the pool's runs; its weight is the deep-time surface's on L1, cell for cell, on and
+  off (`the_young_weights_follow_the_surface_s_runoff`).
+
+**Verdict: default-on.** Unit tests against its sources (ERO-222), no divergence or guard failure on the pool, K's
+regions inside their lines, the young stage and the amplifier on the same rule. It replaces MOI-067's PET for the
+stream power's runoff on frozen ground, as the bake did on 2026-10-01.
 
 ## The continents' export: the erosion law or the plates' uplift (2026-10-31, a diagnosis)
 
