@@ -639,6 +639,16 @@ impl PlatesStage {
             ),
             // ledger: PLT-554 (measurement only)
             (subduction::ARC_BAND_GLOBAL, pull.arc_band_km_myr),
+            // ledger: PLT-761, PLT-760 (measurement only)
+            (
+                subduction::ARC_CONES_CONTINENTAL_GLOBAL,
+                pull.arc_cones_km3[0],
+            ),
+            (subduction::ARC_CONES_OCEANIC_GLOBAL, pull.arc_cones_km3[1]),
+            (
+                subduction::ARC_FRONT_INTRA_OCEANIC_GLOBAL,
+                pull.front_intra_oceanic_km_myr,
+            ),
         ] {
             *world.globals.entry(name.to_owned()).or_insert(0.0) += x;
         }

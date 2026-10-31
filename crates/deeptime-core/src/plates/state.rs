@@ -476,6 +476,14 @@ pub struct Contact {
     /// young fronts' measure. ledger: PLT-669
     #[serde(default)]
     pub arc_onset_myr: Option<f64>,
+    /// Whether the contact's arc began intra-oceanic: at the step its onset was set, none of its
+    /// oceanic fronts had visible continental crust of the overriding plate within
+    /// `arc_distance_km` (PLT-370's test), so the arc stood on ocean floor. Set with
+    /// `arc_onset_myr` and cleared with it; with `tectonics.island_arc_own_crust` the arc keeps
+    /// the island law on the crust it made ([`super::subduction::island_arc_crust`]).
+    /// ledger: PLT-760
+    #[serde(default)]
+    pub arc_intra_oceanic: bool,
 }
 
 impl Contact {

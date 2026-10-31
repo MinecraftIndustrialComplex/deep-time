@@ -19,10 +19,18 @@ Stern & Scholl 2010 (Int. Geol. Rev. 52:1-31, full text, Table 1 p. 12 and pp. 1
   lengths    intra-oceanic arcs 14,500 km (100 km^3/km/Myr), continental arcs 27,500 km (35)
 
 The model's rows:
-  island arcs        arc magma on oceanic crust (`arc_o`); it turns continental when the arc
-                     matures (PLT-047), with the ocean floor under it (row "ocean floor")
-  continental arcs   arc magma on continental crust (`arc_c`; the cones counted inside)
-  hotspots           the hotspots' own magma (`hotspot_magma`)
+  island arcs        arc magma at the island arcs' law (`arc_o`: on oceanic crust, and with
+                     `island_arc_own_crust`, PLT-760, on the crust an intra-oceanic arc made) and the
+                     felsic cones it counted inside its rate (`arc_cones_o`, PLT-761, since
+                     2026-10-31; before, the cones were left out of both arc rows); it turns
+                     continental when the arc matures (PLT-047), with the ocean floor under it (row
+                     "ocean floor")
+  continental arcs   arc magma at the continental arcs' law (`arc_c`) and its felsic cones
+                     (`arc_cones_c`)
+  hotspots           on continental crust: the hotspots' own basalt and their LIPs there
+                     (`hotspot_magma_c`) and the cones they counted inside (`hotspot_cones_c`), since
+                     2026-10-31; before, all of the hotspots' own basalt (`hotspot_magma`), ocean
+                     floor's included and the cones left out (row "model only: hotspots, all")
   ocean floor        the ocean floor's own crust (7 km a sample) made continental with the crust
                      on it (`cb_moves` o2c, every part), less what stays under it as its basement
                      and is not counted as continental crust (`o2c_b_km`, PLT-331, since
@@ -111,10 +119,19 @@ def budget(run, length):
         for m in moves.values()
     )
     o2c_basement = sum(m.get("o2c", 0.0) * PLANET_KM2 * m.get("o2c_b_km", 0.0) for m in moves.values())
+    nan = float("nan")
+    split = "hotspot_magma_c" in g  # runs from 2026-10-31 on (PLT-761)
     out = {
-        "island_arcs": per(g.get("arc_o", 0.0)),
-        "continental_arcs": per(g.get("arc_c", 0.0)),
-        "hotspots": per(g.get("hotspot_magma", 0.0)),
+        "island_arcs": per(g.get("arc_o", 0.0) + g.get("arc_cones_o", 0.0)),
+        "continental_arcs": per(g.get("arc_c", 0.0) + g.get("arc_cones_c", 0.0)),
+        "arc_cones": per(g.get("arc_cones_o", nan) + g.get("arc_cones_c", nan)),
+        "hotspots": per(g.get("hotspot_magma_c", 0.0) + g.get("hotspot_cones_c", 0.0))
+        if split
+        else per(g.get("hotspot_magma", 0.0)),
+        "hotspots_all": per(g.get("hotspot_magma", 0.0) + g.get("hotspot_cones", 0.0)),
+        "cones_all": per(g.get("cone_felsic", 0.0) + g.get("cone_mafic", 0.0)),
+        "sed_trench": per(g.get("sed_trench", nan)),
+        "sed_one_way": per(g.get("sed_trench", nan) - g.get("sed_trench_c", nan) - g.get("sed_trench_o", nan)),
         "made_continental": o2c_km3 / yrs,
         "ocean_floor": o2c_floor / yrs,
         "basement": o2c_basement / yrs,
@@ -123,6 +140,7 @@ def budget(run, length):
         "sed_subducted": per(g.get("sed_subducted", 0.0)),
         "forearc": per(g.get("forearc_c", 0.0) + g.get("forearc_o", 0.0)),
         "forearc_c": per(g.get("forearc_c", 0.0)),
+        "forearc_short": per(g.get("forearc_short", nan)),
         "erosive_km": (g.get("forearc_front_c", 0.0) + g.get("forearc_front_o", 0.0)) / length,
         "collision": per(g.get("crossed", 0.0) - g.get("kept", 0.0)),
         "foundering": per(g.get("foundered", 0.0)),
@@ -140,7 +158,6 @@ def budget(run, length):
         "g_normal": g.get("front_g_normal", 0.0) / max(g.get("front_o", 0.0) + g.get("front_c", 0.0), 1e-9),
     }
     # The collision fronts (PLT-401): NaN for runs from before the globals existed.
-    nan = float("nan")
     crossed, kept = g.get("crossed", 0.0), g.get("kept", 0.0)
     area, fkm = g.get("crossed_km2", nan), g.get("front_km_myr", nan)
     noroom = [g.get(f"noroom_{k}", nan) for k in ("sliver", "capped", "clipped")]
@@ -158,6 +175,18 @@ def budget(run, length):
     out["wedge_frac"] = g.get("kept_wedge", nan) / kept if kept > 0 else nan
     out["arc_o_per_km"] = g.get("arc_o", 0.0) / max(g.get("front_o", 0.0), 1e-9)
     out["arc_c_per_km"] = g.get("arc_c", 0.0) / max(g.get("front_c", 0.0), 1e-9)
+    # By the arcs' setting at onset (PLT-760, runs from 2026-10-31 on): the intra-oceanic arcs'
+    # front past incipient and the island law's rock (cones included) over it.
+    band = g.get("arc_band", nan)
+    fronts = g.get("front_o", 0.0) + g.get("front_c", 0.0)
+    out["band_frac"] = band / fronts if fronts > 0 else nan
+    arcs_rock = g.get("arc_o", 0.0) + g.get("arc_c", 0.0) + g.get("arc_cones_o", 0.0) + g.get("arc_cones_c", 0.0)
+    out["arc_per_band"] = arcs_rock / band if band > 0 else nan
+    fio = g.get("front_io", nan)
+    out["front_io_km"] = fio / length
+    out["arc_io_per_km"] = (g.get("arc_o", 0.0) + g.get("arc_cones_o", 0.0)) / fio if fio > 0 else nan
+    out["v_n_o"] = g.get("front_n_o", nan) / max(g.get("front_o", 0.0), 1e-9)
+    out["v_n_c"] = g.get("front_n_c", nan) / max(g.get("front_c", 0.0), 1e-9)
     out["cord_per_km"] = g.get("cordillera", 0.0) / max(g.get("front_c", 0.0), 1e-9)
     t0, t1 = run["first"], run["t"]
     vol = lambda t: t.get("vol_km3", 0.0) + t.get("vol_hidden_km3", 0.0)
@@ -177,13 +206,19 @@ ROWS = [
     ("intra-oceanic (island) arcs", "island_arcs", 1.5),
     ("continental arcs", "continental_arcs", 1.0),
     ("crust-suturing zones", None, 0.2),
-    ("rifts, hotspots, rifted margins", "hotspots", 0.5),
+    ("rifts, hotspots, rifted margins (on continental crust)", "hotspots", 0.5),
+    ("  model only: the arcs' felsic cones, in both arc rows", "arc_cones", float("nan")),
+    ("  model only: hotspots, all (their basalt and cones)", "hotspots_all", float("nan")),
+    ("  model only: the volcano stage's cones, all", "cones_all", float("nan")),
     ("model only: ocean floor's own crust made continental", "ocean_floor", 0.0),
     ("model only: pelagic sediment made", "pelagic", 0.0),
     ("losses", None, None),
-    ("ocean margins: sediment subduction (PLT-440)", "sed_subducted", 1.1),
+    ("ocean margins: sediment subduction (PLT-440, PLT-660)", "sed_subducted", 1.1),
+    ("  model only: the floor's sediment reaching the trenches", "sed_trench", float("nan")),
+    ("  model only: of it the one-way slab's (all subducted)", "sed_one_way", float("nan")),
     ("ocean margins: subduction erosion (PLT-441)", "forearc", 1.4),
     ("  of it continental crust", "forearc_c", float("nan")),
+    ("  model only: asked and not there (the band short)", "forearc_short", float("nan")),
     ("crust-suturing zones (all three)", "collision", 0.7),
     ("  of it PLT-242's share", "coll_share", float("nan")),
     ("  of it no room: left over in a belt with room", "noroom_sliver", float("nan")),
@@ -209,7 +244,13 @@ LENGTHS = [
     ("erosive fronts, km (Clift & Vannucchi 2004: 22,925 of 40,225)", "erosive_km", "{:.0f}"),
     ("island arcs per km of front, km3/km/Myr (Earth ~100 at full rate)", "arc_o_per_km", "{:.1f}"),
     ("continental arcs per km, km3/km/Myr (Earth 35)", "arc_c_per_km", "{:.1f}"),
+    ("mean v_n at island-arc fronts, mm/yr (PLT-666: 86.6)", "v_n_o", "{:.1f}"),
+    ("mean v_n at continental-arc fronts, mm/yr (PLT-666: 58.6)", "v_n_c", "{:.1f}"),
+    ("intra-oceanic arcs' front past incipient, km (PLT-760)", "front_io_km", "{:.0f}"),
+    ("island law's rock per km of it, km3/km/Myr", "arc_io_per_km", "{:.1f}"),
     ("cordillera per km of continental front, km3/km/Myr", "cord_per_km", "{:.1f}"),
+    ("arc band / arc fronts (the fronts with an arc, PLT-554)", "band_frac", "{:.3f}"),
+    ("arcs' rock per km of band, km3/km/Myr (Earth 2.5 AU / 42,000 km = 60)", "arc_per_band", "{:.1f}"),
     ("mean g, all oceanic fronts, full speed", "g_full", "{:.3f}"),
     ("mean g, all oceanic fronts, normal", "g_normal", "{:.3f}"),
     ("mean g, continental fronts, full speed", "g_c_full", "{:.3f}"),

@@ -733,6 +733,7 @@ mod tests {
                 reversed: false,
                 carried: false,
                 arc_onset_myr: None,
+                arc_intra_oceanic: false,
             }],
             hotspots: Vec::new(),
             ridges: Vec::new(),
