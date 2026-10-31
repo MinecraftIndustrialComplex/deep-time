@@ -6248,7 +6248,7 @@ fn young_floor_made_continental_after_the_step_takes_the_continental_law() {
     for &i in &sea {
         assert_eq!(
             st.samples[i].heat_flow_mw_m2,
-            continental_heat_flow(&st.samples[i], t, false, 0.0),
+            continental_heat_flow(&st.samples[i], t, false),
             "what finish_samples sets"
         );
     }
@@ -6282,6 +6282,142 @@ fn young_floor_made_continental_after_the_step_takes_the_continental_law() {
     let mut st = made.clone();
     thermal::refresh_heat_flow(&mut st, &off, t);
     assert_eq!(st, made);
+}
+
+/// The continental lithosphere's floor (PLT-820, PLT-821): a continental column's thermal
+/// lithosphere never rises above its Moho, so the heat-flow law, the adiabat's conductive flux
+/// through the lid, is bounded by the crust. A 70 km belt under an arc's heating stays at 70 km
+/// (the heating's target is L_hot's 60); floor made continental keeps the floor's 2.32 √(κt) or its
+/// column, whichever is deeper; a stretch thins L with the crust down to the stretched column, not
+/// to 1 km; crust with no state takes its floor's lithosphere at the floor's age (at least its
+/// column), not the frame's 225 km; and the law no longer reaches the 1 km clamp's 3,401 mW/m².
+#[test]
+fn a_continental_lithosphere_reaches_down_to_at_least_its_moho() {
+    use super::thermal::{
+        ARC_HEAT_MW_M2, L_COLD_KM, conductive_mw_m2, continental_l_km, cooling_myr, moho_km,
+        ocean_km, stretch,
+    };
+    let p = preset(2_000, 20.0, "supercontinent", 5);
+    assert!(p.tectonics.thermal_state, "the state is the default");
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (mut st, _geo) = init::initial_state(&p, &env).unwrap();
+    let t = env.t_myr;
+    let visible = |st: &PlateState, kind: u8| -> Vec<usize> {
+        (0..st.samples.len())
+            .filter(|&i| st.samples[i].kind == kind && !st.samples[i].is_hidden())
+            .collect()
+    };
+    let land = visible(&st, CONTINENTAL);
+    let sea = visible(&st, OCEANIC);
+    let column_of = |km: f64| {
+        let base = pools::continental_column();
+        let total: f32 = base.iter().sum();
+        base.map(|x| x * (km * 1000.0) as f32 / total)
+    };
+    // A 70 km Andean belt under an arc, its lithosphere 100 km.
+    let belt = land[0];
+    {
+        let s = &mut st.samples[belt];
+        s.pools = column_of(70.0);
+        s.thickness_m = s.pools.iter().sum();
+        s.lithosphere_km = 100.0;
+        s.keel_km = 0.0;
+        s.flags = ARC;
+        s.orogeny = state::OROGENY_ANDEAN;
+    }
+    // Floor 2.4 Myr old (L = 18 km) made continental under 9.3 km and under 18 km of rock.
+    let age = 2.4;
+    for (&i, extra) in sea[..2].iter().zip([9300.0f32, 18_000.0]) {
+        let s = &mut st.samples[i];
+        s.pools = pools::oceanic_column();
+        s.pools[state::pool::SEDIMENT] += extra;
+        s.thickness_m = s.pools.iter().sum();
+        s.formed_myr = (t - age) as f32;
+        s.lithosphere_km = ocean_km(age) as f32;
+        s.flags = 0;
+        s.make_continental();
+    }
+    let floor_l = ocean_km(age);
+    assert!((floor_l - 18.0).abs() < 0.1, "{floor_l}");
+    assert!((f64::from(st.samples[sea[0]].lithosphere_km) - floor_l).abs() < 1e-4);
+    let deep = moho_km(&st.samples[sea[1]]);
+    assert!((deep - 25.0).abs() < 1e-3, "{deep}");
+    assert!((f64::from(st.samples[sea[1]].lithosphere_km) - deep).abs() < 1e-4);
+    // Floor the last resampling made (no state), 0.5 Myr old, made continental under 2 km of
+    // rock: its floor's 2.32 √(κ 0.5) = 8.2 km against its 9 km column.
+    let unset = sea[2];
+    {
+        let s = &mut st.samples[unset];
+        s.pools = pools::oceanic_column();
+        s.pools[state::pool::SEDIMENT] += 2000.0;
+        s.thickness_m = s.pools.iter().sum();
+        s.formed_myr = (t - 0.5) as f32;
+        s.lithosphere_km = 0.0;
+        s.flags = 0;
+        s.make_continental();
+    }
+    assert_eq!(st.samples[unset].lithosphere_km, 0.0, "no state yet");
+    assert!(ocean_km(0.5) < 9.0);
+    let q_unset = f64::from(continental_heat_flow(&st.samples[unset], t, true));
+    assert!(
+        (q_unset - conductive_mw_m2(9.0)).abs() < 1e-2,
+        "{q_unset} against {}",
+        conductive_mw_m2(9.0)
+    );
+    let before = st.clone();
+    for _ in 0..30 {
+        thermal::step(&mut st, &env);
+    }
+    // The belt: at its Moho, not at L_hot's 60 km; its heat flow 26 + 3,375 / 70 + the arc's 40.
+    let s = &st.samples[belt];
+    assert!(
+        (f64::from(s.lithosphere_km) - 70.0).abs() < 1e-3,
+        "{}",
+        s.lithosphere_km
+    );
+    let q = f64::from(continental_heat_flow(s, t, true));
+    assert!((q - (26.0 + 3375.0 / 70.0 + ARC_HEAT_MW_M2)).abs() < 1e-2, "{q}");
+    // The crust with no state: its floor's lithosphere at its Moho, then cooling towards L_cold
+    // (one step from 9 km).
+    let mut once = before.clone();
+    thermal::step(&mut once, &env);
+    let want = L_COLD_KM + (9.0 - L_COLD_KM) * (-env.dt_myr / cooling_myr()).exp();
+    let got = f64::from(once.samples[unset].lithosphere_km);
+    assert!((got - want).abs() < 1e-3, "{got} against {want}");
+    // Every continental column's lithosphere at or below its Moho after the steps.
+    for s in st.samples.iter().filter(|s| s.kind == CONTINENTAL) {
+        assert!(
+            f64::from(s.lithosphere_km) >= moho_km(s) - 1e-3,
+            "{} km over a {} km column",
+            s.lithosphere_km,
+            moho_km(s)
+        );
+    }
+    // A stretch thins L with the crust to the stretched column: by β = 2, a 40 km lithosphere
+    // under 35 km of crust to 20 km, and one 30 km under its 35 km crust (as the state could
+    // leave it before) to the column's 17.5 km.
+    for (l, want) in [(40.0, 20.0), (30.0, 17.5)] {
+        let mut s = state::Sample::blank(0);
+        s.kind = CONTINENTAL;
+        s.pools = column_of(35.0).map(|x| x * 0.5);
+        s.thickness_m = s.pools.iter().sum();
+        s.lithosphere_km = l;
+        stretch(&mut s, 0.5);
+        assert!(
+            (f64::from(s.lithosphere_km) - want).abs() < 1e-3,
+            "{} against {want}",
+            s.lithosphere_km
+        );
+    }
+    // The 1 km clamp is out of reach: a lithosphere set at 0.5 km over a 7 km column reads 7 km.
+    let mut thin = before.samples[unset];
+    thin.pools = pools::oceanic_column();
+    thin.lithosphere_km = 0.5;
+    assert_eq!(continental_l_km(0.5, moho_km(&thin)), 7.0);
+    let q = f64::from(continental_heat_flow(&thin, t, true));
+    assert!((q - conductive_mw_m2(7.0)).abs() < 1e-2, "{q}");
+    assert!(q < 510.0 && conductive_mw_m2(1.0) > 3400.0);
 }
 
 /// The front lane's cut trace (2026-10-24, plates.md "The front's length: why the plates are
