@@ -10036,7 +10036,8 @@ et al. 1993, p. 373), and Taiwan's 90 km belt is the Chinese margin's crust with
 ### Step 20: two wedges about the suture (PLT-730, PLT-731; 2026-10-29)
 
 The coordinator, inline, from the lead above and the design `docs/design/collision-two-wedges.md`. A switch,
-`tectonics.collision_two_wedges`, off by default (its pool arm below).
+`tectonics.collision_two_wedges`, off by default when built (its pool arm below); **on by default since 2026-10-31**
+(the coordinator's call, decisions log 2026-10-31; "The collision orogen (PLT-740)" below).
 
 - **The rule.** A doubly vergent orogen grows as two critical wedges about the point S where the lower plate's mantle
   goes down: a pro-wedge over the lower plate at the minimum critical taper, a retro-wedge over the upper plate,
@@ -10076,7 +10077,8 @@ The coordinator, inline, from the lead above and the design `docs/design/collisi
 - **At the model's resolution.** The quick planet's samples are about 71 km apart on the model sphere, so a 3 km crest's
   pro-wedge (115 km at 1.5 degrees) is one or two rows and its retro-wedge one; the unit fixture's 16,000 samples
   (about 180 km apart) make each wedge its front row.
-- **On the pool: the lead is refuted, the switch stays off** (arm tw-wedges, key cfdf228e0c4c, `--set
+- **On the pool: the lead is refuted, the switch stays off** (this was the 2026-10-29 reading, set aside on 2026-10-31:
+  the switch is on by default, "The collision orogen (PLT-740)" below; arm tw-wedges, key cfdf228e0c4c, `--set
   tectonics.collision_two_wedges=true` and base29's crust-budget environment, earthlike_quick_16k, 1000 Myr, seeds 1 to
   4 from both starts, 8 runs against base29's 24, medians, Mann-Whitney p in brackets; the arm ran with the first
   draft's absolute retro slope, 2.5 degrees, a ratio of 1.67 against the default's 1.55). The mechanism works: the
@@ -11536,7 +11538,11 @@ boundary, 0.093 of the coast, is high for 0.135 of it) reads settings differentl
 ### The collision orogen (PLT-740, 2026-10-31)
 
 The orogen lane, after Ben's order "Freeboard, then orogen (Recommended)" (decisions log 2026-10-30); the design
-`docs/design/collision-orogen.md`. Measurement first, then one rule behind a switch.
+`docs/design/collision-orogen.md`. Measurement first, then one rule behind a switch. **Both switches,
+`tectonics.collision_two_wedges` (PLT-730, PLT-731) and `tectonics.collision_retro_plateau` (PLT-740), are on by
+default since 2026-10-31** (the coordinator's call under Ben's rule of 2026-10-23, "Always, fix V1 elsewhere";
+decisions log 2026-10-31): sourced, unit-tested, the guard clean on the arm orog-cum, and the costs read below go to
+the crust-budget lane.
 
 - **The two wedges on the freeboard physics** (arm orog-tw-sedm, key 31c7c70bd7c7, argkey c7aa72cc: the two
   freeboard switches PLT-660 and PLT-661 set, as base34 has them on, and `tectonics.collision_two_wedges=true`;
@@ -11571,7 +11577,8 @@ The orogen lane, after Ben's order "Freeboard, then orogen (Recommended)" (decis
   0.02 ± 0.0004 mm/yr (one sample, Bookhagen & Strecker 2012, pp. 103-104), southern Tibet's under 0.01 km/Myr
   (ERO-174). The plateau's wear, not the orogen's placement, is what keeps a Tibet-class plateau from lasting to a
   run's end (STATUS Follow-ups, "High plateaus still wear too fast").
-- **The rule** (PLT-740, `tectonics.collision_retro_plateau`, off; with `collision_two_wedges` only). Past the
+- **The rule** (PLT-740, `tectonics.collision_retro_plateau`, on by default since 2026-10-31; with
+  `collision_two_wedges` only). Past the
   strength height the two wedges' plateau grows retro-ward through the overriding plate's continental crust as far
   as the step's crust needs, not to `collision_belt_km` only: when the fill leaves crust with the retro flank's
   samples within the belt's reach at their limits, the flank is searched again through that plate's continental
