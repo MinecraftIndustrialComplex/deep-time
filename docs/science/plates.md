@@ -13713,3 +13713,54 @@ front on the step after a resampling, unread elsewhere. The measure that would r
 onset is the overlap's own convergence (in `resolve`: the two plates' relative velocity at the
 overlapping samples against the boundary's normal, with PLT-311's transform test). Nothing is
 built.
+
+**The overlap trace (2026-10-31, the resampling trace's next step).** oo-overlap (branch
+oo-overlap-run at f989a9dd: the resampling trace's tree, f9c03086, with the overlap trace's code
+and master's East US host defaults; key 3d2738bf34b0, base34's argkey, `pool.sh run oo-overlap
+--seeds 1 +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`), bit for bit base34's
+seed 1 (`same_run.py`), so its onsets are the resampling trace's, one for one. Each onset now
+carries its two plates' motion across their overlap at the onset (`dynamics::OnsetOverlap`, read
+by `subduction::overlap_motion`): every overlapping sample's boundary normal from the 12 samples
+about it (the higher plate's mean position less the lower's, PLT-811, since a pair that met since
+the last resampling has no lattice edge), the plates' relative velocity there and PLT-311's
+transform test (Bird 2003: within 20 degrees of the boundary); and the pair's reading, the
+samples' normals summed against the relative velocity at the overlap's centroid. Read with
+`onsets.py`.
+
+- The ocean-ocean onsets of plates that came to converge (737): their overlapping samples
+  converge for 0.771, slide past for 0.187 and part for 0.041; the pair converges for 0.690,
+  slides past for 0.275 and parts for 0.034 (convergence across, median 18.2 mm/yr by sample,
+  19.8 by pair). Those whose pair does not converge pass incipient at 0.498 and make 5,051 km of
+  the intra-oceanic front, mean over the run.
+- By time since the last resampling, the pair converges for 0.733 of the onsets on the
+  resampling's own step, 0.639 on the step after (415 onsets; transform 0.327: those not
+  converging make 4,016 km of the front), 0.710 from 2 to 10 Myr after (909 km) and 0.894 after
+  that (19 km).
+- The ocean-continent onsets: plates that came to converge, the pair converging 0.772;
+  reversals 0.652; the initiations' pairs, ocean-ocean, 1.000.
+- All told, the onsets whose pair did not converge across their overlap made about 6,100 km of
+  the 20,464 km of intra-oceanic front (0.30) and 4,900 of the 24,300 km of ocean-continent front
+  (0.20).
+
+**What the overlap trace says.** The share is large: three in ten intra-oceanic contacts begin
+where their two plates do not converge across the overlap, mostly where they slide past each
+other (Bird's transforms), and most of those on the step after a resampling, where the gap fill
+has just put the new outline through the samples (my reading of why: the new floor's samples on
+the midline lie on the outline, so motion along a zigzag boundary puts some inside the other
+plate; not traced). By Bird 2003's definition (paragraph [126]: a subduction zone is a step "with
+a convergent (component of) velocity and a Benioff zone"), a contact between plates that slide
+past or part is not a subduction zone at its onset; half of them pass incipient later, once the
+plates converge there or the zigzag converges locally. That is `subduction::resolve`'s rule: any
+overlap of 3 samples makes a contact, with no convergence test. A correctness fix for the
+default, whatever V1 says.
+
+**The fix, built and off (PLT-810, PLT-811).** `tectonics.contact_needs_convergence`: a new contact
+only where the pair's reading converges and is no transform by PLT-311; reversals and existing
+contacts are not gated. An overlap left without a contact stays an overlap, as one under 3
+samples does now, and the next resampling's ranking settles it. Tests first:
+`a_contact_begins_only_where_its_plates_converge` (one overlap, three motions: converging makes a
+contact either way; along the boundary or parting makes one off and none on) and
+`the_overlap_trace_reads_the_motion_across_the_boundary` (the normal, the classes and the pair's
+reading). It removes up to 0.30 of the intra-oceanic front at the onset; some of those contacts
+would begin later, when their plates converge. Not run: per the coordinator's rule, reported
+before an arm.
