@@ -1,7 +1,7 @@
 # How small terranes dock: design
 
-Status: **built behind a switch, off** (2026-10-30, the docking lane, a sub-agent of the coordinator's
-session) on the branch `small-terrane-docking`: `tectonics.terrane_docking_cover` (`shortening::advance`
+Status: **built behind a switch, off; its pool arm correct (the guard clean), on recommended**
+(2026-10-30 and 31, the docking lane, a sub-agent of the coordinator's session; "What the arm showed") on the branch `small-terrane-docking`: `tectonics.terrane_docking_cover` (`shortening::advance`
 classes the front, `belts::stack` strips it); ledger PLT-760, PLT-761; plates.md "How small terranes
 dock". Its 8-run pool arm runs on the collision orogen's physics (origin/collision-orogen merged in,
 PLT-730, PLT-731 and PLT-740 set on) against the cached arm orog-cum ("Measuring it"). For the
@@ -277,6 +277,44 @@ correctness on the planet (the guard, no divergence) and its count (`collision_s
 records' `stripped_km2_m`, partings by reason); Ben's rule puts physics on once it is built and
 correct, whatever V1 does. On a finer lattice (32k presets) the smaller bodies are resolved and the law
 reaches more of them.
+
+## What the arm showed (2026-10-31)
+
+Arm small-terrane (key dcf0d7480ef3, argkey 35ce6e09, 8 runs, seeds 1 to 4 of both starts; this branch
+with origin/collision-orogen merged in, the docking law and both orogen laws set on) against orog-cum
+(key f2d6412d801f, argkey d3261b0a, the same physics without the docking law). Medians, two-sided
+Mann-Whitney p in brackets (`pool.sh table`; collcoast's p from its `--json` values).
+
+- **Correct on the planet.** The guard clean: the worst 10,154 m from the sea against 9,945 (p 0.51), no
+  step beyond 2 Earth reliefs, no plate cells 5 km over Airy, the highest plate elevation 4,700 m
+  against 4,162 (p 0.13). All 8 runs ran.
+- **What it did.** Hand-offs under 50 samples 12.3 per 100 Myr against 17.6 (p 0.014); 50 to 200 9.9
+  against 9.8, 200 to 1,000 7.1 against 7.8 (p 0.50), 1,000 or more 4.6 and 4.6. Partings 29.2 against
+  23.3 (p 0.23): of the parted (14.1 against 10.9), 5.8 per 100 Myr stripped crust, the terranes that
+  went down whole. Crust stripped a median 35 million km³ a run (p25 28.5, p75 42.9 million), 0.035 km³
+  a year (0.029 to 0.043), inside the estimate's 0.02 to 0.07: about 1 % of Stern & Scholl's 3.2 km³ a
+  year of continental additions. Hand-offs that stripped at some step: 2.5 per 100 Myr under 50 samples,
+  1.2 at 50 to 200, 0.56 at 200 to 1,000, 0.11 at 1,000 or more (the project's reading, not traced:
+  a small body at the front went down first and the larger crust behind it on the same plate then
+  jammed the slab). The hand-offs left under 50 samples are the larger ones: 424 / 568 / 749 km across
+  the front against 362 / 492 / 674, 0.079 within 300 km against 0.127. The crust crossing a front is
+  as thick as before (30.4 against 30.3 km), the kept share 0.950 against 0.954.
+- **V1 and the coast** (none beyond the seeds' spread). Land 0.222 against 0.205 (p 0.19), largest
+  landmass 0.083 against 0.074 (p 0.33), continental crust under the sea 0.567 against 0.605 (p 0.16),
+  land above 2 km 0.018 against 0.013 (p 0.96), the coast with high ground 0.091 against 0.067
+  (p 0.38), collisions per 100 Myr 4.45 against 4.60 (p 0.92), the continental crust's net change
+  +0.083 against +0.094 (p 0.44), criteria met 6 and 6. collcoast: collision high coasts on landmasses
+  under 0.02 of the land 0.359 against 0.668 (p 0.44), the collision regime 0.031 of the land against
+  0.013 (p 0.105), collision high coasts whose belt is not elongated 0.170 against 0.075 (p 0.038, one
+  column of twelve). coastset's coast with high ground 0.096 against 0.092 (p 0.72). On the maps
+  (`dock_maps.py`): the coast whose nearest high ground the hand-offs under 50 samples stamped 0.0005
+  against 0.0018, their land 0.012 of the land against 0.018; the map's M5 0.102 against 0.079, the rise
+  in the open collisions' share (0.063 against 0.033), not the small terranes'.
+
+So the law does what the sources say on the planet (small bodies go down with their slab, leaving their
+cover; the larger ones collide as before), costs about 1 % of the crust's additions, and moves no V1
+number beyond the seeds' spread. By Ben's rule (physics on once it is built and correct) it goes on
+by default; the coordinator's call, with the orogen's flip.
 
 ## Measuring it
 
