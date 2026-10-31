@@ -16,10 +16,14 @@ the final pass (`tectonics.heat_flow_refresh`, PLT-469) fixes.
   under55_share     the same as a share of cont_cells
   q_min, q_p01, q_median, q_mean   the continental heat flow's minimum, 1st percentile, median and mean, mW/m2
   q_max             and its maximum
+  over150_cells, over150_share   cells over 150 mW/m2 (the top of Earth's regional continental heat
+                    flows, 100 to 150: PLT-823) and their share of cont_cells
+  over200_cells, over200_share   cells over 200 mW/m2 (above it Lachenbruch et al. 1985 found only
+                    geothermal fields) and their share
   all_q_min         the minimum of `plates/heat_flow_mw_m2` over cells whose crust type is continental
                     (the field the structure stage and the surface's geotherm read)
 
-Version 1.
+Version 2 (2026-10-31, the continental lid's floor, PLT-820: the shares over 150 and 200 added).
 """
 import json
 import sys
@@ -54,6 +58,10 @@ def main():
         "q_median": float(np.median(v)) if v.size else float("nan"),
         "q_mean": float(v.mean()) if v.size else float("nan"),
         "q_max": float(v.max()) if v.size else float("nan"),
+        "over150_cells": float((v > 150.0).sum()),
+        "over150_share": float((v > 150.0).sum()) / n,
+        "over200_cells": float((v > 200.0).sum()),
+        "over200_share": float((v > 200.0).sum()) / n,
         "all_q_min": float(q_all[ca].min()) if ca.any() else float("nan"),
     }
     print(json.dumps(out, sort_keys=True))
