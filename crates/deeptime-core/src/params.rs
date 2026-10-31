@@ -975,6 +975,19 @@ pub struct TectonicParams {
     /// holds under ERO-215's porosity law (536 m). Off, the solid pile is read against 1 km.
     /// ledger: PLT-762
     pub trench_pile_in_place: bool,
+    /// A contact begins only where its plates converge across their overlap (the oceanic-fronts
+    /// lane, 2026-10-31; off by default): `subduction::resolve` makes a new contact from an
+    /// overlap of `MIN_CONTACT` samples or more only where the two plates' relative velocity at
+    /// the overlap's centroid converges across the boundary's normal there and is no transform by
+    /// Bird 2003's test (PLT-311: within 20 degrees of the boundary, or at rest; Bird calls a
+    /// converging step a subduction zone). The normal is read from the samples about each
+    /// overlapping one (`subduction::overlap_normal`, PLT-811), since a pair that met since the
+    /// last resampling has no lattice edge. Off, any overlap of `MIN_CONTACT` samples makes a
+    /// contact: plates sliding past each other overlap where the lattice's outline zigzags
+    /// (the overlap trace, plates.md: 0.31 of the ocean-ocean onsets began on a pair not
+    /// converging, most on the step after a resampling, and made up to 0.30 of the intra-oceanic
+    /// front). Polarity reversals and existing contacts are not gated. ledger: PLT-810
+    pub contact_needs_convergence: bool,
     /// Island-arc crust counts as continental once it is this thick, km: an oceanic sample turns
     /// continental once the arc crust it has built (`arc_oceanic_m`) on top of normal ocean crust
     /// (7 km) reaches it, whatever its height. Cloos (1993): crust thicker than about 15 km is
@@ -1551,6 +1564,7 @@ impl Default for TectonicParams {
             island_arc_own_crust: false, // ledger: PLT-760 (built 2026-10-31, off)
             collision_arc_magma: false, // ledger: PLT-763 (built 2026-10-31, off)
             trench_pile_in_place: false, // ledger: PLT-762 (built 2026-10-31, off)
+            contact_needs_convergence: false, // ledger: PLT-810 (built 2026-10-31, off)
             arc_mature_crust_km: 15.0, // ledger: PLT-047
             cordillera_shortening_mm_yr: 0.0, // ledger: PLT-048
             cordillera_width_km: 120.0,
