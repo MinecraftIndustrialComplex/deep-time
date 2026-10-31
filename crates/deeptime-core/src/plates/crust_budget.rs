@@ -49,7 +49,7 @@ use rayon::prelude::*;
 use super::collapse::iso_height;
 use super::gap_budget::{NAMES, PARTS, Part};
 use super::geometry::Tree;
-use super::state::{OCEANIC, OROGENY_ANDEAN, OROGENY_HIMALAYAN, Sample, pool};
+use super::state::{OCEANIC, OROGENY_ANDEAN, OROGENY_HIMALAYAN, Sample, TRENCH, pool};
 
 /// Set to switch the budget on.
 pub const ON_ENV: &str = "DEEPTIME_CRUST_BUDGET";
@@ -69,7 +69,7 @@ pub fn enabled() -> bool {
 /// ones alone (m): a part's change of the first is felsic rock made or destroyed, of the second
 /// felsic rock moved onto or off the ocean floor (the loss budget against Stern & Scholl 2010,
 /// `tools/review/loss-budget.py`).
-const STOCKS: [&str; 10] = [
+const STOCKS: [&str; 14] = [
     "cont",
     "cont_hidden",
     "vol",
@@ -80,6 +80,10 @@ const STOCKS: [&str; 10] = [
     "vis",
     "felsic",
     "felsic_ocean",
+    "sed_tr",
+    "sed_ov",
+    "sed_oh",
+    "sed_c",
 ];
 const NT: usize = STOCKS.len();
 const CONT: usize = 0;
@@ -90,6 +94,26 @@ const LAND: usize = 4;
 const DRY: usize = 5;
 const FELSIC: usize = 8;
 const FELSIC_OCEAN: usize = 9;
+/// The sediment and sedimentary rock (`pool::SEDIMENT`, `pool::SEDIMENTARY`, m): on the visible
+/// ocean floor at the trenches (the TRENCH flag: the incoming plate at its front this step), on
+/// all the visible ocean floor, on the hidden ocean floor (gone under, until a resampling), and
+/// on continental crust (visible and hidden). Measurement only (the crust-budget lane's trench
+/// trace, 2026-10-31): the parts' changes of these are the sediment's mass balance.
+const SED_TR: usize = 10;
+const SED_OV: usize = 11;
+const SED_OH: usize = 12;
+const SED_C: usize = 13;
+/// Set to print the sediment stocks' changes by part every step (`cb_step` lines).
+pub const STEPS_ENV: &str = "DEEPTIME_CRUST_BUDGET_STEPS";
+/// The globals each `cb_step` line gives the step's change of (km³ Earth-normalized).
+const STEP_GLOBALS: [(&str, &str); 6] = [
+    ("sed_trench", super::ridges::SEDIMENT_REACHING_TRENCH_GLOBAL),
+    ("sed_subducted", super::ridges::SEDIMENT_SUBDUCTED_GLOBAL),
+    ("accreted", super::ridges::ACCRETED_GLOBAL),
+    ("slab", super::ridges::SLAB_GLOBAL),
+    ("forearc_c", super::subduction::FOREARC_CONTINENTAL_GLOBAL),
+    ("forearc_o", super::subduction::FOREARC_OTHER_GLOBAL),
+];
 
 /// The changes of state counted per sample: ocean floor made continental (count, Σ elevation,
 /// Σ thickness of the continental crust made, m), continental crust made oceanic, hidden,
@@ -120,7 +144,7 @@ pub const EDGES_KM: [f64; 10] = [
 ];
 
 /// The globals each snapshot copies (cumulative over the run, km³ or km² Earth-normalized).
-const GLOBALS: [(&str, &str); 82] = [
+const GLOBALS: [(&str, &str); 89] = [
     ("flow_steps", super::flow::STEPS_GLOBAL),
     ("flow_substeps", super::flow::SUBSTEPS_GLOBAL),
     ("flow_short_myr", super::flow::SHORT_GLOBAL),
@@ -250,6 +274,14 @@ const GLOBALS: [(&str, &str); 82] = [
     ("hotspot_magma_c", super::hotspots::MAGMA_CONTINENTAL_GLOBAL),
     ("hotspot_cones", super::hotspots::CONES_GLOBAL),
     ("hotspot_cones_c", super::hotspots::CONES_CONTINENTAL_GLOBAL),
+    // Where the arcs' magma went by law, setting and crust (measurement, the trace of PLT-760).
+    ("split_c_io_cont", super::subduction::ARC_SPLIT_GLOBALS[0]),
+    ("split_c_io_io_no", super::subduction::ARC_SPLIT_GLOBALS[1]),
+    ("split_c_io_io_yes", super::subduction::ARC_SPLIT_GLOBALS[2]),
+    ("split_c_other", super::subduction::ARC_SPLIT_GLOBALS[3]),
+    ("split_s_io", super::subduction::ARC_SPLIT_GLOBALS[4]),
+    ("split_s_other", super::subduction::ARC_SPLIT_GLOBALS[5]),
+    ("split_o_cont", super::subduction::ARC_SPLIT_GLOBALS[6]),
     // The hotspot lane (ledger: PLT-795, PLT-799, PLT-800): the plume heads' large igneous provinces, all
     // and on continental crust, their count, and the volcanic rifted margins' continental crust
     // and gap points.
@@ -330,6 +362,18 @@ fn stocks(samples: &[Sample]) -> [f64; NT] {
                 if !s.is_continental() {
                     a[FELSIC_OCEAN] += felsic;
                 }
+                let sed =
+                    f64::from(s.pools[pool::SEDIMENT]) + f64::from(s.pools[pool::SEDIMENTARY]);
+                match (s.is_continental(), s.is_hidden()) {
+                    (true, _) => a[SED_C] += sed,
+                    (false, true) => a[SED_OH] += sed,
+                    (false, false) => {
+                        a[SED_OV] += sed;
+                        if s.flags & TRENCH != 0 {
+                            a[SED_TR] += sed;
+                        }
+                    }
+                }
                 a
             },
         )
@@ -360,6 +404,8 @@ pub struct CrustBudget {
     /// The snapshots' lines.
     lines: Vec<String>,
     maps: Option<PathBuf>,
+    /// With [`STEPS_ENV`], the parts' changes and the step globals at the last step's end.
+    steps: Option<(Vec<[f64; NT]>, [f64; STEP_GLOBALS.len()])>,
     /// The collision fronts by what stands on either side (`dock_tally.rs`, measurement only),
     /// printed after the budget's lines.
     pub dock: super::dock_tally::DockTally,
@@ -377,6 +423,8 @@ impl CrustBudget {
             moves: vec![[0.0; NX]; PARTS],
             lines: Vec::new(),
             maps: std::env::var_os(MAPS_ENV).map(PathBuf::from),
+            steps: std::env::var_os(STEPS_ENV)
+                .map(|_| (vec![[0.0; NT]; PARTS], [f64::NAN; STEP_GLOBALS.len()])),
             dock: Default::default(),
         }
     }
@@ -470,6 +518,51 @@ impl CrustBudget {
         for (x, y) in self.moves[p].iter_mut().zip(moved) {
             *x += y;
         }
+    }
+
+    /// With [`STEPS_ENV`], at the end of each plate step: a `cb_step` line with the sediment
+    /// stocks ([`SED_TR`] to [`SED_C`]) now and their changes by part over the step, and the
+    /// step's change of [`STEP_GLOBALS`], km³ Earth-normalized (sample area `area_km2`). The
+    /// first step's globals are their totals so far.
+    pub fn end_step(&mut self, t_myr: f64, area_km2: f64, globals: &BTreeMap<String, f64>) {
+        let Some((prev, g_prev)) = self.steps.as_mut() else {
+            return;
+        };
+        let km3 = area_km2 / 1000.0;
+        let mut line = format!(
+            "\ncb_step t={t_myr:.1} stock=[tr={:.5e},ov={:.5e},oh={:.5e},c={:.5e}]",
+            self.last[SED_TR] * km3,
+            self.last[SED_OV] * km3,
+            self.last[SED_OH] * km3,
+            self.last[SED_C] * km3,
+        );
+        for (name, k) in [
+            ("d_tr", SED_TR),
+            ("d_ov", SED_OV),
+            ("d_oh", SED_OH),
+            ("d_c", SED_C),
+        ] {
+            let row: Vec<String> = (0..PARTS)
+                .filter(|&p| self.parts[p][k] != prev[p][k])
+                .map(|p| format!("{}:{:.4e}", NAMES[p], (self.parts[p][k] - prev[p][k]) * km3))
+                .collect();
+            let _ = write!(line, " {name}=[{}]", row.join(","));
+        }
+        let _ = write!(line, " g=[");
+        for (j, (name, key)) in STEP_GLOBALS.iter().enumerate() {
+            let now = globals.get(*key).copied().unwrap_or(0.0);
+            let was = if g_prev[j].is_nan() { 0.0 } else { g_prev[j] };
+            let _ = write!(
+                line,
+                "{}{name}:{:.4e}",
+                if j > 0 { "," } else { "" },
+                now - was
+            );
+            g_prev[j] = now;
+        }
+        line.push(']');
+        prev.clone_from(&self.parts);
+        self.lines.push(line);
     }
 
     /// Whether the snapshots write maps ([`MAPS_ENV`]).
@@ -632,6 +725,10 @@ impl CrustBudget {
             ("dry", DRY, 1.0 / vis),
             ("felsic", FELSIC, area_km2 / 1000.0 / 1.0e6),
             ("felsic_ocean", FELSIC_OCEAN, area_km2 / 1000.0 / 1.0e6),
+            ("sed_tr", SED_TR, area_km2 / 1000.0 / 1.0e6),
+            ("sed_ov", SED_OV, area_km2 / 1000.0 / 1.0e6),
+            ("sed_oh", SED_OH, area_km2 / 1000.0 / 1.0e6),
+            ("sed_c", SED_C, area_km2 / 1000.0 / 1.0e6),
         ] {
             let row: Vec<String> = (0..PARTS)
                 .filter(|&p| self.parts[p][k] != 0.0)

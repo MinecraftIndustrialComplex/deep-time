@@ -654,6 +654,11 @@ impl PlatesStage {
         ] {
             *world.globals.entry(name.to_owned()).or_insert(0.0) += x;
         }
+        // Measurement only (the crust-budget lane's trace of PLT-760; a global whatever the crust
+        // budget, so recording it changes nothing).
+        for (name, x) in subduction::ARC_SPLIT_GLOBALS.iter().zip(pull.arc_split_km3) {
+            *world.globals.entry((*name).to_owned()).or_insert(0.0) += x;
+        }
         lap(&mut clock, "fronts");
         cut_trace::mark(st, &cache.geo, "fronts");
         // Subduction erosion (PLT-441): its globals only while the rule is on, so a run without
@@ -1074,6 +1079,7 @@ impl PlatesStage {
                 b.write_plates(&st.samples, |i| st.plate_of(i), env.t_myr);
                 b.write_ages(&st.samples, env.t_myr);
             }
+            b.end_step(env.t_myr, env.norm.sample_area_km2(), &world.globals);
             if step >= self.total {
                 world.notes.insert(CRUST_BUDGET_NOTE.to_owned(), b.lines());
             }
