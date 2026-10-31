@@ -207,24 +207,38 @@ crustal section").
 ## The rule (PLT-770, PLT-771)
 
 1. **Which bodies go down.** Each step, at each collision front whose contact still has a slab (the
-   pair's slab track, as the jam reads it, PLT-516): the slab's reach against the terrane's buoyancy,
+   pair's slab track, as the jam reads it, PLT-516): the slab's reach against a body's buoyancy,
    S* = L / (1 + R T / T_c) (`shortening::dragged_length_km`), with L the slab's length up to
-   `slab_depth_km` (PLT-184), T the incoming crust's mean thickness at the front (as FRC-030 reads
-   it), R = 2.25 and T_c = 30 km (Cloos 1993's densities, FRC-028 and FRC-029). The terrane's extent
-   across the front is the collision's shortening so far plus the visible area of the incoming plate's
-   continental crust connected to the front's crust over the front's length. Within S*, the front
-   subducts the terrane (`Collision::subducting`).
-2. **What stays of them.** At a subducting front only the crossing crust's cover stays (PLT-771,
+   `slab_depth_km` (PLT-184), T the body's mean crust thickness at the front (as FRC-030 reads it),
+   R = 2.25 and T_c = 30 km (Cloos 1993's densities, FRC-028 and FRC-029). Each body at the front
+   (the incoming plate's continental crust connected to some of the front's crust) is judged on its
+   own: its extent across the front is all its area, the part already under the overriding plate
+   (hidden) and the rest, over its share of the front's length (the front's length times its share
+   of the front's crust samples). When every body is within its S*, the front subducts them
+   (`Collision::subducting`); one body beyond its reach jams the slab for the whole front
+   (`shortening::docking`).
+2. **Judged as it arrives.** A front judged going down keeps the judgment while its bodies hold no
+   more samples than when judged (`Collision::docking_samples`): their crust only goes under, and a
+   resampling only consumes what is under (PLT-276). Crust that joins them (a new body at the front,
+   or crust behind them reached) has them judged again as they now stand.
+3. **What stays of them.** At a subducting front only the crossing crust's cover stays (PLT-771,
    `pools::COVER`: its own sediment, sedimentary rock and volcanic rock; the basement already goes,
    PLT-331), by PLT-242's share, as the cover's rock (its sediments metamorphosed, PLT-248), with the
-   crust this collision stacked on it (PLT-400). The plutonic and metamorphic crust under it goes down
-   with the slab (`Stacked::stripped_km2_m`, the global `plates/collision_stripped_km3`, the records'
-   `stripped_km2_m`).
-3. **No transfer.** A subducting terrane does not transfer at PLT-068's threshold: it goes down
-   whole, and its collision state ends when no continental crust stands at the front (a parting). A
-   stalled one still welds or transfers (PLT-246).
-4. **The rest as before.** A terrane beyond S* jams its slab and collides: stacked at PLT-242's share,
-   transferred at the threshold, or by transference or the reversal once its slab has gone.
+   crust this collision stacked on it (PLT-400), pool by pool (`belts::kept_pools`: the cover's pools
+   in full and the stacked share of each pool under it). All of it goes to the overriding plate: a
+   terrane going down has no pro-wedge (PLT-730) or wedge (PLT-244) on it, so the kept crust takes
+   the retro side, the belt and the overriding edge (PLT-700). The plutonic and metamorphic crust
+   under it goes down with the slab (`Stacked::stripped_km2_m`, the global
+   `plates/collision_stripped_km3`, the records' `stripped_km2_m`).
+4. **No transfer, a live slab.** A subducting terrane does not transfer at PLT-068's threshold: it
+   goes down whole, and its collision state ends when no continental crust stands at the front (a
+   parting). A stalled one still welds or transfers (PLT-246). Its front feeds the slab as ocean floor
+   does and does not block it (FRC-019's block time is for crust that jams the trench), so the slab
+   neither stops lengthening nor breaks off under a body that takes longer than `slab_breakoff_myr`
+   to go down.
+5. **The rest as before.** A front with a body beyond its reach jams its slab and collides: stacked
+   at PLT-242's share, transferred at the threshold, or by transference or the reversal once its slab
+   has gone.
 
 No new constant: R and T_c are FRC-028 and FRC-029, L PLT-184's, the share PLT-242's, the cover the
 model's own pools.
@@ -234,11 +248,23 @@ model's own pools.
 - The balance in one dimension along the slab: the dense slab's pull over the length left,
   F_sp (L − S)/D, against FRC-030's buoyancy of the dragged length, R F_sp (T / T_c) S / D. Cloos's
   own analysis is of lithosphere columns by local isostasy, his result a thickness (about 15 km); the
-  extent condition is the model's reading for a body of finite size along the slab, which the 2-D
-  models of Yan et al. 2021 bracket (150 km subducting, 300 km reorganizing; S* is 215 to 330 km for
-  30 to 15 km of crust on a full slab). In three dimensions the slab beside a body short along the
-  trench helps pull it down (Tetreault & Buiter's "small crustal units"), which this reading leaves
-  out: it is the conservative one.
+  extent condition is the model's reading for a body of finite size along the slab. It is not
+  bracketed by Yan et al. 2021's 2-D models: S* takes in their small class (150 km or less subducting
+  steeply) at any thickness, but it is 215 km under 30 km of crust and passes their 300 km under crust
+  thinner than about 18 km (308 to 391 km for the base34 small bodies' 17 and 10.5 km), where they
+  find a moderate plateau breaks the slab off and subducts flat or makes the subduction jump, which
+  the model does not have; Yan et al. 2022 (abstract) find plateaus up to 20 km thick subduct
+  steeply. Nor is the reading conservative either way: it leaves out the help of the slab beside a
+  body short along the trench (Tetreault & Buiter's "small crustal units") and takes the slab's
+  whole pull with no resistance of the mantle.
+- The pull itself is not applied at the terrane's own front samples (the model's front law:
+  continental front samples resist only, FRC-018 and FRC-030; the slab pulls through the contact's
+  ocean-floor front and its hanging length). The terrane goes down at the convergence the plates'
+  other forces keep, which does not slow under the small ones (54.8 mm/yr at the onset and 60.1 at
+  the end on base33). Applying the pull through a docking front would be a new force term, left out.
+- A body judged on its own share of the front, and one that jams holding the whole front, are the
+  project's readings; so is judging a body as it arrives (the extent is the body's, not a number that
+  changes as it crosses; re-judged when crust joins it).
 - The cover's base as the detachment (Tetreault & Buiter 2014: "rheologically weak crustal layers or
   shear zones that were formed when the FATs were produced can be activated as detachments", p. 1243;
   Tetreault & Buiter 2012: "the depth of detachment controls the amount of crust accreted"). For the
@@ -329,6 +355,51 @@ the docking law; or `base35-s4` once base35 exists), with the default, `guard`, 
 
 Unit tests: `a_slab_drags_down_buoyant_crust_as_far_as_its_pull_outweighs_it` (shortening.rs: S*'s
 values and the balance at it), `a_terrane_its_slab_drags_down_subducts_stripped_of_its_cover` (belts.rs:
-an arc one row wide subducts stripped and does not transfer; five rows wide, the switch off or no slab,
-a collision as before; five rows with the first already hidden under the overriding plate still jam
-the slab), `the_cover_is_the_layered_rock_on_the_basement` (pools.rs).
+an arc one row wide subducts stripped and does not transfer, its cover all on the overriding plate,
+with `collision_restack_whole` on (the default) and off; five rows wide, the switch off or no slab, a
+collision as before with its pro-wedge; five rows with the first already hidden under the overriding
+plate still jam the slab), `the_reach_holds_a_terrane_just_inside_it_and_not_one_just_beyond`
+(belts.rs: a slab 1 % past and short of the extent's S*, and a judgment kept or made again by the
+samples judged), `each_body_at_a_front_is_judged_on_its_own_share_of_it` (belts.rs: a long arc and a
+short deep fragment at one front, within the reach pooled, jam),
+`a_terrane_going_down_keeps_its_cover_and_its_stacked_crust_pool_by_pool` (belts.rs: `kept_pools`),
+`a_terrane_going_down_over_many_steps_leaves_its_cover_on_the_overriding_plate` (belts.rs: eight steps
+with the plates moving, the overlaps resolved: no transfer, nothing on the incoming plate, the cover
+kept on the overriding plate, no plutonic rock, the arc all under),
+`the_cover_is_the_layered_rock_on_the_basement` (pools.rs).
+
+## The review (PR #51, 2026-10-31) and what it changed
+
+An Opus reviewer (Graphide was out of reviews) read PR #51 (the first build, renumbered PLT-770 and
+PLT-771, on by default) and asked for fixes before landing. Each finding and its fix:
+
+1. **The kept cover landed on the terrane going down** (confirmed). With the two wedges on (PLT-730),
+   `fill_two_wedges` puts the kept rise on the pro flank first, which at a docking front is the
+   terrane itself: a submarine arc against an emergent overriding edge took all of it, carried it
+   across the front again a step later (its sediment metamorphosed, so not in the cover) and lost it,
+   counted it in `collision_stripped_km3`, and thickened the front, shrinking S* on the way down. Fixed
+   by the sources' placement, the cover "added onto the accretionary prism" (Tetreault & Buiter 2014,
+   p. 1243) and "accreted to the growing foldand-thrust belt" (Enkelmann et al. 2008, p. 916): a
+   stripped front has no pro flank and no wedge, so the overriding plate takes all of it (the retro
+   side, the belt, the edge by PLT-700). Test: eight moving steps.
+2. **The kept rock's mix** (confirmed): the kept thickness held the restacked crust while the mix kept
+   only the cover's pools, repainting it; and the cover counted restacked volcanic rock twice. Fixed
+   pool by pool (`kept_pools`): the cover's pools in full, the stacked share of each pool under it.
+3. **Bodies pooled at one front** (confirmed): fixed, each body judged on its own share of the front;
+   one that jams holds the whole front. Test: two bodies.
+4. **The slab broke off under a docking body** (plausible): a body holding half the front blocked the
+   slab (FRC-019), so after 10 Myr the slab was gone and the rest transferred at once (a 300 km body at
+   30 mm/yr needs 10 Myr). Fixed: a front going down feeds its slab as ocean floor does.
+5. **Docs**: the bracketing and "conservative" wording withdrawn (S* passes Yan et al.'s 300 km under
+   crust thinner than about 18 km), the module docs, the switch's doc, the ledger's count line, the
+   build log and the bibliography fixed.
+6. **Tests**: the default restack path, the reach's boundary, many moving steps and two bodies added.
+
+Writing the moving test found a seventh: judged each step by the shortening so far plus the visible
+rest, a terrane going down turned into a jam halfway (at 153 km of shortening a one-row arc read 343
+km against its 329: a sample stays visible until the overriding plate covers it, so the shortening
+runs ahead of the hiding by up to a spacing), and counting its hidden part instead turned it into a
+jam at the end (the front shrinks to its last samples while the hidden part lies along the old front).
+So a body is judged as it arrives, by all its samples, and keeps the judgment while it goes down.
+It likely lies behind the first arm's hand-offs that stripped at some step and then transferred (2.5
+per 100 Myr under 50 samples, 1.2 at 50 to 200; the project's reading, not traced).
