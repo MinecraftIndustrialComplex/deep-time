@@ -13,7 +13,9 @@ plate. Of the walks that meet continental crust it prints the distance, whether 
 between the front and the continent: at the front, at the strip's middle and just before the continent, and where on
 the strip the youngest floor lies. A strip that is youngest at the front grew at the trench; one youngest just before
 the continent opened behind the arc (a back-arc basin); one about as old throughout is ocean the trench was set in.
-Of the walks that leave the plate first it prints the distance, whether the plate met is the one going under, and
+Behind the arc, for every ocean-ocean front sample: the floor's age at the first oceanic sample 200 to 600 km along
+the same great circle, whatever plate holds it but the one going under (as earth_fronts.py reads Seton et al. 2020's
+floor behind Earth's fronts; young floor there is a back-arc basin's). Of the walks that leave the plate first it prints the distance, whether the plate met is the one going under, and
 the floor's age on both sides of that edge (young floor on both is a ridge: the overriding plate is a strip between
 its trench and a ridge).
 Shares of the ocean-ocean front, pooled over the snapshots and runs (each front sample one lattice spacing).
@@ -85,6 +87,22 @@ def snapshot(run, t):
         if norm == 0.0:
             continue
         n /= norm
+        # Behind the arc: the first oceanic floor 200 to 600 km out, on any plate but the subducting one.
+        behind = None
+        for dist in np.arange(200.0, 600.0 + STEP_KM / 2, STEP_KM):
+            ang = dist / R_KM
+            _, k = tree.query(p[i] * np.cos(ang) + n * np.sin(ang))
+            if cont[k]:
+                break
+            if plate[k] != plate[other[0]]:
+                behind = age[k]
+                break
+        if behind is None:
+            rec["behind_none"] = rec.get("behind_none", 0.0) + 1.0
+        else:
+            for lo, hi in ((0, 10), (10, 30), (30, 60), (60, 120), (120, 1e9)):
+                if lo <= behind < hi:
+                    rec[f"behind_age_{lo}"] = rec.get(f"behind_age_{lo}", 0.0) + 1.0
         strip, hit, d = walk(p[i], n, tree, plate, cont, q)
         if hit is None:
             rec["no_continent_1500"] = rec.get("no_continent_1500", 0.0) + 1.0
