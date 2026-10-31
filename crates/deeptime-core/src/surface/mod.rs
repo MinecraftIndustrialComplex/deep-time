@@ -270,16 +270,20 @@ pub struct Totals {
     pub diffusion_iterations: u64,
     pub sinks: u64,
     /// Lake-substeps whose water balance passed nothing on (closed basins, `closed.rs`; with
-    /// `closed_basins`, measurement only), …
+    /// `closed_basins`, measurement only). The three lake counts are taken after the substep's
+    /// lakes the sediment filled were opened (`closed::open_until_stable`), so such a lake is in
+    /// neither this count nor the next, only in `filled_lakes`, …
     #[serde(default)]
     pub closed_lakes: u64,
-    /// … that passed part of their inflow, …
+    /// … lake-substeps that passed part of their inflow (counted the same way), …
     #[serde(default)]
     pub partial_lakes: u64,
-    /// … and the land draining to closed basins, km² × Myr (map); and the lake-substeps that the
-    /// sediment filled to their spill, which then passed all their water (`closed::open_filled`).
+    /// … the land draining to closed basins, km² × Myr (map; the same catchment, after the lakes
+    /// were opened), …
     #[serde(default)]
     pub closed_km2_myr: f64,
+    /// … and the lake-substeps the substep's sediment filled to their spill, which then passed all
+    /// their water: lakes that had passed nothing or part of their inflow, together.
     #[serde(default)]
     pub filled_lakes: u64,
     pub frames: u64,
@@ -1555,23 +1559,18 @@ impl SurfaceStage {
             if let Some(outflow) = lake_outflow.as_mut() {
                 // ledger: ERO-217
                 // A lake the step's sediment filled to its spill passes all its water: the step
-                // is solved again with its area passed on (`closed::open_filled`).
-                let opened = closed::open_filled(outflow, &sc.h_new, &sc.filled);
-                if opened > 0 {
-                    filled_lakes += opened as u64;
-                    match closed::pass_shares(n, outflow) {
-                        Some(pass) => routing::accumulate_passing(
-                            &d,
-                            &sc.routing,
-                            &sc.weight,
-                            &pass,
-                            &mut sc.area,
-                        ),
-                        None => routing::accumulate(&d, &sc.routing, &sc.weight, &mut sc.area),
-                    }
-                    let rep = solve(&mut sc);
-                    iterations += rep.iterations as u64;
-                }
+                // is solved again with its area passed on, until no lake opens (opening one sends
+                // its water and sediment to the lakes below it, `closed::open_until_stable`).
+                filled_lakes += closed::open_until_stable(
+                    outflow,
+                    &mut sc,
+                    |sc, outflow| closed::open_filled(outflow, &sc.h_new, &sc.filled),
+                    |sc, outflow| {
+                        closed::accumulate(&d, &sc.routing, &sc.weight, outflow, &mut sc.area);
+                        let rep = solve(sc);
+                        iterations += rep.iterations as u64;
+                    },
+                ) as u64;
                 let catchment = closed::closed_catchment(&sc.routing, outflow);
                 let land: Vec<bool> = sc.kind.par_iter().map(|&k| k != BASE).collect();
                 let (shut, partial, cells) = closed::counts(outflow, &catchment, &land);

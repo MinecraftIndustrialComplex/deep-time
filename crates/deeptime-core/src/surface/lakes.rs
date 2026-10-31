@@ -137,6 +137,9 @@ pub fn water_levels<G: SurfaceGrid>(
     // at the lake's fill within LAKE_TOL_M of their ground, shoals of the flooded depression that
     // are not lake cells): a lake cell draining onto a shoal that drains back in is no way out
     // (the closed-basins review, 2026-10-31: the share was applied there and at the real exit).
+    // The path goes on through another lake at the same level (within LAKE_TOL_M: one depression
+    // the shoals split, as the solve's lakes take it, `spl::lake_links`), since its water may
+    // come back to the first across the shoals too; a lake at another level is a way out.
     let level: Vec<f64> = lakes.iter().map(|l| l.level - LAKE_TOL_M).collect();
     let leaves = |c: usize| -> bool {
         let k = id[c];
@@ -147,11 +150,17 @@ pub fn water_levels<G: SurfaceGrid>(
         if x == c {
             return true;
         }
-        loop {
-            if id[x] == k {
+        // (A walk along the receivers ends at a root; the bound only guards a loop of them.)
+        for _ in 0..n {
+            let j = id[x];
+            if j == k {
                 return false;
             }
-            if id[x] != NONE || kind[x] != LAND || filled[x] < level[k as usize] {
+            if j != NONE {
+                if (level[j as usize] - level[k as usize]).abs() > LAKE_TOL_M {
+                    return true;
+                }
+            } else if kind[x] != LAND || filled[x] < level[k as usize] {
                 return true;
             }
             let next = rcv(x);
@@ -160,6 +169,7 @@ pub fn water_levels<G: SurfaceGrid>(
             }
             x = next;
         }
+        true
     };
     let is_exit: Vec<bool> = (0..n).into_par_iter().map(leaves).collect();
     let exits = |c: usize| is_exit[c];

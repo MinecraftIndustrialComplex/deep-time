@@ -37,6 +37,7 @@ use serde_json::{Value, json};
 
 use super::amplify::{doublings, resample};
 use super::grid::Dims;
+use super::params::FloodMethod;
 use super::pflood::{BASE, LAKE_TOL_M, LAND, SINK};
 use super::{
     SurfaceParams, climate, closed, diffusion, glacial, lakes, lithology, marine, pflood, routing,
@@ -221,8 +222,14 @@ impl YoungParams {
 /// 47.9 → 47.7 MiB); 340 lists 64.7 MiB there, and is about the most the quick 16k bound of
 /// `the_estimate_covers_the_measured_hold_closely` allows (1,086 MiB listed, at most 15 % over
 /// the 947 held on 2026-10-19). A per-cell constant cannot follow both closely: the small
-/// planet's own arrays take about 320 B a cell, full 16k's 275.
-pub const OWN_BYTES_PER_L2_CELL: u64 = 340;
+/// planet's own arrays take about 320 B a cell, full 16k's 275. 2026-10-31, the closed basins
+/// (`surface.closed_basins`, on by default): the step holds the lakes' water on L2, the runoff and
+/// the loss of open water, two `f32`s a cell (8 B, `lake_water`), from its routing through the
+/// glaciers' step (the last step routes again at its end), so 348. Added by arithmetic, not
+/// measured again: the holds in `the_estimate_covers_the_measured_hold_closely` are the 2026-10-24
+/// ones plus 8 B a cell (quick 951 → 961 MiB on 2,048 × 656 cells, full 3,474 → 3,515 on
+/// 4,096 × 1,312).
+pub const OWN_BYTES_PER_L2_CELL: u64 = 348;
 
 /// Estimate: the world the surface and the stages after it leave ([`super::retained_bytes`]),
 /// the recorded history, and the stage's own arrays on the L2 grid; ≈ 1 µs per cell per step
@@ -355,6 +362,107 @@ fn lake_water(
         h *= 2;
     }
     Some((runoff, loss))
+}
+
+/// What [`route_lakes`] reads of the step: the grid, the flood method, the sea, the budget, the
+/// lakes' water on this grid (None: no closed basins) and the runoff weights.
+struct RouteInput<'a> {
+    d: &'a Dims,
+    flood: FloodMethod,
+    sea: f64,
+    hydro: &'a HydroParams,
+    water: Option<&'a (Vec<f32>, Vec<f32>)>,
+    weight: &'a [f32],
+}
+
+/// The step's routing: the sea, the flood, the receivers and the drainage areas, and with the
+/// lakes' water (`closed.rs`, ERO-217, ERO-218) each lake's outflow, the areas passing on only
+/// the share of a lake's inflow its balance leaves; None without the lakes' water.
+fn route_lakes(
+    s: &RouteInput<'_>,
+    h: &[f64],
+    base_z: &[f64],
+    kind: &mut Vec<u8>,
+    filled: &mut Vec<f64>,
+    rt: &mut routing::Routing,
+    area: &mut Vec<f64>,
+) -> Option<Vec<lakes::LakeOutflow>> {
+    let (d, n) = (s.d, s.d.cells());
+    pflood::open_sea_with(s.flood, d, h, s.sea, (n / 500).max(1), kind);
+    pflood::flood_with(s.flood, d, h, base_z, kind, filled);
+    routing::receivers(d, filled, kind, rt);
+    routing::stack(d, kind, rt);
+    routing::accumulate(d, rt, s.weight, area);
+    let (runoff, loss) = s.water?;
+    let lv = lakes::water_levels(
+        d,
+        h,
+        filled,
+        kind,
+        rt,
+        s.sea,
+        s.hydro.lake_balance,
+        &|c| lakes::CellWater {
+            runoff_m_yr: f64::from(runoff[c]),
+            loss_m_yr: f64::from(loss[c]),
+        },
+    );
+    if let Some(pass) = closed::pass_shares(n, &lv.outflow) {
+        routing::accumulate_passing(d, rt, s.weight, &pass, area);
+    }
+    Some(lv.outflow)
+}
+
+/// What [`solve_lakes`] reads: the routing and the arrays of the step's stream-power solve.
+struct SolveInput<'a> {
+    d: &'a Dims,
+    rt: &'a routing::Routing,
+    weight: &'a [f32],
+    kind: &'a [u8],
+    h0: &'a [f64],
+    filled: &'a [f64],
+    base_z: &'a [f64],
+    kf: &'a [f64],
+    spl: spl::SplParams,
+}
+
+/// The step's stream-power solve with the lakes: `area` is the drainage area with the lakes'
+/// shares passed on ([`route_lakes`]); a lake the step's sediment filled to its spill passes all
+/// its water, and the step is solved again with the area passed on, until no lake opens (ERO-217,
+/// `closed::open_until_stable`: opening one sends its water and sediment to the lakes below it).
+/// Leaves `area` as the last solve had it; returns the new heights.
+fn solve_lakes(
+    s: &SolveInput<'_>,
+    outflow: Option<&mut Vec<lakes::LakeOutflow>>,
+    area: &mut Vec<f64>,
+) -> Vec<f64> {
+    let n = s.d.cells();
+    let solve = |area: &[f64], h_new: &mut [f64], qin: &mut [f64]| {
+        let input = spl::SplInput {
+            kind: s.kind,
+            h0: s.h0,
+            filled: s.filled,
+            base_z: s.base_z,
+            area,
+            kf: s.kf,
+        };
+        spl::solve(s.d, s.rt, &input, &s.spl, h_new, qin);
+    };
+    let (mut h_new, mut qin) = (vec![0.0; n], vec![0.0; n]);
+    solve(area, &mut h_new, &mut qin);
+    let mut state = (h_new, qin);
+    if let Some(outflow) = outflow {
+        closed::open_until_stable(
+            outflow,
+            &mut state,
+            |(h_new, _), outflow| closed::open_filled(outflow, h_new, s.filled),
+            |(h_new, qin), outflow| {
+                closed::accumulate(s.d, s.rt, s.weight, outflow, area);
+                solve(area, h_new, qin);
+            },
+        );
+    }
+    state.0
 }
 
 /// Land elevations above sea: (median, 90th percentile, maximum), m.
@@ -747,23 +855,15 @@ impl YoungStage {
                          rt: &mut routing::Routing,
                          area: &mut Vec<f64>|
              -> Option<Vec<lakes::LakeOutflow>> {
-                pflood::open_sea_with(fm, &d, h, sea, (n / 500).max(1), kind);
-                pflood::flood_with(fm, &d, h, base_z, kind, filled);
-                routing::receivers(&d, filled, kind, rt);
-                routing::stack(&d, kind, rt);
-                routing::accumulate(&d, rt, weight, area);
-                let (runoff, loss) = water.as_ref()?;
-                let lv =
-                    lakes::water_levels(&d, h, filled, kind, rt, sea, hydro_p.lake_balance, &|c| {
-                        lakes::CellWater {
-                            runoff_m_yr: f64::from(runoff[c]),
-                            loss_m_yr: f64::from(loss[c]),
-                        }
-                    });
-                if let Some(pass) = closed::pass_shares(n, &lv.outflow) {
-                    routing::accumulate_passing(&d, rt, weight, &pass, area);
-                }
-                Some(lv.outflow)
+                let step = RouteInput {
+                    d: &d,
+                    flood: fm,
+                    sea,
+                    hydro: &hydro_p,
+                    water: water.as_ref(),
+                    weight,
+                };
+                route_lakes(&step, h, base_z, kind, filled, rt, area)
             };
             let mut kind = vec![LAND; n];
             let mut filled = vec![0.0; n];
@@ -806,43 +906,26 @@ impl YoungStage {
 
             let started = Instant::now();
             {
-                let mut h_new = vec![0.0; n];
-                let mut qin = vec![0.0; n];
-                let spl_p = spl::SplParams {
-                    m: sp.m_spl,
-                    n: sp.n_spl,
-                    g: sp.g_deposition,
-                    dt,
-                    sc: sp.threshold_slope,
-                    max_iter: sp.spl_max_iter as usize,
-                    tol_m: 0.01,
+                let step = SolveInput {
+                    d: &d,
+                    rt: &rt,
+                    weight,
+                    kind: &kind,
+                    h0: &h,
+                    filled: &filled,
+                    base_z: &base_z,
+                    kf: &kf,
+                    spl: spl::SplParams {
+                        m: sp.m_spl,
+                        n: sp.n_spl,
+                        g: sp.g_deposition,
+                        dt,
+                        sc: sp.threshold_slope,
+                        max_iter: sp.spl_max_iter as usize,
+                        tol_m: 0.01,
+                    },
                 };
-                let solve = |area: &[f64], h_new: &mut [f64], qin: &mut [f64]| {
-                    let input = spl::SplInput {
-                        kind: &kind,
-                        h0: &h,
-                        filled: &filled,
-                        base_z: &base_z,
-                        area,
-                        kf: &kf,
-                    };
-                    spl::solve(&d, &rt, &input, &spl_p, h_new, qin);
-                };
-                solve(&area, &mut h_new, &mut qin);
-                // ledger: ERO-217
-                // A lake the step's sediment filled to its spill passes all its water: solved
-                // again with its area passed on (`closed::open_filled`).
-                if let Some(outflow) = outflow.as_mut()
-                    && closed::open_filled(outflow, &h_new, &filled) > 0
-                {
-                    match closed::pass_shares(n, outflow) {
-                        Some(pass) => {
-                            routing::accumulate_passing(&d, &rt, weight, &pass, &mut area)
-                        }
-                        None => routing::accumulate(&d, &rt, weight, &mut area),
-                    }
-                    solve(&area, &mut h_new, &mut qin);
-                }
+                let h_new = solve_lakes(&step, outflow.as_mut(), &mut area);
                 h = h_new;
             }
             drop(kf);
@@ -1283,7 +1366,10 @@ mod tests {
     /// measured again (quick 947 → 949, full 3,462 → 3,468 MiB); quick lists 1,107 MiB. Gap 6
     /// (2026-10-24) gave it a `u32` and an `f32` more (`carrier`, `carrier_lithosphere_km`), the
     /// same 8 B in the same three copies, added the same way (quick 949 → 951, full 3,468 → 3,474
-    /// MiB); quick lists 1,109 MiB.
+    /// MiB); quick lists 1,109 MiB. The closed basins (2026-10-31) hold the lakes' water on L2
+    /// through the glaciers' step, 8 B a cell (`OWN_BYTES_PER_L2_CELL` 348): the holds below are
+    /// those plus that, not measured again (quick 951 → 961, full 3,474 → 3,515 MiB); quick lists
+    /// about 1,119 MiB (1,109 and 10).
     /// YNG-002: unset, the stage steps as long as the deep-time surface (the plate step over
     /// `surface.substeps`); a preset's `steps` still wins.
     #[test]
@@ -1338,8 +1424,8 @@ mod tests {
             .unwrap()
         };
         for (name, held_mib) in [
-            ("earthlike_quick_16k", 951u64),
-            ("earthlike_full_16k", 3474),
+            ("earthlike_quick_16k", 961u64),
+            ("earthlike_full_16k", 3515),
         ] {
             let crate::preset::PresetBody::Planet(p) =
                 crate::preset::Preset::from_json(&json(name)).unwrap().body
@@ -1512,5 +1598,120 @@ mod tests {
             rock_property(&[9.0, f32::NAN], 2, 1, 0, &table),
             vec![0.5, 1.0]
         );
+    }
+
+    /// The young step's routing and solve run the closed basins' law (ERO-217, ERO-218): a 0.5 m
+    /// deep arid basin behind a pass at 500 m, below a range that sheds far more than its room in
+    /// one step (the geometry of `closed.rs`'s overfill test, on this stage's `route_lakes` and
+    /// `solve_lakes`). The routing cuts the spill's area by the basin's (a closed lake passes
+    /// nothing); the solve opens the basin its sediment fills, so the spill is not dammed and the
+    /// result is the open basin's to the bit; solved closed, without the opening, the sediment
+    /// past the room dams the spill. Without the law in the routing the spill carries the basin;
+    /// without the opening in the solve it is dammed.
+    #[test]
+    fn the_young_step_routes_a_closed_basin_and_opens_one_its_sediment_fills() {
+        let (w, h) = (20usize, 9usize);
+        let d = Dims::new(w, h, 1000.0, false);
+        let z: Vec<f64> = (0..w * h)
+            .map(|c| {
+                let (i, j) = ((c % w) as i64, c / w);
+                match i {
+                    0..=1 => -1000.0,
+                    2..=9 => 400.0 + 10.0 * i as f64,
+                    10 if j == 4 => 500.0,
+                    10 => 520.0,
+                    11..=13 => 499.5,
+                    _ => 600.0 + 100.0 * (i - 14) as f64,
+                }
+            })
+            .collect();
+        let n = w * h;
+        let spill = 4 * w + 10;
+        // Arid in the basin and the range behind it (a lake there loses 1 m a year net), humid
+        // where the rivers run to the sea.
+        let (runoff, loss): (Vec<f32>, Vec<f32>) = (0..n)
+            .map(|c| if c % w >= 11 { (0.02, 1.0) } else { (0.5, 0.1) })
+            .unzip();
+        let water = (runoff, loss);
+        let weight = vec![1.0f32; n];
+        let hydro = HydroParams::default();
+        let input = RouteInput {
+            d: &d,
+            flood: FloodMethod::Serial,
+            sea: 0.0,
+            hydro: &hydro,
+            water: Some(&water),
+            weight: &weight,
+        };
+        let base_z = vec![0.0; n];
+        let (mut kind, mut filled) = (vec![LAND; n], vec![0.0; n]);
+        let (mut rt, mut area) = (routing::Routing::default(), Vec::new());
+        let mut outflow =
+            route_lakes(&input, &z, &base_z, &mut kind, &mut filled, &mut rt, &mut area)
+                .expect("the lakes' water was given");
+        assert_eq!(outflow.len(), 1, "{outflow:?}");
+        assert_eq!(outflow[0].share, 0.0, "the arid basin is closed");
+        let mut plain = Vec::new();
+        routing::accumulate(&d, &rt, &weight, &mut plain);
+        assert!(
+            area[spill] < 0.3 * plain[spill],
+            "the closed basin's area stays out of the spill's: {} against {}",
+            area[spill],
+            plain[spill]
+        );
+        // Without the lakes' water the routing is the plain one.
+        let none = RouteInput {
+            water: None,
+            ..input
+        };
+        let (mut kind2, mut filled2) = (vec![LAND; n], vec![0.0; n]);
+        let (mut rt2, mut area2) = (routing::Routing::default(), Vec::new());
+        assert!(
+            route_lakes(
+                &none,
+                &z,
+                &base_z,
+                &mut kind2,
+                &mut filled2,
+                &mut rt2,
+                &mut area2
+            )
+            .is_none()
+        );
+        assert_eq!(area2, plain);
+
+        let kf = vec![1.5e-9; n];
+        let step = SolveInput {
+            d: &d,
+            rt: &rt,
+            weight: &weight,
+            kind: &kind,
+            h0: &z,
+            filled: &filled,
+            base_z: &base_z,
+            kf: &kf,
+            spl: spl::SplParams {
+                m: 1.0,
+                n: 2.0,
+                g: 1.0,
+                dt: 2.0e6,
+                sc: 0.15,
+                max_iter: 6,
+                tol_m: 0.01,
+            },
+        };
+        // Closed and never opened: the sediment past the room settles on the spill.
+        let mut closed_area = area.clone();
+        let dammed = solve_lakes(&step, None, &mut closed_area)[spill] - z[spill];
+        // The step's solve opens the basin, and is then the plain accumulation's.
+        let opened = solve_lakes(&step, Some(&mut outflow), &mut area)[spill] - z[spill];
+        assert!(closed::pass_shares(n, &outflow).is_none(), "every lake passes all");
+        assert_eq!(area, plain, "the area passed on is the plain one");
+        let mut open_area = plain.clone();
+        let open = solve_lakes(&step, None, &mut open_area)[spill] - z[spill];
+        eprintln!("the spill's rise: dammed {dammed:.1} m, opened {opened:.1} m, open {open:.1} m");
+        assert!(dammed > 50.0, "closed, the overflow dams the spill: {dammed}");
+        assert!((opened - open).abs() < 1.0e-6, "{opened} against {open}");
+        assert!(opened < 0.25 * dammed, "{opened} against {dammed}");
     }
 }
