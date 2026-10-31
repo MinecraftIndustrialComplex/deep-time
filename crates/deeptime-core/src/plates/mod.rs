@@ -1383,6 +1383,18 @@ impl PlatesStage {
             let km3: f64 = applied.iter().map(|(c, _)| c[k]).sum::<f64>() * area / 1000.0;
             *world.globals.entry(name.to_owned()).or_insert(0.0) += km3;
         }
+        // Measurement (ledger: PLT-804): of the cones' rock, what continental crust took, so the
+        // crust budget's surface part (booked with erosion) can be read with the cones out.
+        let continental: f64 = applied
+            .iter()
+            .zip(&st.samples)
+            .filter(|(_, s)| s.kind == CONTINENTAL)
+            .map(|((c, _), _)| c[0] + c[1])
+            .sum();
+        *world
+            .globals
+            .entry(CONE_CONTINENTAL_GLOBAL.to_owned())
+            .or_insert(0.0) += continental * area / 1000.0;
         if let Some(gb) = st.gap_budget.as_mut() {
             // By the weight of every cell, as its elevation (ISO-125).
             let mean = |sum: &dyn Fn(usize) -> f64| -> Vec<f64> {
@@ -1513,6 +1525,8 @@ fn flexure_of(links: &[CellLink], tris: &[[u32; 3]], n: usize, field: &Field) ->
 pub const CONE_FELSIC_GLOBAL: &str = "plates/cone_felsic_km3";
 /// … and as mafic volcanic rock (shields, the flood basalts' plateaus), km³.
 pub const CONE_MAFIC_GLOBAL: &str = "plates/cone_mafic_km3";
+/// … and of both, what continental crust took, km³ (measurement; ledger: PLT-804).
+pub const CONE_CONTINENTAL_GLOBAL: &str = "plates/cone_continental_km3";
 
 /// `WorldState::globals`: visible continental sample-steps standing at the elevation cap, and all
 /// visible continental sample-steps.

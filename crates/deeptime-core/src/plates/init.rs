@@ -439,6 +439,7 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
                     flux_mg_s: flux,
                     magma_km3_yr: flux * sourced::MAGMA_KM3_YR_PER_MG_S,
                     head_radius_km: 0.0,
+                    cones: Default::default(),
                 };
             }
             let born = t0 - rng.range(0.0, 50.0);
@@ -456,6 +457,7 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
                 flux_mg_s: 0.0,
                 magma_km3_yr: 0.0,
                 head_radius_km: 0.0,
+                cones: Default::default(),
             }
         })
         .collect();

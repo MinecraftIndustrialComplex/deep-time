@@ -144,7 +144,7 @@ pub const EDGES_KM: [f64; 10] = [
 ];
 
 /// The globals each snapshot copies (cumulative over the run, km³ or km² Earth-normalized).
-const GLOBALS: [(&str, &str); 89] = [
+const GLOBALS: [(&str, &str); 96] = [
     ("flow_steps", super::flow::STEPS_GLOBAL),
     ("flow_substeps", super::flow::SUBSTEPS_GLOBAL),
     ("flow_short_myr", super::flow::SHORT_GLOBAL),
@@ -291,6 +291,28 @@ const GLOBALS: [(&str, &str); 89] = [
     ("lip_n", super::hotspots::LIP_COUNT_GLOBAL),
     ("vrm", super::ridges::VOLCANIC_MARGIN_GLOBAL),
     ("vrm_n", super::ridges::VOLCANIC_MARGIN_SAMPLES_GLOBAL),
+    // The cone budget (ledger: PLT-803, PLT-804): the cones the continental crust took; the
+    // cones the tails netted by their hotspot, and on continental cells; the tails' rock; the
+    // hotspots' cones at full, as handed, and handed on continental cells (the volcano stage).
+    ("cone_c", super::CONE_CONTINENTAL_GLOBAL),
+    ("hot_by_id", super::hotspots::CONES_BY_ID_GLOBAL),
+    (
+        "hot_by_id_c",
+        super::hotspots::CONES_BY_ID_CONTINENTAL_GLOBAL,
+    ),
+    ("tail_rock", super::hotspots::TAIL_ROCK_GLOBAL),
+    (
+        "vh_built",
+        crate::surface::volcanoes::HOTSPOT_CONES_BUILT_GLOBAL,
+    ),
+    (
+        "vh_handed",
+        crate::surface::volcanoes::HOTSPOT_CONES_HANDED_GLOBAL,
+    ),
+    (
+        "vh_handed_c",
+        crate::surface::volcanoes::HOTSPOT_CONES_HANDED_CONTINENTAL_GLOBAL,
+    ),
 ];
 
 /// Earth's radius, km: the distances to the coast are Earth-normalized.
