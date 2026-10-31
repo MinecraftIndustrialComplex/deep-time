@@ -539,7 +539,7 @@ impl PlatesStage {
         ] {
             *world.globals.entry(name.to_owned()).or_insert(0.0) += x;
         }
-        // The crust terranes docking stripped sent down (PLT-760, measurement only; written only
+        // The crust terranes docking stripped sent down (PLT-770, measurement only; written only
         // with the switch so a run without it keeps its globals list).
         if env.k.terrane_docking_cover {
             *world

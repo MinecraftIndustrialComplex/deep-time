@@ -21,7 +21,7 @@ Over each run after its first 100 Myr (the pool's measures' window), every colli
   (`peak_uplift_m`: the front's largest uplift of each step summed; partings: `peak_height_m`, the belt's
   highest mean height), the belt's footprint, and how the hand-off ended (stalled, sutured, transference:
   a continent that did not suture).
-With `tectonics.terrane_docking_cover` (PLT-760): per class, the states that stripped crust
+With `tectonics.terrane_docking_cover` (PLT-770): per class, the states that stripped crust
 (`stripped_km2_m` > 0: their terrane went down with its slab for at least one step) per 100 Myr and
 their stripped crust (km2 x m, quartiles); per run, the crust stripped over the whole run (cb_globals
 `stripped`, km3) and its rate (km3 a year).

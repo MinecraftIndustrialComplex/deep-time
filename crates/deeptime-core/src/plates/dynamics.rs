@@ -627,7 +627,7 @@ pub struct CollisionRec {
     #[serde(default)]
     pub stacked_km2_m: f64,
     /// The crust the slab took instead of the belt where the terrane docked stripped to its cover
-    /// (`tectonics.terrane_docking_cover`, PLT-760), km² × m (measurement only).
+    /// (`tectonics.terrane_docking_cover`, PLT-770), km² × m (measurement only).
     #[serde(default)]
     pub stripped_km2_m: f64,
     /// The front's unit centroid in the step it was last seen (zero when it never had one), so a

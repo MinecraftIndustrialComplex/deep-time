@@ -1296,8 +1296,11 @@ pub struct TectonicParams {
     /// of thrusted crustal units ... rather than collision and addition of the entire crustal
     /// thickness"; "only the upper 2–5 km of arc crust" where the arc is on the subducting plate.
     /// `shortening::advance` classes the front, `belts::stack` strips it; the design
-    /// docs/design/small-terrane-docking.md. Off by default until its pool arm. ledger: PLT-760,
-    /// PLT-761
+    /// docs/design/small-terrane-docking.md. On by default since 2026-10-31 (the coordinator's
+    /// call, under Ben's rule of 2026-10-23: physics goes on by default once built and correct;
+    /// decisions log 2026-10-31; the arm small-terrane against orog-cum: the guard clean,
+    /// hand-offs of terranes under 50 samples 17.6 to 12.3 per 100 Myr). `false`: every
+    /// terrane collides and transfers as before (PLT-068). ledger: PLT-770, PLT-771
     pub terrane_docking_cover: bool,
     /// Contacts unseen for longer than this are closed, Myr (12 steps at the 2-Myr step).
     /// Ledger PLT-059.
@@ -1566,7 +1569,7 @@ impl Default for TectonicParams {
             initiation_stress_mpa: 20.0, // ledger: PLT-505 (game-choice; on since 2026-10-23)
             transference: true,          // ledger: PLT-516
             collision_backarc_reversal: true, // ledger: PLT-737 (on since 2026-10-30)
-            terrane_docking_cover: false, // ledger: PLT-760 (off until its pool arm)
+            terrane_docking_cover: true, // ledger: PLT-770, PLT-771 (on since 2026-10-31)
             contact_timeout_myr: 24.0,   // ledger: PLT-059
             collision_orogeny_myr: 30.0, // ledger: PLT-079
             collision_melt_after_myr: 20.0, // ledger: PLT-735

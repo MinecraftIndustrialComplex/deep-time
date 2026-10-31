@@ -11629,14 +11629,14 @@ the crust-budget lane.
   the no-room rule takes less, and the crust kept is the same as without it, to 1e-6; off, nothing beyond the belt
   rises.
 
-## How small terranes dock (PLT-760, PLT-761, 2026-10-30)
+## How small terranes dock (PLT-770, PLT-771, 2026-10-30)
 
 The coast-with-high-ground audit (docs/research/notes/coast-high-ground-audit-2026-10-30.md) read
 the model's small terranes as turned into collision belts: terranes under 50 samples are 0.54 of the
 hand-offs, they dock in 0 to 2 Myr, and 0.95 of the crust that crosses their fronts stays as thickness
 on the overriding plate (PLT-242), where "on Earth such fragments accrete as area or subduct". The
 docking lane measured base33's cached runs, read the sources and built the missing branch behind a
-switch, `tectonics.terrane_docking_cover` (off). Design: docs/design/small-terrane-docking.md (its
+switch, `tectonics.terrane_docking_cover` (on by default since 2026-10-31, decisions log). Design: docs/design/small-terrane-docking.md (its
 tables in full).
 
 ### What base33 does with them (24 runs, measurement only)
@@ -11704,14 +11704,14 @@ edge), and the land they leave stands at Talamanca's and the Coastal Range's hei
 0.006 to 0.008 of M5 at most (the audit's +0.01 about), and that part is not missing physics. What is
 missing is the small branch: a body the slab can pull down is docked as a collision too.
 
-### The law (`tectonics.terrane_docking_cover`, PLT-760, PLT-761; off)
+### The law (`tectonics.terrane_docking_cover`, PLT-770, PLT-771; on by default since 2026-10-31)
 
 Each step, at each collision front whose contact still has a slab of the pair: the slab's reach
 against the incoming crust's buoyancy, S* = L / (1 + 2.25 T / 30 km) (FRC-030's buoyancy of the
 dragged length against the pull of the dense slab left; L the slab's length up to 700 km, PLT-184; T
 the incoming crust's thickness at the front): 215 km under 30 km of crust, 329 km under 15 km. A
 terrane whose extent across the front is within S* goes down with the slab: of its crossing crust
-only the cover (sediment, sedimentary and volcanic rock, PLT-761: 2.5 km of a model island arc of 15
+only the cover (sediment, sedimentary and volcanic rock, PLT-771: 2.5 km of a model island arc of 15
 km, inside the "upper 2–5 km") stays, by PLT-242's share; the rest is counted as
 `plates/collision_stripped_km3`; and it does not transfer at PLT-068's threshold. A larger terrane jams
 and collides as before. The extent condition is the project's reading of Cloos's buoyancy for a body

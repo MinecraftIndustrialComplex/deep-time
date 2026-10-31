@@ -1,8 +1,8 @@
 # How small terranes dock: design
 
-Status: **built behind a switch, off; its pool arm correct (the guard clean), on recommended**
+Status: **built; on by default since 2026-10-31** (the coordinator's call, decisions log 2026-10-31: its pool arm correct, the guard clean)
 (2026-10-30 and 31, the docking lane, a sub-agent of the coordinator's session; "What the arm showed") on the branch `small-terrane-docking`: `tectonics.terrane_docking_cover` (`shortening::advance`
-classes the front, `belts::stack` strips it); ledger PLT-760, PLT-761; plates.md "How small terranes
+classes the front, `belts::stack` strips it); ledger PLT-770, PLT-771; plates.md "How small terranes
 dock". Its 8-run pool arm runs on the collision orogen's physics (origin/collision-orogen merged in,
 PLT-730, PLT-731 and PLT-740 set on) against the cached arm orog-cum ("Measuring it"). For the
 coast-with-high-ground lane (Ben, 2026-10-30: "Freeboard, then orogen
@@ -204,7 +204,7 @@ crustal section").
   "only the upper 2–5 km of arc crust"). The model docks every continental body, however small, as a
   collision: stacked at 0.95 and transferred at 100 km of shortening (PLT-068, a calibrated value).
 
-## The rule (PLT-760, PLT-761)
+## The rule (PLT-770, PLT-771)
 
 1. **Which bodies go down.** Each step, at each collision front whose contact still has a slab (the
    pair's slab track, as the jam reads it, PLT-516): the slab's reach against the terrane's buoyancy,
@@ -214,7 +214,7 @@ crustal section").
    across the front is the collision's shortening so far plus the visible area of the incoming plate's
    continental crust connected to the front's crust over the front's length. Within S*, the front
    subducts the terrane (`Collision::subducting`).
-2. **What stays of them.** At a subducting front only the crossing crust's cover stays (PLT-761,
+2. **What stays of them.** At a subducting front only the crossing crust's cover stays (PLT-771,
    `pools::COVER`: its own sediment, sedimentary rock and volcanic rock; the basement already goes,
    PLT-331), by PLT-242's share, as the cover's rock (its sediments metamorphosed, PLT-248), with the
    crust this collision stacked on it (PLT-400). The plutonic and metamorphic crust under it goes down
