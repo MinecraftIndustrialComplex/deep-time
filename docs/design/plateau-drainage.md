@@ -392,4 +392,5 @@ So more of the final high coasts sit on broad collision regions. Not explained h
 It is not the fix for O4. The plateaus wear on their frozen flat tops. The next sourced law: the surface's runoff from
 the bake's own budget (`HydroParams::budget`, the closure's balance), in place of `surface/climate.rs`'s PET 0 below
 0 °C. One budget for the rivers and the lakes, no knob. K was calibrated on the surface's runoff (2026-10-18), so that
-arm reads the regions' table again rather than retuning K.
+arm reads the regions' table again rather than retuning K. Taken up on 2026-10-31 by the runoff lane
+(docs/design/surface-runoff-budget.md: `surface.runoff_budget`, ERO-221, ERO-222).
