@@ -2782,7 +2782,7 @@ mod tests {
             let tree = Tree::over(&pos, |_| true);
             let overlaps = subduction::overlaps(&st, &fx.geo, &pos, &tree, &env);
             let resolved =
-                subduction::resolve(&mut st, &mut world, &fx.geo, &overlaps, &pos, &env).unwrap();
+                subduction::resolve(&mut st, &mut world, &fx.geo, &overlaps, &pos, &tree, &env).unwrap();
             let (fronts, fired) =
                 shortening::advance(&mut st, &fx.geo, &pos, &tree, &env, resolved.seeds);
             let contacts: Vec<_> = st

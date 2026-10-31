@@ -399,7 +399,7 @@ impl PlatesStage {
         let overlaps = subduction::overlaps(st, &cache.geo, &pos, &tree, &env);
         book(st, gap_budget::Part::Other);
         lap(&mut clock, "detect");
-        let resolved = subduction::resolve(st, world, &cache.geo, &overlaps, &pos, &env)?;
+        let resolved = subduction::resolve(st, world, &cache.geo, &overlaps, &pos, &tree, &env)?;
         // Measurement only (the overlap trace): the contacts begun this step, their plates'
         // motion across their overlaps, for the step's record.
         if st.dynamics.is_some() {
