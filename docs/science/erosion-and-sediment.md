@@ -1356,10 +1356,14 @@ docs/design/surface-runoff-budget.md; this is the summary.
 
 **The law (ERO-221; `surface.runoff_budget`, off).** The stream power's runoff weight (ERO-010) takes each cell's runoff
 from `HydroParams::budget`, the same budget the lakes' balance uses. Precipitation is rain in the thawed share of the
-year (HYD-036) and the snow melts by its degree-days (HYD-037: 4 mm per °C per day, inside Hock 2003's 2.5 to 5.5 for
-snow at non-glaciated sites). PET is Holdridge's 58.93, here 60, x the biotemperature (HYD-029, HYD-030), and Fu's curve
-acts on the liquid water (HYD-034, HYD-035). Without frost it is the old runoff to 1e-12. Ground that never thaws runs
-off nothing, so its weight sits at ERO-011's floor.
+year (HYD-036) and the snow melts by its degree-days (HYD-037: 4 mm per °C per day, a choice inside Hock 2003's 2.5 to
+5.5 for snow at non-glaciated sites). PET is Holdridge's 58.93, here 60, x the biotemperature (HYD-029, HYD-030), and
+Fu's curve acts on the liquid water (HYD-034, HYD-035). The months are the climate stage's warmest and coldest month as
+it wrote them. With no month below freezing it is the old runoff to 1e-12. Land with a mean above freezing and a frosty
+month runs off less (its biotemperature is above its mean: P 600 mm at 5 ± 15 °C, 336 against 245 mm), and so does land
+below cold headwaters. Ground that never thaws runs off nothing, so its weight sits at ERO-011's floor, which is then
+load-bearing (25 mm a year where the lakes count 0). The young landscape and the amplifier take the same weight
+(YNG-011).
 
 **The checks (ERO-222).**
 - **The Mackenzie:** budget runoff 204 mm and ET 206, against 169 and 237 measured: within the 54 mm mean absolute
@@ -1367,7 +1371,10 @@ off nothing, so its weight sits at ERO-011's floor.
 - **The Dry Valleys:** nothing runs off when the warmest month stays below freezing. But a warmest month just above
   0 °C melts all the snow and evaporates little, so 0.29 to 0.87 of P runs off: the budget has no sublimation.
 - **The Tibetan lakes:** the budget evaporates 69 to 141 mm against their modelled 170 to 290. It still runs off 0.46
-  to 0.83 of P, against all of it under the old rule.
+  to 0.83 of P, against all of it under the old rule. The shortfall is printed, not asserted.
+- **A polar year's months as given:** a mean of -17 °C with months of -5 and -40 °C runs off nothing. Centred on the
+  mean, the same range put the warmest month at +0.5 °C and ran some of it off (corrected 2026-10-31; this changes the
+  closed basins' and the flexure's lakes on cold ground too).
 - **Verkhoyansk's biotemperature:** 2.65 °C from the sinusoid, against Holdridge's rough 3.05.
 - **The cold controlled plateau:** the interior wears 88.0 against 118.0 m/Myr; never thawing, 3.8.
 
@@ -1381,5 +1388,8 @@ off nothing, so its weight sits at ERO-011's floor.
 
 Measured on the pool (the arm plat-rb0, 8 runs, on the closed basins; the design's "The arm's results"): the flat high
 ground wears 92 against 141 m/Myr and the land above 4 km doubles (0.0022 against 0.0010 of the land, Earth 0.0195);
-K's regions of 500 m relief and more wear 15 to 19 % slower, inside Montgomery & Brandon's lines; the export to the sea
-does not move (3.34 against 3.36 km³ a year). Verdict: default-on.
+K's regions wear 11 % slower at 250 to 500 m of relief, 19 and 16 % at 500 and 1,000 m and more, 8 % at 1,500 m and
+more, inside Montgomery & Brandon's lines; the export to the sea does not move (3.34 against 3.36 km³ a year). The
+verdict then was default-on. The runoff law's review (2026-10-31) held it: the young stage and the amplifier kept the
+old rule (the pool's runs never reach them), the months were centred on the mean, and no test went through the switch.
+All three are fixed; the law is to be armed again on base35-s4.

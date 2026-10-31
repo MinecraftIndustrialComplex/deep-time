@@ -153,6 +153,53 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 
 ## Build log
 
+### 2026-10-31: The runoff law's review fixes: the young stage on the surface's rule, the climate stage's months as given (a correction on master's lakes), a wiring test (the runoff lane, worktree agent-a4e92fd13092b08b0, branch `surface-runoff-budget` with origin/master 8b24e359 merged in; not merged)
+
+- **The review** (an Opus reviewer at a38ab3e9, relayed by the coordinator): land only after fixes, and no default until
+  the law is armed again. With the switch off nothing changed (alias identical); units, the frost-free identity, NaN
+  cases, determinism, lakes and ice checked out. Design: docs/design/surface-runoff-budget.md, "The review and its
+  fixes".
+- **Fixed:**
+  - **The young stage and the amplifier** kept PET = 60 T (0 below 0 °C) with the switch on: a never-thawing plateau at
+    P 300 mm weighed 0.05 on L1 and 0.6 on L2. `young::runoff_weights` now takes the deep-time surface's rule (the budget
+    on L1's months with the switch); YNG-011 and the stage's header updated. Test:
+    `the_young_weights_follow_the_surface_s_runoff` (L2's weight on L1 equals `surface::runoff_weight` to 1e-6, on and
+    off; without the stage's fields 1; the young lakes take the months as given).
+  - **The months were centred on the mean** in `climate::cell_water` (master's lakes too). It now takes the climate
+    stage's warmest and coldest month as written (`climate::months`); without the stage, the mean ± 8 °C as before.
+    **A correction on master's default:** the closed basins (ERO-217) and the flexure's lakes (ISO-126) read the same
+    budget, so cold ground's lakes change. Test: `a_year_s_months_are_taken_as_given` (mean -17, months -5 and -40 °C:
+    0 runoff; centred, 0.79 and 0.86 of P 7 and 11 mm ran off).
+  - **A test through the switch:** `surface::step_water` and `surface::runoff_weight` are the step's wiring;
+    `the_runoff_budget_reaches_the_stream_power_s_weight` runs four climates through them (off 0.6 below a mean of
+    0 °C; on 0.05 never thawing and for the polar year, 0.396 with a summer; frost-free 0.425 both; the lakes' budget
+    alone leaves the weight). The cold plateau test takes `runoff_weight` too. The Tibet test asserts only that the
+    budget evaporates, at most P, and prints the shortfall (`the_tibetan_lakes_evaporate_under_the_budget`).
+  - **Docs:** K's regions read from the table (250 to 500 m -11 %, 500 m and more -19 %, 1,000 m and more -16 %,
+    1,500 m and more -8 %); "frost-free" now means no month below freezing, with a test for a warm mean with a frosty
+    month (P 600 at 5 ± 15 °C: 336 against 245 mm, -27 %; 900 at 8 ± 12: -6 %; 400 at 2 ± 10: -34 %) and the design's
+    rows for it and for land below cold headwaters.
+  - **Smaller:**
+    - `hydro.pet_mm_per_c` and `hydro.snow_melt_mm_per_degree_day` documented as read by the history (`HydroParams`,
+      the editor's hints, HYD-029, HYD-037), not pinned;
+    - ERO-011's floor marked `game-choice` and said to be load-bearing for never-thawing ground (25 mm a year where the
+      lakes count 0);
+    - ERO-220's `flatf` a temperature class;
+    - HYD-037 `game-choice` inside Hock's range;
+    - the bibliography's Armijo1986 and Blisniuk2001 back in the collision orogen's section (they sat after this lane's
+      section with no blank line);
+    - the summary's runoff-weight sums serial in cell order;
+    - `// ledger: MOI-067` on the snapshot's two 60s.
+- **Ledger:** ERO-011, ERO-217, ERO-220, ERO-221, ERO-222, HYD-029, HYD-033, HYD-037, YNG-011 and MOI-067 amended; the
+  ERO and HYD headers and claims.md recounted (`tools/review/claims_counts.py --write`).
+- **Gate** (VM, `tools/review/plateau/gate.sh quick`, its filter now with `runoff_budget`; the script made
+  executable): fmt and clippy (core and cli, all targets) clean, the lane's 80 tests passed. The full gate: see below.
+- **Next.** The two arms on base35-s4 once it exists (the coordinator's message):
+  `pool.sh run rb-months --seeds 1,2,3,4` (the branch's default: the months' correction alone) and
+  `pool.sh run rb1 --seeds 1,2,3,4 --set surface.runoff_budget=true`, both with `+DEEPTIME_CRUST_BUDGET=1
+  +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`, then `pool.sh table --base base35-s4 --arm rb-months --arm rb1` and the
+  plateau reads (`wear.sh`, `recal.sh`). The young stage is outside the pool's runs; its unit check is the read.
+
 ### 2026-10-31: The continents' export is set by the plates' uplift, not by the erosion law (a diagnosis from cached runs; the runoff lane, worktree agent-a4e92fd13092b08b0, branch `surface-runoff-budget`; nothing built)
 
 - **The question** (the crust-budget lane, branch `trench-input`): the continents export 3.82 km³ of rock a year on
@@ -222,9 +269,10 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
   deeptime-core 1,158 passed and 12 ignored, its integration tests passed.
 - **Ledger.**
   - New: ERO-221 `cited-unverified` (the law: ω's primary unread), ERO-222 `verified` (the checks).
-  - Upgraded: HYD-029 `verified` (Holdridge's 58.93 read), HYD-037 `verified` (Hock 2003, Table 1).
+  - Upgraded: HYD-029 `verified` (Holdridge's 58.93 read); HYD-037 was marked `verified` (Hock 2003, Table 1), and
+    is a `game-choice` inside Hock's range since the review.
   - HYD-030 gains the read: Holdridge also cuts at 30 °C, the code does not.
-  - claims.md recounted (ERO 200, HYD 138; all 2,996).
+  - claims.md recounted (ERO 200, HYD 138).
   - Bibliography: a new section of 13 entries; Holdridge1967 and Zhang2004 updated.
 - **The arm** (queued by the coordinator). The alias check was identical. plat-rb0 ran on key a3b047bb6ddb, argkey
   7591e701, 8 runs, with the orogen switches and both of the lanes' switches. Reads: `tools/review/plateau/arm_rb.sh`,
@@ -234,14 +282,15 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
   - **The flat high ground** wears 91.9 against 141.4 m/Myr (the runs apart: 82 to 123 against 114 to 196), and there
     is 1.7 times as much of it.
   - **High ground over time:** land above 4 km 0.0022 against 0.0010, above 3 km 0.0105 against 0.0086.
-  - **K's regions** of 500 m relief and more wear 15 to 19 % slower, still inside Montgomery & Brandon's lines; lower
-    relief is unchanged.
+  - **K's regions** (corrected after the review): 250 to 500 m of relief -11 %, 500 m and more -19 %, 1,000 m and
+    more -16 %, 1,500 m and more -8 %, still inside Montgomery & Brandon's lines; under 100 m +8 %, 100 to 250 m -4 %.
   - **The export** to the sea is 3.34 against 3.36 km³ a year, and the land's mean lowering 38.9 against 36.8 m/Myr.
   - **Guard:** 10.5 km, 0 steps beyond one relief. The criteria median 6.
 
   The dry flat top now wears by its edge's cut (28.2 m/Myr) and diffusion (26.1), with stream power without the cut
   at 2.7.
-- **Next.** Verdict: `surface.runoff_budget` default-on, on top of the closed basins. It replaces MOI-067's PET for the
+- **Next.** Verdict then: `surface.runoff_budget` default-on, on top of the closed basins (held by the review: see the
+  entry "The runoff law's review fixes"). It replaces MOI-067's PET for the
   runoff (no evaporation below 0 °C). Left for the plateaus: the escarpment's cut and κ 2 at 4.8-km cells.
 
 ### 2026-10-31: What wears the plateaus, measured on cached runs; lakes that pass on what their water balance leaves, built and off (`surface.closed_basins`, ERO-217 to ERO-220) (the plateau lane, worktree agent-a4e92fd13092b08b0, branch `plateau-drainage` on origin/collision-orogen 0e8a5ac9; not merged)
