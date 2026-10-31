@@ -1051,6 +1051,21 @@ buoyancy against the ridge's, lithosphere-thermal-state.md's open question), not
 not the lead: the interiors wear at Earth's long-run cratonic rates. K's calibration (present-day against long-run)
 is a separate question that moves the lowland's relief and the export, not the drowning.
 
+**K's calibration, a question for Ben** (the plateau lane's, 2026-10-31; his decision of 2026-10-17 set the erosion
+law against measured rates). K (ERO-004), κ (ERO-023) and the chemical floor were set on Montgomery & Brandon's eq. 2,
+a present-day relation, whose low-relief end (E0 10 m/Myr and the quiet-land 0.2 mm/yr per km of relief) is 2 to 5
+times Clift et al. 2009's Cenozoic rates for stable basins (median 4.0 m/Myr), and Clift et al. call the modern
+export unrepresentative of long periods (p. 90 to 91). The options:
+
+1. *Keep the present-day calibration* (the recommendation until the column's height law is built). The lowland keeps
+   eroding at 22 m/Myr; the export stays 2.2 times Clift's, set by the plates' supply (the uplift trace: erosion-law
+   changes leave it and make relief instead); the drowning is unchanged, since its terms are the area and the line.
+2. *Calibrate to long-run rates* (Clift et al.'s Table 4, with thermochronology and outcrop rates). K and κ fall about
+   2 to 5 times at low relief; by the plateau lane's finding the export would stay and the land would stand higher
+   until its erosion met the supply (with n = 2, slopes as (E/K)^(1/2): relief 1.4 to 2.2 times on eroding ground,
+   our arithmetic), more land above 1 and 2 km and the thick crust lasting longer; the column at the sea and the area
+   would not change, so it would not fix the drowning alone, and it moves the high coasts with the relief.
+
 ## Simplifications and limits
 
 - The fill uses the ground at the step's start; the floor's answer to the new water load comes in
