@@ -400,6 +400,7 @@ fn test_volcano(kind: Kind, oceanic: bool) -> Volcano {
         cause: None,
         segment: 0,
         gone: None,
+        rock_m: 0.0,
     }
 }
 
@@ -527,6 +528,7 @@ fn island_subsidence_defaults_to_nothing_and_the_setting_still_works() {
             cell_m: 300.0 * 16.0,
             delta: vec![0.0; n],
             rock: vec![[0.0; 2]; n],
+            hot_rock: vec![[0.0; 2]; n],
             elev: &elev,
         };
         let mut vs = vec![island(true), island(false)];
@@ -993,5 +995,209 @@ fn threads_and_a_resume_leave_the_volcanoes_unchanged() {
     assert_eq!(bits(&got), bits(&world));
     for d in [dir, dir2] {
         let _ = std::fs::remove_dir_all(d);
+    }
+}
+
+/// The cone budget's arithmetic (PLT-803): L1 is Lambert's equal-area projection, so its cells,
+/// each `cell_m`² of the game's sphere scaled to the plate model's, cover the model sphere (to the
+/// grid's rounding of its height); a hotspot's cones hand all their growth's rock while the budget
+/// covers it, else the budget over the growth, and nothing from no budget.
+#[test]
+fn the_l1_cells_cover_the_model_sphere_and_cones_hand_at_most_their_budget() {
+    let grid = GridDesc::for_planet("L1", 16_384, 16).unwrap();
+    let mh = 300.0;
+    let cell_m = f64::from(grid.r) * mh;
+    let planet_m = 16_384.0 * mh / std::f64::consts::TAU;
+    let model_km = 6370.0;
+    let km2 = grid.cells() as f64 * cell_km3_per_m(cell_m, planet_m, model_km) * 1000.0;
+    let sphere = 4.0 * std::f64::consts::PI * model_km * model_km;
+    assert!(
+        (km2 / sphere - 1.0).abs() < 0.01,
+        "{km2} km² against {sphere}"
+    );
+    assert_eq!(cone_share(0.0, 5.0), 1.0);
+    assert_eq!(cone_share(10.0, 20.0), 1.0);
+    assert!((cone_share(10.0, 2.5) - 0.25).abs() < 1e-12);
+    assert_eq!(cone_share(10.0, 0.0), 0.0);
+    assert_eq!(cone_share(10.0, -1.0), 0.0);
+}
+
+/// The cone budget on the coupled pipeline (PLT-803, PLT-804), with Sleep's tails (PLT-790 to
+/// PLT-794): the cones the tails netted by their hotspot are at most a seventh of the tails' rock
+/// (their lavas), the hotspots' cones handed less than they built at the game's size, the tails'
+/// basalt and their cones together the tails' rock, and the tails netted no more than the cones
+/// handed.
+#[test]
+fn a_hotspots_cones_hand_the_pools_at_most_its_tails_lavas() {
+    let mut v: serde_json::Value = serde_json::from_str(&pipeline_json(20_000, 60.0, 5)).unwrap();
+    v["tectonics"]["hotspots_sourced"] = serde_json::json!(true);
+    v["tectonics"]["hotspot_cone_budget"] = serde_json::json!(true);
+    // No plume heads: their domes join the hotspots' basalt global.
+    v["tectonics"]["lip_probability"] = serde_json::json!(0.0);
+    let dir = temp_dir("cone-budget");
+    let s = session(&v.to_string(), &dir, 2);
+    finish(&s);
+    let world = s.checkpoint().unwrap().world;
+    let g = |k: &str| world.globals.get(k).copied().unwrap_or(f64::NAN);
+    let rock = g(crate::plates::hotspots::TAIL_ROCK_GLOBAL);
+    let by_id = g(crate::plates::hotspots::CONES_BY_ID_GLOBAL);
+    let magma = g(crate::plates::hotspots::MAGMA_GLOBAL);
+    let built = g(HOTSPOT_CONES_BUILT_GLOBAL);
+    let handed = g(HOTSPOT_CONES_HANDED_GLOBAL);
+    let lavas = rock * crate::plates::hotspots::sourced::TAIL_EXTRUSIVE_SHARE;
+    eprintln!(
+        "tails' rock {rock:.4e} km³, lavas {lavas:.4e}, cones built {built:.4e}, handed \
+         {handed:.4e}, netted {by_id:.4e}, the tails' basalt {magma:.4e}"
+    );
+    assert!(rock > 0.0 && handed > 0.0, "no tails or no cones");
+    assert!(
+        by_id <= lavas * (1.0 + 1e-9),
+        "{by_id} netted against lavas {lavas}"
+    );
+    assert!(
+        handed < built,
+        "the budget never bound: {handed} of {built}"
+    );
+    assert!(
+        (magma + by_id - rock).abs() < 1e-3 * rock,
+        "{magma} + {by_id} against {rock}"
+    );
+    assert!(
+        by_id <= handed * (1.0 + 1e-9) + 1e-9,
+        "{by_id} netted of {handed} handed"
+    );
+    assert!(g(crate::plates::CONE_CONTINENTAL_GLOBAL) >= 0.0);
+    // No kernel counted a cone by place (the hotspots' are handed apart, ledger: PLT-803).
+    assert_eq!(g(crate::plates::hotspots::CONES_GLOBAL), 0.0);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+/// The cone budget on the volcano stage (PLT-803) with two hotspots at once: each hotspot's cones
+/// hand their growth's rock in their own hotspot's share (hotspot 3's budget covers half its
+/// growth, hotspot 7's all of it), into the hotspots' rock apart from the other cones'; a cone
+/// backs the share of its growth its rock gave, and a growth whose footprint held no cell backs
+/// none although a cone of the same hotspot handed rock; a caldera takes back and lays the share
+/// of its relief its cone's rock backs, from the hotspots' rock for a budgeted hotspot's cone and
+/// from the rest for an arc's, whose rock backs all its relief.
+#[test]
+fn two_hotspots_cones_hand_and_take_back_each_their_own_share() {
+    let grid = GridDesc::for_planet("L1", 16_384, 16).unwrap();
+    let n = grid.cells();
+    let mh = 300.0;
+    let elev = vec![0.0f32; n];
+    let blank = || L1 {
+        grid: &grid,
+        mh,
+        cell_m: f64::from(grid.r) * mh,
+        delta: vec![0.0; n],
+        rock: vec![[0.0; 2]; n],
+        hot_rock: vec![[0.0; 2]; n],
+        elev: &elev,
+    };
+    // Powers of two, so every share below is exact.
+    let km3_per_m = 0.25;
+    let of = |kind: Kind, oceanic: bool, hotspot: Option<u32>| {
+        let mut v = test_volcano(kind, oceanic);
+        v.hotspot = hotspot;
+        v
+    };
+    // Hotspot 3: a shield over two cells and a silicic centre whose footprint held no cell;
+    // hotspot 7: a silicic centre over one cell.
+    let mut vs = vec![
+        of(Kind::Shield, true, Some(3)),
+        of(Kind::Silicic, false, Some(3)),
+        of(Kind::Silicic, false, Some(7)),
+    ];
+    let held = [(0, 10, 4.0f32), (0, 11, 2.0), (2, 20, 3.0)];
+    let held_dh = [(0, 5.0), (1, 5.0), (2, 4.0)];
+    // Hotspot 3 grew 1.5 km³ against a budget of 0.75, hotspot 7 0.75 km³ against 10.
+    let budgets = BTreeMap::from([(3u32, 0.75), (7u32, 10.0)]);
+    let continental = |c: usize| c == 11 || c == 20;
+    let mut l1 = blank();
+    let (mut built, mut handed) = (BTreeMap::new(), BTreeMap::new());
+    hand_held(
+        &mut vs,
+        &held,
+        &held_dh,
+        &budgets,
+        km3_per_m,
+        &continental,
+        &mut l1.hot_rock,
+        &mut built,
+        &mut handed,
+    );
+    // The shield's mafic rock at half its growth, the centre's felsic rock whole.
+    assert_eq!(l1.hot_rock[10], [0.0, 2.0]);
+    assert_eq!(l1.hot_rock[11], [0.0, 1.0]);
+    assert_eq!(l1.hot_rock[20], [3.0, 0.0]);
+    assert!(l1.rock.iter().all(|r| *r == [0.0; 2]), "the rest's rock");
+    assert_eq!(built, BTreeMap::from([(3, 1.5), (7, 0.75)]));
+    assert_eq!(
+        handed,
+        BTreeMap::from([(3, [0.75, 0.25]), (7, [0.75, 0.75])])
+    );
+    assert_eq!(
+        vs.iter().map(|v| v.rock_m).collect::<Vec<_>>(),
+        [2.5, 0.0, 4.0]
+    );
+    // The calderas' share: the cone's rock over its relief under the budget, all without it, all
+    // for an arc's cone.
+    vs[0].built_m = 10.0;
+    vs[2].built_m = 4.0;
+    assert_eq!(caldera_rock_share(&vs[0], true), 0.25);
+    assert_eq!(caldera_rock_share(&vs[0], false), 1.0);
+    assert_eq!(caldera_rock_share(&vs[1], true), 0.0);
+    assert_eq!(caldera_rock_share(&vs[2], true), 1.0);
+    let arc = of(Kind::Strato, false, None);
+    assert_eq!(caldera_rock_share(&arc, true), 1.0);
+    let erupt = |v: &Volcano, rock: (f64, bool)| {
+        let mut v = v.clone();
+        let before = v.shape();
+        let rc = 0.3 * v.radius_m;
+        let depth_m = 0.2 * v.height_m;
+        v.depression = Some(Depression {
+            rho: rc / v.radius_m,
+            depth: depth_m / v.height_m,
+            caldera: true,
+        });
+        let after = v.shape();
+        let mut l1 = blank();
+        let mut log = Vec::new();
+        let done = collapse(
+            &mut l1,
+            &v,
+            &before,
+            &after,
+            (rc, depth_m, false),
+            rock,
+            km3_per_m,
+            &|_| false,
+            1,
+            &mut log,
+        );
+        (l1.delta, l1.rock, l1.hot_rock, done)
+    };
+    for (v, rock) in [
+        (&vs[0], (0.25, true)),
+        (&vs[2], (1.0, true)),
+        (&arc, (1.0, false)),
+    ] {
+        let (delta, rest, hot, done) = erupt(v, rock);
+        let (share, apart) = rock;
+        let (took, other) = if apart { (&hot, &rest) } else { (&rest, &hot) };
+        assert!(delta.iter().any(|&d| d < 0.0) && delta.iter().any(|&d| d > 0.0));
+        assert!(other.iter().all(|r| *r == [0.0; 2]), "{:?}", v.kind);
+        for c in 0..n {
+            let r = f64::from(took[c][0]) + f64::from(took[c][1]);
+            let want = share * f64::from(delta[c]);
+            assert!(
+                (r - want).abs() <= 1e-6 * v.height_m,
+                "{:?} cell {c}: {r} m of rock for {} m",
+                v.kind,
+                delta[c]
+            );
+        }
+        assert!((done.moved[1] - share * done.moved[0]).abs() <= 1e-9 * done.moved[0].abs());
+        assert!(done.removed_m3 > 0.0 && done.moved_c == 0.0);
     }
 }
