@@ -1,6 +1,6 @@
 # What wears the plateaus, and lakes that pass on what their water balance leaves: design
 
-Status: **measured on cached runs, designed and built behind a switch, off; its arm ran** (2026-10-31, the plateau lane,
+Status: **measured on cached runs, designed and built; on by default since 2026-10-31** (the coordinator's call, decisions log 2026-10-31; its arm ran, 2026-10-31, the plateau lane,
 branch `plateau-drainage` on `collision-orogen`). `surface.closed_basins` (`crates/deeptime-core/src/surface/closed.rs`;
 ERO-217, ERO-218), with a split of the flat high ground by its water (ERO-220). The controlled plateau is ERO-219. The
 arm plat-cb0 against orog-cum ("The arm"): the law is sound and cheap and gives the planets internally drained land,
@@ -379,7 +379,7 @@ collision high coasts whose collision cells within 400 km are round, not elongat
 
 So more of the final high coasts sit on broad collision regions. Not explained here.
 
-**Verdict on default-on: yes.**
+**Verdict on default-on: yes (done 2026-10-31: `surface.closed_basins` is on by default, the coordinator's call, decisions log 2026-10-31).**
 - **The project's rule is met** (CLAUDE.md, decisions log 2026-10-23: physics goes on once built and correct; the rule
   it replaces goes off with it):
   - unit tests against its sources;
