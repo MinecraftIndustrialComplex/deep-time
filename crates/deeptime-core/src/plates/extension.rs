@@ -978,7 +978,7 @@ mod tests {
         land.kind = CONTINENTAL;
         land.pools = column;
         land.thickness_m = total_col as f32;
-        samples[5] = land.clone();
+        samples[5] = land;
         let laid = lay(
             &mut fills,
             &mut samples,
@@ -1025,7 +1025,7 @@ mod tests {
         // … and goes to the fallback when one of them has died.
         let mut fills = vec![fill_of(10.0)];
         let mut samples: Vec<Sample> = (0..6).map(|_| ocean()).collect();
-        samples[5] = land.clone();
+        samples[5] = land;
         let laid = lay(
             &mut fills,
             &mut samples,
