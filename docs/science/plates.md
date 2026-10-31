@@ -11774,6 +11774,14 @@ the restacked rock took the cover's mix; two bodies at one front were pooled; th
 under a body slower than 10 Myr; and the extent, read each step as the shortening plus the visible
 rest, overshot halfway down by the lattice's lag. The build above is the corrected one.
 
+Its arm (small-terrane-2, key a7bb6d240ebe, the same settings and seeds, against orog-cum; master's
+heat flow of late continental crust, PLT-469, is in it too): hand-offs under 50 samples 13.3 per 100
+Myr against 17.6 (p 0.010), partings 30.4 against 23.3 (p 0.005), collision high coasts on landmasses
+under 0.02 of the land 0.346 against 0.668 (p 0.038), crust stripped 0.033 km³ a year; no step beyond
+2 Earth reliefs, the deepest trench floor 10,243 m against 9,945 (p 0.001), half the guard's 19.8 km;
+no V1 number beyond the seeds' spread (the coast with high ground 0.092 against 0.067, p 0.33; land
+0.210 against 0.205, p 0.80; continental crust under the sea 0.582 against 0.605, p 1.0).
+
 ## Sediment by margin type and the margin's sediment (PLT-660 to PLT-662, 2026-10-25)
 
 The drowning diagnosis (build log 2026-10-25, "M5 lane: why the land drowns on m5-unfreeze") found the
