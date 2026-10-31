@@ -279,6 +279,11 @@ pub struct Totals {
     /// … and the land draining to closed basins, km² × Myr (map).
     #[serde(default)]
     pub closed_km2_myr: f64,
+    /// The stream power's runoff weight against the climate snapshot's own rule, with
+    /// `surface.runoff_budget` (measurement only, ERO-221): km² × Myr of land, of it × the weight
+    /// used and × the snapshot's own weight, then the same for land above 2 km over the sea.
+    #[serde(default)]
+    pub runoff_weight_km2_myr: [f64; 6],
     pub frames: u64,
     /// Land erosion by process and elevation band (`erosion_bands`).
     #[serde(default)]
@@ -1360,6 +1365,23 @@ impl SurfaceStage {
             fam,
             cell_water,
         } = setup;
+        // ledger: ERO-221
+        // The runoff weight used against the snapshot's own (measurement only).
+        let mut runoff_weight = [0.0f64; 6];
+        if p.runoff_budget {
+            let own = |c: usize| (clim.runoff_m_yr[c] / p.runoff_ref_m_yr as f32).max(0.05);
+            runoff_weight = (0..n)
+                .into_par_iter()
+                .filter(|&c| sc.h[c] > sea)
+                .map(|c| {
+                    let (u, o) = (f64::from(sc.weight[c]), f64::from(own(c)));
+                    let hi = if sc.h[c] - sea > 2000.0 { 1.0 } else { 0.0 };
+                    [1.0, u, o, hi, hi * u, hi * o]
+                })
+                .reduce(|| [0.0; 6], |a, b| std::array::from_fn(|i| a[i] + b[i]));
+            let km2_myr = d.cell_area() / 1.0e6 * dt / 1.0e6;
+            runoff_weight.iter_mut().for_each(|v| *v *= km2_myr);
+        }
         let class_of = |st: &SurfaceState, c: usize| surface_class(&cls, &basement, st, c);
 
         let mut water_levels: Option<lakes::Levels> = None;
@@ -2521,6 +2543,9 @@ impl SurfaceStage {
         t.closed_lakes += closed_lakes;
         t.partial_lakes += partial_lakes;
         t.closed_km2_myr += closed_km2_myr;
+        for (a, b) in t.runoff_weight_km2_myr.iter_mut().zip(runoff_weight) {
+            *a += b;
+        }
 
         let m_per_block_v = self.preset.scale.m_per_block_v;
         let sea_y = f64::from(self.preset.scale.sea_level_y);
