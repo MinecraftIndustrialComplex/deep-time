@@ -925,7 +925,7 @@ over the sea on 39 to 42 km of crust; the model's interiors stand at the sea on 
 "such as Laurentia, were episodically flooded and exposed repeatedly through the last 0.5 Gyr" (Korenaga, Planavsky
 & Evans 2017, full text, citing Wise 1974, Algeo & Seslavinsky 1995 and Sloss 1963); the drowned share of Earth's
 continental crust reached 0.528 at 80 Ma and 0.600 at 510 Ma (RLC-031). base35's 0.602 is Earth's most flooded
-Phanerozoic stand, held from -700 Myr to the end.
+Phanerozoic stand; from -700 Myr on its continental crust is 0.42 to 0.63 under the sea (cb_t, medians).
 
 **The split.** For the crust at least 20 km thick in 1-km bands b, with s_b the band's share of that crust, d_b its
 dry share and m_b its mean height over the sea, the dry share D = Σ s_b d_b and the mean height H = Σ s_b m_b split
