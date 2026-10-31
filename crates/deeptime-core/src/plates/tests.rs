@@ -5951,7 +5951,10 @@ fn young_floor_made_continental_after_the_step_takes_the_continental_law() {
     st.samples[land].heat_flow_mw_m2 = 120.0;
     for &i in &sea {
         st.samples[i].make_continental();
-        assert_eq!(st.samples[i].heat_flow_mw_m2, 0.0, "the floor's went with it");
+        assert_eq!(
+            st.samples[i].heat_flow_mw_m2, 0.0,
+            "the floor's went with it"
+        );
     }
     st.samples[land].make_continental();
     assert_eq!(
@@ -5982,13 +5985,20 @@ fn young_floor_made_continental_after_the_step_takes_the_continental_law() {
     let l = thermal::ocean_km(age);
     assert!((l - 18.0).abs() < 0.1, "{l}");
     let law = thermal::conductive_mw_m2(l);
-    assert!((q(&st, sea[0]) - law).abs() < 1e-3, "{} against {law}", q(&st, sea[0]));
+    assert!(
+        (q(&st, sea[0]) - law).abs() < 1e-3,
+        "{} against {law}",
+        q(&st, sea[0])
+    );
     assert!(
         (q(&st, sea[1]) - law - thermal::ARC_HEAT_MW_M2).abs() < 1e-3,
         "{}",
         q(&st, sea[1])
     );
-    assert!(law < ocean_heat_flow(age), "under the floor's law, which has no say");
+    assert!(
+        law < ocean_heat_flow(age),
+        "under the floor's law, which has no say"
+    );
 
     // Off (both switches), the pass leaves the made crust with none: the fault it fixes.
     let mut off = p.tectonics.clone();
