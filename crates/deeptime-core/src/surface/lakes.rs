@@ -71,6 +71,28 @@ pub struct Levels {
     pub dry_below_sea: usize,
     /// Cells above the sea level under a lake (the sea's rule had them dry).
     pub wet_above_sea: usize,
+    /// What each lake above the sea passes on over its spill (with `balance`; `closed.rs`,
+    /// ERO-217), in the order the balance resolved them.
+    pub outflow: Vec<LakeOutflow>,
+}
+
+/// What one lake passes on: the share of the water that reaches it which its balance leaves to
+/// flow out (Garcia-Castellanos 2006, eq. 2: the outlet's discharge is the runoff collected less
+/// what the lake's surface evaporates), 0 for a lake that cannot fill to its spill (a closed,
+/// internally drained basin).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct LakeOutflow {
+    /// The lake's exit cells: its cells whose receiver lies outside it (over the spill).
+    pub exits: Vec<u32>,
+    /// Outflow over inflow, 0 to 1.
+    pub share: f64,
+    /// The flood's level, its spill, m.
+    pub spill_m: f64,
+    /// The level the balance holds, m: the spill for a lake that fills, the shore of one that
+    /// cannot, the floor's lowest cell when no water stands in it.
+    pub level_m: f64,
+    /// The depression's cells.
+    pub cells: usize,
 }
 
 /// One lake while the balance is taken.
@@ -81,6 +103,8 @@ struct Lake {
     level: f64,
     /// Exits not yet reached by the upstream pass.
     exits_left: u32,
+    /// The exits the upstream pass reached (for [`Levels::outflow`]).
+    exit_cells: Vec<u32>,
     /// What flowed in, m³/yr.
     supply: f64,
 }
@@ -123,6 +147,7 @@ pub fn water_levels<G: SurfaceGrid>(
     let mut q = vec![0.0f64; n];
     let mut full = 0;
     let mut dry = 0;
+    let mut outflow: Vec<LakeOutflow> = Vec::new();
     let mut resolve = |lake: &mut Lake| -> (f64, f64) {
         if lake.level <= sea + LAKE_TOL_M {
             // Open to the sea: the sea reaches it at its own level.
@@ -136,6 +161,20 @@ pub fn water_levels<G: SurfaceGrid>(
         let at_full = lake.supply - loss;
         if !balance || at_full >= 0.0 {
             full += 1;
+            if balance {
+                // ledger: ERO-218
+                outflow.push(LakeOutflow {
+                    exits: std::mem::take(&mut lake.exit_cells),
+                    share: if lake.supply > 0.0 {
+                        (at_full / lake.supply).clamp(0.0, 1.0)
+                    } else {
+                        1.0
+                    },
+                    spill_m: lake.level,
+                    level_m: lake.level,
+                    cells: lake.cells.len(),
+                });
+            }
             return (lake.level, at_full.max(0.0));
         }
         // It cannot fill: its cells go under from the lowest up while the inflow, and the
@@ -160,13 +199,26 @@ pub fn water_levels<G: SurfaceGrid>(
             g = next;
             wet += 1;
         }
-        if wet == 0 {
+        let z = if wet == 0 {
             dry += 1;
-            (DRY, 0.0)
+            DRY
         } else {
             // The level is the shore: the lowest cell it does not cover.
-            (h[lake.cells[wet.min(lake.cells.len() - 1)] as usize], 0.0)
-        }
+            h[lake.cells[wet.min(lake.cells.len() - 1)] as usize]
+        };
+        // ledger: ERO-217
+        outflow.push(LakeOutflow {
+            exits: std::mem::take(&mut lake.exit_cells),
+            share: 0.0,
+            spill_m: lake.level,
+            level_m: if z == DRY {
+                h[lake.cells[0] as usize]
+            } else {
+                z
+            },
+            cells: lake.cells.len(),
+        });
+        (z, 0.0)
     };
     for &c in r.stack.iter().rev() {
         let c = c as usize;
@@ -186,6 +238,7 @@ pub fn water_levels<G: SurfaceGrid>(
         let lake = &mut lakes[k];
         lake.supply += q[c];
         lake.exits_left -= 1;
+        lake.exit_cells.push(c as u32);
         if lake.exits_left == 0 {
             let (z, out) = resolve(lake);
             level[k] = z;
@@ -200,6 +253,7 @@ pub fn water_levels<G: SurfaceGrid>(
         lakes: lakes.iter().filter(|l| l.level > sea + LAKE_TOL_M).count(),
         full,
         dry,
+        outflow,
         ..Levels::default()
     };
     out.water_z = (0..n)
@@ -251,6 +305,7 @@ fn label_lakes<G: SurfaceGrid>(
             cells: Vec::new(),
             level: f64::INFINITY,
             exits_left: 0,
+            exit_cells: Vec::new(),
             supply: 0.0,
         };
         id[s] = k;
@@ -310,6 +365,7 @@ fn label_lakes_parallel<G: SurfaceGrid>(
                 cells: Vec::new(),
                 level: f64::INFINITY,
                 exits_left: 0,
+                exit_cells: Vec::new(),
                 supply: 0.0,
             };
             let mut todo = vec![s];
@@ -375,6 +431,7 @@ pub fn at_step_end<G: SurfaceGrid>(
         dry: flood.dry,
         dry_below_sea,
         wet_above_sea,
+        outflow: Vec::new(),
     }
 }
 

@@ -80,6 +80,33 @@ def main():
         flat = [b["flat"]["net"] for _, b in runs if "flat" in b]
         if flat:
             print(f"  flat net per run: min {min(flat):.1f}, max {max(flat):.1f}")
+        # The land's mean lowering (the bands' area x time shares times their net), and each class's
+        # part of it, run by run, then the median.
+        mean, parts = [], {c: [] for c in ("flat", "steep", "z0", "z1000", "z2000", "z3000", "z4000")}
+        for _, b in runs:
+            total = sum(b[z]["share"] * b[z]["net"] for z in ("z0", "z1000", "z2000", "z3000", "z4000") if z in b)
+            if total <= 0:
+                continue
+            mean.append(total)
+            for c in parts:
+                if c in b:
+                    parts[c].append(b[c]["share"] * b[c]["net"] / total)
+        if mean:
+            print(f"  the land's mean net lowering {med(mean):.1f} m/Myr; parts of it: "
+                  + ", ".join(f"{c} {med(v):.3f}" for c, v in parts.items() if v))
+        # What the surface sent to the sea and eroded over the run, Earth-normalized km3 a year
+        # (the map's km3 x Earth's area over the L1 map's, 1024 x 328 cells of 4.8 km; a 1000-Myr run).
+        scale = 5.10e8 / (1024 * 328 * 4.8 * 4.8) / 1.0e9
+        sea, ero = [], []
+        for r, _ in runs:
+            for line in open(Path(arm) / r / "summary.txt", errors="replace"):
+                if "surface_final=" in line:
+                    kv = dict(t.split("=", 1) for t in line.split() if "=" in t)
+                    sea.append(float(kv.get("to_sea_km3", "nan")) * scale)
+                    ero.append(float(kv.get("eroded_km3", "nan")) * scale)
+                    break
+        if sea:
+            print(f"  to the sea {med(sea):.2f} km3/yr, eroded {med(ero):.2f} km3/yr (Earth-normalized, medians)")
 
 
 if __name__ == "__main__":

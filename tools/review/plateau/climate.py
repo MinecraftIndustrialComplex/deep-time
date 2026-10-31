@@ -11,7 +11,8 @@ cold and warm seasons) and lets only melted snow run off. From the dumped final 
 `climate/t_mean_c`, `climate/t_warm_c`, `climate/koppen`; the cold season taken as 2 t_mean - t_warm, the sinusoid's
 other extreme): for the land above 2 km and its flat part (3 x 3 relief under 500 m), the share below 0 degC, the
 medians of t_mean, T+ and the thawed share of the year, and the Koppen arid (B) and polar (E) shares. Medians over runs.
-Precipitation is not in the dump, so the runoff itself is not computed here.
+Also the share under the climate's ice (100 m or more: no river erosion) and the cold share without ice (under
+10 m). Precipitation is not in the dump, so the runoff itself is not computed here.
 """
 import json
 import math
@@ -53,6 +54,7 @@ def run(r):
     tm = field(f, idx, "climate/t_mean_c")
     tw = field(f, idx, "climate/t_warm_c")
     k = field(f, idx, "climate/koppen").round().astype(int)
+    ice = field(f, idx, "climate/ice_thickness_m") if "climate/ice_thickness_m" in idx else np.zeros_like(z)
     hi = z > 2000.0
     pad = np.pad(z, 1, mode="edge")
     win = np.stack([pad[1 + dy:pad.shape[0] - 1 + dy, 1 + dx:pad.shape[1] - 1 + dx]
@@ -72,6 +74,11 @@ def run(r):
         out[label + "_arid"] = float(np.isin(k[msk], [4, 5, 6, 7]).mean())
         out[label + "_polar"] = float(np.isin(k[msk], [29, 30]).mean())
         cold = msk & (tm < 0)
+        # The climate's ice over it: from 100 m the surface's rivers do not erode (kf x (1 - the
+        # smoothstep of 10 to 100 m), `surface/mod.rs`); the cold cells without ice are the ones
+        # whose P the surface counts all as runoff for its rivers.
+        out[label + "_ice100"] = float((ice[msk] >= 100.0).mean())
+        out[label + "_below0_no_ice"] = float((cold & (ice < 10.0)).sum() / n)
         if cold.any():
             # Below 0 degC the surface's PET is 0; the bake's is 60 x T+ (mm/yr) on the melted share.
             out[label + "_below0_pet_hydro_mm"] = float(np.median(60.0 * tp[cold]))
