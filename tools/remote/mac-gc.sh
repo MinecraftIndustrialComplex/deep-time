@@ -23,7 +23,7 @@
 
 set -euo pipefail
 
-HOST="${DEEPTIME_MAC:-ban@deeptime-test-ban.westus2.cloudapp.azure.com}"
+HOST="${DEEPTIME_MAC:-ban@deeptime-test-ban.eastus.cloudapp.azure.com}"
 MODS=/Volumes/Graphide/ban/mic/mods
 DRY=0; [ "${1:-}" = --dry-run ] && DRY=1
 IDLE_TARGET=$(( 7 * 86400 ))  # a kept copy idle this long loses its target/
