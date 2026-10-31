@@ -226,7 +226,9 @@ fn work_terrain(field: &Field, sea_raw: i32) -> (GridDesc, Vec<i16>) {
 /// The climate at block (x, z), as the bake's water part reads it: precipitation, mean
 /// temperature and the warmest and coldest month (`climate/t_warm_c`, `climate/t_cold_c`; the
 /// mean ± 8 °C without them) bilinear from the frame's L1 climate, else the surface stage's zonal
-/// stand-in.
+/// stand-in. The year is drawn about the mean from the warmest month (`Climate::thaw`): a frame's
+/// world holds the climate stage's twelve months only at the last step, where the bake takes
+/// them, and the final frame draws the bake's own files ([`from_bake`]).
 pub(crate) fn climate_at<'w>(
     world: &'w WorldState,
     circumference: f64,

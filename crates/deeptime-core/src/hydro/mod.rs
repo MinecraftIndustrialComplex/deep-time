@@ -531,6 +531,10 @@ pub struct Climate {
     /// Mean temperature of the warmest and the coldest month, °C.
     pub t_warm_c: f64,
     pub t_cold_c: f64,
+    /// The twelve monthly means, °C, where the climate stage wrote them ([`Climate::of_months`]:
+    /// the bake's monthly layers, the stage's last step); None: the year is drawn from the mean
+    /// and the warmest month ([`Climate::thaw`]).
+    pub months_c: Option<[f64; 12]>,
 }
 
 impl Climate {
@@ -541,6 +545,7 @@ impl Climate {
             t_mean_c,
             t_warm_c: t_mean_c,
             t_cold_c: t_mean_c,
+            months_c: None,
         }
     }
 
@@ -565,24 +570,69 @@ impl Climate {
             } else {
                 t - 8.0
             },
+            months_c: None,
         }
     }
 
-    /// The year's mean of the temperature above freezing, °C, and the share of the year above
-    /// freezing, for a sinusoidal year between the coldest and the warmest month (with no month
-    /// below freezing: the mean annual temperature and 1).
+    /// From a mean and the twelve months' departures from their own mean, °C (HYD-033: the
+    /// departures are the same at any height, so the monthly layers' are added to the cell's
+    /// mean). Any departure not finite: the mean ± 8 °C of [`Climate::of`].
+    // ledger: HYD-030, HYD-033
+    pub fn of_months(precip_mm: f64, t_mean_c: f64, departures_c: &[f64; 12]) -> Climate {
+        let base = Climate::of(precip_mm, t_mean_c, f64::NAN, f64::NAN);
+        if departures_c.iter().any(|d| !d.is_finite()) {
+            return base;
+        }
+        let t = base.t_mean_c;
+        let months: [f64; 12] = std::array::from_fn(|m| t + departures_c[m]);
+        Climate {
+            t_warm_c: months.iter().copied().fold(t, f64::max),
+            t_cold_c: months.iter().copied().fold(t, f64::min),
+            months_c: Some(months),
+            ..base
+        }
+    }
+
+    /// The year's mean of the temperature above freezing, °C (Holdridge's biotemperature), and
+    /// the share of the year above freezing.
+    ///
+    /// - With the twelve months ([`Climate::months_c`]): Holdridge's own method, the mean of the
+    ///   twelve monthly means with each one below freezing counted as 0 °C (Holdridge 1967; his
+    ///   Verkhoyansk gives his 3.05 °C exactly); the share above freezing on the year drawn
+    ///   straight between the months' middles.
+    /// - Else a sinusoidal year about the mean, its amplitude the warmest month's departure from
+    ///   it, T = mean + (warm − mean) cos θ: no frost when 2 mean − warm ≥ 0 (the mean and 1), no
+    ///   thaw when warm ≤ 0. The coldest month does not enter: a year's months need not be
+    ///   symmetric about their mean (the climate stage's winter inversion), and a sinusoid
+    ///   through the two months, centred between them, drops the mean (until 2026-10-31: the
+    ///   biotemperature fell below the mean and jumped where the coldest month crossed 0 °C; the
+    ///   runoff law's re-review).
+    ///
+    /// Either way the biotemperature is continuous in the months and never below max(mean, 0),
+    /// the mean of a year's warmth above freezing being at least that of its mean (its rounding
+    /// is held to that).
+    // ledger: HYD-030, HYD-031
     pub fn thaw(&self) -> (f64, f64) {
-        let a = 0.5 * (self.t_warm_c - self.t_cold_c).max(0.0);
-        let m = 0.5 * (self.t_warm_c + self.t_cold_c);
-        if m - a >= 0.0 {
-            (self.t_mean_c.max(0.0), 1.0)
-        } else if m + a <= 0.0 {
+        let floor = self.t_mean_c.max(0.0);
+        if let Some(months) = &self.months_c {
+            let above = months.iter().map(|t| t.max(0.0)).sum::<f64>() / 12.0;
+            let share = (0..12)
+                .map(|m| thawed_share(months[m], months[(m + 1) % 12]))
+                .sum::<f64>()
+                / 12.0;
+            return (above.max(floor), share);
+        }
+        let mean = self.t_mean_c;
+        let a = (self.t_warm_c - mean).max(0.0);
+        if mean - a >= 0.0 {
+            (floor, 1.0)
+        } else if mean + a <= 0.0 {
             (0.0, 0.0)
         } else {
-            // T = m + a·cos θ is above 0 for |θ| < θ0.
-            let th = (-m / a).clamp(-1.0, 1.0).acos();
+            // T = mean + a·cos θ is above 0 for |θ| < θ0.
+            let th = (-mean / a).clamp(-1.0, 1.0).acos();
             (
-                ((m * th + a * th.sin()) / std::f64::consts::PI).max(0.0),
+                ((mean * th + a * th.sin()) / std::f64::consts::PI).max(floor),
                 th / std::f64::consts::PI,
             )
         }
@@ -596,6 +646,18 @@ impl Climate {
         } else {
             (self.precip_mm / pet).min(10.0)
         }
+    }
+}
+
+/// The share of a month's span above freezing on a year drawn straight from month temperature
+/// `from` to the next month's `to`, °C.
+// ledger: HYD-031
+fn thawed_share(from: f64, to: f64) -> f64 {
+    match (from > 0.0, to > 0.0) {
+        (true, true) => 1.0,
+        (false, false) => 0.0,
+        (true, false) => from / (from - to),
+        (false, true) => to / (to - from),
     }
 }
 
