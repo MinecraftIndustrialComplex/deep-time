@@ -152,6 +152,37 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 
 ## Build log
 
+### 2026-10-31: PR #50's review answered on collision-orogen-on: the plateau test reaches its ocean, the plateau's structures, stale docs (the orogen lane, worktree agent-a52784a4e4ef20e33)
+
+- **The review.** An Opus reviewer stood in for Graphide, which is out of free reviews. It found no correctness bug.
+- **The plateau test.** `the_retro_plateau_grows_past_the_belt_through_its_own_crust` never reached its sea: one step's
+  crust fills a 300 m lowland only about 120 km past the belt. Its lowland now stands 20 m under the strength height
+  for the 400 km before a strip of ocean floor. Every sample there rises, nothing on the ocean floor or across it does,
+  and the no-room rule (the shipped PLT-700 path) takes more than none and less than with the switch off.
+- **New test.** `an_arc_in_collision_takes_the_crust_on_its_edge_on_the_shipped_path`: the shipped switches on an arc
+  whose incoming continent stands at the strength height. There is no plateau, and the arc's edge takes everything.
+- **The plateau's structures: documented, not marked.** Its samples are stamped as the collision's orogeny but stay
+  outside the footprint (PLT-260), so they get no collision folds or thrusts. The reason is that the crust comes by
+  the orogen's flow, not by shortening their own upper crust:
+  - Tibet's eastern margin, "without significant shortening of the upper crust": Clark & Royden 2000, p. 703, full text.
+  - Royden et al. 1997, abstract.
+  - The interior extends east-west: Armijo et al. 1986 and Blisniuk et al. 2001, abstracts.
+
+  The limits: Vanderhaeghe et al. 2003, p. 40, find pure-shear upper-crust thickening in one model's plateau, and the
+  interior's normal faults are not modelled. This is recorded in belts.rs, PLT-740, PLT-260, plates.md and the design.
+- **Stale docs fixed:**
+  - `heat_flow_refresh` (params.rs) and `make_continental` (state.rs; now lists every caller).
+  - "never across a sea" is now "never across ocean floor" (belts.rs, PLT-740, the design).
+  - The Vanderhaeghe Fig. 11c reading is labelled as the research agent's.
+  - Wolf2021 now lists PLT-730.
+  - The wedge test's taper comment.
+  - The recording test's seed comment: it shares seed 2 with the weld test now.
+- **Tools.** `tools/review/orogen/adv_maps.py` is copied in from the advisor's VM folder, and advmaps.sh runs it.
+- **Follow-up recorded** (lithosphere-thermal-state.md, Open questions): with the state, the continental law over a
+  young floor's lithosphere has no ceiling.
+- **Gate (VM).** `cargo test --workspace --no-fail-fast`: 1,438 passed, 0 failed, 13 ignored (deeptime-core lib
+  1,154). clippy `-D warnings` and fmt are clean.
+
 ### 2026-10-31: young floor made continental kept its 300 mW/m² (PLT-469); the bake test on collision-orogen-on fixed (the orogen lane, worktree agent-a52784a4e4ef20e33, branch heatflow-fix pushed to `collision-orogen-on`)
 
 - **The failure.** On collision-orogen-on (e23c2317, both orogen switches on) `bake::tests::the_release_pace_bakes_continental_heat_flow_with_the_final_pass`
