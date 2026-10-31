@@ -1,7 +1,8 @@
 # The continents' crust budget against Stern & Scholl 2010: design
 
-Status: **built behind switches, off** (2026-10-31, the crust-budget lane, branch `crust-budget`; the
-coordinator's task after the freeboard landed, PR #49): PLT-760 to PLT-763; section 5 designed only. Ledger PLT-760 onward; plates.md "The crust budget
+Status: **built behind switches, off; one arm run** (2026-10-31, the crust-budget lane, branch
+`crust-budget`; the coordinator's task after the freeboard landed, PR #49): PLT-760 to PLT-763, the
+arm cb-cum below; section 5 designed only. Ledger PLT-760 onward; plates.md "The crust budget
 against Stern & Scholl 2010, row by row (2026-10-31)" holds the readings and the arm.
 
 ## Why
@@ -161,6 +162,18 @@ plume heads (PLT-117's LIPs, which raise the rifting rate of the plate above, `l
 whose rules are uncited (PLT-108 to PLT-120, `pending-rewrite`). So this addition waits on the
 hotspots' rewrite: a sourced plume flux, which would give both the hotspots' own addition and the
 volcanic margins. Not built: a 50 % draw per breakup would be a forcing term, not a law.
+
+## The arm cb-cum (2026-10-31)
+
+PLT-760, PLT-762 and PLT-763 on, 8 runs (key f8c4afc098b8, argkey d8fa0c32) against base34-s4;
+the tables are in plates.md. The net change of the continental volume goes from −0.98 to −0.18 km³
+a year (the late half −1.14 to −0.54): the arcs' rock less their cones +0.47, the suture's arcs
++0.18, subduction erosion −0.15 (fewer erosive fronts under the in-place line), sediment subduction
+unchanged at 2.60. The island arcs make 1.82 with their cones (Stern & Scholl 1.5) on 1.75 times
+their front at 0.66 of their rate per km. The label-free felsic rock loses 1.18 km planet-mean over
+the late half against base34-s4's 1.70. The sea follows the kept crust (169 to 392 m at the end;
+continental crust 0.492 to 0.528 of the planet), which floods the supercontinent planets: criteria
+met median 6.5 to 5 (p 0.041), the crust's net change +0.065 to +0.098, the guard clean.
 
 ## What is left
 
