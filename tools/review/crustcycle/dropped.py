@@ -20,6 +20,7 @@ as km^3 a year over the run:
 and the medians of each arm with the two-sided Mann-Whitney p (scipy). Visible ocean floor of another plate under the
 top cover with no contact vanishes with its sediment and is in no global: its sediment shows in the residual only.
 """
+import json
 import re
 import statistics
 import sys
@@ -50,7 +51,8 @@ def run_row(run):
     parts = {}
     for name, body in re.findall(r"(\w+)=\[([^\]]*)\]", p_line):
         parts[name] = {k: float(v) for k, v in PART.findall(body)}
-    t0 = float(KV.findall(lines[[i for i, x in enumerate(lines) if x.startswith("cb_globals ")][0]])[0][1])
+    # The run's start (rec.json), not the first snapshot's time.
+    t0 = float(json.loads((run / "rec.json").read_text())["t0_myr"])
     years = (g["t"] - t0) * 1.0e6
     blend = lambda names: sum(parts.get(n, {}).get("resample_blend", 0.0) for n in names) * 1.0e6
     ocean, cont = blend(("sed_ov", "sed_oh")), blend(("sed_c",))

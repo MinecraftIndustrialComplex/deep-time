@@ -19,7 +19,8 @@ It prints, pooled over the runs:
   the intra-oceanic front on the maps (-950 to -50 Myr every 50; ocean-ocean as oofronts.py classes it: no continental
   crust of the overriding plate within 200 km, PLT-370) by the floor going under (younger than 55 Myr or not) and by
   the class of its contact's onset (the pair's latest onset at or before the map's time and still active then; a
-  split's copy, which carries a new plate id, matched by one side, or unmatched);
+  split's copy, which carries a new plate id, through the plates' lineage, rec.json's `parent`; or unmatched);
+  snapshots taken at a resampling carry no front flags and are left out, as oofronts.py leaves them;
   for the onsets on the step after a resampling on gap fill: their pair's history, the boundary the step before, the
   floor's age at the onset (`slab_age_myr`), the age that floor had when the fill made it (the onset's age less the
   time since the fill) against the interval the fill closed (a gap point's age is alpha times that interval, PLT-502,
@@ -44,14 +45,15 @@ HIST = ["spread in interval", "spread before", "never spread"]
 KINDS = ["spreading", "converging", "transform", "front", "collision", "none", "unknown"]
 
 
-def when_of(since):
+def when_of(since, dt):
+    # By the run's step (`dt`, Myr): its own step, the step after, two after.
     if since < 0:
         return 5
     if since < 1e-6:
         return 0
-    if since <= 2.001:
+    if since <= dt + 1e-3:
         return 1
-    if since <= 4.001:
+    if since <= 2.0 * dt + 1e-3:
         return 2
     if since <= 10.001:
         return 3
@@ -66,9 +68,9 @@ def floor_of(o):
     return 0 if p["under_bits"][0] * 2 >= n else 1
 
 
-def classify(o, res_ts, t0):
+def classify(o, res_ts, t0, dt):
     since = o.get("since_resample_myr", -1.0)
-    o["when"] = when_of(since)
+    o["when"] = when_of(since, dt)
     o["floor"] = floor_of(o)
     # The interval the last fill closed: from the resampling before it (or the run's start) to it.
     o["interval"] = float("nan")
@@ -97,7 +99,8 @@ def front_samples(run, t):
     idx = np.nonzero(front)[0]
     spacing = float(np.sqrt(4 * np.pi * oofronts.R_KM ** 2 / len(a)))
     if not len(idx):
-        return [], spacing
+        # A snapshot at a resampling carries no front flags (crust_budget.rs): not a planet with no front.
+        return None
     trees = {}
     for q in np.unique(plate[cont]):
         m = np.nonzero(cont & (plate == q))[0]
@@ -118,9 +121,17 @@ def front_samples(run, t):
     return out, spacing
 
 
-def link(onsets_by_pair, onsets, u, q, t):
+def ancestors(x, parents):
+    out = [x]
+    while len(out) < 64 and parents.get(out[-1]) is not None:
+        out.append(parents[out[-1]])
+    return out
+
+
+def link(onsets_by_pair, onsets, u, q, t, parents=None):
     """The onset of the contact (under u, over q) at map time t: the pair's latest onset at or before t still active
-    then; else (a split's copy carries a new plate id) the latest such onset sharing one side; else None."""
+    then; else (a split's copy carries a new plate id) the latest such onset whose plates are u's and q's ancestors
+    (rec.json's plate lives, `parent`); else None."""
     best = None
     for i in onsets_by_pair.get((u, q), []):
         o = onsets[i]
@@ -129,11 +140,14 @@ def link(onsets_by_pair, onsets, u, q, t):
                 best = i
     if best is not None:
         return best, "pair"
-    for i, o in enumerate(onsets):
-        if (o["under"] == u or o["over"] == q) and o["t"] <= t + 1e-6 and o.get("last_myr", o["t"]) >= t - 1e-6:
-            if best is None or o["t"] > onsets[best]["t"]:
-                best = i
-    return (best, "one side") if best is not None else (None, "none")
+    if parents:
+        au, aq = ancestors(u, parents), ancestors(q, parents)
+        for i, o in enumerate(onsets):
+            if (o["under"] in au and o["over"] in aq and o["t"] <= t + 1e-6
+                    and o.get("last_myr", o["t"]) >= t - 1e-6):
+                if best is None or o["t"] > onsets[best]["t"]:
+                    best = i
+    return (best, "lineage") if best is not None else (None, "none")
 
 
 def main(argv):
@@ -150,14 +164,17 @@ def main(argv):
             if not steps:
                 continue
             runs += 1
-            length_myr += float(steps[-1]["t"]) - float(rec.get("t0_myr", steps[0]["t"]))
             res_ts = [float(x["t"]) for x in rec.get("resamples") or []]
             onsets = [o for o in rec.get("onsets") or [] if "since_resample_myr" in o]
             traced = bool(res_ts) and bool(onsets)
             traced_runs += int(traced)
             t0 = float(rec.get("t0_myr", steps[0]["t"]))
+            if traced:
+                length_myr += float(steps[-1]["t"]) - t0
+            dt = float(rec.get("dt_myr", 2.0))
+            parents = {int(x["id"]): x.get("parent") for x in rec.get("plates") or []}
             for o in onsets:
-                classify(o, res_ts, t0)
+                classify(o, res_ts, t0, dt)
             onset_rows.extend(onsets)
             by_pair = {}
             for i, o in enumerate(onsets):
@@ -174,7 +191,7 @@ def main(argv):
                 for q, u, age in fs:
                     young = int(age < YOUNG_MYR)
                     if traced:
-                        i, how = link(by_pair, onsets, u, q, t)
+                        i, how = link(by_pair, onsets, u, q, t, parents)
                         key = (young, onsets[i]["when"], onsets[i]["floor"], onsets[i]["hist"], how) if i is not None \
                             else (young, -1, -1, -1, how)
                     else:
@@ -196,11 +213,11 @@ def main(argv):
     for yv, name in ((1, "young"), (0, "old")):
         den = sum(v for (y, _), v in how_tot.items() if y == yv)
         print(f"  {name} floor: linked to its contact's onset by the pair " + "  ".join(
-            f"{h} {how_tot.get((yv, h), 0.0) / max(den, 1e-9):.3f}" for h in ("pair", "one side", "none")))
+            f"{h} {how_tot.get((yv, h), 0.0) / max(den, 1e-9):.3f}" for h in ("pair", "lineage", "none")))
     print("# the intra-oceanic front on the maps by its contact's onset, shares of the young-floor / old-floor front"
-          " (linked by the pair or one side)")
+          " (linked by the pair or its lineage)")
     for yv, name in ((1, f"floor under {YOUNG_MYR:.0f} Myr"), (0, f"floor {YOUNG_MYR:.0f} Myr or older")):
-        sel = {k: v for k, v in maps.items() if k[0] == yv and k[4] in ("pair", "one side")}
+        sel = {k: v for k, v in maps.items() if k[0] == yv and k[4] in ("pair", "lineage")}
         den = max(sum(sel.values()), 1e-9)
         print(f"  {name} ({den / max(snapshots, 1):.0f} km at a snapshot)")
         for wi, w in enumerate(WHEN):
@@ -215,7 +232,7 @@ def main(argv):
     tot_km = sum(o["front_km_myr"][0] for o in made)
     per = 1.0 / max(length_myr, 1e-9)
     print(f"# onsets that made intra-oceanic front ({len(made)} of {len(onset_rows)}); front made over the run, mean km"
-          f" {tot_km * per * traced_runs / max(traced_runs, 1):.0f} per run")
+          f" {tot_km * per:.0f} per run (the traced runs)")
     print("  share of the intra-oceanic front made (front_km_myr, a split's copies counted), by when and floor:")
     for wi, w in enumerate(WHEN):
         row = [sum(o["front_km_myr"][0] for o in made if o["when"] == wi and o["floor"] == fi) / max(tot_km, 1e-9)
