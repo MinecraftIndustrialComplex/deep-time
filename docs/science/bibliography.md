@@ -10077,6 +10077,7 @@ The sources of the old-floor lane (plates.md "Step 16"; build log 2026-10-27). T
 - Access: the university repository's copy open.
 - Library: not kept.
 - Read so far (by the project): pages 1-4, 6, 14, 16 and 18 of 23, 2026-10-30 (a research sub-agent): the abstract, "Reconstruction of pre-incision profiles suggests that rock uplift during the growth of the Cordillera de Talamanca is no greater than ∼2 km."; p. 3, the Cocos Ridge "subducting near-orthogonally under the Panama microplate at a rate of 85 mm/yr"; p. 4, the Cordillera de Talamanca "reaching elevations of 3800 m (Mt Chirripó, 3820 m), and extending 175 km along strike of the arc, coincident with the width of the Cocos Ridge"; p. 6, "the greatest shortening (40 km since the Pliocene) and largest number of thrust faults occur directly inboard of the Cocos Ridge axis"; p. 16, "a young (<3 Ma) collision of the Cocos Ridge and the Central American trench".
+
 ## The collision orogen: plateau growth and plateau wear (PLT-740), added 2026-10-31
 
 Read for the orogen lane by a Sonnet research sub-agent (2026-10-31); the quotes are the agent's, from the copies
