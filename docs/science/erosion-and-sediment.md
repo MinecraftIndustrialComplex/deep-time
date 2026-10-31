@@ -23,6 +23,7 @@ Through the whole history, rivers cut into rising land (the stream power law: er
 | [ERO](ledger/ERO.md) | pelagic and periplatform carbonate, photic diagnostics, euxinic veto | ERO-191 to ERO-197 (7) |
 | [ERO](ledger/ERO.md) | chemical denudation: the dissolved load of the carbon cycle's silicate weathering | ERO-205 to ERO-207 (3) |
 | [ERO](ledger/ERO.md) | the pelagic rain: dust, the dissolved load back as opal and carbonate, its test, its facies | ERO-208 to ERO-216 (9) |
+| [ERO](ledger/ERO.md) | closed basins: what a lake passes on by its water balance, the internally drained plateau test, the flat high ground split by its water | ERO-217 to ERO-220 (4) |
 
 Rows by status (2026-10-18, `tools/review/claims_counts.py`): `verified` 10, `cited-unverified` 82, `from-memory` 2, `abstract-only` 4, `calibrated` 8, `game-choice` 11, `uncited` 56.
 
@@ -1267,3 +1268,50 @@ its 200,000 cap). Planning the mouths' fills in parallel and applying them in tu
 each plan checked against the cells it popped) re-planned 41 % of them and ran slower, so the fill
 stays serial; its heap item is packed into one u128 key (16 bytes, compared as one number;
 `the_packed_item_orders_as_its_fields`).
+
+
+## Internally drained basins (the plateau lane, 2026-10-31)
+
+**What was asked.** Why Tibet-class plateaus wear away (flat high ground at 109 to 129 m/Myr though arid or polar by its
+Köppen class, against the Altiplano's 0.02 mm/yr), which terms wear a plateau's flat top, and a sourced law for what
+Earth's plateaus do instead (the orogen lane's O4, docs/design/collision-orogen.md; the follow-up "High plateaus still
+wear too fast"). The measurements, the sources and the arm are in docs/design/plateau-drainage.md; this is the summary.
+
+**What wears them** (cached runs only: base34, 24 runs, and orog-cum, 8; `tools/review/plateau/`). On the flat high
+ground (above 2 km, 3 x 3 relief under 500 m at the step's start) the surface's gross lowering is stream power without
+the critical slope's cut 0.37, the cut 0.32 to 0.34, diffusion 0.21 to 0.24, ice 0.06 to 0.07 (net 134 to 138 m/Myr).
+The cut on ground that was flat at the step's start follows the receiver's lowering in the same solve: it is the
+threshold hillslope behind an incising river, so stream power through the plateau's drainage, with the cut it drives, is
+0.69 to 0.71 of the wear. Almost nothing the flat high ground loses is laid back on it. The frozen-ground runoff of
+`surface/climate.rs` (all of P below 0 °C) reaches 0.004 to 0.029 of the flat high ground: the rest of its cold part
+is under the climate's ice, where the rivers do not erode. A third to a half of the flat high ground drains into a
+depression at a run's end, and every depression spills (ERO-080). After its collision a plateau's crust goes 0.57 to
+0.69 to the plates' collapse and flow (PLT-254 to PLT-259, PLT-300, PLT-412 to PLT-415, sourced) and 0.31 to 0.43 to
+the surface, read from the rock pools of the crust-budget maps. The plateaus' own wear is 1 to 2 % of the land's mean
+lowering (40.1 and 37.1 m/Myr); the land under 2 km is 0.72 to 0.75 of it.
+
+**What Earth's do.** Their interiors are internally drained and barely erode (southern Tibet 6 to 16 m/Myr, Hetzel et
+al. 2011, p. 983; 8.1 and 11.8 m/Myr, Strobl et al. 2012; the Altiplano-Puna's internally drained plateau 0.02 mm/yr
+against 0.50 on its wet eastern flank, Bookhagen & Strecker 2012, p. 103). A closed lake's level is its water balance
+(Langbein 1961, p. 4: "I + P A_L = E' A_L"; Garcia-Castellanos 2007, p. 387, eq. 12), a lake passes on its runoff less
+its evaporation (Garcia-Castellanos 2006, eq. 2: "Qw(x = 0) = P . lb - E . ll", and "for a closed lake Qw(x = 0) = 0"),
+and closure keeps the orogen's rock ("its effect in terms of mass removal from the orogen is null", Garcia-Castellanos
+2007, p. 380). The basin fills and its base level rises (Sobel et al. 2003, [60]); it opens when it fills to its outlet,
+the climate wets, or a river captures it (Garcia-Castellanos 2006, pp. 284-285; Sobel et al. 2003, [58]).
+
+**The law (ERO-217, ERO-218; `surface.closed_basins`, off).** The flexure's lake balance (ISO-126, the bake's budget,
+HYD-050 and HYD-051) now also sets what each lake passes on: the stream power's drainage area leaves a lake's exit at
+the share of its inflow its balance lets out, and none from a lake that cannot fill to its spill. The depression stays
+the solve's lake (HYD-110), so what a closed basin's ranges shed stays on its crust. The flat high ground is also split
+by its water in the erosion bands (`flatc`, `flatd`, `flatf`; ERO-220).
+
+**The controlled plateau (ERO-219).** ERO-176's rimmed plateau on the presets' law, a wet outer flank: the arid interior
+(runoff weight 0.05) wears 3.8 m/Myr spilling and 0.5 closed, the edge 121.2 and 111.7; a humid interior 129.9 spilling
+and 134.7 with its balance. The arid interior's own runoff already slows it far below the planets' flat high ground, so
+on the planets its rivers carry water from upstream and over the spills of the depressions; the law takes that water
+away where the balance closes them.
+
+**Left as it is.** The plates' collapse and flow; the frozen ground's runoff (ERO-010); the 5 % floor of the runoff
+weight (ERO-011, which K was calibrated with); the lakes' evaporation at the bake's 200 + 60 T+ mm a year (HYD-040,
+HYD-041), about half Tibet's 650 to 1,300 (Wang et al. 2020) and Titicaca's 1,100 to 1,270; ranges above the plateau
+(the orogen's edge peaks). Measured on the pool: not yet (the arm is the design's "How it is judged").

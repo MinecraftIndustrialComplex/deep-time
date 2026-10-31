@@ -150,7 +150,9 @@ plateau's retro-ward growth (O2), and a surface that lasts. The model makes the 
 (above: 724 samples above 4 km); the third is the surface stage's: flat high ground that is arid by its climate class
 still wears at 109 to 129 m/Myr, against the Altiplano's 20 m/Myr. That wear is the lever for a Tibet-class plateau at
 a run's end, and it is not this stage's (STATUS Follow-ups, "High plateaus still wear too fast"; ERO-174); the
-sources above (internal drainage defeating the channel network under aridity) are its lead.
+sources above (internal drainage defeating the channel network under aridity) are its lead. Taken up on 2026-10-31
+by the plateau lane (docs/design/plateau-drainage.md): what wears the flat top, and lakes that pass on what their water
+balance leaves (`surface.closed_basins`, ERO-217, ERO-218).
 
 ## What it does not do
 

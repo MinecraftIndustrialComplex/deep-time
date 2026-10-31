@@ -28,7 +28,7 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [CRE](ledger/CRE.md) | core engine: plate geometry, noise, plate state, deformation lattice | 35 | 0 | 8 | 0 | 0 | 0 | 0 | 27 | 1 | 0 | 0 |
 | [DEF](ledger/DEF.md) | folds, faults, intrusions | 80 | 18 | 0 | 0 | 1 | 0 | 61 | 0 | 0 | 0 | 0 |
 | [DEP](ledger/DEP.md) | deposit models, counts, sizes | 178 | 55 | 2 | 0 | 20 | 0 | 74 | 27 | 0 | 0 | 40 |
-| [ERO](ledger/ERO.md) | erosion, sediment, facies | 194 | 21 | 82 | 4 | 7 | 8 | 17 | 55 | 0 | 0 | 11 |
+| [ERO](ledger/ERO.md) | erosion, sediment, facies | 198 | 23 | 82 | 4 | 7 | 8 | 19 | 55 | 0 | 0 | 11 |
 | [FRC](ledger/FRC.md) | plate forces (the force balance, recorded) | 34 | 6 | 0 | 10 | 3 | 0 | 15 | 0 | 0 | 0 | 0 |
 | [GEO](ledger/GEO.md) | geothermal features | 64 | 4 | 0 | 0 | 0 | 0 | 57 | 3 | 0 | 0 | 0 |
 | [GLA](ledger/GLA.md) | glacial erosion and landforms | 74 | 0 | 25 | 1 | 0 | 1 | 28 | 19 | 0 | 0 | 2 |
@@ -40,7 +40,7 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [MAG](ledger/MAG.md) | magma and lava | 58 | 2 | 1 | 0 | 1 | 0 | 53 | 1 | 0 | 0 | 0 |
 | [MOI](ledger/MOI.md) | moisture, winds, seasons | 71 | 0 | 17 | 0 | 0 | 0 | 9 | 45 | 70 | 0 | 6 |
 | [ORE](ledger/ORE.md) | deposit formation, coal, petroleum, placers | 202 | 27 | 17 | 2 | 17 | 0 | 71 | 68 | 0 | 0 | 75 |
-| [PLT](ledger/PLT.md) | plate tectonics | 374 | 90 | 54 | 10 | 32 | 11 | 144 | 33 | 129 | 6 | 48 |
+| [PLT](ledger/PLT.md) | plate tectonics | 375 | 90 | 54 | 10 | 32 | 11 | 145 | 33 | 129 | 6 | 48 |
 | [POL](ledger/POL.md) | the pole cap | 9 | 0 | 0 | 0 | 0 | 0 | 8 | 1 | 0 | 0 | 16 |
 | [PRS](ledger/PRS.md) | presets other than earthlike_quick_16k; test and world presets | 69 | 2 | 8 | 0 | 1 | 2 | 49 | 7 | 11 | 0 | 5 |
 | [PRV](ledger/PRV.md) | geologic provinces | 29 | 0 | 0 | 0 | 5 | 3 | 11 | 10 | 0 | 0 | 2 |
@@ -51,7 +51,7 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [STR](ledger/STR.md) | strata, traps, hosts | 53 | 1 | 0 | 0 | 1 | 2 | 49 | 0 | 0 | 0 | 4 |
 | [VOL](ledger/VOL.md) | volcanoes | 110 | 7 | 0 | 3 | 3 | 2 | 71 | 24 | 0 | 0 | 0 |
 | [YNG](ledger/YNG.md) | the young landscape | 21 | 0 | 0 | 0 | 0 | 1 | 11 | 9 | 0 | 0 | 2 |
-| **all** | | **2,989** | **429** | **347** | **67** | **132** | **85** | **1,422** | **507** | **326** | **11** | **274** |
+| **all** | | **2,994** | **431** | **347** | **67** | **132** | **85** | **1,425** | **507** | **326** | **11** | **274** |
 
 72 rows are `verified` (counted from the ledger files after WP-2 merged WP-15/16 and the plate-check boundary mix, 2026-10-02, WP-13a, the volcano decisions and WP-8): PLT-213 and PLT-218 (plate-check boundary mix and arc heights), ISO-041, ISO-042
 and ISO-048 (the flexure agent), MAG-028 and MAG-029 (WP-2), one GEO row and thirteen HNT rows (WP-15, WP-16, WP-2 and the volcano decisions),
