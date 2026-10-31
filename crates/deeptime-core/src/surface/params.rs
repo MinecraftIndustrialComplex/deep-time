@@ -125,8 +125,11 @@ pub struct SurfaceParams {
     /// Lakes pass on what their water balance leaves (`closed.rs`): the stream power's drainage
     /// area leaves a lake's exit at the share of its inflow that flows out (Garcia-Castellanos
     /// 2006, eq. 2), none from a lake that cannot fill to its spill, an internally drained basin.
-    /// Needs the hydrology's lake balance (`hydro.lake_balance`). Off by default (the plateau
-    /// lane, 2026-10-31): every lake passes all of its inflow, as before. ledger: ERO-217, ERO-218
+    /// Needs the hydrology's lake balance (`hydro.lake_balance`). On by default since 2026-10-31
+    /// (the coordinator's call, under Ben's rule of 2026-10-23: physics goes on by default once
+    /// built and correct; decisions log 2026-10-31; the arm plat-cb0 against orog-cum: the guard
+    /// clean, K's calibration regions within 2 %, 0.13 of the land internally drained). `false`:
+    /// every lake passes all of its inflow, as before (ERO-080). ledger: ERO-217, ERO-218
     pub closed_basins: bool,
     /// The stream power's runoff from the bake's water budget (`HydroParams::budget`, the lake
     /// balance's): rain only in the thawed share of the year, snow melted by its degree-days,
@@ -268,7 +271,7 @@ impl Default for SurfaceParams {
             glacial: super::glacial::GlacialParams::default(),
             flexure: super::flexure::FlexureParams::default(),
             held_offsets: true,   // ledger: ISO-125
-            closed_basins: false, // ledger: ERO-217 (off: the plateau lane, 2026-10-31)
+            closed_basins: true,  // ledger: ERO-217, ERO-218 (on since 2026-10-31)
             runoff_budget: false, // ledger: ERO-221 (off: the runoff lane, 2026-10-31)
             numerics: Numerics::default(),
         }

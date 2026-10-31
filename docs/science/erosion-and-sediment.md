@@ -1301,15 +1301,18 @@ and closure keeps the orogen's rock ("its effect in terms of mass removal from t
 2007, p. 380). The basin fills and its base level rises (Sobel et al. 2003, [60]); it opens when it fills to its outlet,
 the climate wets, or a river captures it (Garcia-Castellanos 2006, pp. 284-285; Sobel et al. 2003, [58]).
 
-**The law (ERO-217, ERO-218; `surface.closed_basins`, off).** The flexure's lake balance (ISO-126, the bake's budget,
+**The law (ERO-217, ERO-218; `surface.closed_basins`, on by default since 2026-10-31, decisions log).** The flexure's lake balance (ISO-126, the bake's budget,
 HYD-050 and HYD-051) now also sets what each lake passes on: the stream power's drainage area leaves a lake's exit at
 the share of its inflow its balance lets out, and none from a lake that cannot fill to its spill. The depression stays
-the solve's lake (HYD-110), so what a closed basin's ranges shed stays on its crust. The flat high ground is also split
+the solve's lake (HYD-110), so what a closed basin's ranges shed stays on its crust up to the lake's room; a basin
+its sediment fills to the spill opens and passes its water ("the sediment overfill of the lake ... can trigger drainage
+opening", Garcia-Castellanos 2006, pp. 284-285), and a lake cell is an exit only where its water leaves the lake for
+good. The young landscape (L2) takes the same law. The flat high ground is also split
 by its water in the erosion bands (`flatc`, `flatd`, `flatf`; ERO-220).
 
 **The controlled plateau (ERO-219).** ERO-176's rimmed plateau on the presets' law, a wet outer flank: the arid interior
 (runoff weight 0.05) wears 3.8 m/Myr spilling and 0.5 closed, the edge 121.2 and 111.7; a humid interior 129.9 spilling
-and 134.7 with its balance. The arid interior's own runoff already slows it far below the planets' flat high ground, so
+and 129.8 with its balance (its lake losing 20 mm a year, passing 0.69 of its inflow). The arid interior's own runoff already slows it far below the planets' flat high ground, so
 on the planets its rivers carry water from upstream and over the spills of the depressions; the law takes that water
 away where the balance closes them.
 
