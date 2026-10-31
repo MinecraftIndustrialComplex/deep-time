@@ -18,7 +18,10 @@
 //! - a smaller terrane (an island arc, a microcontinent) **moves alone** to the overriding plate
 //!   (its samples move into a new rigid group of that plate with the rotation they already had),
 //!   once the collision has shortened by `collision_threshold_km` or stalled; the overriding plate
-//!   takes the area-weighted mean of its rotation and the terrane's;
+//!   takes the area-weighted mean of its rotation and the terrane's. A terrane its slab drags
+//!   down whole (`tectonics.terrane_docking_cover`, ledger PLT-770) is not handed over on
+//!   shortening (`shortening::advance` does not fire it): it goes down with the slab, its cover
+//!   left on the overriding plate (`belts`), and only a stall hands it over;
 //! - with `tectonics.transference` (Stern 2004's transference; ledger PLT-516), a continent whose
 //!   collision has not stalled also moves alone, once its subduction has failed (the contact's
 //!   slab is gone), its plate has gone on converging on it by the critical convergence since, and
