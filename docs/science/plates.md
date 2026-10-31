@@ -11533,6 +11533,103 @@ docs/research/notes/m5-coast-high-ground-2026-10-25.md: Earth's coast within 200
 boundary, 0.093 of the coast, is high for 0.135 of it) reads settings differently from `coastset`
 (the model's collision belt coast, 0.084, high for 0.685), so the two are not compared here.
 
+## How small terranes dock (PLT-760, PLT-761, 2026-10-30)
+
+The coast-with-high-ground audit (docs/research/notes/coast-high-ground-audit-2026-10-30.md) read
+the model's small terranes as turned into collision belts: terranes under 50 samples are 0.54 of the
+hand-offs, they dock in 0 to 2 Myr, and 0.95 of the crust that crosses their fronts stays as thickness
+on the overriding plate (PLT-242), where "on Earth such fragments accrete as area or subduct". The
+docking lane measured base33's cached runs, read the sources and built the missing branch behind a
+switch, `tectonics.terrane_docking_cover` (off). Design: docs/design/small-terrane-docking.md (its
+tables in full).
+
+### What base33 does with them (24 runs, measurement only)
+
+`tools/review/terranes/dock_records.py` (the dynamics record, the crust budget) and
+`tools/review/terranes/dock_maps.py` (the crust-budget maps), on key 31c7c70bd7c7:
+
+- **How many and how fast.** Hand-offs of terranes under 50 samples (about 255,000 km², a sample
+  5,100 km²) come 29.2 times per 100 Myr, 50 to 200 samples 13.3, 200 to 1,000 samples 8.6, larger 3.9
+  (medians over the runs); partings 15.0 parted, 4.3 reversed, 4.9 closed, 1.2 open at the end. Under 50 samples a hand-off lasts 0 / 0 / 4 Myr (p25 / p50 / p75) with 123 / 151 /
+  200 km of shortening, all on PLT-068's threshold, at a convergence that does not slow (54.8 mm/yr at
+  the onset, 60.1 at the end): half dock in the step they begin, one step's convergence crossing.
+- **How much each crossing keeps.** 30,200 / 42,500 / 62,400 km² of crust crosses, 0.086 of all the
+  crust crossing collision fronts by area; at the run's mean crossing thickness (32.8 km) and kept
+  share (0.946), 0.94 / 1.31 / 1.93 million km³ a hand-off. Of what reached the front, 0.35 (the median;
+  0.52 pooled) crossed and the rest moved to the overriding plate as area.
+- **How high their belts stand.** The front's largest uplift, summed over the steps, is 3.5 / 5.1 /
+  7.6 km; at the run's end the land those hand-offs stamped (0.046 of the land) stands 219 / 498 / 702
+  m over the sea (p90 1,244 m), 0.056 of it above 2 km, a median 374 km from the sea.
+- **How much of the coast with high ground they make.** On the final map (the plate model's ground on
+  100,000 Fibonacci points, M5 0.142 against the census grid's 0.1325; each collision stamp matched to
+  its collision state by plate and time, 0.66 of the points with more than one candidate), the
+  nearest qualifying high ground of 0.0099 of the coast is a hand-off under 50 samples', 0.0037 one of
+  50 to 200; without those two classes' high ground M5 is 0.1288, 0.0055 lower (0.0082 by the mean
+  over runs). The collisions open at the end hold 0.0547 (without them M5 is 0.095), the Andean
+  margins 0.0284.
+- **What they are.** The bodies of one plate's continental crust under 50 samples, not their plate's
+  largest (127 a snapshot from -900 to -50 Myr), have 19.0 km of own crust at the median (8.9 to 34.2
+  from p10 to p90), 0.73 of them island arcs by their magma (14.4 km on 7 km of ocean crust), the
+  rest 28.6 km; 0.18 of them dry.
+- **How big they are across the front.** The hand-offs under 50 samples reach 333 / 455 / 642 km
+  across the front (the shortening plus the rest's area over the front's length; p10 254, p90 887);
+  the larger classes 1,236 km and more at the median.
+
+### What Earth does
+
+A Sonnet research sub-agent read the sources (copied in the design with pages; the full texts of
+Cloos 1993 and Tetreault & Buiter 2012 could not be got, their abstracts were read). Small buoyant
+bodies go down with the slab, scraped of a sliver: "the force of the subducting slab drives
+subduction and can most likely overcome the buoyancy of small crustal units (Molnar and Gray, 1979;
+Cloos, 1993)", "Seamounts and submarine volcanics subduct easily if they are not incorporated into the
+accretionary prism" (Tetreault & Buiter 2014, p. 1265); "in most cases only the upper 2–5 km of arc
+crust are accreted onto continents through thin-skinned thrusting and preserved. This most likely
+occurs when island arcs are on the subducting plate" (p. 1251); seamounts "generally subducted, with
+only thin slices of basalts (<1 km thick) being offscraped" (Clift et al. 2009, p. 95); "lithospheric
+buoyancy does not prevent FAT subduction during constant convergence" (Tetreault & Buiter 2012,
+abstract). Larger ones jam and dock: "Many of the larger FATs such as oceanic plateaus and continental
+fragments are accreted by collision" (Tetreault & Buiter 2014, p. 1246), underplating "perhaps the
+most common type of terrane accretion" (p. 1245), "terrane–continent collision leaving behind accreted
+terranes 25–40 km thick" (p. 1243). The size between: Yan et al. 2021 (abstract) find steep subduction
+"without subduction zone reorganization" for a "small‐sized (≤150 km)" plateau and a breakoff and flat
+slab, or a jump behind the plateau, for a "moderate‐sized (≥300 km)" one with a depleted root. The
+upper plate over a docking body: the Cordillera de Talamanca over the subducting Cocos Ridge, "rock
+uplift ... no greater than ∼2 km" and "40 km since the Pliocene" of shortening (Morell et al. 2012);
+the Yakutat terrane's "Earth’s highest coastal mountain range" (Enkelmann et al. 2008); Taiwan's
+accreting Luzon arc 0 to 1.68 km (Lai et al. 2022).
+
+### Reading the model against them
+
+At the quick planet's 71-km lattice the model's "small" terranes are moderate bodies: 333 to 642 km
+across the front (p25 to p75), Yan et al.'s reorganizing size, island arcs at Cloos's 15 km and
+continental fragments near Tetreault & Buiter's 24.8 km mean. Docking them as collisions is in kind
+Earth's (the rest of the terrane accretes as area, the crossing underplates the overriding plate's
+edge), and the land they leave stands at Talamanca's and the Coastal Range's heights. They hold about
+0.006 to 0.008 of M5 at most (the audit's +0.01 about), and that part is not missing physics. What is
+missing is the small branch: a body the slab can pull down is docked as a collision too.
+
+### The law (`tectonics.terrane_docking_cover`, PLT-760, PLT-761; off)
+
+Each step, at each collision front whose contact still has a slab of the pair: the slab's reach
+against the incoming crust's buoyancy, S* = L / (1 + 2.25 T / 30 km) (FRC-030's buoyancy of the
+dragged length against the pull of the dense slab left; L the slab's length up to 700 km, PLT-184; T
+the incoming crust's thickness at the front): 215 km under 30 km of crust, 329 km under 15 km. A
+terrane whose extent across the front is within S* goes down with the slab: of its crossing crust
+only the cover (sediment, sedimentary and volcanic rock, PLT-761: 2.5 km of a model island arc of 15
+km, inside the "upper 2–5 km") stays, by PLT-242's share; the rest is counted as
+`plates/collision_stripped_km3`; and it does not transfer at PLT-068's threshold. A larger terrane jams
+and collides as before. The extent condition is the project's reading of Cloos's buoyancy for a body
+of finite size along the slab (Cloos's own result is a thickness), bracketed by Yan et al.'s 150 and
+300 km and conservative (the slab beside a body short along the trench, which would help pull it
+down, is left out).
+
+On base33 the hand-offs within that reach are 0.054 (220 km, continental fragments) to 0.127 (270 km,
+arcs) of those under 50 samples and almost none of the larger, so the law is expected to move the
+coast with high ground by less than the small terranes' 0.006 to 0.008 and the continental crust by a
+few hundredths of a km³ a year (the project's estimates before the arm). Its 8-run arm against
+`base34-s4` is the coordinator's to schedule; a finer lattice resolves smaller bodies, and there it
+reaches more of them.
+
 ## Sediment by margin type and the margin's sediment (PLT-660 to PLT-662, 2026-10-25)
 
 The drowning diagnosis (build log 2026-10-25, "M5 lane: why the land drowns on m5-unfreeze") found the
