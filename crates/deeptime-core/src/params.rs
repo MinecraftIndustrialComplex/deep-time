@@ -779,10 +779,13 @@ pub struct TectonicParams {
     /// The depleted keel under the start's continents, km (at most `thermal_reference_km`); 0 =
     /// no keels (ledger PLT-463).
     pub thermal_keel_km: f64,
-    /// After the step's resampling, every continental sample gets at least its heat-flow law's
-    /// conductive value: crust the rate guard spread onto old sea floor kept the floor's (ledger
-    /// PLT-469). On by default since 2026-10-23 (the coordinator's call: a bookkeeping fix that
-    /// moves no elevation); on with `thermal_state` whatever this says.
+    /// The heat flow's final pass after the step's resampling (ledger PLT-469): crust made
+    /// continental after the step set its heat flow (the rate guard's spread onto ocean floor,
+    /// `collapse::spread`) has none, the floor's having gone with its kind
+    /// (`Sample::make_continental`, since 2026-10-31), and takes its law's full value; every other
+    /// continental sample gets at least its law's conductive value. Off (with `thermal_state` off
+    /// too), such crust keeps no heat flow. On by default since 2026-10-23 (the coordinator's
+    /// call: a bookkeeping fix that moves no elevation); on with `thermal_state` whatever this says.
     pub heat_flow_refresh: bool,
     /// The thickest continental crust, km: a column thicker than this loses the excess from its
     /// bottom to the mantle (continental subduction, a foundering root; `plates/collapse.rs`).
