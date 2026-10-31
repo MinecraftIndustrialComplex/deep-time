@@ -4,7 +4,7 @@ Status: **on by default since 2026-10-31** (the coordinator's call, decisions lo
 books fix for the default; built 2026-10-31, the hotspot lane, branch `hotspot-lip`):
 `tectonics.hotspot_cone_budget` (PLT-803), with the measurement PLT-804. A correctness fix of the
 default as much as of the sourced tails (section 1): it holds whatever `hotspots_sourced` says. The
-arms are in section 5.
+arms are in section 5, the review's fixes in section 6.
 
 ## 1. Why: rock no rate made
 
@@ -49,7 +49,10 @@ volcano-stage global), thirteen times the hotspots' own basalt (0.049).
 
 A hotspot's cones are its tail's erupted rock. The tail's magma over a step is its rock R (sourced:
 PLT-793's magma over the step; the preset's: PLT-115's three times the rise over the kernel), of it
-the lavas a share e (sourced: a seventh, PLT-794; the preset's rock is all lava, e = 1). So:
+the lavas a share e (sourced: a seventh, PLT-794; the preset's rock is all lava, e = 1). On the
+default (the preset's hotspots) R is PLT-115's three times the rise under PLT-112's rate and PLT-114's
+ceilings, all three uncited: the budget makes the cones agree with the tail's books, and the books
+are no better sourced than the preset's hotspots are. So:
 
 1. **The budget.** After a plate step each live tail that lives through the next step leaves its
    cones e R of that step to hand (`Hotspot::cones.budget_km3`, Earth-normalized km³); a tail that
@@ -60,20 +63,31 @@ the lavas a share e (sourced: a seventh, PLT-794; the preset's rock is all lava,
    projection, every cell `cell_m`² of the game's sphere, scaled to the model sphere by (R_model /
    R_game)²), is handed at the share f = min(1, budget / B); the cone's relief stays whole. Each
    volcano keeps the rock it holds (`Volcano::rock_m` of its `built_m`), so a caldera's collapse
-   takes back, and its ignimbrite sheet spreads, only that share of rock. What the hotspot's cones
-   handed in the frame, net of calderas, is written on the hotspot (`cones.handed_km3`, and of it on
-   continental cells), wherever it lies.
+   takes back, and its ignimbrite sheet spreads, only that share of rock. Each hotspot's cones hand
+   by its own budget, and a growth whose footprint holds no cell hands nothing and backs nothing
+   (whatever its hotspot's other cones handed). What the hotspot's cones handed in the frame, net
+   of calderas, is written on the hotspot (`cones.handed_km3`, and of it on continental cells),
+   wherever it lies. Their rock reaches the plate model apart from the other cones'
+   (`surface/volcanic_hotspot_felsic_m`, `surface/volcanic_hotspot_mafic_m`): the pools take it as
+   any cone's rock, but it is not among the cones an arc or a kernel counts inside its rate by place
+   (`apply_surface_feedback` returns only the others), since the tail nets it by hotspot.
 3. **Netted by the tail.** At the next plate step the tail adds R − C of its rock, C what its cones
    handed: its intrusions (1 − e) R whole and its lavas e R − C (with the step's lag a shortfall
-   comes off the intrusions; the tail never adds less than nothing). The cones inside the kernel are
-   no longer netted by place: they are among C. So over a tail's life the pools hold its rock R, the
-   cones' share included, and no cone hands rock its tail did not make.
+   comes off the intrusions). C is netted between nothing and the step's R, so the tail never adds
+   less than nothing nor more than its rate; the rest carries to the next step, of either sign:
+   cones past the step's R, cones over a step with no rock (every kernel column at PLT-114's
+   ceiling, or none visible), a caldera's take-back beyond what the cones had handed since. A dead
+   tail nets nothing: what its record holds, at its death and from its cones' calderas after, leaves
+   it as unnetted (`plates/hotspot_cones_unnetted_km3`). The kernel counts no cone by place. So over
+   a tail's life the pools hold its rock R, the cones' share included, and no cone hands rock its
+   tail did not make, but for the unnetted.
 4. **The rest of a cone is relief.** The part of a cone's height its rock does not back stands as
    relief over rock the plate model already holds (the ocean crust and the tail's intrusions under
    it); the surface's erosion of that relief strips the column under it, as eroding any relief does.
    This brings back, for the budgeted shields only, what plate task 8 removed for every cone (an
    eroded cone stripping crust it did not add); the alternative, rock from nothing, is the larger
-   error (section 1). Most hotspot shields stand under the sea, where only marine diffusion acts.
+   error (section 1). How much of that relief stands above the sea, where the rivers wear it, has
+   not been measured.
 
 Not changed: the arcs (their cones outside the arc band, at most 0.06 km³ a year, are a separate
 fix), the flood basalts' plateaus (a province's record volume, PLT-796), the islands' subsidence
@@ -87,15 +101,26 @@ fix), the flood basalts' plateaus (a province's record volume, PLT-796), the isl
   calderas); `volcanoes/hotspot_cones_handed_km3` and `..._handed_continental_km3`: what they handed
   (the same as built with the switch off).
 - With the switch: `plates/hotspot_cones_by_id_km3` (and `..._continental_km3`), the cones the tails
-  netted by their hotspot; `plates/hotspot_tail_rock_km3`, the tails' rock R before netting.
+  netted by their hotspot; `plates/hotspot_tail_rock_km3`, the tails' rock R before netting;
+  `plates/hotspot_cones_unnetted_km3`, what dead tails' records held that no tail netted. The
+  kernel's `plates/hotspot_cones_km3` stays 0.
 
 ## 4. Tests
 
 - `a_budgeted_tail_nets_its_cones_by_their_hotspot` (plates/tests.rs): a Hawaii tail with cones
-  handed for it adds R − C, its lavas e R − C, its intrusions (1 − e) R; the cones on its kernel are
-  not netted again; it leaves e R as the next frame's budget, none if it dies before the next step.
-- `cones_hand_at_most_their_budget` and `the_l1_cells_cover_the_model_sphere` (volcanoes/tests.rs):
-  the share f, and the cells' Earth-normalized area summing to the model sphere's.
+  handed for it adds R − C, its lavas e R − C, its intrusions (1 − e) R; the kernel counts none of
+  the cones on its samples; it leaves e R as the next frame's budget, none if it dies before the
+  next step; a take-back beyond what was handed is carried and the tail adds its whole rock; a step
+  with no rock carries what was handed, of either sign; a dead tail's record leaves it as unnetted.
+- `a_budgeted_hotspots_cones_join_the_pools_but_no_rate_by_place` (plates/tests.rs): the same rock
+  on `surface/volcanic_felsic_m` and on `surface/volcanic_hotspot_felsic_m` leaves the pools and
+  the cone globals the same, and only the former among the cones the arcs and kernels count.
+- `the_l1_cells_cover_the_model_sphere_and_cones_hand_at_most_their_budget` (volcanoes/tests.rs, one
+  test): the share f, and the cells' Earth-normalized area summing to the model sphere's.
+- `two_hotspots_cones_hand_and_take_back_each_their_own_share` (volcanoes/tests.rs): two hotspots'
+  cones hand by their own budgets (half and all), apart from the other cones' rock; `rock_m` is the
+  share of each growth, none for a footprint without cells; the calderas' share and their
+  take-back and sheet from the right rock.
 - `a_hotspots_cones_hand_the_pools_at_most_its_tails_lavas` (volcanoes/tests.rs, a 60 Myr pipeline
   with Sleep's tails): the cones handed by id at most a seventh of the tails' rock, the cones built
   more than handed, and the tails' basalt plus their cones the tails' rock.
@@ -118,3 +143,23 @@ subsection "The cone budget". Key b58b6e4506f5 (a92a07f0), 8 runs each:
 Verdict: on by default, whatever the hotspot switches say (a correctness fix of master's default).
 The coordinator turned it on on 2026-10-31 (decisions log); the hotspot lane's three switches stay
 off until the lid is built.
+
+## 6. The review's fixes (an Opus review of 4d9ea6f5, 2026-10-31)
+
+- **Netted twice.** `fronts_finish` runs before the hotspots and nets every felsic cone within
+  `subduction_distance_km` of an oceanic slab's front into the arc's rate; silicic centres and every
+  caldera's ignimbrite are felsic, so a continental hotspot's near a front was netted by the arc and
+  by its tail (on hs-budget 0.004 to 0.007 km³ a year, about a fifth of what the tails netted by id,
+  the reviewer's reading; loss-budget.py counted it in both `arc_cones_c` and `hot_by_id_c`, cones.py
+  subtracted it twice). The budgeted hotspots' cones now reach the plate model apart (section 2,
+  item 2), and the kernel no longer reads the cones at all under the budget.
+- **The pending's carry.** A negative pending (calderas taking back more than was handed) was
+  netted uncapped (the tail added more than its rate), cleared on a step with no rock while a
+  positive one was carried, and dropped at a tail's death. Now netted between nothing and the
+  step's rock, carried of either sign, and booked as unnetted at death (section 2, item 3).
+- **A footprint without cells.** A cone whose growth held no cell gained `rock_m` at its hotspot's
+  share when a sibling cone had cells, so its caldera would take back rock never handed. Only a
+  growth that held cells now backs rock.
+
+These change the runs with the budget on (none of the arms above is bit for bit after them); the
+default without the budget is unchanged.

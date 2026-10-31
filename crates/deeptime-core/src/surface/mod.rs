@@ -170,6 +170,12 @@ pub mod field {
     pub const VOLCANIC_FELSIC: &str = "surface/volcanic_felsic_m";
     /// … and mafic volcanic rock (shields, the flood basalts' plateaus), m.
     pub const VOLCANIC_MAFIC: &str = "surface/volcanic_mafic_m";
+    /// … and the same of the hotspots' cones under the cone budget, apart
+    /// (`tectonics.hotspot_cone_budget`, ledger: PLT-803): the plate model adds them to its pools
+    /// as the rest, but no arc or kernel counts them inside its rate by place, since the tails net
+    /// them by hotspot.
+    pub const VOLCANIC_HOTSPOT_FELSIC: &str = "surface/volcanic_hotspot_felsic_m";
+    pub const VOLCANIC_HOTSPOT_MAFIC: &str = "surface/volcanic_hotspot_mafic_m";
     /// Written by the plate model: the feedback it applied, sampled back onto L1, m.
     pub const FEEDBACK_APPLIED: &str = "surface/feedback_applied_m";
     /// Centre-line thickness of the glaciers of the step's last ice solve, m (`glacial.rs`).

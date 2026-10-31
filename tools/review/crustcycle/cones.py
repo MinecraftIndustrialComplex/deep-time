@@ -17,7 +17,11 @@ Prints per run and as the mean [lowest, highest] over the runs, in km^3 a year E
               flood-basalt count times the preset's 1,500 m x 0.315 x pi x (900 km)^2 (the agent's
               arithmetic)
   by id       the cones the hotspots' tails netted by the cone's own hotspot (`hotspot_cones_by_id`, the
-              cone budget, PLT-803; nan before)
+              cone budget, PLT-803; nan before). Runs of the budget before its review fixes (2026-10-31)
+              count a continental hotspot's felsic cones within an arc's reach under arcs too, so
+              unbudgeted reads low there by them (0.004 to 0.007 on hs-budget)
+  unnetted    what dead tails' cones handed that no tail netted (`hotspot_cones_unnetted`, PLT-804; nan
+              before the review fixes), inside unbudgeted
   vh built    the hotspots' cones at full, as the volcano stage built them (`volcanoes/hotspot_cones_
               built_km3`, PLT-804), and vh handed what they handed (the same without the budget)
   unbudgeted  handed less every counted part: rock no rate made
@@ -82,6 +86,7 @@ def one(run):
         "hotspots": hot,
         "plateau": plateau,
         "by id": by_id,
+        "unnetted": per("hotspot_cones_unnetted_km3"),
         "unbudgeted": handed - counted if not math.isnan(arcs) else nan,
         "on cont.": per("cone_continental_km3"),
         "vh built": vol("hotspot_cones_built_km3"),

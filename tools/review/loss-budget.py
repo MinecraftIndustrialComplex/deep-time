@@ -40,6 +40,9 @@ The model's rows:
                      rifted margins' continental crust (`vrm`), with sub-rows for the tails, the
                      provinces whole and the margins; with the cone budget (PLT-803) the cones a
                      tail netted by their own hotspot (`hot_by_id_c`) in place of its kernel's
+                     (runs of the budget before its review fixes, 2026-10-31, count a continental
+                     hotspot's felsic cones within an arc's reach in `arc_cones_c` too, 0.004 to
+                     0.007 km^3 a year on hs-budget)
   ocean floor        the ocean floor's own crust (7 km a sample) made continental with the crust
                      on it (`cb_moves` o2c, every part), less what stays under it as its basement
                      and is not counted as continental crust (`o2c_b_km`, PLT-331, since
