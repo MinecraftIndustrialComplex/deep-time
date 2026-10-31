@@ -153,7 +153,7 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 
 ## Build log
 
-### 2026-10-31: Continental extension's first arm on base35-s4: identical with the switches off, 2 runs diverged with them on, two fixes, re-armed (the runoff lane, worktree agent-a4e92fd13092b08b0, branch `continental-extension` with origin/master 9d9e4c94 merged in; not merged)
+### 2026-10-31: Continental extension's arms on base35-s4: identical with the switches off; ext-cum diverged (3 of 8), two fixes; ext-cum2 clean but the continents drown (land 0.216 to 0.130): not default-on (the runoff lane, worktree agent-a4e92fd13092b08b0, branch `continental-extension` with origin/master 9d9e4c94 merged in; not merged)
 
 - **The merge:** origin/master 9d9e4c94 (PR #54, base35's master) into the branch (81c3104b); PLT-780 to PLT-785 kept
   before the hotspot lane's PLT-790 to PLT-804, the PLT header and claims.md recounted, plates.md keeps both sides'
@@ -162,7 +162,8 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
   environment words: the world state (109 files) and `rec.json` identical. With both switches off the branch is
   base35's physics.
 - **ext-cum** (argkey 0efeeddf, both switches, the crust and gap budgets): the surface diverged on supercontinent-2 at
-  -782 Myr (a cell 387 km from the sea) and on scattered_continents-1 at -574 Myr (322 km). Two faults, both the law's:
+  -782 Myr (a cell 387 km from the sea), on scattered_continents-1 at -574 Myr (322 km) and on scattered_continents-2
+  at -402 Myr (334 km). Two faults, both the law's:
   - a gap sample took the fill spread evenly with no upper bound, so a gap the resampling found narrower than the
     opening (or a fill that waited) stacked hundreds of km of crust on a few samples. Fix: at most the stretched
     columns' own thickness (`RiftFill::source_m`), the rest waits or goes to the fallback (PLT-784);
@@ -172,13 +173,28 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 
   Tests: `a_resampling_lays_the_fill_as_the_rifts_floor_or_breaks_up` (a gap narrower than its fill),
   `crust_added_brings_its_own_light_top`, and the integration test's thickest column (49.4 km on, 51.2 km off).
-  Quick gate (`tools/review/extension/gate.sh quick`, now with `rifts_stretching`): the tests passed; the full gate
-  runs.
+  Gates on the fixed head: quick (`tools/review/extension/gate.sh quick`, now with `rifts_stretching`) passed; full
+  (job ext-fix-full): fmt and workspace clippy clean, `cargo test --workspace` 1,491 passed, 0 failed, 13 ignored.
 - **ext-base** (argkey of the gap budget's words, both switches off): the land ledger's base, 8 runs on 81c3104b; the
   fixes act only with the switches on, so it stands.
-- **Next:** ext-cum2 (the same arguments on the fixed head) and its identity check, then
-  `pool.sh table --base base35-s4 --arm ext-base --arm ext-cum2` and `tools/review/extension/arm.sh`; then the runoff
-  law's arms (rb-months, rb1) in the same slot. Design: docs/design/continental-extension.md, "The first arm".
+- **ext-cum2** (the fixed head b6c066edc137, identical to base35 off again): all 8 ran, the guard as the base's
+  (worst 10,042 m, highest plate 3,368 against 4,413 m). Against base35-s4 (ext-base matches it in every column):
+  land 0.130 (0.216, p < 0.001), continental crust under the sea 0.796 (0.594), land above 2 km 0.003 (0.009), coast
+  with high ground 0.047, land under ice 0.011, collisions 5.95, the crust's net change +0.219, criteria median 5
+  (mean 4.50 against 5.38), sea at the end 118 m (339).
+  - Land ledger (`tools/review/extension/arm.sh`, /data/ban/deeptime-runs/extension/arm-ext.txt): the land above the
+    sea 8.04e7 to 1.44e7 km^3 (base 3.76e7); the `extension` part lowers it 0.068 km^3 a year (thinning land columns
+    0.87, shelves 1.78), the whole of the land's loss; the sea's own term -0.008 (base -0.040).
+  - Rift totals: 2.65 km^3 a year stretched (about the arcs' whole addition), 2.34 laid as floor, 0.30 by the
+    fallback; 12 rifting pairs a step on average.
+  - The light top: mean about 10 m either way, largest 0.8 to 1.0 km: a small term.
+  - **Verdict: not default-on as built.** The rifts are everywhere and long-lived; the likely cause is the wide mode
+    (a 4 L reach of about 5,000 km, and a Moho test that does not change as a column thins, since the lithosphere
+    thins with it), against Buck 1991's narrowing of a wide rift as its crust thins.
+- **Next:** a measurement-only rift trace (per pair the opening before break-up, the mode, the area thinned); then, if
+  the wide mode is it, the mode change with crustal thickness from Buck 1991 and a reach bounded by the hot region,
+  and the arm again. Then the runoff law's arms (rb-months, rb1) in the slot. Design: docs/design/continental-extension.md,
+  "The second arm".
 
 ### 2026-10-31: Continental extension, rifts that stretch before they break up (`tectonics.rift_stretching`, PLT-781 to PLT-784), and the settling's light top (`tectonics.settle_top_density`, PLT-780), built and off; what the rate cap trims, measured (PLT-785) (the runoff lane, worktree agent-a4e92fd13092b08b0, branch `continental-extension` on `uplift-trace` 9cbdd3c5; not merged)
 

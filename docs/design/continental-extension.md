@@ -1,7 +1,8 @@
 # Continental extension: rifts that stretch before they break up, and the settling's light top
 
-Status: **designed and built, both off** (2026-10-31, the runoff lane's next task, branch `continental-extension` from
-`uplift-trace` 9cbdd3c5). `tectonics.rift_stretching` (`plates/extension.rs`, PLT-781 to PLT-784) and
+Status: **designed and built, both off; armed on base35-s4: clean after two fixes, but it drowns the continents, so
+not default-on as built** (2026-10-31, the runoff lane's next task, branch `continental-extension` from
+`uplift-trace` 9cbdd3c5; "The second arm"). `tectonics.rift_stretching` (`plates/extension.rs`, PLT-781 to PLT-784) and
 `tectonics.settle_top_density` (`plates/settle.rs`, PLT-780), with a measurement of what the rate cap trims (the land
 ledger's `cap_land` and `cap_sea`, PLT-785). The arm waits for base35-s4 ("The arm").
 
@@ -327,8 +328,9 @@ If the arm moves something it should not, per-switch arms find which. No V1 numb
 The identity check of the head (81c3104b, key 10fe59b33034) against base35's seed 1 was identical (the world state's
 109 files and `rec.json`): with both switches off this branch is base35's physics.
 
-ext-cum (argkey 0efeeddf) failed in 2 of its first runs: the surface diverged at -782 Myr on supercontinent-2 (a cell
-387 km from the sea) and at -574 Myr on scattered_continents-1 (322 km), past the guard's 237 km. Reading the code
+ext-cum (argkey 0efeeddf) failed in 3 of its 8 runs: the surface diverged at -782 Myr on supercontinent-2 (a cell
+387 km from the sea), at -574 Myr on scattered_continents-1 (322 km) and at -402 Myr on scattered_continents-2 (334 km),
+past the guard's 237 km. Reading the code
 found two faults, both on the law's side:
 
 1. **A gap could take a stack of crust** (PLT-784). `lay` spread a fill evenly over the gap samples between its
@@ -355,3 +357,58 @@ The first fault is the likelier cause of the divergence (a run's first 218 Myr, 
 up); the second biases the land low over a run. Both are fixed before the arm runs again, as ext-cum2 (the same
 arguments on the fixed head). ext-base (the land ledger's base, both switches off) stands: the fixes act only with
 the switches on.
+
+## The second arm (ext-cum2, 2026-10-31): clean, but the continents drown
+
+ext-cum2: the same arguments on the fixed head (key b6c066edc137, argkey 0efeeddf); the identity check of that head
+against base35's seed 1 was identical again. All 8 runs ran. ext-base (8 runs, both switches off, the gap budget on)
+matches base35-s4 in every column of the table (p 1.0).
+
+**The table** (`pool.sh table --base base35-s4 --arm ext-base --arm ext-cum2`; medians of 8, Mann-Whitney p):
+
+| | land | largest landmass | continental crust under the sea | land above 2 km | coast with high ground | land under ice | collisions per 100 Myr | crust's net change | criteria median, mean | sea after 100 Myr / end, m |
+|---|---|---|---|---|---|---|---|---|---|---|
+| base35-s4 | 0.216 | 0.048 | 0.594 | 0.009 | 0.071 | 0.062 | 4.85 | +0.113 | 5, 5.38 | 280 / 339 |
+| ext-cum2 | 0.130 (< 0.001) | 0.038 (0.33) | 0.796 (< 0.001) | 0.003 (0.021) | 0.047 (0.050) | 0.011 (0.028) | 5.95 (0.046) | +0.219 (< 0.001) | 5, 4.50 (0.080) | 161 / 118 |
+
+**The guard** (`measure guard`): worst 10,042 m (base 10,304), no step beyond two Earth reliefs, the largest rise
+6,866 m (7,144), the highest plate elevation 3,368 m (4,413, p 0.038).
+
+**The land ledger** (`arm.sh`, mean of 8 over the run, km^3 a year of height above the sea):
+- the land above the sea falls from 8.04e7 to 1.44e7 km^3 (base: to 3.76e7);
+- of the change, -0.066 km^3 a year, the sea's own term is only -0.008 (the sea ends lower, 113 m against 322);
+  the parts give -0.058 (base -0.003);
+- the `extension` part alone lowers the land by 0.068 (thinning land columns by 0.87 km^3 a year and shelves by
+  1.78): all of the land's loss. Every other part scales down with the smaller land (erosion -2.29 against -4.05,
+  rebound 1.81 against 3.21, belts 0.53 against 0.89, settle 0.41 against 0.77);
+- over the last 500 Myr the same: extension -0.053, the parts -0.030.
+
+**The rift totals** (mean of 8): 2.65 km^3 a year stretched off the columns, 2.34 laid as rift floor, 0.30 by the
+fallback, 0.01 waiting at the end; about 6,000 rift-steps per run, 12 rifting pairs in a step on average.
+
+**The light top** (`plates/top_deficit_*` at the end): the mean over the continental crust is about 10 m either way,
+the largest 0.8 to 1.0 km. With the restore it is a small term: the drowning is the stretching's.
+
+**The crust budget** (against base35's ext-base): the continental volume's net change -0.19 km^3 a year (-0.37); the
+surface takes 1.87 off the continents (3.53) and sediment subduction is 1.44 (2.24), since there is less land to
+wear; island arcs 1.40 (1.82), continental arcs 0.40 (0.45).
+
+**Reading.**
+- The law conserves the crust and runs clean: no divergence, the guard as the base's, the fill all laid but 0.4 %.
+- But it spreads the continents thin. 2.65 km^3 a year of continental crust is stretched, about as much as all the
+  arcs add, and goes to rift floors: continental crust under the sea. The land falls to 0.130, the crust under the
+  sea rises to 0.796, and the high ground and the ice go with the land.
+- Rifts are everywhere and long-lived: 12 pairs a step. A narrow rift should break up within a few hundred km of
+  opening (the reach is about one row of columns, which reaches the 10 km floor in a few steps). So the persistence
+  points at the wide mode, whose reach is 4 L, about 5,000 km on a 2,000 km boundary, and whose Moho criterion does
+  not change as a column thins: the lithosphere thins with the crust (`thermal::stretch`), so the Moho's temperature
+  on the linear geotherm stays where it was, and a hot region keeps stretching until the whole of it reaches the
+  10 km floor. Buck 1991 has the mode change as the crust thins: a wide rift narrows. Not measured yet.
+
+**Verdict: not default-on as built.** It is physics-backed bookkeeping, but its trigger and reach let one opening
+thin a whole hot region, and the result is a planet whose continents are mostly drowned rift floor. Next:
+1. measure the rifts: per pair the opening before break-up, the mode, the area thinned (a measurement-only trace);
+2. if the wide mode is it, the mode change as the crust thins (Buck 1991's crustal-thickness and strain-rate
+   dependence, read for its numbers) in place of a fixed Moho test, and the wide reach bounded by the hot region
+   that is still over its own strength;
+3. then the arm again. The settling's light top can go on its own arm meanwhile (its mean is about 10 m).
