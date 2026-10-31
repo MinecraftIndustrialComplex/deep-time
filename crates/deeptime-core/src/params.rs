@@ -555,6 +555,16 @@ pub struct TectonicParams {
     /// `wedge_slope_deg`. Taiwan's, measured on both flanks of one orogen (2.9° west, 4.5° east,
     /// Davis, Suppe & Dahlen 1983). ledger: PLT-731
     pub retro_slope_ratio: f64,
+    /// `true`: with `collision_two_wedges`, the plateau past the strength height grows
+    /// retro-ward through the overriding plate's connected continental crust as far as the
+    /// step's crust needs, instead of stopping at `collision_belt_km` (`plates/belts.rs`,
+    /// `retro_plateau`; the design `docs/design/collision-orogen.md`, O2). A doubly vergent
+    /// orogen turns into a plateau that "grow[s] laterally at constant thickness" with its
+    /// growth retro-ward (Vanderhaeghe et al. 2003), "located mostly on the retro-side" (Wolf et
+    /// al. 2021). Only what the connected crust cannot hold goes to the no-room rule
+    /// (`collision_noroom_stays`). `false` (the default): the retro flank ends at the belt's
+    /// reach, as before. ledger: PLT-740
+    pub collision_retro_plateau: bool,
     /// `true` (the default since 2026-10-26, the suture-loss lane): the crust a collision belt
     /// has no room for stays in the crust. The belt's passes run until its crust is placed or
     /// every sample stands at the strength height (no pass limit and no half-belt floor), and
@@ -1411,6 +1421,7 @@ impl Default for TectonicParams {
             collision_belt_taper: true,       // ledger: PLT-600, PLT-601 (on since 2026-10-25)
             collision_two_wedges: false,      // ledger: PLT-730
             retro_slope_ratio: 1.55,          // ledger: PLT-731
+            collision_retro_plateau: false,   // ledger: PLT-740
             collision_noroom_stays: true,     // ledger: PLT-700 (on since 2026-10-26)
             weld_speed_mm_yr: 2.0,            // ledger: PLT-246 (Bird 2003 [3], since 2026-10-27)
             weld_after_myr: 10.0,             // ledger: PLT-246
