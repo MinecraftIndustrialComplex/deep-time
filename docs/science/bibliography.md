@@ -10230,7 +10230,6 @@ The plateau lane's sources (docs/design/plateau-drainage.md, erosion-and-sedimen
 - Access: paywalled; the abstract only.
 - Library: not kept.
 - Read so far (by the project): the abstract, 2026-10-31: "The compilation reveals an overall trend in which D increases strongly with increasing moisture among relatively dry sites and less strongly with increasing moisture among relatively wet sites".
-- Read so far (by the project): the abstract, 2026-10-31: "Low internal relief, aridity, and internal drainage characterize the Puna-Altiplano Plateau and the Tibetan Plateau and the Tarim basin"; "We hypothesize that these large, internally drained areas persist indefinitely when uplift overwhelms the fluvial systems and defeats the channel network"; "Most coupled tectonic-landscape development models prevent the development of internal drainage and so may overestimate the voracity of erosion in regimes that favor internal drainage, profoundly influencing predicted orogenic growth patterns".
 
 ### Armijo1986
 - Reference: Armijo, Tapponnier, Mercier and Han (1986). Quaternary extension in southern Tibet: Field observations and tectonic implications. Journal of Geophysical Research 91(B14):13803-13872 (the initials not recorded by the read).

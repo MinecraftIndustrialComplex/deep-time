@@ -152,7 +152,7 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 
 ## Build log
 
-### 2026-10-31: What wears the plateaus, measured on cached runs; lakes that pass on what their water balance leaves, built and off (`surface.closed_basins`, ERO-217 to ERO-220) (the plateau lane, worktree agent-a4e92fd13092b08b0, branch `plateau-drainage` on origin/collision-orogen 0e8a5ac9; not merged)
+### 2026-10-31: What wears the plateaus, measured on cached runs; lakes that pass on what their water balance leaves, built, on by default since 2026-10-31 (`surface.closed_basins`, ERO-217 to ERO-220) (the plateau lane, worktree agent-a4e92fd13092b08b0, branch `plateau-drainage` on origin/collision-orogen 0e8a5ac9; not merged)
 
 - **Why.** The orogen lane's O4 (docs/design/collision-orogen.md): Tibet-class high ground forms and is gone 100 Myr
   later, its flat top wearing at 109 to 129 m/Myr though arid or polar; the follow-up "High plateaus still wear too
@@ -174,8 +174,10 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
   2006 and 2007 (a lake's outflow and the closed-lake balance), Strecker et al. 2009, Bookhagen & Strecker 2012, Hetzel
   et al. 2011, Wang et al. 2020 and Strobl et al. 2012 (the accepted manuscript); Langbein 1961 pp. 3-6, 12-13 and Table
   1; Blodgett et al. 1997 (an archived preprint) sections 1.2, 3.1 to 3.3; Garcia-Castellanos et al. 2003 in parts;
-  Sobel et al. 2003, Lal et al. 2003 and Richardson et al. 2019 abstracts only.
-- **Built** (behind `surface.closed_basins`, off; c4fd3e38, d8cdbea2): the stream power's drainage area leaves each
+  Sobel et al. 2003 in full (paragraphs [1] to [66], from the Wayback Machine's copy of Wiley's full-text page); Lal
+  et al. 2003 and Richardson et al. 2019 abstracts only.
+- **Built** (behind `surface.closed_basins`, off at first and on by default since 2026-10-31, branch
+  `plateau-drainage-on`; c4fd3e38, d8cdbea2): the stream power's drainage area leaves each
   lake's exit at the share of its inflow its balance lets out (Garcia-Castellanos 2006, eq. 2; ERO-218), none from a lake
   that cannot fill to its spill (ERO-217); the balance is the flexure's (ISO-126) on the bake's budget. `lakes.rs`
   records each lake's outflow, `routing::accumulate_passing`, `surface/closed.rs`; the erosion bands split the flat high
