@@ -76,7 +76,7 @@ use super::Env;
 use super::dynamics;
 use super::geometry::{Geo, Tree};
 use super::kinematics::{quat, tangent};
-use super::state::{CONTINENTAL, Collision, PlateState, Sample};
+use super::state::{CONTINENTAL, Collision, Docked, PlateState, Sample};
 use super::subduction::{CONFIRM_MM_YR, MIN_CONTACT, locked_against};
 
 /// A collision begins only where its front converges at least this fast, mm/yr: the rate a
@@ -498,7 +498,8 @@ pub fn step_collision(
             stalled_since_myr: None,
             jam_km: None,
             subducting: false,
-            docking_samples: 0,
+            docking: Vec::new(),
+            docking_resample: 0,
             belt: super::state::Belt::default(),
         });
     }
@@ -620,28 +621,27 @@ pub fn advance(
             let e = slab_km.entry((s.under, s.over)).or_insert(0.0);
             *e = e.max(s.km);
         }
-        let classed: Vec<(usize, Option<u32>)> = state
+        let resample = state.resample_step;
+        let classed: Vec<(usize, Option<Vec<Docked>>)> = state
             .contacts
             .iter()
             .enumerate()
             .filter_map(|(k, c)| {
                 let col = c.collision.as_ref()?;
                 let f = fronts.get(&k).filter(|_| col.last_step == env.step)?;
-                let judged = if col.subducting {
-                    col.docking_samples
-                } else {
-                    0
-                };
-                let down = slab_km
-                    .get(&(c.under, c.over))
-                    .and_then(|&km| docking(state, geo, env, c.under, f, km, judged));
+                let judged: &[Docked] = if col.subducting { &col.docking } else { &[] };
+                let renumbered = col.docking_resample != resample;
+                let down = slab_km.get(&(c.under, c.over)).and_then(|&km| {
+                    docking(state, geo, env, c.under, f, km, judged, renumbered)
+                });
                 Some((k, down))
             })
             .collect();
         for (k, down) in classed {
             if let Some(col) = state.contacts[k].collision.as_mut() {
                 col.subducting = down.is_some();
-                col.docking_samples = down.unwrap_or(0);
+                col.docking = down.unwrap_or_default();
+                col.docking_resample = resample;
             }
         }
     }
@@ -702,11 +702,11 @@ pub fn drags_whole(
     f: &Front,
     slab_km: f64,
 ) -> bool {
-    docking(state, geo, env, under, f, slab_km, 0).is_some()
+    docking(state, geo, env, under, f, slab_km, &[], false).is_some()
 }
 
 /// Whether the slab of a contact, `slab_km` long, drags the terranes at its front `f` down whole
-/// (ledger PLT-770), and if so the bodies' samples to remember (`Collision::docking_samples`).
+/// (ledger PLT-770), and if so the bodies to remember (`Collision::docking`).
 ///
 /// Each body at the front (the incoming plate's continental crust connected to some of the front's
 /// crust, along lattice edges as `collide`'s fill) is judged on its own: its extent across the
@@ -717,16 +717,24 @@ pub fn drags_whole(
 /// down only when every body at it does: a body that jams the slab holds the whole front (the
 /// stripping and the transfer are the front's).
 ///
-/// A body is judged as it arrives and keeps that judgment while it goes down: with `judged` the
-/// samples of the bodies judged going down at this front before (0: none), bodies that hold no
-/// more samples than that are the ones judged (their crust only goes under, and a resampling only
-/// consumes what is under, PLT-276) and go on down. Judging again on the way down would read the
-/// lattice's lag as size: a sample stays visible until the overriding plate covers it, so the
-/// collision's shortening runs ahead of the samples' hiding by up to a spacing, and as the body
-/// goes under the front left beside it shortens to its last samples while its hidden part lies
-/// along the whole of the old front. Crust that joins the bodies (a new body, or crust behind them
-/// reached) has them judged again, all of them as they now stand. Each fill stops once it passes
-/// the most any body could hold, or the samples judged before.
+/// A body is judged as it arrives and keeps that judgment while it goes down. `judged` are the
+/// bodies judged going down at this front, as of the last step: a body now holding some of a
+/// judged body's samples is that body (or their union, where judged bodies have joined); while it
+/// holds no more samples than it did, it goes on down, its crust only going under; when it holds
+/// more (crust has joined it), it is judged again by all its samples over its judged share of the
+/// front's length, so a few samples joining move its extent by a few samples' width. A body that
+/// holds none of them has just arrived and is judged over its share of today's front. Judging a
+/// body again over today's front on the way down would read the lattice's lag as size: a sample
+/// stays visible until the overriding plate covers it, so the collision's shortening runs ahead of
+/// the samples' hiding by up to a spacing, and as the body goes under the front left beside it
+/// shortens to its last samples while its hidden part lies along the whole of the old front.
+///
+/// A resampling numbers the samples afresh (`renumbered`: the judged bodies are of an older
+/// numbering): the bodies at the front then share the judged bodies' length by their front crust,
+/// and go on down while they hold no more samples than the judged ones did (the resampling only
+/// consumes what is under, PLT-276), or are judged again over those shares. The fills stop once
+/// the bodies pass the most they could hold.
+#[allow(clippy::too_many_arguments)]
 pub fn docking(
     state: &PlateState,
     geo: &Geo,
@@ -734,8 +742,9 @@ pub fn docking(
     under: u32,
     f: &Front,
     slab_km: f64,
-    judged: u32,
-) -> Option<u32> {
+    judged: &[Docked],
+    renumbered: bool,
+) -> Option<Vec<Docked>> {
     let length_km = f.length_km();
     let ours = |i: usize| state.plate_of(i) == under && state.samples[i].kind == CONTINENTAL;
     let seeds: Vec<u32> = f
@@ -750,46 +759,96 @@ pub fn docking(
     let slab_km = slab_km.min(env.k.slab_depth_km); // ledger: PLT-184
     let area = env.norm.sample_area_km2();
     let crust: std::collections::BTreeSet<u32> = seeds.iter().copied().collect();
-    // A body's own front length and thickness are known only once its fill is done, so a fill
-    // stops early only past the most any body could hold, the whole front's length at the reach
-    // of crust of no thickness, and past the samples judged before.
-    let most = (dragged_length_km(slab_km, 0.0) * length_km / area).max(f64::from(judged));
-    // The samples reached so far, by any body's fill (hidden or not).
-    let mut seen: std::collections::BTreeSet<u32> = std::collections::BTreeSet::new();
-    let mut bodies: Vec<(usize, usize, f64)> = Vec::new();
-    let mut total = 0_usize;
+    let judged_km: f64 = judged.iter().map(|d| d.length_km).sum();
+    let judged_n: usize = judged.iter().map(|d| d.samples.len()).sum();
+    // A body's length and thickness are known only once its fill is done, so the fills stop early
+    // only past the most all the bodies could hold: today's front and the judged bodies' lengths
+    // at the reach of crust of no thickness.
+    let most = dragged_length_km(slab_km, 0.0) * (length_km + judged_km) / area;
+    // The samples reached so far, by any body's fill (hidden or not), and each one's body.
+    let mut body_of: BTreeMap<u32, usize> = BTreeMap::new();
+    struct Body {
+        samples: Vec<u32>,
+        seeds: usize,
+        t_m: f64,
+    }
+    let mut bodies: Vec<Body> = Vec::new();
     for &seed in &seeds {
-        if !seen.insert(seed) {
+        if body_of.contains_key(&seed) {
             continue;
         }
+        let b = bodies.len();
+        body_of.insert(seed, b);
         let mut stack = vec![seed];
-        let (mut n_seeds, mut t_sum, mut n) = (0_usize, 0.0_f64, 0_usize);
+        let (mut members, mut n_seeds, mut t_sum) = (Vec::new(), 0_usize, 0.0_f64);
         while let Some(v) = stack.pop() {
             if crust.contains(&v) {
                 n_seeds += 1;
                 t_sum += f64::from(state.samples[v as usize].thickness_m);
             }
-            n += 1;
-            total += 1;
-            if total as f64 > most {
+            members.push(v);
+            if body_of.len() as f64 > most {
                 return None;
             }
             for (u, _) in geo.edges(v) {
-                if ours(u as usize) && seen.insert(u) {
+                if ours(u as usize) && !body_of.contains_key(&u) {
+                    body_of.insert(u, b);
                     stack.push(u);
                 }
             }
         }
-        bodies.push((n, n_seeds, t_sum / n_seeds.max(1) as f64));
+        members.sort_unstable();
+        bodies.push(Body {
+            samples: members,
+            seeds: n_seeds,
+            t_m: t_sum / n_seeds.max(1) as f64,
+        });
     }
-    if judged > 0 && total <= judged as usize {
-        return Some(judged);
+    // Each body's judged length and samples (None: it has just arrived).
+    let mut was: Vec<Option<(f64, usize)>> = vec![None; bodies.len()];
+    if renumbered {
+        if !judged.is_empty() {
+            let total: usize = bodies.iter().map(|b| b.samples.len()).sum();
+            for (w, b) in was.iter_mut().zip(&bodies) {
+                let share = b.seeds as f64 / seeds.len() as f64;
+                // While all of them hold no more than the judged ones, each keeps on down.
+                let held = if total <= judged_n { b.samples.len() } else { 0 };
+                *w = Some((judged_km * share, held));
+            }
+        }
+    } else {
+        for d in judged {
+            let mut hit: Vec<usize> = d
+                .samples
+                .iter()
+                .filter_map(|s| body_of.get(s).copied())
+                .collect();
+            hit.sort_unstable();
+            hit.dedup();
+            for b in hit {
+                let w = was[b].get_or_insert((0.0, 0));
+                w.0 += d.length_km;
+                w.1 += d.samples.len();
+            }
+        }
     }
-    let within = bodies.iter().all(|&(n, n_seeds, t_m)| {
-        let body_length_km = length_km * n_seeds as f64 / seeds.len() as f64;
-        n as f64 * area <= dragged_length_km(slab_km, t_m) * body_length_km
-    });
-    within.then_some(total as u32)
+    let mut out = Vec::with_capacity(bodies.len());
+    for (b, w) in bodies.into_iter().zip(was) {
+        let n = b.samples.len();
+        let (km, judge) = match w {
+            // No more than it held: the body judged, going on down.
+            Some((km, held)) => (km, n > held),
+            None => (length_km * b.seeds as f64 / seeds.len() as f64, true),
+        };
+        if judge && n as f64 * area > dragged_length_km(slab_km, b.t_m) * km {
+            return None;
+        }
+        out.push(Docked {
+            samples: b.samples,
+            length_km: km,
+        });
+    }
+    Some(out)
 }
 
 /// Ends contact `k`'s collision (if it is in one) without a transfer or weld, recording why.

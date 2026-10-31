@@ -379,7 +379,8 @@ pub(in crate::plates) mod tests {
             stalled_since_myr: None,
             jam_km: None,
             subducting: false,
-            docking_samples: 0,
+            docking: Vec::new(),
+            docking_resample: 0,
             belt: Belt::default(),
         }
     }
