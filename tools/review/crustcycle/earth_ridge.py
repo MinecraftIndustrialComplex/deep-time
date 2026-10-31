@@ -10,8 +10,11 @@ PLT-370), with the floor going under (the first dated floor 20 to 200 km out on 
 2020). For each step: the great-circle distance to the nearest floor younger than 5 Myr on the subducting side of
 the step's great circle (Seton's 6-minute cells; the spreading ridges and their flanks, back-arc basins included where
 they lie on that side), and the half rate that distance implies with the floor's age at the trench (km / Myr =
-mm/yr). Prints, as slabfloor.py prints the model's intra-oceanic fronts, each class's length on floor younger than 55
-Myr and older, banded by the ridge's distance and the implied rate, with the length-weighted median distance.
+mm/yr). And the distance to the nearest spreading step of the same two plates (Bird's OSR or CRB steps of the
+step's plate pair): where the pair spreads along one stretch of its boundary and converges along another, as
+slabfloor.py's ridge across from the overriding plate. Prints, as slabfloor.py prints the model's intra-oceanic
+fronts, each class's length on floor younger than 55 Myr and older, banded by the ridge's distance, the implied rate
+and the same pair's spreading, with the length-weighted median distance.
 
 The model's young floor near its ridges is made at resamplings (slabfloor.py reads its ridge as floor within 5 Myr of
 the planet's youngest); Earth's grid is the present day, so floor younger than 5 Myr is its ridges' flanks.
@@ -41,7 +44,14 @@ def band(edges, x):
 
 
 def main(argv):
-    steps = [s for s in ef.read_steps(argv[0]) if s["cls"] == "SUB"]
+    every = ef.read_steps(argv[0])
+    steps = [s for s in every if s["cls"] == "SUB"]
+    pair = lambda s: frozenset((s["bid"][0:2], s["bid"][3:5]))
+    spreading = {}
+    for s in every:
+        if s["cls"] in ("OSR", "CRB"):
+            c = ef.unit(s["lon0"], s["lat0"]) + ef.unit(s["lon1"], s["lat1"])
+            spreading.setdefault(pair(s), []).append(c / np.linalg.norm(c))
     crust = ef.read_crust(argv[1])
     grid = ef.read_age(argv[2])
     th = float(argv[3]) if len(argv) > 3 else 15.0
@@ -87,7 +97,10 @@ def main(argv):
             if k >= len(young):
                 break
             k *= 4
-        rows.append({"oo": oo, "km": s["length"], "age": sa, "dist": dist,
+        same = np.inf
+        for c in spreading.get(pair(s), []):
+            same = min(same, math.acos(max(-1.0, min(1.0, float(c @ m)))) * ef.R_KM)
+        rows.append({"oo": oo, "km": s["length"], "age": sa, "dist": dist, "same": same,
                      "rate": dist / sa if np.isfinite(dist) and np.isfinite(sa) and sa > 0 else np.inf})
     print(f"# Bird 2003 SUB steps {len(rows)}, {sum(r['km'] for r in rows):.0f} km; ocean-ocean at {th:.0f} km of"
           f" CRUST1.0 crystalline crust; ridge: Seton et al. 2020 floor under {RIDGE_MYR:.0f} Myr on the subducting side")
@@ -101,7 +114,8 @@ def main(argv):
             if not tot:
                 continue
             print(f"  {name}, {yname}: {tot:.0f} km")
-            for title, edges, key in (("ridge distance, km", DIST, "dist"), ("implied half rate, mm/yr", RATE, "rate")):
+            for title, edges, key in (("ridge distance, km", DIST, "dist"), ("implied half rate, mm/yr", RATE, "rate"),
+                                      ("the pair's own spreading, km", DIST, "same")):
                 acc = {}
                 for r in sel:
                     bb = band(edges, r[key])
