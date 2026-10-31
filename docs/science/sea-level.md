@@ -993,7 +993,9 @@ So the sea and the thin crust put base35's continents low, and both are one fact
 spread over 0.48 of the planet instead of 0.38. In the cb_t series the own-crust volume holds (7.56 to 7.14 × 10⁹ km³
 over the run) while the label's area grows from 0.42 to 0.50 within 50 Myr and to 0.53 to 0.55 after -750 Myr, and its
 own mean thickness falls from 35.1 to 31.8 km by -900 Myr and to 26.1 km at the end; the sea follows the area (0 to 157
-m by -900 Myr, 316 m at the end).
+m by -900 Myr, 316 m at the end). The first 50 Myr's growth is the start's outline (`thinning.py` at -950 Myr): the
+converted margins 0 to 0.023 of the planet at 12.5 km, the edges 0.044 to 0.097 at 33.0 km, the interiors unchanged
+(0.379 to 0.380); later the interiors shrink (0.199 at the end) and the edges and margins grow (0.236 and 0.093).
 
 **Why the crust stays thin.** On PLT-281's line every column thicker than the column at the sea (31.4 km + 7.02 S,
 33.6 km under base35's sea) stands above it in proportion, and erosion takes it back down: the interiors reach the sea
