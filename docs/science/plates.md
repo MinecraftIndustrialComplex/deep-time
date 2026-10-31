@@ -13841,7 +13841,7 @@ plates converge there or the zigzag converges locally. That is `subduction::reso
 overlap of 3 samples makes a contact, with no convergence test. A correctness fix for the
 default, whatever V1 says.
 
-**The fix, built and off (PLT-810, PLT-811).** `tectonics.contact_needs_convergence`: a new contact
+**The fix, built (PLT-810, PLT-811; on by default since 2026-10-31, below).** `tectonics.contact_needs_convergence`: a new contact
 only where the pair's reading converges and is no transform by PLT-311; reversals and existing
 contacts are not gated. An overlap left without a contact stays an overlap, as one under 3
 samples does now, and the next resampling's ranking settles it. Tests first:
@@ -13851,6 +13851,24 @@ contact either way; along the boundary or parting makes one off and none on) and
 reading). It removes up to 0.30 of the intra-oceanic front at the onset; some of those contacts
 would begin later, when their plates converge. Not run: per the coordinator's rule, reported
 before an arm.
+
+**The arm and the default (2026-10-31).** One 8-run arm, oo-gate (`--set
+tectonics.contact_needs_convergence=true`, the crust-budget envs), against base35-s4 (master
+9d9e4c94, seeds 1 to 4 of both starts). Guard clean (no step beyond two Earth reliefs). No V1
+check beyond the seeds' spread: land 0.216 to 0.189 (p 0.16), continental crust under the sea
+0.594 to 0.653 (p 0.13), criteria met 5 against 5 (p 0.95). The gate does what it says: every
+ocean-ocean onset of a pair that came to converge now converges across its overlap (1.000). The
+intra-oceanic front does not shrink: past incipient 20,265 to 21,296 km (medians), its share on
+floor younger than 55 Myr 0.488 to 0.520 (about 9,100 to 10,150 km against Earth's 2,240 to
+3,860 km of intra-oceanic trench); the subducting fronts 47,103 to 49,017 km. The pairs it holds
+back begin a few steps later, once they converge. So the intra-oceanic excess is not this rule:
+it is plates that really converge meeting where the resampling fills the gap between them (the
+resampling trace above), which is the next thing to read. On by default since 2026-10-31 (the
+coordinator's call, decisions log: a correctness fix, Bird 2003 paragraph [126]). With it on,
+`weld_seed_sweep` welds scattered 3, 5, 7, 9, 11, 13 to 16, 18 and 22 and supercontinent 1, 2,
+8, 9, 12, 13, 16, 17 and 19; the sutures test moved from scattered 8 to 3. Test fixtures whose
+plates were turned but left at rest resolve their overlaps moving about their turn at 50 mm/yr
+(`resolve_turned` in the tests), so their contacts begin as PLT-810 asks.
 
 ## Hotspots, plume heads and volcanic margins from sources (2026-10-31)
 
