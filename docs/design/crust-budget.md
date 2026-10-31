@@ -1,7 +1,7 @@
 # The continents' crust budget against Stern & Scholl 2010: design
 
-Status: **in progress** (2026-10-31, the crust-budget lane, branch `crust-budget`; the coordinator's
-task after the freeboard landed, PR #49). Ledger PLT-760 onward; plates.md "The crust budget
+Status: **built behind switches, off** (2026-10-31, the crust-budget lane, branch `crust-budget`; the
+coordinator's task after the freeboard landed, PR #49): PLT-760 to PLT-763; section 5 designed only. Ledger PLT-760 onward; plates.md "The crust budget
 against Stern & Scholl 2010, row by row (2026-10-31)" holds the readings and the arm.
 
 ## Why
@@ -16,10 +16,13 @@ cap or forcing term to move a row towards Earth's number (Ben: "Results that don
 but are still perfectly playable and physics backed > Results that are forced to align with earth
 by introducing extremely weird forcing functions").
 
-## The budget row by row (sedmargin, km³ a year, means of 8)
+## The budget row by row (base34-s4, km³ a year, means of 8)
 
 `tools/review/loss-budget.py` against Stern & Scholl 2010's Table 1 (p. 12, the library text, read
-again for this design):
+again for this design), on base34's seeds 1 to 4 (master f80d75a8, key 122e4803cded), whose budget
+is the arm sedmargin's to the last digit (the same switches on the same planets). Over base34's 24
+runs the net is −1.06, and over the late half (`--from -500`) −1.33, with sediment subduction 2.93
+and the arcs 1.48:
 
 | row | model | Stern & Scholl 2010 | why the model is there (the code) |
 |---|---|---|---|
@@ -73,14 +76,101 @@ continental crust and the cones they counted (`hotspot_magma_c`, `hotspot_cones`
 the cones to the arc rows and reads the hotspot row on continental crust (S&S's additions are to
 continental crust; ocean floor's seamounts go down with their slab, PLT-286).
 
-### 3. Sediment subduction
+### 3. Sediment subduction: the share stays; the line is read in place (PLT-762, built)
 
-(after the research sub-agent's report)
+The row is 2.4 times Stern & Scholl's 1.1, and the first reading was that PLT-660's 0.83 at
+accretionary margins was the wrong share: Stern & Scholl (p. 15) write that "large accretionary
+bodies at sediment-dominated margins sequester approximately 70% of all sediments entering
+subduction zones". Read against its sources, it is not:
 
-### 4. Additions at breakup and at sutures
+- von Huene & Scholl 1991 (the abstract, the research sub-agent) give 70 % as the share
+  *subducted* at large prisms ("roughly 70% of the incoming trench floor section is subducted
+  beneath the frontal accretionary body"), 80 % at small and medium prisms, all at type 2 margins.
+  Stern & Scholl's sentence reads it the other way round (the sub-agent: probably garbled;
+  Scholl & von Huene 2007's Table 2 was not obtained).
+- Clift & Vannucchi 2004 count underplating as accretion ([8]) and take the subducted share as the
+  delivery less the prism's growth ([38]); their 83 % is what passes the forearc wedge to depth
+  ([39], "at least 50 km below the forearc wedge"). Clift et al. 2009's Table 1 (read): of the
+  1,768,761 km³/Myr delivered to 40,225 km of trenches, 1,648,091 go down, 0.93.
 
-(after the research sub-agent's report)
+So the model's share of what reaches its trenches, 2.60 of 2.90 (0.90), is Clift's. What differs is
+how much reaches them, per km of trench:
+
+| per km of trench, km³/km/Myr | base34-s4 | Clift et al. 2009 | Stern & Scholl 2010 |
+|---|---|---|---|
+| sediment delivered | 52.7 (2.90 km³/yr over 55,180 km of front) | 44.0 (40,225 km) | |
+| sediment subducted | 47.1 | 41.0 | 25 (1.1 AU over ~43,000 km) |
+
+The model's trench is longer (55,180 km of oceanic front, Bird 2003's subduction zones 51,310)
+and each km takes 1.2 times Clift's. The sources disagree by 1.6 times between themselves, and
+von Huene & Scholl's long-term 1.0 km³/yr corrects for "high rates of terrigenous seafloor
+sedimentation during the past 30 m.y." So the sediment row is within Clift's per-km physics;
+nothing is changed in the share, and no rule is added to lower it.
+
+One units error is fixed: Clift & Vannucchi's 1 km (PLT-660's accretionary pile and PLT-442's
+erosive margin's cover) is "the thickness of sediment (uncorrected for porosity) on the subducting
+plate at the trench axis" ([31]), and the model's pools are rock (surface/pelagic.rs: no pore
+water). `tectonics.trench_pile_in_place` reads the line as the rock a 1 km porous column holds
+under ERO-215's porosity law, 536 m (C&V used Sclater & Christie's sand-shale mix, not read; the
+model's own law stands in). On base34-s4's maps 0.065 of the trench samples hold 536 to 1,000 m of
+rock and 0.04 of the trench sediment (`tools/review/crustcycle/probe.py`): a small change, and the
+erosive fronts shrink by the same samples.
+
+Test: `the_trench_pile_line_is_read_in_place`.
+
+### 4. Arc magma at sutures (PLT-763, built)
+
+`tectonics.collision_arc_magma`. Stern & Scholl's Table 1 books 0.2 AU of additions at
+crust-suturing subduction zones; Scholl & von Huene 2009 (the abstract): "During collisional
+suturing at fossil CSSZs, global arc magmatic addition is estimated at 0.2 AU. This assessment
+presumes that in the past the global length of crustal collision zones averaged c. 6000 km".
+The model's arcs need an oceanic slab, so a collision front made none. The rule gives a collision
+front's overriding band (PLT-042's band, past the slab's ends none, none while incipient) 0.2 AU
+over 6,000 km, 33.3 km³/km/Myr (the agent's division, as PLT-045's 100 is 1.5 AU over 14,500 km),
+at any convergence, into the arc pools of its crust's law, booked as `arc_s` and in neither arc
+row. The model's collision front at any time is 18,411 km on base34-s4 (Stern & Scholl: 6,000
+long-term, 12,000 today; Bird 2003's continental convergent boundary 23,003 km), so at the
+source's per-km rate it would add about 0.6 km³ a year, three times the 0.2: the model's sutures
+are longer than Scholl & von Huene's average, which is the collision lane's finding, not this rule's
+to correct.
+
+Test: `a_collision_front_adds_scholl_and_von_huenes_suture_arc`.
+
+### 5. Rifts, hotspots and volcanic rifted margins (designed, not built)
+
+The row is 0.05 against 0.5, and the sources give no rate for it: Stern & Scholl pool rifts,
+hotspots and volcanic rifted margins at "approximately 0.5 AU" with no derivation (the research
+sub-agent found none either); Clift et al. 2009 give continental flood basalts 0.12 km³ a year
+with their intrusive roots, and oceanic plateaus 1.1 if every one accreted; Schubert & Sandwell
+1989 an upper bound of 3.7 for plateau accretion. What a volcanic margin adds is measured on two
+margins: the US East Coast, "up to 25 km" of igneous crust "only for about 80–100 km seaward", "as
+much as 2.7 × 10^6 km3" over 2,000 km, in "only 5–8 m.y." (Kelemen & Holbrook 1995, abstract),
+about 1,350 km³ per km; the North Atlantic, a crustal volume of 6.6 × 10^6 km³ over more than
+2,600 km of margin in about 3 Myr (Eldholm & Grue 1994, abstract), about 2,500 km³ per km with
+the onshore basalts. Volcanic margins are "the majority of passive continental margins worldwide"
+(Franke 2013), half in Clift et al. 2009's own count of subducted margins.
+
+The rule this supports: at a resampling, a gap point whose nearest edge sample is continental crust
+(the first ocean floor between two continents that rifted apart) and that lies within 100 km of it
+(Kelemen & Holbrook's 80 to 100 km) takes igneous crust to 20 km instead of the ocean column's 7
+(mafic plutonic under mafic volcanic, PLT-104's proportion), as continental crust over its ocean
+basement (PLT-331), on a volcanic margin. It needs a sourced test for which breakups are volcanic.
+White & McKenzie 1989 tie the igneous thickness to the mantle's temperature (the abstract only;
+the law is in the full text, not obtained), and the model's own hot mantle at a breakup is its
+plume heads (PLT-117's LIPs, which raise the rifting rate of the plate above, `lip_rift_boost`),
+whose rules are uncited (PLT-108 to PLT-120, `pending-rewrite`). So this addition waits on the
+hotspots' rewrite: a sourced plume flux, which would give both the hotspots' own addition and the
+volcanic margins. Not built: a 50 % draw per breakup would be a forcing term, not a law.
 
 ## What is left
 
-(at the end)
+- The hotspots' rewrite with sources (plume births, fluxes, LIP volumes), then the volcanic margins
+  of section 5 on it.
+- Subduction erosion (0.49 against 1.4): the erosive front is 13,395 km against Clift &
+  Vannucchi's 22,925 at the planet's convergence (PLT-442's 60 mm/yr), and the forearc band holds
+  0.40 of what PLT-441 asks (`forearc_short` 0.72 km³ a year): an intra-oceanic forearc has nothing
+  beyond its 7 km of ocean crust to give. Earth's erosive forearcs retreat into the arc (Scholl &
+  von Huene 2010, ~2.5 km/Myr), `tectonics.erosion_retreat` (PLT-523, off); a loss, so it would
+  deepen the drain.
+- The land's export: the trench takes what the continents shed (3.8 to 4.2 km³ a year off them
+  against Clift et al. 2009's Cenozoic rivers' 1.8), the surface lane's.

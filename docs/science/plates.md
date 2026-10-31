@@ -22,6 +22,7 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | the continents census's Earth references and measuring choices (`tools/review/continents_census.py`, section "White patches, drowned continents and coastal high ground", 2026-10-21) | PLT-360 to PLT-363 (4) |
 | [PLT](ledger/PLT.md) | the crust flux into collision fronts: the crust budget's measures and Earth's references (section "The crust flux into collision fronts", 2026-10-21) | PLT-401 (1) |
 | [PLT](ledger/PLT.md) | the trench budget: sediment subduction, subduction erosion and where it acts, the trench's release, the measures and Earth's references (section "The trench budget", 2026-10-22; switches, off by default) | PLT-440 to PLT-444 (5) |
+| [PLT](ledger/PLT.md) | the crust budget against Stern & Scholl 2010, row by row: the island law on an intra-oceanic arc's own crust, the additions measured whole, the trench sediment line in place, arc magma at sutures (section "The crust budget against Stern & Scholl 2010, row by row", 2026-10-31; switches, off by default) | PLT-760 to PLT-763 (4) |
 
 Rows by status (after the ocean–continent transition, 2026-10-04): `verified` 17, `cited-unverified` 46, `from-memory` 4, `abstract-only` 19, `calibrated` 14, `game-choice` 79, `uncited` 42; `pending-rewrite` 151; `not-yet-coded` 8; `merged` (not counted) 33.
 
