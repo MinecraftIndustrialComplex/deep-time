@@ -2612,8 +2612,7 @@ mod tests {
         // Judged going down before with as many samples or more, it keeps going down; with
         // fewer judged than it holds now (crust joined), it is judged afresh.
         let n = ours.len() as u32;
-        let judged =
-            |km: f64, j: u32| shortening::docking(&st, &fx.geo, &env, 1, &f, km, j);
+        let judged = |km: f64, j: u32| shortening::docking(&st, &fx.geo, &env, 1, &f, km, j);
         assert_eq!(judged(1.01 * slab_km, 0), Some(n), "{msg}");
         assert_eq!(judged(0.99 * slab_km, n), Some(n), "{msg}");
         assert_eq!(judged(0.99 * slab_km, n + 5), Some(n + 5), "{msg}");
