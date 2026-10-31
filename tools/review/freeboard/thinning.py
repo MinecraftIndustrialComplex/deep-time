@@ -19,7 +19,10 @@ T - 7 (S - z0) ... printed as T_at_sea: the thickness the column would have with
 (pools::COLUMN_ISOSTATIC_FACTOR, PLT-281). If the interiors thin because the sea fell (erosion to base level,
 the collapse's room column T_n + 7 S, PLT-412), T_at_sea follows 35.1 + 7 S and z - S stays near the same on both arms.
 
-Prints medians over runs, one table per arm. Needs numpy and scipy (the VM's .pyenv-numpy)."""
+Prints medians over runs, one table per arm. Other modes (MODE=...): census, every sample by its felsic rock whatever
+its label (CTIMES); origin, the classes split by an ocean basement and the edges by distance; trench, the ocean floor
+at the trenches and its pile. Needs numpy and scipy (the VM's .pyenv-numpy, run with -I). Written up in
+docs/science/sea-level.md, "Why the continents thin with the margin's sediment continental"."""
 import json
 import os
 import statistics
@@ -232,6 +235,39 @@ def main_origin(argv):
                 print(f"{k:>20} " + " ".join(f"{x:>8.3f}" for x in v))
 
 
+TRENCH_FLAG = 2  # state::TRENCH
+
+
+def trench(run, t):
+    """The ocean floor at the trenches (oceanic samples with the TRENCH flag): its share of the planet, its mean pile
+    (sediment and sedimentary rock), and the share of that pile on floor holding continental crystalline rock
+    (felsic family over 0.5 km: a sediment margin turned back to ocean floor, PLT-667, or a spread's receiver)."""
+    a, pp = read(run, t)
+    n = len(a)
+    tr = (a[:, 4] < 0.5) & ((a[:, 10].astype(np.int64) & TRENCH_FLAG) > 0)
+    pile = (pp[:, 0] + pp[:, 1]) / 1000.0
+    felsic = (pp[:, 2] + pp[:, 3] + pp[:, 4]) / 1000.0
+    rich = tr & (felsic > 0.5)
+    tot = pile[tr].sum()
+    return {"share": float(tr.mean()), "pile": float(pile[tr].mean()) if tr.any() else float("nan"),
+            "pile_p90": float(np.quantile(pile[tr], 0.9)) if tr.any() else float("nan"),
+            "rich_share": float(rich.sum() / max(tr.sum(), 1)),
+            "rich_pile_share": float(pile[rich].sum() / tot) if tot > 0 else float("nan"),
+            "pile_planet_m": float(pile[tr].sum() / n * 1000.0)}
+
+
+def main_trench(argv):
+    ts = [int(x) for x in os.environ.get("CTIMES", "-800,-500,-200,0").split(",")]
+    cols = ["share", "pile", "pile_p90", "rich_share", "rich_pile_share", "pile_planet_m"]
+    for arg in argv:
+        rs = runs_of(arg)
+        print(f"== trench floor {arg} ({len(rs)} runs)")
+        print(f"{'t':>6} " + " ".join(f"{c:>15}" for c in cols))
+        for t in ts:
+            res = [trench(r, t) for r in rs]
+            print(f"{t:>6} " + " ".join(f"{med([x[c] for x in res]):>15.3f}" for c in cols))
+
+
 def main_census(argv):
     ts = [int(x) for x in os.environ.get("CTIMES", "-1000,-500,0").split(",")]
     for arg in argv:
@@ -257,5 +293,7 @@ if __name__ == "__main__":
         main_census(sys.argv[1:])
     elif os.environ.get("MODE") == "origin":
         main_origin(sys.argv[1:])
+    elif os.environ.get("MODE") == "trench":
+        main_trench(sys.argv[1:])
     else:
         main(sys.argv[1:])
