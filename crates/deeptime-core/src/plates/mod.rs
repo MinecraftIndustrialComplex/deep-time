@@ -561,6 +561,17 @@ impl PlatesStage {
                 .map(|s| s.stays_km2_m / 1000.0)
                 .sum::<f64>();
         }
+        // The two wedges' retro plateau beyond the belt's reach (PLT-740, measurement only; written
+        // only with the switch so a run without it keeps its globals list).
+        if env.k.collision_retro_plateau {
+            *world
+                .globals
+                .entry(belts::PLATEAU_GLOBAL.to_owned())
+                .or_insert(0.0) += stacked
+                .values()
+                .map(|s| s.plateau_km2_m / 1000.0)
+                .sum::<f64>();
+        }
         // The overriding plate's share (PLT-652, measurement only; written only with the switch so
         // a run without it keeps its globals list).
         if env.k.collision_upper_plate_shortening {

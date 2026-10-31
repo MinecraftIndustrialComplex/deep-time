@@ -10074,3 +10074,62 @@ The sources of the old-floor lane (plates.md "Step 16"; build log 2026-10-27). T
 - Access: the university repository's copy open.
 - Library: not kept.
 - Read so far (by the project): pages 1-4, 6, 14, 16 and 18 of 23, 2026-10-30 (a research sub-agent): the abstract, "Reconstruction of pre-incision profiles suggests that rock uplift during the growth of the Cordillera de Talamanca is no greater than ∼2 km."; p. 3, the Cocos Ridge "subducting near-orthogonally under the Panama microplate at a rate of 85 mm/yr"; p. 4, the Cordillera de Talamanca "reaching elevations of 3800 m (Mt Chirripó, 3820 m), and extending 175 km along strike of the arc, coincident with the width of the Cocos Ridge"; p. 6, "the greatest shortening (40 km since the Pliocene) and largest number of thrust faults occur directly inboard of the Cocos Ridge axis"; p. 16, "a young (<3 Ma) collision of the Cocos Ridge and the Central American trench".
+## The collision orogen: plateau growth and plateau wear (PLT-740), added 2026-10-31
+
+Read for the orogen lane by a Sonnet research sub-agent (2026-10-31); the quotes are the agent's, from the copies
+named. Copies kept outside the repository only (temporary).
+
+### Vanderhaeghe2003
+- Reference: Vanderhaeghe, O., Medvedev, S., Fullsack, P., Beaumont, C. and Jamieson, R. A. (2003). Evolution of orogenic wedges and continental plateaux: insights from crustal thermal-mechanical models overlying subducting mantle lithosphere. Geophysical Journal International 153(1):27-51. (the initials and the title as the lane's request named them; the read confirms the surnames, journal, volume, pages and DOI)
+- DOI or URL: 10.1046/j.1365-246X.2003.01861.x; read at https://academic.oup.com/gji/article-pdf/153/1/27/1719393/153-1-27.pdf
+- Cited as: "Vanderhaeghe et al. 2003".
+- Ledger ids: PLT-740.
+- Access: open (the publisher's PDF).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. Model: 35 km crust, 1 cm/yr, 75 Myr, mantle subduction at S, the retro mantle stationary (Table 1). p. 27: "A reduction in the viscosity ratio (ηb/ηc ∼ 10−2) is sufficient to cause a transition of the central wedge region to a plateau"; "In most models, the plateaux grow laterally at constant thickness between characteristic edge peaks". pp. 28-29: "once a plateau develops (Ftb << Ftc), the plateau crustal thickness is insensitive to the properties of the weak basal layer (ηb and hb) and is determined mainly by the properties of the cold crust and parameters that limit value of Ftc (e.g. z*)". p. 30: "the hottest crust is located below the retro-plateau". p. 34: "The maximum thickness increases without limit" (uniform crust). p. 41: "it is the net retro-ward flow that accounts for retro-ward growth of the plateau"; the transition "does not result from a gradual decrease in surface slope ... Instead, two edge peak barriers are created and the plateau grows between them". p. 43: "By 45 Myr, TMoho > T* = 700°C across a significant zone retro-ward of S, leading to basal decoupling and the onset of the transition to a plateau"; a weaker upper crust (ca. 3 × 10^22 Pa s) gives elevations that "approach observations from Tibet and the Altiplano (ca. 5500 m)". pp. 39-40: at 75 Myr (750 km of convergence) "The plateau is now 300 km wide". The pro-side edge staying near S is the agent's reading of Fig. 11c. No pro/retro mass share is given.
+
+### Wolf2021
+- Reference: Wolf et al. (2021). Journal of Geophysical Research: Solid Earth 126:e2020JB021168 (the title and the full author list not recorded by the read: to complete from the copy).
+- DOI or URL: 10.1029/2020JB021168; read at https://diposit.ub.edu/bitstreams/03990b7d-7da6-4614-9357-02061c018e4a/download
+- Cited as: "Wolf et al. 2021".
+- Ledger ids: PLT-740.
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. p. 13: "Convergence is partitioned to 60% pro- and 40% retro-side deformation after onset of retro-wedge shortening". p. 14: "The onset of plateau formation is dependent on viscous weakening resulting from crustal thickening and associated radioactive heating, and has a thermal equilibration timescale independent of convergence rate". p. 25 (conclusion 3): "If crustal shortening creates CA > ~12.5 × 10^9 m2, a large and hot plateau forms, located mostly on the retro-side as a consequence of underthrusting of the retro-mantle". p. 24: the present-day Indian S-point lies "below the accreted Tibetan terranes and not below thickened Indian crust".
+- Reference check: the first author, year, journal, DOI and article number as the agent printed them; the title and authors to complete.
+
+### MedvedevBeaumontPreprint
+- Reference: Medvedev and Beaumont. Growth of Continental Plateaus by Channel Injection: Constraints and Thermo-Mechanical Consistency. Preprint (later in a Geological Society of London Special Publication, pages not checked).
+- DOI or URL: http://geodynamics.oceanography.dal.ca/LHO/MB_Plateau_ChanFlow04.pdf (the host's TLS certificate does not match its name).
+- Cited as: "Medvedev & Beaumont (preprint)".
+- Ledger ids: PLT-740.
+- Access: open preprint.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (page numbers the preprint's). p. 3: "These models also predict that plateaus grow outward by tectonic thickening and accretion of adjacent crust in the transition zone between the plateau and the surrounding foreland"; pp. 3-4: weak mid- to lower crust cannot maintain long-wavelength topography, "and therefore plateaus flatten like pancake batter", while the flanking transition zones "laterally support (like bookends) the plateau".
+
+### BookhagenStrecker2012
+- Reference: Bookhagen and Strecker (2012). Earth and Planetary Science Letters 327-328:97-110 (the title not recorded by the read: to complete from the copy).
+- DOI or URL: read at https://bodobookhagen.github.io/pdf/bookhagen12_central_Andes_erosion_rates.pdf
+- Cited as: "Bookhagen & Strecker 2012".
+- Ledger ids: none yet (design and plates.md "The collision orogen": a reference line for plateau wear, ERO-174's lead).
+- Access: open (the author's copy).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. pp. 103-104: erosion rates "of basins immediately to the east of the Altiplano-Puna Plateau drainage divide are similar (0.02 ± 0.01 mm/yr, n = 5) to erosion rates on the internally drained plateau (0.02 ± 0.0004 mm/yr, n = 1)"; 0.50 ± 0.3 mm/yr on the wet, steep eastern orographic barriers.
+
+### Strecker2009
+- Reference: Strecker et al. (2009). Geology 37(7):643-646 (title and full author list not recorded by the read).
+- DOI or URL: 10.1130/G25545A.1; read at https://bodobookhagen.github.io/pdf/strecker09_topography_andes.pdf
+- Cited as: "Strecker et al. 2009".
+- Ledger ids: none yet (the design's lead for plateau wear).
+- Access: open (an author's copy).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. pp. 644-645: "the low internal plateau relief appears to result from the long-term climatic evolution of the plateau margin, which involves the creation and sustenance of an effective orographic barrier promoting internal drainage and protracted aridity ... the low internal relief reflects basin isolation from the foreland base level as erosional efficiency decreases in the arid plateau"; p. 644: the plateau interior's peak-to-basin relief "<0.7 km".
+
+### Sobel2003
+- Reference: Sobel, Hilley and Strecker (2003). Formation of internally drained contractional basins by aridity-limited bedrock incision (the title as the lane's request named it). Journal of Geophysical Research 108(B7):2344.
+- DOI or URL: 10.1029/2002JB001883; the abstract from https://api.openalex.org/works/doi:10.1029/2002JB001883
+- Cited as: "Sobel, Hilley & Strecker 2003".
+- Ledger ids: none yet (the design's lead for plateau wear).
+- Access: paywalled; the abstract only.
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31: "Low internal relief, aridity, and internal drainage characterize the Puna-Altiplano Plateau and the Tibetan Plateau and the Tarim basin"; "We hypothesize that these large, internally drained areas persist indefinitely when uplift overwhelms the fluvial systems and defeats the channel network"; "Most coupled tectonic-landscape development models prevent the development of internal drainage and so may overestimate the voracity of erosion in regimes that favor internal drainage, profoundly influencing predicted orogenic growth patterns".
