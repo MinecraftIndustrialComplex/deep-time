@@ -55,6 +55,7 @@ ORIGINS = ["initial", "rift", "fission", "back_arc", "subduction_initiation", "m
 
 
 def snapshot(run, t, lives, onsets=None, by_pair=None):
+    parents = {k: v.get("parent") for k, v in lives.items()}
     a, _ = probe.read(run, t)
     nm = probe.name_of(t)
     plate = np.fromfile(run / "maps" / "plate" / nm, "<u4").astype(np.int64)
@@ -67,7 +68,8 @@ def snapshot(run, t, lives, onsets=None, by_pair=None):
     idx = np.nonzero(front)[0]
     spacing = float(np.sqrt(4 * np.pi * oofronts.R_KM ** 2 / len(a)))
     if not len(idx):
-        return [], spacing
+        # A snapshot at a resampling carries no front flags (crust_budget.rs): left out, as oofronts.py leaves it.
+        return None, spacing
     trees = {}
     for q in np.unique(plate[cont]):
         m = np.nonzero(cont & (plate == q))[0]
@@ -113,7 +115,7 @@ def snapshot(run, t, lives, onsets=None, by_pair=None):
         life = lives.get(u, {})
         contact_age, first_floor = np.nan, np.nan
         if onsets:
-            j, _ = gapfronts.link(by_pair, onsets, u, q, t)
+            j, _ = gapfronts.link(by_pair, onsets, u, q, t, parents)
             if j is not None:
                 contact_age = t - onsets[j]["t"]
                 first_floor = onsets[j]["slab_age_myr"]

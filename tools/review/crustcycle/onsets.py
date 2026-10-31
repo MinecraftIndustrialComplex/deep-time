@@ -192,6 +192,12 @@ def overlap_lines(sub, length_myr):
           f"{statistics.median([o['overlap']['pair_conv_mm_yr'] for o in ov]):.1f} (the pair)")
     print(f"    of them with the pair not converging: passed incipient {passed:.3f}; front made, mean km over the run:"
           f" oo {km[0]:.0f}, oc {km[1]:.0f}")
+    # The samples' mean convergence (`conv_mm_yr`, PLT-811's reading since PR #55's fixes), positive, by the pair's
+    # class as recorded: in records made before the fixes, how many the mean would have called converging.
+    by = [sum(1 for o in ov if o["overlap"]["pair_class"] == i and o["overlap"]["conv_mm_yr"] > 0.0)
+          / max(sum(1 for o in ov if o["overlap"]["pair_class"] == i), 1) for i in range(len(OVERLAP))]
+    print(f"    the samples' mean convergence positive: all {sum(1 for o in ov if o['overlap']['conv_mm_yr'] > 0.0) / len(ov):.3f};"
+          f" by the recorded class " + "  ".join(f"{k} {v:.3f}" for k, v in zip(OVERLAP, by)))
 
 
 def overlap_report(onsets, length_myr):
