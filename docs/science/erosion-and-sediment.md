@@ -1354,7 +1354,7 @@ docs/design/surface-runoff-budget.md; this is the summary.
 - **Sublimation** takes 10 to 90 % of winter snowfall in the Alps (Strasser et al. 2008) and 20 to 32 % in the Rockies
   (MacDonald et al. 2010).
 
-**The law (ERO-221; `surface.runoff_budget`, off).** The stream power's runoff weight (ERO-010) takes each cell's runoff
+**The law (ERO-221; `surface.runoff_budget`, on by default since 2026-10-31).** The stream power's runoff weight (ERO-010) takes each cell's runoff
 from `HydroParams::budget`, the same budget the lakes' balance uses. Precipitation is rain in the thawed share of the
 year (HYD-036) and the snow melts by its degree-days (HYD-037: 4 mm per °C per day, a choice inside Hock 2003's 2.5 to
 5.5 for snow at non-glaciated sites). PET is Holdridge's 58.93, here 60, x the biotemperature (HYD-029, HYD-030), and
@@ -1395,4 +1395,4 @@ old rule (the pool's runs never reach them), the months were centred on the mean
 All three are fixed. Armed again on base35-s4 (rb1, 8 runs): the guard the base's, the flat high ground 110 against
 146.5 m/Myr (the months' correction alone, rb-months), the land above 2 km a sixth more over the run, K's regions 8 to
 18 % slower and inside Montgomery & Brandon's lines, the criteria a median of 6 against 5. The months' correction alone
-moves no column. Verdict: default-on.
+moves no column. On by default since 2026-10-31 (the coordinator's call, decisions log), the months' correction with it.

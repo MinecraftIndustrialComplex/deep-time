@@ -205,7 +205,10 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
     flat high ground 110.0 m/Myr against rb-months' 146.5, on 1.3 times the land; land above 2 km over the run
     0.0280 against 0.0238; K's regions 8 to 18 % slower than rb-months', all inside Montgomery & Brandon's lines.
   - The young stage is outside the pool's runs; its unit check is the read.
-- **Verdict: default-on** (the coordinator's flip).
+- **Verdict: default-on.** Flipped on this branch (the coordinator's call, decisions log 2026-10-31):
+  `surface.runoff_budget` true in `SurfaceParams::default`, ERO-010, ERO-221 and ERO-222 noted, the design's status and
+  the science page; origin/master 0a3ada8c merged first. The builder's earlier flip (runoff-budget-on, 95a928a7) is
+  superseded: its only change past master was the flip itself, made here again on the reviewed law.
 
 ### 2026-10-31: The continents' export is set by the plates' uplift, not by the erosion law (a diagnosis from cached runs; the runoff lane, worktree agent-a4e92fd13092b08b0, branch `surface-runoff-budget`; nothing built)
 

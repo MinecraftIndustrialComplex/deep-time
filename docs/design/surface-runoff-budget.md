@@ -1,6 +1,6 @@
 # The surface's runoff from the bake's water budget: design
 
-Status: **built behind a switch, off; its review's fixes built; armed again on base35-s4 (rb1): verdict default-on**
+Status: **on by default since 2026-10-31** (the coordinator's call, decisions log 2026-10-31, after its review's fixes and the arm rb1 on base35-s4)
 (2026-10-31, the runoff lane, branch `surface-runoff-budget` on `plateau-drainage` 7df49df8). The switch is
 `surface.runoff_budget` (`crates/deeptime-core/src/surface/climate.rs`, ERO-221). The checks against cold basins are
 ERO-222. The arm plat-rb0 ran on the closed basins ("The arm's results"): the flat high ground wears a third less, the
