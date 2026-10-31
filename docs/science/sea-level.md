@@ -1074,8 +1074,10 @@ buoyancy against the ridge's, lithosphere-thermal-state.md's open question), not
 the lead: the interiors wear at Earth's long-run cratonic rates. K's calibration (present-day against long-run) is a
 separate question that moves the lowland's relief and the export, not the drowning.
 
-**K's calibration, a question for Ben** (the plateau lane's, 2026-10-31; his decision of 2026-10-17 set the erosion
-law against measured rates). K (ERO-004), κ (ERO-023) and the chemical floor were set on Montgomery & Brandon's eq. 2,
+**K's calibration** (the plateau lane's question, 2026-10-31; Ben's decision of 2026-10-17 set the erosion law
+against measured rates). Kept as it is for now (the coordinator's call, decisions log 2026-10-31): the drowning is not
+its doing, and a recalibration would revise Ben's decision, so it goes to him once the column's height law is on, if
+the question still stands. K (ERO-004), κ (ERO-023) and the chemical floor were set on Montgomery & Brandon's eq. 2,
 a present-day relation, whose low-relief end (E0 10 m/Myr and the quiet-land 0.2 mm/yr per km of relief) is 2 to 5
 times Clift et al. 2009's Cenozoic rates for stable basins (median 4.0 m/Myr), and Clift et al. call the modern export
 unrepresentative of long periods (p. 90 to 91); Wilkinson & McElroy 2007 put the Phanerozoic mean of all land at 16
