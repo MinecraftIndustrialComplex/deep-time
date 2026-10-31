@@ -5,18 +5,38 @@ coordinator's task of 2026-10-31; branch `continental-buoyancy` from master 0a3a
 
 ## Why
 
-The low-continents diagnosis (sea-level.md, "Why base35's continents stand low, against Earth (2026-10-31)") found
-base35's continents low because Earth's volume of continental crust covers 0.48 of the planet instead of 0.38: the
-larger area holds the sea 371 m over Earth's fill (+516 m of it the area of crust at least 20 km thick), and the same
-volume spread wider is thin (31.8 km mean against 36.4; 0.27 of the planet at 30 to 35 km against Earth's 0.08, 0.012
-at 40 to 50 km against 0.10). The area is large because no column can hold crust thicker than the column at the sea:
-every continental column stands on PLT-281's one Airy line, z = z_0 + (T - 35.1 km) / 7.02 over the datum (z_0 525 m,
-the middle of `continent_elevation_m`), which is Earth's at 32 to 34 km and stands 290 to 1,310 m above Earth's at 36
-to 44 km, so thick crust stands high and erosion brings it down to the sea's column (33.6 km under base35's sea).
+The low-continents diagnosis (sea-level.md, "Why base35's continents stand low, against Earth (2026-10-31)", revised
+after PR #56's review) found base35's continents low because its crust at least 20 km thick covers 0.48 of the planet
+instead of Earth's 0.38, with 10 % more volume than Earth's and 13 % thinner: the larger area holds the sea 292 m over
+Earth's fill (means; +492 m of it the area, -68 m the steering's nudge), and the thin crust stands low. The area has
+two sources of about equal weight:
+
+- **The start** (the preset): every run starts with 0.4225 of the planet continental in a uniform 35.1 km column
+  (PLT-131), 10 % over Earth's area with 6 % more volume (14.8 against 14.0 km planet-mean) and none of Earth's 0.117
+  of the planet at 40 km and more. It carries about 0.4 of base35's excess area (0.7 of base34's); on Earth's
+  histograms the start's area alone puts the sea 213 m over Earth's fill.
+- **The run's thinning** (35.1 to 32.0 km mean), about 0.4: the start's crust is taken under at trenches and
+  collisions (its volume kept by the crust budget) while new area grows on ocean floor as island-arc crust at 31.6 km,
+  and the start's own crust thins to 33.5 km. Its cause is a hypothesis, not measured: every continental column stands
+  on PLT-281's one Airy line, z = z_0 + (T - 35.1 km) / 7.02 over the datum (z_0 525 m, the middle of
+  `continent_elevation_m`), which with the sea at the datum is near Earth's at 32 to 34 km and stands 400 to 1,320 m
+  above Earth's ice-free crust at 36 to 44 km, so thick crust stands high and may wear to the column at the sea (33.6
+  km under base35's sea). The kept volume of the crust budget is the rest (about 0.2 on base35).
+
 Earth holds its thick crust low on cold, keeled lithosphere and its thin crust high on hot lithosphere: in CRUST1.0
 the Basin and Range and Cordillera stand 1,407 to 1,834 m on 30 to 45 km of crust and the cratons 140 to 660 m on 35
 to 45 km, with alike crustal densities (m4cold.py); Hyndman & Currie 2011 put a hot back-arc at the sea on about 27
 km and a craton on about 38 km, about 1,600 m apart at equal crust.
+
+**So the height law and the start's continents are one design.** A height law alone leaves the start's 0.4: on any
+craton line a 35.1 km start column stands under a sea at the datum (about 400 m on Hyndman & Currie's, and -350 m on
+this design's prototype with the start's L 225 km and K 200 km, `tools/review/buoyancy/law.py`, constants to be
+sourced), so the law with the start as it is would drown the start further. This design therefore also sets the
+start's continents from Earth's hypsometry and volume under the same law: their area (Earth's crust at least 20 km
+thick covers 0.384 of the planet, 14.0 km planet-mean), their thickness distribution (mean 36.4 km, p10 26.6, p50
+36.9, p90 44.5) and their lithosphere (cold keeled interiors, hotter margins), so that with the sea at the datum the
+start stands where Earth's continents stand. The run's thinning is what the arm tests: if the hypothesis holds, cold
+thick crust standing low under the law keeps its thickness and the same volume covers less area.
 
 ## Why thermal isostasy (ISO-110) is built and off, and whether that still holds
 
