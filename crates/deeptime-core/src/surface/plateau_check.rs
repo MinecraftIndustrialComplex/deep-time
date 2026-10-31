@@ -21,6 +21,8 @@
 //! internally drained plateau of `closed.rs` (ERO-217 to ERO-219): the rimmed plateau with a wet
 //! outer flank and an arid interior (the stream power's runoff weight at ERO-011's floor inside
 //! the rim), its interior spilling over the rim as today or, with the lakes' water balance, closed.
+//! And a cold plateau (ERO-221, ERO-222): the interior's runoff weight from the snapshot's own
+//! rule (all of P below 0 °C) against the bake's budget (`surface.runoff_budget`).
 //!
 //! `cargo test -p deeptime-core plateau -- --nocapture` prints the table.
 
@@ -428,4 +430,46 @@ fn an_arid_plateau_behind_its_rim_keeps_its_rock() {
         (net(3, 0) - net(2, 0)).abs() < 0.1 * net(2, 0),
         "a humid interior spills"
     );
+}
+
+/// A cold plateau (ERO-221): the rimmed plateau of [`plateau_basin`] whose interior has Tangra
+/// Yumco's climate (Biskop et al. 2016, Table 4: P 300 mm/yr; §2.1: "The mean annual air
+/// temperature (MAAT) lies between 0 and −3 ◦C", here −1.5; the months the mean ± 8 °C of
+/// HYD-032), its runoff weight from the snapshot's own rule (a mean below 0 °C: all of P runs
+/// off) or from the bake's budget (`surface.runoff_budget`), and an interior whose warmest month
+/// stays below freezing (the budget: no runoff, the weight at ERO-011's floor). Spilling over the
+/// rim in every case, so only the runoff differs.
+#[test]
+fn a_cold_plateau_runs_off_what_its_summer_leaves() {
+    use super::climate::{cell_water, mean_t_runoff_m_yr};
+    let hydro = crate::hydro::HydroParams::default();
+    let (p, t, half) = (300.0, -1.5, 8.0); // ledger: ERO-222, HYD-032
+    let weight = |runoff_m_yr: f64| ((runoff_m_yr / 0.5) as f32).max(0.05); // ledger: ERO-010
+    let own = weight(mean_t_runoff_m_yr(p, t));
+    let budget = weight(cell_water(&hydro, p, t, half).runoff_m_yr);
+    let frozen = weight(cell_water(&hydro, p, -12.0, 8.0).runoff_m_yr);
+    eprintln!("cold plateau interior weights: own {own:.3}, budget {budget:.3}, frozen {frozen:.3}");
+    let rows = [
+        ("cold interior, the snapshot's runoff", plateau_basin(own, None)),
+        ("cold interior, the bake's budget", plateau_basin(budget, None)),
+        ("never-thawing interior, the budget", plateau_basin(frozen, None)),
+    ];
+    eprintln!(
+        "m/Myr over 10 Myr: interior spl threshold diffusion net | edge spl threshold diffusion net"
+    );
+    let mut got = Vec::new();
+    for (name, case) in &rows {
+        let s = run(case);
+        eprintln!(
+            "{name:38} {:8.1} {:8.1} {:8.1} {:8.1} | {:8.1} {:8.1} {:8.1} {:8.1}",
+            s[0][0], s[0][1], s[0][2], s[0][3], s[1][0], s[1][1], s[1][2], s[1][3]
+        );
+        got.push(s);
+    }
+    let net = |k: usize| got[k][0][3];
+    assert!((own - 0.6).abs() < 1.0e-6, "all of P runs off: weight {own}");
+    assert!(budget < 0.75 * own, "the summer evaporates: weight {budget}");
+    assert!(frozen <= 0.05, "nothing runs off: weight {frozen}");
+    assert!(net(1) < 0.85 * net(0), "the budget's interior wears less");
+    assert!(net(2) < 0.1 * net(0), "a never-thawing interior barely wears");
 }
