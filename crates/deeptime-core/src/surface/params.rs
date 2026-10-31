@@ -122,6 +122,12 @@ pub struct SurfaceParams {
     /// (`advect::held_cells`; flexure.md "The held offsets"). On by default since 2026-10-23.
     /// Off: the feedback takes the whole offset everywhere, as before. ledger: ISO-125
     pub held_offsets: bool,
+    /// Lakes pass on what their water balance leaves (`closed.rs`): the stream power's drainage
+    /// area leaves a lake's exit at the share of its inflow that flows out (Garcia-Castellanos
+    /// 2006, eq. 2), none from a lake that cannot fill to its spill, an internally drained basin.
+    /// Needs the hydrology's lake balance (`hydro.lake_balance`). Off by default (the plateau
+    /// lane, 2026-10-31): every lake passes all of its inflow, as before. ledger: ERO-217, ERO-218
+    pub closed_basins: bool,
     /// How the stage's solvers run (P1-19): numerics that change no law.
     pub numerics: Numerics,
 }
@@ -254,7 +260,8 @@ impl Default for SurfaceParams {
             drama: 1.0,
             glacial: super::glacial::GlacialParams::default(),
             flexure: super::flexure::FlexureParams::default(),
-            held_offsets: true, // ledger: ISO-125
+            held_offsets: true,   // ledger: ISO-125
+            closed_basins: false, // ledger: ERO-217 (off: the plateau lane, 2026-10-31)
             numerics: Numerics::default(),
         }
     }
