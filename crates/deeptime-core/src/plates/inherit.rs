@@ -378,6 +378,7 @@ pub(in crate::plates) mod tests {
             continental_over: 0.0,
             stalled_since_myr: None,
             jam_km: None,
+            subducting: false,
             belt: Belt::default(),
         }
     }

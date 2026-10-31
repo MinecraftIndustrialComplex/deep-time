@@ -276,9 +276,12 @@ pub struct Totals {
     /// … that passed part of their inflow, …
     #[serde(default)]
     pub partial_lakes: u64,
-    /// … and the land draining to closed basins, km² × Myr (map).
+    /// … and the land draining to closed basins, km² × Myr (map); and the lake-substeps that the
+    /// sediment filled to their spill, which then passed all their water (`closed::open_filled`).
     #[serde(default)]
     pub closed_km2_myr: f64,
+    #[serde(default)]
+    pub filled_lakes: u64,
     /// The stream power's runoff weight against the climate snapshot's own rule, with
     /// `surface.runoff_budget` (measurement only, ERO-221): km² × Myr of land, of it × the weight
     /// used and × the snapshot's own weight, then the same for land above 2 km over the sea.
@@ -1146,6 +1149,14 @@ impl SurfaceStage {
         // setup). The parallel flood (`surface.numerics.flood`, ERO-184) shares the pool with them.
         let beside = Instant::now();
         let hydro_p = self.preset.hydro.unwrap_or_default();
+        if self.done == 0 && p.closed_basins && !hydro_p.lake_balance {
+            // Every lake is full without the balance, so none closes (ERO-217).
+            ctx.log.push(
+                crate::log::Level::Warn,
+                "surface: surface.closed_basins is on but hydro.lake_balance is off, so every lake \
+                 stays full and passes all its water: no basin closes",
+            );
+        }
         let flexure_water = p.flexure.active() && p.flexure.water_by_basin;
         let fam_of = &self.fam;
         let erod = &self.erod;
@@ -1444,6 +1455,7 @@ impl SurfaceStage {
         // passed a part, the land draining to closed basins (km² × Myr), and the last substep's
         // cells that do (the erosion bands' closed flat high ground).
         let (mut closed_lakes, mut partial_lakes, mut closed_km2_myr) = (0u64, 0u64, 0.0f64);
+        let mut filled_lakes = 0u64;
         let mut closed_mask: Option<Vec<bool>> = None;
         let epoch = self.epoch();
         for sub in 0..subs {
@@ -1467,6 +1479,8 @@ impl SurfaceStage {
             // passing the share of its inflow its balance leaves, a closed basin's none. The
             // levels are the flexure's (the same flood, routing and budget).
             let mut balance: Option<lakes::Levels> = None;
+            // What the lakes pass on, kept past the solve (a lake its sediment fills opens).
+            let mut lake_outflow: Option<Vec<lakes::LakeOutflow>> = None;
             if p.closed_basins
                 && let Some(cw) = &cell_water
             {
@@ -1484,13 +1498,7 @@ impl SurfaceStage {
                 if let Some(pass) = closed::pass_shares(n, &lv.outflow) {
                     routing::accumulate_passing(&d, &sc.routing, &sc.weight, &pass, &mut sc.area);
                 }
-                let catchment = closed::closed_catchment(&sc.routing, &lv.outflow);
-                let land: Vec<bool> = sc.kind.par_iter().map(|&k| k != BASE).collect();
-                let (shut, partial, cells) = closed::counts(&lv.outflow, &catchment, &land);
-                closed_lakes += shut;
-                partial_lakes += partial;
-                closed_km2_myr += cells as f64 * d.cell_area() / 1.0e6 * dts / 1.0e6;
-                closed_mask = Some(catchment);
+                lake_outflow = Some(lv.outflow.clone());
                 balance = Some(lv);
                 self.time("closed", started);
             }
@@ -1555,6 +1563,55 @@ impl SurfaceStage {
                 sc.kf_eff.copy_from_slice(&sc.kf);
             }
             let started = Instant::now();
+            let solve = |sc: &mut Scratch| {
+                let input = spl::SplInput {
+                    kind: &sc.kind,
+                    h0: &sc.h,
+                    filled: &sc.filled,
+                    base_z: &sc.base_z,
+                    area: &sc.area,
+                    kf: &sc.kf_eff,
+                };
+                spl::solve_cut(
+                    &d,
+                    &sc.routing,
+                    &input,
+                    &spl_p,
+                    &mut sc.h_new,
+                    &mut sc.qin,
+                    Some(&mut sc.cut),
+                )
+            };
+            let rep = solve(&mut sc);
+            iterations += rep.iterations as u64;
+            if let Some(outflow) = lake_outflow.as_mut() {
+                // ledger: ERO-217
+                // A lake the step's sediment filled to its spill passes all its water: the step
+                // is solved again with its area passed on (`closed::open_filled`).
+                let opened = closed::open_filled(outflow, &sc.h_new, &sc.filled);
+                if opened > 0 {
+                    filled_lakes += opened as u64;
+                    match closed::pass_shares(n, outflow) {
+                        Some(pass) => routing::accumulate_passing(
+                            &d,
+                            &sc.routing,
+                            &sc.weight,
+                            &pass,
+                            &mut sc.area,
+                        ),
+                        None => routing::accumulate(&d, &sc.routing, &sc.weight, &mut sc.area),
+                    }
+                    let rep = solve(&mut sc);
+                    iterations += rep.iterations as u64;
+                }
+                let catchment = closed::closed_catchment(&sc.routing, outflow);
+                let land: Vec<bool> = sc.kind.par_iter().map(|&k| k != BASE).collect();
+                let (shut, partial, cells) = closed::counts(outflow, &catchment, &land);
+                closed_lakes += shut;
+                partial_lakes += partial;
+                closed_km2_myr += cells as f64 * d.cell_area() / 1.0e6 * dts / 1.0e6;
+                closed_mask = Some(catchment);
+            }
             let input = spl::SplInput {
                 kind: &sc.kind,
                 h0: &sc.h,
@@ -1563,16 +1620,6 @@ impl SurfaceStage {
                 area: &sc.area,
                 kf: &sc.kf_eff,
             };
-            let rep = spl::solve_cut(
-                &d,
-                &sc.routing,
-                &input,
-                &spl_p,
-                &mut sc.h_new,
-                &mut sc.qin,
-                Some(&mut sc.cut),
-            );
-            iterations += rep.iterations as u64;
             if sub + 1 == subs {
                 spl::families(&d, &sc.routing, &input, &fam, dts, &sc.h_new, &mut sc.mix);
             }
@@ -2101,7 +2148,8 @@ impl SurfaceStage {
             .map(|c| sc.h[c] - h_start[c])
             .collect();
         // The flat high ground's split by its water (measurement only): dry by its runoff weight,
-        // frozen by its mean temperature.
+        // frozen by its mean temperature (below 0 °C).
+        // ledger: ERO-220
         let dry_mask: Vec<bool> = sc
             .weight
             .par_iter()
@@ -2543,6 +2591,7 @@ impl SurfaceStage {
         t.closed_lakes += closed_lakes;
         t.partial_lakes += partial_lakes;
         t.closed_km2_myr += closed_km2_myr;
+        t.filled_lakes += filled_lakes;
         for (a, b) in t.runoff_weight_km2_myr.iter_mut().zip(runoff_weight) {
             *a += b;
         }

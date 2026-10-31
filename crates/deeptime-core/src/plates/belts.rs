@@ -49,8 +49,8 @@
 //!    the metre (the sliver rule above and the strength height's passes): only where it lands
 //!    moves.
 //!
-//!    With `collision_two_wedges` (PLT-730, off: its pool arm put more collision land at the
-//!    coast, plates.md "Step 20") the orogen
+//!    With `collision_two_wedges` (PLT-730, on by default since 2026-10-31; plates.md "Step 20"
+//!    and "The collision orogen") the orogen
 //!    is two wedges about the front instead: a doubly vergent orogen grows as a pro-wedge over
 //!    the lower plate at the lesser critical taper and a retro-wedge over the upper plate at the
 //!    greater, about the point where the lower plate's mantle goes down (Willett, Beaumont &
@@ -65,18 +65,19 @@
 //!    The pro-wedge's crust rides its plate to the front and crosses whole (PLT-400), to be
 //!    stacked again on both sides.
 //!
-//!    With `collision_retro_plateau` too (PLT-740, off; the design
+//!    With `collision_retro_plateau` too (PLT-740, on by default since 2026-10-31; the design
 //!    `docs/design/collision-orogen.md`, O2) that plateau has no set width: when the step's crust
 //!    is not all placed with the retro flank's samples within `collision_belt_km` at their
 //!    limits, the flank is searched again through the overriding plate's continental samples
 //!    (twice the reach each time) and the same fill runs over it, until the crust is placed or
 //!    the plate's connected continental crust is all taken. A doubly vergent orogen turns into a
-//!    plateau that grows "laterally at constant thickness", retro-ward, its pro edge staying near
-//!    the subduction point (Vanderhaeghe et al. 2003, pp. 27, 41), "located mostly on the
-//!    retro-side" (Wolf et al. 2021, p. 25); a plateau grows "by tectonic thickening and
+//!    plateau that grows "laterally at constant thickness" (Vanderhaeghe et al. 2003, p. 27),
+//!    retro-ward (p. 41), "located mostly on the retro-side" (Wolf et al. 2021, p. 25); its pro
+//!    edge staying near the subduction point is a research sub-agent's reading of Vanderhaeghe et
+//!    al.'s Fig. 11c, not a sentence of theirs. A plateau grows "by tectonic thickening and
 //!    accretion of adjacent crust in the transition zone" (Medvedev & Beaumont, preprint, p. 3).
-//!    It grows through its own crust, never across a sea. Only what the connected crust cannot
-//!    hold goes to the no-room rule below.
+//!    It grows through its own continental crust, under the sea or not, never across ocean floor.
+//!    Only what the connected crust cannot hold goes to the no-room rule below.
 //!
 //!    With `collision_noroom_stays` (PLT-700, on) nothing goes down for want of room: the belt's
 //!    passes run until the crust is placed or every sample stands at the strength height (no
@@ -95,7 +96,14 @@
 //! Both are stamped as a collision orogeny where they rose by more than 5 m/Myr (the subduction
 //! fronts' rule): the `collision` regime the structure stage folds and thrusts, the orogen
 //! provinces, the young-orogen weakness of the flexure. The fold direction is the shortening
-//! direction, the front's normal.
+//! direction, the front's normal. The retro plateau beyond the belt's reach (PLT-740) is stamped
+//! too but stays outside the collision's footprint (no convergence, shortening or carrier, PLT-260),
+//! so the structure stage gives it no collision folds or thrusts: its crust comes by the orogen's
+//! flow from the front, not by shortening its own upper crust. Tibet's eastern margin rose
+//! "without significant shortening of the upper crust" (Clark & Royden 2000, p. 703) and the
+//! plateau's interior extends east-west (Armijo et al. 1986; Blisniuk et al. 2001; abstracts).
+//! The limits: Vanderhaeghe et al. (2003, p. 40) find "pure shear thickening in the upper crust"
+//! of one model's plateau, and the interior's normal faults are not modelled.
 //!
 //! **The foreland basin** is not built here. The uplift on continental crust is a load the
 //! surface stage's flexure solve (`surface/flexure.rs`) carries, and the stiff incoming plate
@@ -220,6 +228,10 @@ pub const STAYS_GLOBAL: &str = "plates/collision_noroom_stays_km3";
 /// only; ledger: PLT-601): the toe advancing, so whether the width `collision_belt_km` (PLT-241)
 /// bounds the belt at all. Zero without `collision_belt_taper`.
 pub const TOE_GLOBAL: &str = "plates/collision_taper_toe_km3";
+/// The crust that terranes docking stripped to their cover sent down with the slab instead of
+/// stacking it, km³ Earth-normalized (`tectonics.terrane_docking_cover`, ledger PLT-770; written
+/// only with the switch; measurement only).
+pub const STRIPPED_GLOBAL: &str = "plates/collision_stripped_km3";
 /// With `collision_retro_plateau` (PLT-740): the crust the two wedges' retro plateau took beyond
 /// the belt's reach (`collision_belt_km`), km³ of crust (in [`KEPT_GLOBAL`] too; measurement only,
 /// written only with the switch so a run without it keeps its globals list).
@@ -313,6 +325,12 @@ pub struct Stacked {
     /// The part of `thickness_m` this collision stacked on the incoming crust before it crossed
     /// (its excess over the normal column where this collision stamped it), m (PLT-400).
     pub restack_m: f64,
+    /// The crossing crust's supracrustal cover (`pools::COVER` of its own crust), m, and, where
+    /// the slab drags the terrane down whole (`tectonics.terrane_docking_cover`, PLT-770), the
+    /// share of the crust under the cover that the slab took instead of the belt, km² × m of
+    /// crust (beside PLT-242's own loss; measurement only).
+    pub cover_m: f64,
+    pub stripped_km2_m: f64,
     /// What of the share found no room, km² × m of crust (measurement only): the belt's part
     /// left over with room still in it, with none, and what the ceilings clipped.
     pub sliver_km2_m: f64,
@@ -414,6 +432,9 @@ pub fn stack(
         let col = state.contacts[c].collision.as_ref().expect("in collision");
         let (conv, normal) = (col.convergence_mm_yr, DVec3::from_array(col.normal));
         let sides = read_sides(state, env, f, &fields, sea_m);
+        // ledger: PLT-770. A terrane its slab drags down whole (`shortening::advance` classes
+        // the front, `Collision::subducting`) keeps only its cover; the slab takes the rest.
+        let stripped = env.k.terrane_docking_cover && col.subducting;
         let step = stack_front(
             state,
             geo,
@@ -427,6 +448,7 @@ pub fn stack(
                 normal,
                 shortening_km: col.shortening_km,
                 onset_myr: col.onset_myr,
+                stripped,
             },
             f,
             flexure,
@@ -443,6 +465,7 @@ pub fn stack(
         b.wedge_km = applied.wedge_km;
         b.stacked_km2_m += applied.belt_km2_m + applied.wedge_km2_m;
         b.wedge_km2_m += applied.wedge_km2_m;
+        b.stripped_km2_m += applied.stripped_km2_m;
         b.uplift_m += applied.max_dz_m;
         b.lifted10 = b.lifted10.max(step.lifted10);
         b.lifted100 = b.lifted100.max(step.lifted100);
@@ -610,6 +633,9 @@ struct Side {
     shortening_km: f64,
     /// When the collision began, Myr.
     onset_myr: f64,
+    /// The incoming terrane is one its slab drags down whole, stripped of its cover
+    /// (`tectonics.terrane_docking_cover`, `Collision::subducting`; ledger PLT-770).
+    stripped: bool,
 }
 
 /// One front's stacking, and what the belt's record gains.
@@ -737,15 +763,34 @@ fn stack_front(
         let n = f.crust.len() as f64;
         (a / n, r / n, w / n)
     };
+    // The crossing crust's cover (ledger: PLT-771), of its own crust (the basement apart).
+    let cover_m = if f.crust.is_empty() {
+        0.0
+    } else {
+        f.crust
+            .iter()
+            .map(|&j| super::pools::cover_m(&samples[j as usize].own_pools()))
+            .sum::<f64>()
+            / f.crust.len() as f64
+    };
+    // ledger: PLT-770. A terrane its slab drags down keeps its cover (scraped off at the front)
+    // and the crust this collision stacked on it (its wedge's, PLT-400); the slab takes the rest.
+    // Otherwise all of it.
+    let kept_m = if side.stripped {
+        (cover_m + restack_m).min(thickness_m)
+    } else {
+        thickness_m
+    };
     // ledger: PLT-242 (the share), PLT-281 (Airy with the crust's mean density). With
     // `collision_restack_whole` the crust this collision stacked crosses whole: it took the share
     // when it first crossed (ledger: PLT-400).
     let rise_km2_m = if k.collision_restack_whole {
-        crossed_km2 * (k.collision_stacking_share * (thickness_m - restack_m) + restack_m)
+        crossed_km2 * (k.collision_stacking_share * (kept_m - restack_m).max(0.0) + restack_m)
             / COLUMN_ISOSTATIC_FACTOR
     } else {
-        k.collision_stacking_share * crossed_km2 * thickness_m / COLUMN_ISOSTATIC_FACTOR
+        k.collision_stacking_share * crossed_km2 * kept_m / COLUMN_ISOSTATIC_FACTOR
     };
+    let stripped_km2_m = k.collision_stacking_share * crossed_km2 * (thickness_m - kept_m);
     // ledger: PLT-652. The overriding plate's interior takes its share of the convergence as
     // distributed shortening (`collision_upper_plate_shortening`, the module docs); the front
     // stacks the rest, in the wedge and the belt as before.
@@ -788,11 +833,17 @@ fn stack_front(
         .max(0.5 * 2.0 / 3.0 * belt_km * f.length_km());
 
     // The rock that stays: the consumed crust's own mix, its sediments buried and metamorphosed.
-    // ledger: PLT-248.
+    // ledger: PLT-248. Docking stripped, its cover's (ledger: PLT-771).
     let mut mix = [0.0f64; pool::COUNT];
     for &j in &f.crust {
-        for (m, &x) in mix.iter_mut().zip(samples[j as usize].own_pools().iter()) {
-            *m += f64::from(x.max(0.0));
+        for (p, (m, &x)) in mix
+            .iter_mut()
+            .zip(samples[j as usize].own_pools().iter())
+            .enumerate()
+        {
+            if !side.stripped || super::pools::COVER.contains(&p) {
+                *m += f64::from(x.max(0.0));
+            }
         }
     }
     mix[pool::METAMORPHIC] += mix[pool::SEDIMENT] + mix[pool::SEDIMENTARY];
@@ -1051,6 +1102,8 @@ fn stack_front(
             above_m,
             recent_above_m,
             restack_m,
+            cover_m,
+            stripped_km2_m,
             sliver_km2_m,
             capped_km2_m,
             stays_km2_m,
@@ -1141,7 +1194,8 @@ fn stack_front(
 
     // The collision's footprint, for the structure stage (`structure::deform::emplace`): every
     // sample of the belt, the wedge and the foreland within reach of the basin carries the
-    // convergence and the shortening of this collision; the foreland on the incoming plate
+    // convergence and the shortening of this collision (not the retro plateau beyond the belt's
+    // reach, PLT-740: grown by the orogen's flow, the module docs); the foreland on the incoming plate
     // beyond the wedge's toe is flagged. Where two collisions meet the larger values stay and a
     // belt or wedge sample is never a foreland one.
     // ledger: PLT-260 (the footprint); PLT-249 (the basin's reach).
@@ -1995,6 +2049,10 @@ mod tests {
         // taper (the default) the front's edge in this fixture stands at its own height until
         // the toe advances (ledger: PLT-600, PLT-601); the taper's own tests check it.
         fx.preset.tectonics.collision_belt_taper = false;
+        // The old law (PLT-243, PLT-244): crust on the overriding plate within the belt and the
+        // capped wedge only, whatever the default (the two wedges, PLT-730, on since 2026-10-31,
+        // put the pro-wedge's crust on the incoming plate and the retro plateau's behind the belt).
+        fx.preset.tectonics.collision_two_wedges = false;
         // The old default share (0.5), so twelve steps stay under the strength height (PLT-253)
         // and every step's rise shows in the belt's height.
         fx.preset.tectonics.collision_stacking_share = 0.5;
@@ -2088,11 +2146,10 @@ mod tests {
     fn a_collisions_own_wedge_crosses_whole_with_the_switch() {
         let mut fx = Fixture::new();
         fx.preset.tectonics.collision_threshold_km = 1.0e9;
-        // PLT-243's profile, so the wedge (PLT-244) builds from the first step and its crust
-        // reaches the front within six. Under the critical taper the front's edge in this
-        // fixture stands at its own height until the toe advances, and the wedge waits for it
-        // (ledger: PLT-600, PLT-601).
-        fx.preset.tectonics.collision_belt_taper = false;
+        // The two wedges (PLT-730, on since 2026-10-31) give the incoming plate its pro-wedge
+        // from the first step, so its crust reaches the front within six; the belt's taper
+        // (PLT-600) is the old belt laws' and plays no part here.
+        assert!(fx.preset.tectonics.collision_two_wedges);
         let share = 0.5;
         fx.preset.tectonics.collision_stacking_share = share;
         let mut restacked = false;
@@ -2288,6 +2345,119 @@ mod tests {
         // The continent's 35.1 km less the 4 km of basement.
         assert!(s.crossed_km2 > 0.0, "{s:?}");
         assert!((s.thickness_m - 31_100.0).abs() < 1.0, "{s:?}");
+    }
+
+    /// A terrane its slab drags down whole subducts stripped of its cover (`terrane_docking_cover`,
+    /// ledger PLT-770, PLT-771): an island arc of 8 km on 7 km of ocean crust (15 km, Cloos 1993's
+    /// jamming thickness) one row of samples wide across the front, against a 700 km slab, whose
+    /// reach is 700 / (1 + 2.25 × 15 / 30) = 329 km. Of its crossing crust only its cover stays
+    /// (its own lavas and tuffs, a sixth of the arc: 1.33 km), by PLT-242's share and as the
+    /// cover's rock, the slab takes the rest, and it does not transfer at the threshold. Five rows
+    /// wide it jams the slab: a collision as before, all of it kept, a transfer at the threshold;
+    /// so with the switch off, and on a contact with no slab.
+    #[test]
+    fn a_terrane_its_slab_drags_down_subducts_stripped_of_its_cover() {
+        use crate::plates::pools::oceanic_column;
+        let run = |docking: bool, rows: f64, slab: bool, hidden: f64| {
+            let mut fx = Fixture::new();
+            // Under the step's 40 km of shortening: the terrane would transfer at once.
+            fx.preset.tectonics.collision_threshold_km = 30.0;
+            fx.preset.tectonics.collision_restack_whole = false;
+            fx.preset.tectonics.crust_strength_mpa = 2000.0;
+            fx.preset.tectonics.terrane_docking_cover = docking;
+            let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(20.0));
+            let spacing = fx.norm.km(fx.norm.spacing_rad());
+            let pts = fx.geo.points();
+            for (i, s) in st.samples.iter_mut().enumerate() {
+                if s.group != 1 || s.kind != CONTINENTAL {
+                    continue;
+                }
+                s.pools = oceanic_column();
+                if fx.norm.km(pts[i].x.asin()) <= rows * spacing {
+                    // The arc on its ocean crust, its basement (PLT-331), a sixth volcanic.
+                    let arc = 8000.0_f32;
+                    s.pools[pool::MAFIC_VOLCANIC] += arc / 6.0 * 2.0 / 3.0;
+                    s.pools[pool::FELSIC_VOLCANIC] += arc / 6.0 / 3.0;
+                    s.pools[pool::FELSIC_PLUTONIC] += arc * 5.0 / 6.0;
+                    s.basement_m = 7000.0;
+                    s.elevation_m = -2000.0;
+                    // Rows already under the overriding plate: the front's crust is hidden.
+                    if fx.norm.km(pts[i].x.asin()) <= hidden * spacing {
+                        s.flags |= HIDDEN;
+                    }
+                } else {
+                    s.kind = crate::plates::state::OCEANIC;
+                    s.elevation_m = -4000.0;
+                }
+                s.thickness_m = s.pools.iter().sum();
+            }
+            if slab {
+                st.slabs.push(SlabTrack {
+                    under: 1,
+                    over: 0,
+                    km: 700.0,
+                    blocked_myr: 0.0,
+                    idle_myr: 0.0,
+                    latent: false,
+                });
+            }
+            let area = fx.norm.sample_area_km2();
+            let pool_sum = |st: &PlateState, p: usize| -> f64 {
+                st.samples
+                    .iter()
+                    .filter(|s| !s.is_hidden())
+                    .map(|s| f64::from(s.pools[p]) * area)
+                    .sum()
+            };
+            let before = crust_km2_m(&st, area);
+            let plutonic0 = pool_sum(&st, pool::FELSIC_PLUTONIC);
+            let (stacked, fired) = fx.step(&mut st, 1, None);
+            let s = stacked[&0].clone();
+            let added = crust_km2_m(&st, area) - before;
+            let plutonic = pool_sum(&st, pool::FELSIC_PLUTONIC) - plutonic0;
+            let col = st.contacts[0].collision.as_ref().expect("a collision");
+            let share = fx.preset.tectonics.collision_stacking_share;
+            (share, s, added, plutonic, col.subducting, fired.len())
+        };
+        assert!((shortening::dragged_length_km(700.0, 15_000.0) - 329.4).abs() < 0.1);
+        // One row wide: the slab drags it down, stripped to its cover; no transfer.
+        let (share, s, added, plutonic, subducting, fired) = run(true, 1.0, true, 0.0);
+        assert!(subducting, "{s:?}");
+        assert_eq!(fired, 0, "a terrane going down does not transfer");
+        assert!(s.crossed_km2 > 0.0, "{s:?}");
+        assert!((s.thickness_m - 8_000.0).abs() < 1.0, "{s:?}");
+        assert!((s.cover_m - 8_000.0 / 6.0).abs() < 1.0, "{s:?}");
+        let cover = share * s.crossed_km2 * s.cover_m;
+        assert!(
+            (added - cover).abs() < 1e-4 * cover,
+            "added {added:.4e} for the cover's {cover:.4e}"
+        );
+        let below = share * s.crossed_km2 * (s.thickness_m - s.cover_m);
+        assert!((s.stripped_km2_m - below).abs() < 1e-6 * below, "{s:?}");
+        assert!(
+            plutonic.abs() < 1e-6 * cover,
+            "no plutonic rock stays: {plutonic}"
+        );
+        // The terrane is read through its crust already under the overriding plate: five rows
+        // with the first hidden still jam the slab.
+        let (_, s, _, _, subducting, fired) = run(true, 5.0, true, 1.0);
+        assert!(!subducting && fired == 1, "{s:?}");
+        // Five rows wide, the switch off, no slab: a collision as before.
+        for (docking, rows, slab) in [(true, 5.0, true), (false, 1.0, true), (true, 1.0, false)] {
+            let (share, s, added, plutonic, subducting, fired) = run(docking, rows, slab, 0.0);
+            assert!(!subducting, "{docking} {rows} {slab}");
+            assert_eq!(
+                fired, 1,
+                "{docking} {rows} {slab}: it transfers at the threshold"
+            );
+            let whole = share * s.crossed_km2 * s.thickness_m;
+            assert!(
+                (added - whole).abs() < 1e-4 * whole,
+                "{docking} {rows} {slab}: added {added:.4e} for {whole:.4e}"
+            );
+            assert_eq!(s.stripped_km2_m, 0.0);
+            assert!(plutonic > 0.5 * whole * 5.0 / 6.0, "{plutonic}");
+        }
     }
 
     /// The crust that stacks is the crust that crossed the front: the volume added is the
@@ -2722,7 +2892,12 @@ mod tests {
     /// little more.)
     #[test]
     fn the_front_keeps_its_taper_and_strength_height_beside_the_interiors_share() {
-        let weak = |fx: &mut Fixture| fx.preset.tectonics.crust_strength_mpa = 40.0;
+        let weak = |fx: &mut Fixture| {
+            fx.preset.tectonics.crust_strength_mpa = 40.0;
+            // The belt from critical taper (PLT-600, PLT-601), lowest at the front, whatever the
+            // default: the two wedges (PLT-730, on since 2026-10-31) stand their crest at the front.
+            fx.preset.tectonics.collision_two_wedges = false;
+        };
         let off = upper_run(150.0, false, 12, weak);
         let r = upper_run(150.0, true, 12, weak);
         let k = &r.fx.preset.tectonics;
@@ -3261,9 +3436,10 @@ mod tests {
     /// PLT-740 on a head-on collision with two wedges whose retro flank within the belt's reach
     /// and whose pro side already stand at the strength height: with the switch the step's crust
     /// goes beyond `collision_belt_km` through the overriding plate's continental crust as a plateau
-    /// at the strength height (nearest the belt first), stops at a sea between two of its
-    /// continents, keeps the volume and leaves the no-room rule (PLT-700) only what the connected
-    /// crust cannot hold; off, the no-room rule takes all of it and nothing beyond the belt rises.
+    /// at the strength height and stops at ocean floor between two of its continents: every
+    /// sample before the ocean rises, nothing on it or across it, and the no-room rule (PLT-700,
+    /// the shipped path) takes what the connected crust cannot hold. The volume is kept; off, the
+    /// no-room rule takes all of it and nothing beyond the belt rises.
     #[test]
     fn the_retro_plateau_grows_past_the_belt_through_its_own_crust() {
         let mut out = Vec::new();
@@ -3280,8 +3456,16 @@ mod tests {
             let pts = fx.geo.points();
             let norm = fx.norm;
             // The overriding side: at the strength height within the belt's reach (and a sample
-            // spacing more), lowland 400 km beyond it, a sea strip 400 km wide, then lowland.
+            // spacing more), 20 m under it for 400 km beyond, ocean floor 400 km wide, then
+            // lowland at 300 m. One step's crust (about 285,000 m km per km of front, PR #50's
+            // review) fills a 300 m lowland only about 120 km past the belt; 20 m under the
+            // strength height it fills the 400 km to the ocean with crust left over.
             let spacing = norm.km(norm.spacing_rad());
+            let (low, sea_from, sea_to) = (
+                cap - 20.0,
+                belt_km + spacing + 400.0,
+                belt_km + spacing + 800.0,
+            );
             let behind = |p: DVec3| norm.km((-p.x).clamp(-1.0, 1.0).asin());
             for (i, s) in st.samples.iter_mut().enumerate() {
                 let p = pts[i];
@@ -3296,13 +3480,16 @@ mod tests {
                 let x = behind(p);
                 if x <= belt_km + spacing {
                     s.elevation_m = cap as f32;
-                } else if x > belt_km + spacing + 400.0 && x <= belt_km + spacing + 800.0 {
+                } else if x <= sea_from {
+                    s.elevation_m = low as f32;
+                } else if x <= sea_to {
                     let mut sea = Sample::blank(0);
                     sea.elevation_m = -4000.0;
                     *s = sea;
                 }
             }
             let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
+            let t0: Vec<f32> = st.samples.iter().map(|s| s.thickness_m).collect();
             let area = fx.norm.sample_area_km2();
             let before = crust_km2_m(&st, area);
             let (stacked, _) = fx.step(&mut st, 1, None);
@@ -3313,24 +3500,38 @@ mod tests {
                 (added - kept).abs() < 1e-4 * added.max(1.0),
                 "on {on}: the record is the crust added, {added} vs {kept}"
             );
-            // The rises on the lowland beyond the belt (the samples set at the strength height
-            // reach a spacing past it), before the sea and past it.
-            let (mut near, mut far, mut top) = (0.0f64, 0.0f64, f64::NEG_INFINITY);
+            // On the overriding side beyond the belt (the samples set at the strength height
+            // reach a spacing past it): the lowland before the ocean (its rise, its samples, those
+            // that rose, its highest), the lowland across it, and the ocean floor.
+            let (mut near, mut count, mut rose) = (0.0f64, 0usize, 0usize);
+            let (mut top, mut far, mut ocean) = (f64::NEG_INFINITY, 0.0f64, 0.0f64);
+            let (mut strip, mut beyond) = (0usize, 0usize);
             for (i, x) in st.samples.iter().enumerate() {
                 let p = pts[i];
-                if p.x >= 0.0 || x.kind != CONTINENTAL {
+                if p.x >= 0.0 {
                     continue;
                 }
-                let d = behind(p);
                 let dz = f64::from(x.elevation_m - z0[i]);
-                if d > belt_km + spacing && d <= belt_km + spacing + 400.0 {
+                let d = behind(p);
+                if x.kind != CONTINENTAL {
+                    if arc(p) && d > sea_from && d <= sea_to {
+                        ocean += (dz.abs() + f64::from((x.thickness_m - t0[i]).abs())) * area;
+                        strip += 1;
+                    }
+                    continue;
+                }
+                if d > belt_km + spacing && d <= sea_from {
                     near += dz.max(0.0) * area;
+                    count += 1;
+                    rose += usize::from(dz > 0.0);
                     top = top.max(f64::from(x.elevation_m));
-                } else if d > belt_km + spacing + 800.0 {
+                } else if d > sea_to {
                     far += dz.abs() * area;
+                    beyond += 1;
                 }
             }
-            out.push((s, near, far, top, cap));
+            assert!(strip > 0 && beyond > 0, "an ocean between two continents");
+            out.push((s, near, far, top, cap, count, rose, ocean));
         }
         let (off, on) = (&out[0], &out[1]);
         assert!(
@@ -3340,16 +3541,27 @@ mod tests {
         );
         assert_eq!(off.0.plateau_km2_m, 0.0);
         assert!(
-            off.1 < 1e-6 && off.2 < 1e-6,
+            off.1 < 1e-6 && off.2 < 1e-6 && off.6 == 0,
             "off: nothing beyond the belt rose: {off:?}"
         );
         assert!(
-            on.0.plateau_km2_m > 0.0,
+            on.0.plateau_km2_m > 0.0 && on.1 > 0.0,
             "on: the plateau took crust: {:?}",
             on.0
         );
-        assert!(on.1 > 0.0, "on: the lowland past the belt rose: {on:?}");
-        assert!(on.2 < 1e-6, "on: nothing across the sea rose: {on:?}");
+        assert!(
+            on.5 > 0 && on.6 == on.5,
+            "on: every sample of the lowland before the ocean rose: {} of {}",
+            on.6,
+            on.5
+        );
+        assert!(on.2 < 1e-6, "on: nothing across the ocean rose: {on:?}");
+        assert!(
+            on.7 < 1e-6 && off.7 < 1e-6,
+            "nothing on the ocean floor: {} and {}",
+            on.7,
+            off.7
+        );
         assert!(
             on.3 <= on.4 + 1e-3,
             "on: the plateau stands at most at the strength height: {} vs {}",
@@ -3357,8 +3569,8 @@ mod tests {
             on.4
         );
         assert!(
-            on.0.stays_km2_m < off.0.stays_km2_m,
-            "on: the no-room rule takes only what the connected crust cannot hold: {} vs {}",
+            on.0.stays_km2_m > 0.0 && on.0.stays_km2_m < off.0.stays_km2_m,
+            "on: the no-room rule takes what the connected crust cannot hold: {} vs {}",
             on.0.stays_km2_m,
             off.0.stays_km2_m
         );
@@ -3381,6 +3593,8 @@ mod tests {
             let mut fx = Fixture::new();
             fx.preset.tectonics.collision_threshold_km = 1.0e9;
             fx.preset.tectonics.collision_belt_taper = taper;
+            // The belt laws of PLT-243 and PLT-600, not the two wedges (PLT-730, on since 2026-10-31).
+            fx.preset.tectonics.collision_two_wedges = false;
             let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
             let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
             let (stacked, _) = fx.step(&mut st, 1, None);
@@ -3441,8 +3655,10 @@ mod tests {
             fx.preset.tectonics.collision_threshold_km = 1.0e9;
             fx.preset.tectonics.collision_belt_km = 2000.0;
             fx.preset.tectonics.collision_belt_taper = taper;
-            // The sliver rule itself (PLT-700 off).
+            // The sliver rule itself (PLT-700 off), under the old belt laws: the two wedges
+            // (PLT-730, on since 2026-10-31) have no sliver rule.
             fx.preset.tectonics.collision_noroom_stays = false;
+            fx.preset.tectonics.collision_two_wedges = false;
             let mut st = sliver_plates(&fx);
             let (stacked, _) = fx.step(&mut st, 1, None);
             let s = &stacked[&0];
@@ -3527,6 +3743,9 @@ mod tests {
                 fx.preset.tectonics.collision_belt_km = 2000.0;
                 fx.preset.tectonics.collision_belt_taper = taper;
                 fx.preset.tectonics.collision_noroom_stays = on;
+                // The old belt laws, whose sliver rule loses the crust for want of room: the two
+                // wedges (PLT-730, on since 2026-10-31) hold it on the incoming plate too.
+                fx.preset.tectonics.collision_two_wedges = false;
                 let mut st = sliver_plates(&fx);
                 let area = fx.norm.sample_area_km2();
                 let before = crust_km2_m(&st, area);
@@ -3569,6 +3788,9 @@ mod tests {
             let mut fx = Fixture::new();
             fx.preset.tectonics.collision_threshold_km = 1.0e9;
             fx.preset.tectonics.collision_noroom_stays = on;
+            // The old belt laws, whose belt part goes down for want of room: the two wedges
+            // (PLT-730, on since 2026-10-31) put the pro-wedge's crust on the incoming plate.
+            fx.preset.tectonics.collision_two_wedges = false;
             // The interior's share (PLT-652) rises elsewhere on the plate: the front alone here.
             fx.preset.tectonics.collision_upper_plate_shortening = false;
             let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
@@ -3605,6 +3827,57 @@ mod tests {
             "{} vs {}",
             on.0.stays_km2_m,
             off.0.capped_km2_m
+        );
+    }
+
+    /// PLT-700 on the shipped path (the two wedges, PLT-730, and the retro plateau, PLT-740, on):
+    /// an arc in collision whose incoming continent already stands at the strength height has no
+    /// room in either wedge and no continental crust for a plateau, so the no-room rule puts the
+    /// step's crust on the arc's edge at the front, and the step keeps it.
+    #[test]
+    fn an_arc_in_collision_takes_the_crust_on_its_edge_on_the_shipped_path() {
+        let mut fx = Fixture::new();
+        fx.preset.tectonics.collision_threshold_km = 1.0e9;
+        let k = &fx.preset.tectonics;
+        assert!(k.collision_two_wedges && k.collision_retro_plateau && k.collision_noroom_stays);
+        // The interior's share (PLT-652) rises elsewhere on the plate: the front alone here.
+        fx.preset.tectonics.collision_upper_plate_shortening = false;
+        let cap = fx.preset.tectonics.strength_height_m(9.81);
+        let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
+        for s in st.samples.iter_mut() {
+            if s.group == 0 {
+                let mut ocean = Sample::blank(0);
+                ocean.elevation_m = -2000.0;
+                *s = ocean;
+            } else if s.kind == CONTINENTAL {
+                s.elevation_m = cap as f32;
+            }
+        }
+        let t0: Vec<f32> = st.samples.iter().map(|s| s.thickness_m).collect();
+        let area = fx.norm.sample_area_km2();
+        let before = crust_km2_m(&st, area);
+        let (stacked, _) = fx.step(&mut st, 1, None);
+        let s = stacked[&0].clone();
+        assert_eq!(s.belt_class, BeltClass::Empty);
+        let added = crust_km2_m(&st, area) - before;
+        let kept = s.belt_km2_m + s.wedge_km2_m + s.upper_km2_m;
+        assert!(
+            (added - kept).abs() < 1e-4 * added.max(1.0),
+            "the record is the crust added, {added} vs {kept}"
+        );
+        assert_eq!(s.plateau_km2_m, 0.0, "no continental crust to grow through");
+        assert!(s.capped_km2_m == 0.0 && s.stays_km2_m > 0.0, "{s:?}");
+        let over: f64 = st
+            .samples
+            .iter()
+            .zip(&t0)
+            .filter(|(s, _)| s.group == 0)
+            .map(|(s, &t)| f64::from(s.thickness_m - t) * area)
+            .sum();
+        assert!(
+            (over - s.stays_km2_m).abs() < 1e-3 * s.stays_km2_m,
+            "the edge took what found no room: {over} vs {}",
+            s.stays_km2_m
         );
     }
 

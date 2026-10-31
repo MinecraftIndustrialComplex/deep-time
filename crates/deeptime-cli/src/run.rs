@@ -497,7 +497,7 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
          flexure_yielded_cells={:.0} flexure_dry_below_sea/wet_above_sea_cells={:.0}/{:.0} \
          guard_worst_m={:.0} guard_steps_over_1/2/3/6_reliefs={:.0}/{:.0}/{:.0}/{:.0} \
          step_rise/fall_polar_m={:.0}/{:.0} step_rise/fall_rest_m={:.0}/{:.0} \
-         closed_lake_steps={} partial_lake_steps={} closed_km2_myr={:.3e}",
+         closed_lake_steps={} partial_lake_steps={} closed_km2_myr={:.3e} filled_lake_steps={}",
         t.steps,
         land / n,
         peak,
@@ -561,6 +561,7 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
         t.closed_lakes,
         t.partial_lakes,
         t.closed_km2_myr,
+        t.filled_lakes,
     );
     Some(line + &runoff_weight_words(&t.runoff_weight_km2_myr))
 }

@@ -1,0 +1,334 @@
+# How small terranes dock: design
+
+Status: **built; on by default since 2026-10-31** (the coordinator's call, decisions log 2026-10-31: its pool arm correct, the guard clean)
+(2026-10-30 and 31, the docking lane, a sub-agent of the coordinator's session; "What the arm showed") on the branch `small-terrane-docking`: `tectonics.terrane_docking_cover` (`shortening::advance`
+classes the front, `belts::stack` strips it); ledger PLT-770, PLT-771; plates.md "How small terranes
+dock". Its 8-run pool arm runs on the collision orogen's physics (origin/collision-orogen merged in,
+PLT-730, PLT-731 and PLT-740 set on) against the cached arm orog-cum ("Measuring it"). For the
+coast-with-high-ground lane (Ben, 2026-10-30: "Freeboard, then orogen
+(Recommended)", the advisor's third item; docs/research/notes/coast-high-ground-audit-2026-10-30.md).
+
+## Why
+
+The audit found the model's small terranes turned into collision belts: terranes under 50 samples are
+0.54 of the collision states, they dock in a median 0 to 2 Myr, and about 0.95 of the crust that
+crosses the front stays as thickness on the overriding plate (PLT-242's share, read for large
+sutures). Its expectation: "on Earth such fragments accrete as area or subduct", about +0.01 of the
+coast with high ground's +0.049 excess.
+
+## What the cached runs say (base33, measurement only)
+
+base33: master 2abbc567, pool key 31c7c70bd7c7, `earthlike_quick_16k-1000/cd665cef`, 24 runs, the
+crust-budget maps on. Tools on this branch: `tools/review/terranes/dock_records.py` (the dynamics
+record and the crust budget), `tools/review/terranes/dock_maps.py` (the crust-budget maps); outputs
+`/data/ban/deeptime-runs/terranes/` on the VM. A sample is about 5,100 km² (Earth-normalized), 71 km
+across.
+
+**The collision states by terrane size** (after each run's first 100 Myr; counts are medians over the
+runs, the rest pooled quartiles p25 / p50 / p75; the terrane's samples at the hand-off):
+
+| | under 50 | 50 to 200 | 200 to 1,000 | 1,000 or more |
+|---|---|---|---|---|
+| hand-offs per 100 Myr | 29.2 | 13.3 | 8.6 | 3.9 |
+| share of the crust crossing collision fronts (by area) | 0.086 | 0.071 | 0.147 | 0.314 |
+| duration, Myr | 0 / 0 / 4 | 0 / 2 / 4 | 0 / 2 / 10 | 24 / 42 / 60 |
+| shortening, km | 123 / 151 / 200 | 122 / 154 / 204 | 126 / 171 / 322 | 485 / 1,030 / 1,650 |
+| front, km | 217 / 291 / 433 | 294 / 453 / 745 | 373 / 678 / 1,600 | 2,290 / 3,430 / 5,060 |
+| crust crossed, km² | 30,200 / 42,500 / 62,400 | 39,900 / 61,900 / 106,000 | 49,100 / 91,300 / 325,000 | 649,000 / 1.89 M / 4.28 M |
+| crust kept, km³ (crossed × the run's mean crossing thickness, 32.8 km, × its kept share, 0.946) | 0.94 / 1.31 / 1.93 M | 1.24 / 1.92 / 3.28 M | 1.52 / 2.82 / 9.98 M | 20 / 58 / 132 M |
+| terrane at the hand-off, km² | 51,000 / 87,000 / 148,000 | 337,000 / 444,000 / 638,000 | 1.42 / 2.08 / 2.95 M | 11 / 22 / 41 M |
+| share of what reached the front that crossed it (pooled) | 0.349 median (0.521) | 0.123 (0.301) | 0.047 (0.224) | 0.072 (0.091) |
+| the front's uplift, summed over the steps, km | 3.5 / 5.1 / 7.6 | 4.5 / 6.7 / 9.8 | 6.0 / 9.2 / 26 | 41 / 79 / 108 |
+| convergence at the end, mm/yr | 36.5 / 60.1 / 82.7 | 32.4 / 55.1 / 78.3 | 22.9 / 46.0 / 70.9 | 0.8 / 7.9 / 19.6 |
+| how it ended | all on shortening (PLT-068) | all on shortening | 0.007 stalled, 0.035 transference | 0.24 welded, 0.76 transference |
+| extent across the front, km (the shortening plus the rest's area over the front) | 333 / 455 / 642 (p10 254, p90 887) | 831 / 1,236 / 1,874 | 2,137 / 3,200 / 5,215 | 4,787 / 7,800 / 13,667 |
+| share with that extent at most 220 / 270 km | 0.054 / 0.127 | 0.0007 / 0.0024 | 0 / 0 | 0 / 0 |
+
+Partings (states with no hand-off): parted 15.0, reversed 4.3, closed 4.9 and open at the end 1.2 per
+100 Myr. Under 50 samples the convergence does not slow (54.8 mm/yr at the onset, 60.1 at the end):
+the terrane does not stop its plate; half dock in the step they begin, one step's convergence
+(about 120 to 150 km) crossing the front.
+
+**What the small bodies are** (at every map from -900 to -50 Myr: the bodies of one plate's continental
+crust under 50 samples that are not their plate's largest; 127 a snapshot): own crust (the thickness
+less a converted arc's ocean basement, PLT-331) p10 / p25 / p50 / p75 / p90 8.9 / 11.4 / 19.0 / 28.3 /
+34.2 km; 0.40 of the samples under 15 km, 0.25 at 15 to 25, 0.26 at 25 to 35, 0.09 at 35 or more;
+0.73 of them island arcs by their magma (own crust 10.1 / 14.4 / 23.4 km), the rest 24.1 / 28.6 /
+32.8 km; their surface a median 2.2 km under the sea, 0.18 of them dry.
+
+**Which collisions make the coast with high ground** (the final map, t0000: the plate model's ground
+less the last step's sea on 100,000 Fibonacci points, M5 0.142 against the census grid's 0.1325; every
+land point with a collision stamp matched to the collision state that stamped it by plate and time,
+0.66 of them with more than one candidate, the one ending nearest the stamp taken; medians of 24):
+
+| the nearest qualifying high ground | share of the coast |
+|---|---|
+| hand-offs under 50 / 50 to 200 / 200 to 1,000 / 1,000 or more samples | 0.0099 / 0.0037 / 0.0057 / 0.0004 |
+| partings / collisions open at the end | 0.0035 / 0.0547 |
+| Andean / other | 0.0284 / 0.0102 |
+
+Without the high ground of the hand-offs under 200 samples M5 is 0.1288 (0.0055 lower, the mean over
+runs 0.0082); without the open collisions' 0.095. The land the small hand-offs stamped stands low:
+under 50 samples 0.046 of the land, p25 / p50 / p75 / p90 219 / 498 / 702 / 1,244 m over the sea, 0.056 of
+it above 2 km; the open collisions' 0.050 of the land at 945 / 1,755 / 2,991 / 3,639 m, 0.46 above 2 km,
+a median 215 km from the sea.
+
+So the small terranes hold a small part of the excess, about 0.006 to 0.008 of M5 at most (the
+advisor's +0.01, about), and the belts they leave stand at Earth's examples' heights (below). The
+bulk is the open, large collisions near the sea: the orogen lane's.
+
+### On base34 (the freeboard merge)
+
+base34: master f80d75a8 (PR #49, PLT-660 and PLT-661 on), pool key 122e4803cded, `cd665cef`, 24 runs;
+the arm's base, `base34-s4`, is its seeds 1 to 4. The same tools (`records-base34.json`,
+`maps-base34.jsonl`; `dock_maps.py --summary` prints both bases side by side). base33's in brackets.
+
+- **Records.** Hand-offs per 100 Myr: under 50 samples 20.4 (29.2), 50 to 200 11.8 (13.3), 200 to
+  1,000 8.1 (8.6), 1,000 or more 5.3 (3.9). Under 50: duration 0 / 2 / 4 Myr, shortening 122 / 152 /
+  202 km, front 229 / 311 / 479 km, crust crossed 31,400 / 44,600 / 69,000 km², kept 0.72 / 1.03 / 1.59 M
+  km³ (the mean crossing thickness 24.4 km (32.8), kept share 0.949), the front's uplift 2.8 / 4.4 /
+  6.9 km, the terrane at the hand-off 51,000 / 97,000 / 158,000 km², 0.35 of what reached the front
+  crossing it (pooled 0.59). Extent across the front 336 / 462 / 660 km (p10 256, p90 915); the share
+  within 220 / 270 / 300 / 350 / 400 km 0.052 / 0.128 / 0.179 / 0.277 / 0.377 (base33 0.054 / 0.127 /
+  0.180 / 0.289 / 0.392); 50 to 200 samples 0.002 / 0.006 / 0.012 / 0.021 / 0.030.
+- **Makeup.** 60 small bodies a snapshot (127), and thinner: own crust p10 / p25 / p50 / p75 / p90
+  2.4 / 6.4 / 10.2 / 15.0 / 23.6 km, 0.75 of the samples under 15 km (0.40); island arcs 0.68 of them
+  (own crust 7.1 / 10.0 / 13.7 km), the rest 4.0 / 10.5 / 21.4 km; their surface a median 3.3 km under
+  the sea, 0.057 dry (0.18).
+- **The coast with high ground** (the map's M5 0.089 median, 0.098 mean (0.142)). The nearest
+  qualifying high ground: hand-offs under 50 / 50 to 200 / 200 to 1,000 / 1,000 or more samples
+  0.0029 / 0.0041 / 0.0011 / 0.0017; partings 0.0017; open 0.0443; Andean 0.0114; other 0.0035. Without
+  the high ground of the hand-offs under 200 samples M5 is 0.0870 (0.0021 lower, the mean 0.0044);
+  without the open collisions' 0.056. The land the hand-offs under 50 samples stamped: 0.026 of the
+  land, 117 / 331 / 635 / 838 m over the sea, 0.014 of it above 2 km; the open collisions' 0.044 of the
+  land at 551 / 1,056 / 2,046 / 3,118 m, 0.26 above 2 km.
+
+The freeboard merge left fewer, thinner small bodies, most of them under Cloos's 15 km, and their
+share of the coast with high ground fell to about 0.002 to 0.004. The thinner crust lengthens the reach
+(S* = 308 km under 17 km of crust, an arc of 10 km on its 7 km basement; 391 km under 10.5 km; on a
+full slab), so more of them are within it than on base33, and they matter less to M5.
+
+## What Earth does (a Sonnet research sub-agent, 2026-10-30; its prints, copied)
+
+Read in full or by pages as marked; the agent could not open the full texts of Cloos 1993, Tetreault
+& Buiter 2012, Vogt & Gerya 2014 and others (publishers' blocks), and used no shadow library.
+
+- **Cloos 1993** (GSA Bulletin 105:715-737; the abstract only): "Buoyancy analysis indicates that
+  only bodies of continental and oceanic island are crust that are > ∼15 km thick make the
+  lithosphere buoyant enough to jam a subduction zone" (the copy's typo); "Basaltic plateaus must
+  have crustal thicknesses >∼30 km to typically cause collisional orogenesis during subduction";
+  "Short subducting seamounts (<1-2 km tall) typically cause only temporary dents ... The direct
+  tectonic effect resulting from the subduction of most bathymetric highs is only a temporary
+  isostatic uplift of the fore-arc region of as much as several kilometers, followed by subsidence
+  to original elevations."
+- **Tetreault & Buiter 2014** (Solid Earth 5:1243-1275; pp. 1243-1257, 1259, 1262-1265 read): "most
+  accreted terranes are thin crustal units sheared off of FATs and added onto the accretionary prism,
+  with thicknesses on the order of hundreds of meters to a few kilometers. However, many island arcs,
+  oceanic plateaus, and submarine ridges were sheared off in the subduction interface and underplated
+  onto the overlying continent. Other times we find evidence of terrane–continent collision leaving
+  behind accreted terranes 25–40 km thick." (p. 1243); "The tectonic addition of crustal material to
+  continents at accretionary zones usually occurs by adding slivers of thrusted crustal units to the
+  accretionary prism region (Coney et al., 1980; Snyder, 2002; Cawood et al., 2009), rather than
+  collision and addition of the entire crustal thickness to the continent." (p. 1244); "Underplating
+  of FAT crustal material onto the overriding plate during or after subduction, also called
+  subcretion, is perhaps the most common type of terrane accretion." (p. 1245); "Intact accretion of
+  FAT crusts by “docking” is often a collisional process (when subduction ceases) rather than an
+  accretionary process (subduction continues after accretion) ... Many of the larger FATs such as
+  oceanic plateaus and continental fragments are accreted by collision." (p. 1246); "in most cases
+  only the upper 2–5 km of arc crust are accreted onto continents through thin-skinned thrusting and
+  preserved. This most likely occurs when island arcs are on the subducting plate and arc material is
+  underplated and accreted onto the overriding plate." (p. 1251); "Finally, the force of the
+  subducting slab drives subduction and can most likely overcome the buoyancy of small crustal units
+  (Molnar and Gray, 1979; Cloos, 1993)." and "Seamounts and submarine volcanics subduct easily if they
+  are not incorporated into the accretionary prism." (p. 1265). Island arcs average "26 ± 6 km"
+  (p. 1247), plateaus and ridges "21 ± 4 km" (p. 1253), continental fragments "∼ 24.8 ± 5.7 km"
+  (p. 1259); arcs about "100 km in width" (p. 1246).
+- **Tetreault & Buiter 2012** (JGR Solid Earth 117, B8; the abstract only): "(1) accretion of crustal
+  units occurs when there is a weak detachment layer within the FAT, (2) the depth of detachment
+  controls the amount of crust accreted onto the overriding plate, and (3) lithospheric buoyancy does
+  not prevent FAT subduction during constant convergence."
+- **Yan et al. 2021** (JGR Solid Earth 126(7), e2021JB021855; the abstract only): "steep subduction
+  without subduction zone reorganization, favored by a small‐sized (≤150 km) or lowly depleted oceanic
+  plateau"; "breakoff of subducting slab followed by flat‐slab subduction, which is conditional on a
+  moderate‐sized (≥300 km) oceanic plateau"; "initiation of a new subduction zone behind the plateau
+  (subduction zone jump)". **Yan et al. 2022** (GJI 231(2):1349-1362; the abstract only): "a
+  relatively thin oceanic plateau (≤20 km thick) undergoes steep subduction, a moderate-scale plateau
+  (25–30 km thick) favours flat-slab subduction and large-scale plateaus (≥35 km thick) are more
+  susceptible to collide and accrete to the overriding upper plate."
+- **Clift, Vannucchi & Phipps Morgan 2009** (Earth-Science Reviews 97:80-104; the library's copy,
+  pp. 84-88, 95, 98-99): "ca. 90% of the mass of the Luzon Arc is transferred to the edge of
+  continental Asia" (p. 85; the arc there is on the overriding plate); in arc–arc collision "the
+  oceanic arc is plastered to the edge of the continental mass, effectively as a coherent block with
+  no opportunity for major crustal loss by subduction" (p. 86); "Even in accretionary plate margins
+  volcanic seamounts are generally subducted, with only thin slices of basalts (<1 km thick) being
+  offscraped into the wedge of trench sediment" (p. 95).
+- **Stern & Scholl 2010** (International Geology Review 52:1-31; the library's copy, p. 22): "Accretion
+  accompanies collision, when a subduction zone is choked with buoyant crust and lithosphere (Cloos
+  1993), destroying the original subduction zone and perhaps forcing a new one to form elsewhere
+  (Stern 2004)"; terrane accretion episodes "typically last 8–10 million years (Clift et al. 2009)".
+- **The upper plate over a docking body.** Cocos Ridge (Morell et al. 2012, JGR 117 B04409, pp. 1-4,
+  6, 14, 16, 18): "rock uplift during the growth of the Cordillera de Talamanca is no greater than ∼2
+  km" (abstract), "the greatest shortening (40 km since the Pliocene) ... directly inboard of the Cocos
+  Ridge axis" (p. 6), the range "reaching elevations of 3800 m" (p. 4), the ridge subducting at
+  85 mm/yr (p. 3). Yakutat (Enkelmann et al. 2008, Geology 36:915-918, pp. 915, 916, 918): "Ongoing
+  oblique collision and flat-slab subduction of the Yakutat terrane has produced Earth’s highest
+  coastal mountain range"; "Most of the Tertiary sedimentary cover to the Yakutat terrane has been
+  scraped off basement rocks and accreted to the growing foldand-thrust belt" (p. 916). Taiwan's
+  Coastal Range, the accreting Luzon arc itself, 0 to 1.68 km (Lai et al. 2022, PLT-241's note).
+
+The sources disagree on arcs: Tetreault & Buiter find most arc crust lost (preserved, the agent's
+ratios of their p. 1248 numbers: Talkeetna 0.51 to 0.60, Bonanza 0.63, Canyon Mountain 0.28; "in most
+cases only the upper 2–5 km"), Clift et al. find the Luzon arc (on the overriding side) 88 to 90 %
+transferred and arc–arc collision plastering arcs on whole (Talkeetna and Kohistan with "the full
+crustal section").
+
+## Reading the model against them
+
+- **The model's small terranes are not small in the sources' sense.** At the quick planet's 71-km
+  lattice, the hand-offs under 50 samples reach 333 / 455 / 642 km across the front (p25 / p50 / p75):
+  the size Yan et al. 2021 find can reorganize the subduction zone ("moderate‐sized (≥300 km)", with a
+  depleted root: breakoff and a flat slab, or a jump), not the "small‐sized (≤150 km)" one that
+  subducts steeply. Only the p10 (254 km) lies between the two. They are island arcs a median 14.4 km thick on 7 km of ocean crust, about
+  Cloos's 15 km (arcs turn continental at that, PLT-047), and continental fragments of 28.6 km
+  (Tetreault & Buiter's mean 24.8).
+- **What happens to them is mostly Earth's in kind.** A body of that size docks: the model hands the
+  rest of the terrane to the overriding plate as area (0.65 of what reached the front at the median)
+  after one step's crossing, and the crossing crust thickens the overriding plate's edge (Tetreault &
+  Buiter's underplating, "perhaps the most common type"): the front's largest uplift is about 5 km
+  (summed over the steps, mostly one), and at the run's end the land those hand-offs stamped stands a
+  median 0.5 km over the sea (p90 1.2 km); Talamanca's uplift is at most 2 km over a subducting ridge,
+  Taiwan's accreting arc 0 to 1.68 km, St Elias Earth's highest coast.
+- **What is missing is the small branch.** A body its slab can pull down goes down with it,
+  scraped of its cover ("the force of the subducting slab ... can most likely overcome the buoyancy of
+  small crustal units"; seamounts with "only thin slices of basalts (<1 km thick) being offscraped";
+  "only the upper 2–5 km of arc crust"). The model docks every continental body, however small, as a
+  collision: stacked at 0.95 and transferred at 100 km of shortening (PLT-068, a calibrated value).
+
+## The rule (PLT-770, PLT-771)
+
+1. **Which bodies go down.** Each step, at each collision front whose contact still has a slab (the
+   pair's slab track, as the jam reads it, PLT-516): the slab's reach against the terrane's buoyancy,
+   S* = L / (1 + R T / T_c) (`shortening::dragged_length_km`), with L the slab's length up to
+   `slab_depth_km` (PLT-184), T the incoming crust's mean thickness at the front (as FRC-030 reads
+   it), R = 2.25 and T_c = 30 km (Cloos 1993's densities, FRC-028 and FRC-029). The terrane's extent
+   across the front is the collision's shortening so far plus the visible area of the incoming plate's
+   continental crust connected to the front's crust over the front's length. Within S*, the front
+   subducts the terrane (`Collision::subducting`).
+2. **What stays of them.** At a subducting front only the crossing crust's cover stays (PLT-771,
+   `pools::COVER`: its own sediment, sedimentary rock and volcanic rock; the basement already goes,
+   PLT-331), by PLT-242's share, as the cover's rock (its sediments metamorphosed, PLT-248), with the
+   crust this collision stacked on it (PLT-400). The plutonic and metamorphic crust under it goes down
+   with the slab (`Stacked::stripped_km2_m`, the global `plates/collision_stripped_km3`, the records'
+   `stripped_km2_m`).
+3. **No transfer.** A subducting terrane does not transfer at PLT-068's threshold: it goes down
+   whole, and its collision state ends when no continental crust stands at the front (a parting). A
+   stalled one still welds or transfers (PLT-246).
+4. **The rest as before.** A terrane beyond S* jams its slab and collides: stacked at PLT-242's share,
+   transferred at the threshold, or by transference or the reversal once its slab has gone.
+
+No new constant: R and T_c are FRC-028 and FRC-029, L PLT-184's, the share PLT-242's, the cover the
+model's own pools.
+
+## What is the project's reading
+
+- The balance in one dimension along the slab: the dense slab's pull over the length left,
+  F_sp (L − S)/D, against FRC-030's buoyancy of the dragged length, R F_sp (T / T_c) S / D. Cloos's
+  own analysis is of lithosphere columns by local isostasy, his result a thickness (about 15 km); the
+  extent condition is the model's reading for a body of finite size along the slab, which the 2-D
+  models of Yan et al. 2021 bracket (150 km subducting, 300 km reorganizing; S* is 215 to 330 km for
+  30 to 15 km of crust on a full slab). In three dimensions the slab beside a body short along the
+  trench helps pull it down (Tetreault & Buiter's "small crustal units"), which this reading leaves
+  out: it is the conservative one.
+- The cover's base as the detachment (Tetreault & Buiter 2014: "rheologically weak crustal layers or
+  shear zones that were formed when the FATs were produced can be activated as detachments", p. 1243;
+  Tetreault & Buiter 2012: "the depth of detachment controls the amount of crust accreted"). For the
+  model's arcs it keeps a sixth of the arc's crust (its lavas, PLT-046) and its sediment: 2.5 km of a
+  15-km arc on its basement, inside "the upper 2–5 km of arc crust" (a check, not a calibration).
+- "Subduction continues" read as a live slab of the pair, the reading transference's jam uses.
+
+## Considered and not taken
+
+- **Every terrane under `collision_suture_frac` stripped** (the first build of this lane, replaced
+  before any arm): it would strip the crossing of terranes up to 4.2 million km² (833 samples), which
+  the sources dock by collision ("Continental fragments and composite terranes typically lead to
+  collision", Tetreault & Buiter 2014, p. 1246); the size split there is a game-choice (PLT-078), not
+  physics. By the crossed shares above it would have sent about 2 km³ a year more down (the project's
+  estimate on supercontinent-1's crust budget: 0.30 of the 3.5 × 10⁸ km² crossing collision fronts in
+  1,000 Myr, taken at 25 km of crust less 3 km of cover, at the share), against Stern & Scholl's
+  3.2 km³ a year of all continental additions.
+- **Moving the transfer to the jam's first step**: half the small hand-offs already end in the step
+  they begin; the step's crossing (one step's convergence) would not change.
+- **A kept share by rock density** (the mafic crust as eclogite going down): the model's arc crust is
+  felsic plutonic under its lavas, the basement apart, so it would strip nothing new from arcs, and
+  for continents it would contradict PLT-242's verified share.
+
+## What the arm should show (the project's estimate before it runs)
+
+Small: about 0.05 to 0.13 of the hand-offs under 50 samples and almost none above are within S* on
+base33, so the coast with high ground should move by less than its small terranes' 0.006 to 0.008, and
+the continental crust should lose a few hundredths of a km³ a year (the project's estimate: 1.6 to 3.7
+bodies per 100 Myr, each taken at about 60,000 km² and 20 km of crust, less their cover). On base34,
+the arm's base, about 0.18 to 0.38 of the hand-offs under 50 samples are within S* (300 to 400 km at
+the crust's thinner thickness, on a full slab; a shorter slab reaches less), 3.7 to 7.7 bodies per 100
+Myr: the coast with high ground should move by less than their 0.002 to 0.004, and the crust should
+lose about 0.02 to 0.07 km³ a year (the project's estimate: each body at most its extent times its
+front, 60,000 to 90,000 km², at 8 to 10 km of own crust less its cover, at the share). The arm is for the law's
+correctness on the planet (the guard, no divergence) and its count (`collision_stripped_km3`, the
+records' `stripped_km2_m`, partings by reason); Ben's rule puts physics on once it is built and
+correct, whatever V1 does. On a finer lattice (32k presets) the smaller bodies are resolved and the law
+reaches more of them.
+
+## What the arm showed (2026-10-31)
+
+Arm small-terrane (key dcf0d7480ef3, argkey 35ce6e09, 8 runs, seeds 1 to 4 of both starts; this branch
+with origin/collision-orogen merged in, the docking law and both orogen laws set on) against orog-cum
+(key f2d6412d801f, argkey d3261b0a, the same physics without the docking law). Medians, two-sided
+Mann-Whitney p in brackets (`pool.sh table`; collcoast's p from its `--json` values).
+
+- **Correct on the planet.** The guard clean: the worst 10,154 m from the sea against 9,945 (p 0.51), no
+  step beyond 2 Earth reliefs, no plate cells 5 km over Airy, the highest plate elevation 4,700 m
+  against 4,162 (p 0.13). All 8 runs ran.
+- **What it did.** Hand-offs under 50 samples 12.3 per 100 Myr against 17.6 (p 0.014); 50 to 200 9.9
+  against 9.8, 200 to 1,000 7.1 against 7.8 (p 0.50), 1,000 or more 4.6 and 4.6. Partings 29.2 against
+  23.3 (p 0.23): of the parted (14.1 against 10.9), 5.8 per 100 Myr stripped crust, the terranes that
+  went down whole. Crust stripped a median 35 million km³ a run (p25 28.5, p75 42.9 million), 0.035 km³
+  a year (0.029 to 0.043), inside the estimate's 0.02 to 0.07: about 1 % of Stern & Scholl's 3.2 km³ a
+  year of continental additions. Hand-offs that stripped at some step: 2.5 per 100 Myr under 50 samples,
+  1.2 at 50 to 200, 0.56 at 200 to 1,000, 0.11 at 1,000 or more (the project's reading, not traced:
+  a small body at the front went down first and the larger crust behind it on the same plate then
+  jammed the slab). The hand-offs left under 50 samples are the larger ones: 424 / 568 / 749 km across
+  the front against 362 / 492 / 674, 0.079 within 300 km against 0.127. The crust crossing a front is
+  as thick as before (30.4 against 30.3 km), the kept share 0.950 against 0.954.
+- **V1 and the coast** (none beyond the seeds' spread). Land 0.222 against 0.205 (p 0.19), largest
+  landmass 0.083 against 0.074 (p 0.33), continental crust under the sea 0.567 against 0.605 (p 0.16),
+  land above 2 km 0.018 against 0.013 (p 0.96), the coast with high ground 0.091 against 0.067
+  (p 0.38), collisions per 100 Myr 4.45 against 4.60 (p 0.92), the continental crust's net change
+  +0.083 against +0.094 (p 0.44), criteria met 6 and 6. collcoast: collision high coasts on landmasses
+  under 0.02 of the land 0.359 against 0.668 (p 0.44), the collision regime 0.031 of the land against
+  0.013 (p 0.105), collision high coasts whose belt is not elongated 0.170 against 0.075 (p 0.038, one
+  column of twelve). coastset's coast with high ground 0.096 against 0.092 (p 0.72). On the maps
+  (`dock_maps.py`): the coast whose nearest high ground the hand-offs under 50 samples stamped 0.0005
+  against 0.0018, their land 0.012 of the land against 0.018; the map's M5 0.102 against 0.079, the rise
+  in the open collisions' share (0.063 against 0.033), not the small terranes'.
+
+So the law does what the sources say on the planet (small bodies go down with their slab, leaving their
+cover; the larger ones collide as before), costs about 1 % of the crust's additions, and moves no V1
+number beyond the seeds' spread. By Ben's rule (physics on once it is built and correct) it goes on
+by default; the coordinator's call, with the orogen's flip.
+
+## Measuring it
+
+On the collision orogen's physics (the coordinator, 2026-10-31: docking interacts with where the
+collision crust goes, and the two wedges and the retro plateau go on by default next): this branch
+with origin/collision-orogen merged in, `pool.sh run small-terrane --seeds 1,2,3,4 --set
+tectonics.terrane_docking_cover=true --set tectonics.collision_two_wedges=true --set
+tectonics.collision_retro_plateau=true +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`
+against the cached arm orog-cum (key f2d6412d801f, argkey d3261b0a, 8 runs, the same physics without
+the docking law; or `base35-s4` once base35 exists), with the default, `guard`, `collcoast` and
+`coastset` measures, and the two tools above over both arms.
+
+Unit tests: `a_slab_drags_down_buoyant_crust_as_far_as_its_pull_outweighs_it` (shortening.rs: S*'s
+values and the balance at it), `a_terrane_its_slab_drags_down_subducts_stripped_of_its_cover` (belts.rs:
+an arc one row wide subducts stripped and does not transfer; five rows wide, the switch off or no slab,
+a collision as before; five rows with the first already hidden under the overriding plate still jam
+the slab), `the_cover_is_the_layered_rock_on_the_basement` (pools.rs).
