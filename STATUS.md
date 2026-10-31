@@ -152,6 +152,55 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 
 ## Build log
 
+### 2026-10-31: The surface's runoff from the bake's water budget, built and off (`surface.runoff_budget`, ERO-221, ERO-222) (the runoff lane, worktree agent-a4e92fd13092b08b0, branch `surface-runoff-budget` on origin/plateau-drainage 7df49df8; not merged)
+
+- **Why.** The plateau lane's arm found where the flat high ground wears: 0.67 of it, over the run, is below 0 °C on the
+  year, and it wears at 141 m/Myr. There the stream power's runoff is all of P: the snapshot's PET is 60 mm/°C x the
+  mean temperature, 0 below 0 °C (MOI-067). The bake's budget dropped that rule on 2026-10-01 (P1-22b follow-up), and
+  the lakes' balance already uses the budget. Design: docs/design/surface-runoff-budget.md; science page:
+  erosion-and-sediment.md "Cold lands' runoff".
+- **Built** (behind `surface.runoff_budget`, off):
+  - `surface/climate.rs`: `cell_water` and `water_budget`, the bake's budget per cell, now shared by the lakes and the
+    weight; `mean_t_runoff_m_yr`, the snapshot's own runoff, factored out unchanged.
+  - The setup computes the budget once when the lakes or the runoff need it. With the switch on, the weight takes its
+    runoff.
+  - The summary's surface line gains `runoff_weight_land_used/own` and `runoff_weight_high_used/own` (measurement
+    only).
+  - With the switch off, nothing changes. The budget's arithmetic only moved; the alias check below confirms it.
+- **Sources** (one Sonnet research sub-agent; what each read is in bibliography.md, "Cold lands' runoff"):
+  - full texts: MAGS Water and Energy Budget Synthesis, Woo & Thorne 2003, Yang et al. 2002, Fountain et al. (Dry
+    Valleys), Myers et al. 2020, Biskop et al. 2016, Strasser et al. 2008, MacDonald et al. 2010, Killingtveit et al.
+    2003, Hock 2003, Holdridge's Life Zone Ecology (scan);
+  - Rawlins et al. 2010 without its table;
+  - Zhang et al. 2004's abstract only, with Fu's ω of 2.6 read at second hand (Greve et al. 2015's response; Zhang,
+    Hickel & Shao, MODSIM 2005);
+  - not fetched: Serreze et al. 2002 and 2006, Woo's Resolute papers, Yang Kun et al. 2014.
+- **Tests first** (`surface::climate`, `plateau_check`; ERO-222):
+  - without frost the budget is the old runoff to 1e-12;
+  - never-thawing ground runs off nothing;
+  - the Mackenzie (P 410): budget runoff 204 and ET 206 mm, against 169 and 237 measured, within Fu's 54 mm (Zhang et
+    al. 2004);
+  - the Dry Valleys: no runoff with the warmest month below 0 °C. The gap is printed: at 0.5 to 1.5 °C, 0.29 to 0.87 of
+    P runs off, since the budget has no sublimation;
+  - the Tibetan lakes (Biskop 2016, modelled): budget ET 69 to 141 against 170 to 290 mm;
+  - Verkhoyansk's biotemperature: 2.65 against Holdridge's rough 3.05 °C;
+  - the cold controlled plateau: interior 118.0 against 88.0 m/Myr, and 3.8 never thawing.
+
+  Gate (VM, `tools/review/plateau/gate.sh full` on da27fa0d): fmt and clippy (workspace, all targets) clean,
+  deeptime-core 1,158 passed and 12 ignored, its integration tests passed.
+- **Ledger.**
+  - New: ERO-221 `cited-unverified` (the law: ω's primary unread), ERO-222 `verified` (the checks).
+  - Upgraded: HYD-029 `verified` (Holdridge's 58.93 read), HYD-037 `verified` (Hock 2003, Table 1).
+  - HYD-030 gains the read: Holdridge also cuts at 30 °C, the code does not.
+  - claims.md recounted (ERO 200, HYD 138; all 2,996).
+  - Bibliography: a new section of 13 entries; Holdridge1967 and Zhang2004 updated.
+- **Next.** The coordinator queues the arm. With both switches off the build should be orog-cum's physics:
+  `tools/review/pool/pool.sh alias HEAD f2d6412d801f --check-seed 1`. Then `pool.sh run plat-rb0 --seeds 1,2,3,4 --set
+  tectonics.collision_two_wedges=true --set tectonics.collision_retro_plateau=true --set surface.closed_basins=true
+  --set surface.runoff_budget=true +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`, and `pool.sh
+  table --base orog-cum --arm plat-cb0 --arm plat-rb0`. Then `tools/review/plateau/wear.sh`, `recal.sh` and
+  `closedshare.py` over plat-rb0, plat-cb0 and orog-cum.
+
 ### 2026-10-31: What wears the plateaus, measured on cached runs; lakes that pass on what their water balance leaves, built and off (`surface.closed_basins`, ERO-217 to ERO-220) (the plateau lane, worktree agent-a4e92fd13092b08b0, branch `plateau-drainage` on origin/collision-orogen 0e8a5ac9; not merged)
 
 - **Why.** The orogen lane's O4 (docs/design/collision-orogen.md): Tibet-class high ground forms and is gone 100 Myr

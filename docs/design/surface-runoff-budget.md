@@ -116,6 +116,9 @@ Yumco's interior climate (P 300, MAAT -1.5 °C) and spills in every case. Its in
 snapshot's rule and 0.396 under the budget, and its interior net lowering 118.0 and 88.0 m/Myr. An interior that never
 thaws wears 3.8 m/Myr.
 
+Gate (VM, `tools/review/plateau/gate.sh full` on da27fa0d): fmt and clippy (workspace, all targets) clean, deeptime-core
+1,158 passed and 12 ignored, its integration tests passed.
+
 Reading: the budget gets a measured permafrost basin right within the curve's own error, and closes off ground that
 never thaws, where the old rule erred most. It still runs off too much where the plateau's sun and wind evaporate more
 than Holdridge's biotemperature allows, and where cold-season snow sublimates.
