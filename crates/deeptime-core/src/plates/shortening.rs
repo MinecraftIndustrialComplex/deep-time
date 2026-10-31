@@ -680,12 +680,15 @@ pub fn dragged_length_km(slab_km: f64, thickness_m: f64) -> f64 {
     slab_km.max(0.0) / (1.0 + r)
 }
 
-/// Whether the slab of a contact, `slab_km` long, drags the terrane at its front `f` down whole
-/// (ledger PLT-770): the terrane's extent across the front, the collision's `shortening_km` so
-/// far plus the visible area of the incoming plate's continental crust connected to the front's
-/// crust (through its crust already under the overriding plate too) over the front's length, is
-/// within [`dragged_length_km`] of the slab (up to `slab_depth_km`, PLT-184) for the front crust's
-/// mean thickness. The fill stops once the area would carry the extent past the reach.
+/// Whether the slab of a contact, `slab_km` long, drags the terranes at its front `f` down whole
+/// (ledger PLT-770). Each body at the front (the incoming plate's continental crust connected to
+/// some of the front's crust, through its crust already under the overriding plate too) is judged
+/// on its own: its extent across the front, the collision's `shortening_km` so far plus its visible
+/// area over its share of the front's length (the front's length times its share of the front's
+/// crust samples), must be within [`dragged_length_km`] of the slab (up to `slab_depth_km`,
+/// PLT-184) for its own front crust's mean thickness. The front goes down only when every body at
+/// it does: a body that jams the slab holds the whole front (the stripping and the transfer are
+/// the front's). Each body's fill stops once its area would carry it past its reach.
 pub fn drags_whole(
     state: &PlateState,
     geo: &Geo,
@@ -696,45 +699,52 @@ pub fn drags_whole(
     slab_km: f64,
 ) -> bool {
     let length_km = f.length_km();
-    if f.crust.is_empty() || length_km <= 0.0 {
-        return false;
-    }
-    let t_m = f
-        .crust
-        .iter()
-        .map(|&j| f64::from(state.samples[j as usize].thickness_m))
-        .sum::<f64>()
-        / f.crust.len() as f64;
-    let reach_km = dragged_length_km(slab_km.min(env.k.slab_depth_km), t_m); // ledger: PLT-184
-    let room_km = reach_km - shortening_km;
-    if room_km <= 0.0 {
-        return false;
-    }
-    // The most visible samples the rest of the terrane may hold. The fill is `collide`'s (the
-    // plate's continental samples, hidden or not, along lattice edges): the front's crust may be
-    // the crust already under the overriding plate, which joins the rest; only the visible part,
-    // the rest, counts.
-    let most = room_km * length_km / env.norm.sample_area_km2();
     let ours = |i: usize| state.plate_of(i) == under && state.samples[i].kind == CONTINENTAL;
-    let mut seen = std::collections::BTreeSet::new();
-    let mut stack: Vec<u32> = Vec::new();
-    for &s in &f.crust {
-        if ours(s as usize) && seen.insert(s) {
-            stack.push(s);
-        }
+    let seeds: Vec<u32> = f.crust.iter().copied().filter(|&s| ours(s as usize)).collect();
+    if seeds.is_empty() || length_km <= 0.0 {
+        return false;
     }
-    let mut rest = 0_usize;
-    while let Some(v) = stack.pop() {
-        if !state.samples[v as usize].is_hidden() {
-            rest += 1;
-            if rest as f64 > most {
-                return false;
+    let slab_km = slab_km.min(env.k.slab_depth_km); // ledger: PLT-184
+    let area = env.norm.sample_area_km2();
+    let crust: std::collections::BTreeSet<u32> = seeds.iter().copied().collect();
+    let most_any = (dragged_length_km(slab_km, 0.0) - shortening_km) * length_km / area;
+    // The samples reached so far, by any body's fill (the fill is `collide`'s: the plate's
+    // continental samples, hidden or not, along lattice edges; only the visible ones count as
+    // the rest of a body, the hidden ones are already under the overriding plate).
+    let mut seen: std::collections::BTreeSet<u32> = std::collections::BTreeSet::new();
+    for &seed in &seeds {
+        if !seen.insert(seed) {
+            continue;
+        }
+        // The body's front crust (its seeds and their thickness) and its visible area, by one
+        // fill. Its own front length and thickness are known only once the fill is done, so the
+        // fill stops early only past the most any body could hold: the whole front's length at
+        // the reach of crust of no thickness.
+        let mut stack = vec![seed];
+        let (mut n_seeds, mut t_sum, mut rest) = (0_usize, 0.0_f64, 0_usize);
+        while let Some(v) = stack.pop() {
+            let s = &state.samples[v as usize];
+            if crust.contains(&v) {
+                n_seeds += 1;
+                t_sum += f64::from(s.thickness_m);
+            }
+            if !s.is_hidden() {
+                rest += 1;
+                if rest as f64 > most_any {
+                    return false;
+                }
+            }
+            for (u, _) in geo.edges(v) {
+                if ours(u as usize) && seen.insert(u) {
+                    stack.push(u);
+                }
             }
         }
-        for (u, _) in geo.edges(v) {
-            if ours(u as usize) && seen.insert(u) {
-                stack.push(u);
-            }
+        let t_m = t_sum / n_seeds.max(1) as f64;
+        let room_km = dragged_length_km(slab_km, t_m) - shortening_km;
+        let body_length_km = length_km * n_seeds as f64 / seeds.len() as f64;
+        if room_km <= 0.0 || rest as f64 > room_km * body_length_km / area {
+            return false;
         }
     }
     true
