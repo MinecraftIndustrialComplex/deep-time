@@ -976,3 +976,39 @@ fn the_runoff_budget_reaches_the_stream_power_s_weight() {
         off[3]
     );
 }
+
+// ledger: ERO-221
+/// The switch reaches the stream power through the surface's step itself (the runoff law's
+/// re-review, finding 5): one step of the coupled pipeline (the plates, the climate stage, the
+/// surface) with `surface.runoff_budget` on. The step's measurement
+/// (`Totals::runoff_weight_km2_myr`) sums over its land the weight its stream power used and the
+/// snapshot's own; the planet's frozen and frosty ground makes the used one smaller (a step that
+/// read the snapshot's runoff again, or the budget's water not at all, gives the two the same).
+#[test]
+fn one_surface_step_takes_the_budget_s_weight() {
+    let mut v: serde_json::Value =
+        serde_json::from_str(&pipeline_json(3000, 2.0, 5)).expect("the pipeline's preset");
+    v["surface"]["runoff_budget"] = serde_json::json!(true);
+    let dir = temp_dir("runoff-budget-step");
+    let s = session(&v.to_string(), &dir);
+    finish(&s);
+    let world = s.checkpoint().unwrap().world;
+    let t = world
+        .surface
+        .as_ref()
+        .expect("the surface ran")
+        .totals
+        .clone();
+    let [land, used, own, high, high_used, high_own] = t.runoff_weight_km2_myr;
+    eprintln!(
+        "one step, {} steps: land {land:.4e} km2 Myr, used weight {:.3}, own {:.3}; above 2 km {high:.4e}, {:.3} and {:.3}",
+        t.steps,
+        used / land,
+        own / land,
+        high_used / high.max(1.0e-30),
+        high_own / high.max(1.0e-30)
+    );
+    assert!(t.steps >= 1 && land > 0.0, "{t:?}");
+    assert!(used > 0.0 && used < own, "used {used}, own {own}");
+    let _ = std::fs::remove_dir_all(&dir);
+}

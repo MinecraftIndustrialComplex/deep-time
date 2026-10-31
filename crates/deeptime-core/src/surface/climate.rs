@@ -523,12 +523,19 @@ mod tests {
         // The same both sides of 0 °C with twelve lopsided months: a long mild winter whose
         // coldest month crosses freezing, and a short warm summer.
         let year = |coldest: f64| {
-            let mut m = [6.0, 3.0, coldest, 3.0, 5.0, 7.0, 9.0, 11.0, 14.0, 22.0, 14.0, 9.0];
+            let mut m = [
+                6.0, 3.0, coldest, 3.0, 5.0, 7.0, 9.0, 11.0, 14.0, 22.0, 14.0, 9.0,
+            ];
             let mean = m.iter().sum::<f64>() / 12.0;
             m.iter_mut().for_each(|x| *x -= mean);
             let cl = Climate::of_months(600.0, mean, &m);
             let (b, share) = cl.thaw();
-            (mean, b, share, cell_water_of(&hydro, &cl).runoff_m_yr * 1000.0)
+            (
+                mean,
+                b,
+                share,
+                cell_water_of(&hydro, &cl).runoff_m_yr * 1000.0,
+            )
         };
         let (_, b0, s0, q0) = year(0.0);
         for coldest in [0.01, -0.01] {
