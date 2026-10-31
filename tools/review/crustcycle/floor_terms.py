@@ -12,7 +12,8 @@ T 0000 (the end) unless --t. Samples are counted as equal areas (the lattice's).
 Per run and the arm's medians: the shares of the samples by crust (continental; oceanic of the ocean's own 7 km
 column, under 7.2 km; oceanic 7.2 to 10 km; oceanic 10 km or more), each one's mean height z (the map's, m) and the
 oceanic ones' mean age; the ocean's own column's mean height in floor-age bins and its share of the floor in each (so
-a higher floor splits into a younger floor and a floor held up at the same age); the rock in oceanic samples beyond
+a higher floor splits into a younger floor and a floor held up at the same age) and its mean height over GDH1's bare
+floor of its age (`res`, m; pools::gdh1_depth_m); the rock in oceanic samples beyond
 the ocean's 2 km of mafic volcanic rock and 5 km of mafic plutonic rock (the igneous rock the tails, the heads and the
 margins add, and arcs), as metres over the whole planet; and the hotspot-flagged share of the floor.
 """
@@ -27,6 +28,13 @@ HOTSPOT = 8
 ARC = 4
 RUNS = [f"{s}-{n}" for s in ("supercontinent", "scattered_continents") for n in (1, 2, 3, 4)]
 AGE_BINS = [(0, 10), (10, 30), (30, 60), (60, 100), (100, 200), (200, 1e9)]
+
+
+def gdh1_depth(age):
+    """GDH1's bare-floor depth, m below the datum (pools::gdh1_depth_m, PLT-352; the preset's ridge -2,600 and
+    floor -5,651 are GDH1's own, so the scale is 1)."""
+    t = np.maximum(np.nan_to_num(age, nan=0.0), 0.0)
+    return np.where(t < 20.0, 2600.0 + 365.0 * np.sqrt(t), 5651.0 - 2473.0 * np.exp(-0.0278 * t))
 
 
 def one(run, t):
@@ -46,11 +54,14 @@ def one(run, t):
         if k != "cont":
             out[k + "_age"] = float(np.nanmean(age[sel])) if sel.any() else float("nan")
     o7 = classes["oc7"]
+    res = z + gdh1_depth(age)
+    out["oc7_res"] = float(np.nanmean(res[o7])) if o7.any() else float("nan")
     for lo, hi in AGE_BINS:
         sel = o7 & (age >= lo) & (age < hi)
         tag = f"a{lo}"
         out[tag + "_share"] = float(sel.sum()) / max(float(o7.sum()), 1.0)
         out[tag + "_z"] = float(z[sel].mean()) if sel.any() else float("nan")
+        out[tag + "_res"] = float(res[sel].mean()) if sel.any() else float("nan")
     extra_v = np.maximum(pools[:, 5] - 2000.0, 0.0)
     extra_p = np.maximum(pools[:, 6] - 5000.0, 0.0)
     out["oc_extra_volc_m"] = float(np.where(oc, extra_v, 0.0).sum()) / n
