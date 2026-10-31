@@ -1553,9 +1553,9 @@ pub fn boundary_mix(
     // Each active contact's slab length, km, and age, Myr (the bands, measurement only).
     let slab_km: BTreeMap<(u32, u32), f64> =
         st.slabs.iter().map(|s| ((s.under, s.over), s.km)).collect();
-    // The onset trace: each recorded onset's categories, by its step and slab age (a split's copies
-    // and a reversal keep the slab age; a reversal's onset has its own record).
-    let onset_of: BTreeMap<(u64, u64), [u8; 3]> = st
+    // The onset trace: each recorded onset's categories, by its step, slab age and convergence
+    // (`onset_key`: a split's copies keep them; a reversal's onset has its own record).
+    let onset_of: BTreeMap<(u64, u64, u64), [u8; 3]> = st
         .dynamics
         .as_ref()
         .map(|d| {
@@ -1563,7 +1563,7 @@ pub fn boundary_mix(
                 .iter()
                 .map(|o| {
                     (
-                        (o.step, o.slab_age_myr.to_bits()),
+                        onset_key(o.step, o.slab_age_myr, o.convergence_mm_yr),
                         [o.kind, o.route, o.buoyant()],
                     )
                 })
@@ -1582,7 +1582,11 @@ pub fn boundary_mix(
                 arc_age: c.arc_onset_myr.map_or(f64::NAN, |a| env.t_myr - a),
                 onset_slab_age: c.onset_slab_age_myr,
                 onset: onset_of
-                    .get(&(c.onset_step, c.onset_slab_age_myr.to_bits()))
+                    .get(&onset_key(
+                        c.onset_step,
+                        c.onset_slab_age_myr,
+                        c.onset_convergence_mm_yr,
+                    ))
                     .copied()
                     .unwrap_or([ONSET_KINDS.len() as u8, 3, 4]),
                 new: c.onset_step == env.step,
@@ -2104,6 +2108,13 @@ struct Tally {
     continental: u32,
 }
 
+/// A recorded onset's key, which a contact and a split's copies of it keep: its step, its slab
+/// age and its convergence at the onset (the slab age alone is 0 for every continental onset, so
+/// two of one step shared a record; PR #55's review).
+fn onset_key(step: u64, slab_age_myr: f64, convergence_mm_yr: f64) -> (u64, u64, u64) {
+    (step, slab_age_myr.to_bits(), convergence_mm_yr.to_bits())
+}
+
 /// Measurement only (the onset trace, 2026-10-31): records each contact whose onset is this step
 /// ([`OnsetRec`]) with its pair's boundary the step before, then updates the pairs' history and
 /// keeps this step's boundaries and contacts for the next.
@@ -2182,12 +2193,12 @@ fn record_onsets(
         });
     }
     d.onsets.extend(new);
-    // What became of each onset's contact and a split's copies of it (by its onset step and slab
-    // age, which the copies keep), this step.
-    let mut by_onset: BTreeMap<(u64, u64), Vec<usize>> = BTreeMap::new();
+    // What became of each onset's contact and a split's copies of it (by `onset_key`, which the
+    // copies keep), this step.
+    let mut by_onset: BTreeMap<(u64, u64, u64), Vec<usize>> = BTreeMap::new();
     for (i, o) in d.onsets.iter().enumerate() {
         by_onset
-            .entry((o.step, o.slab_age_myr.to_bits()))
+            .entry(onset_key(o.step, o.slab_age_myr, o.convergence_mm_yr))
             .or_default()
             .push(i);
     }
@@ -2196,7 +2207,11 @@ fn record_onsets(
     let spacing_km = env.norm.km(env.norm.spacing_rad());
     let mut contact_onset: BTreeMap<(u32, u32), usize> = BTreeMap::new();
     for c in st.contacts.iter().filter(|c| c.active(env.step)) {
-        let Some(list) = by_onset.get(&(c.onset_step, c.onset_slab_age_myr.to_bits())) else {
+        let Some(list) = by_onset.get(&onset_key(
+            c.onset_step,
+            c.onset_slab_age_myr,
+            c.onset_convergence_mm_yr,
+        )) else {
             continue;
         };
         let i = list
