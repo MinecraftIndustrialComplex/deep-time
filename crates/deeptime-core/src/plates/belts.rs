@@ -2871,7 +2871,11 @@ mod tests {
         // front, as a collision stamps the crust it stacks (crust another collision stamped
         // lately is locked, PLT-224, and makes no front).
         fx.step(&mut st, 1, None);
-        let onset_myr = st.contacts[0].collision.as_ref().expect("a collision").onset_myr as f32;
+        let onset_myr = st.contacts[0]
+            .collision
+            .as_ref()
+            .expect("a collision")
+            .onset_myr as f32;
         for s in &mut st.samples {
             if s.group == 1 && s.kind == CONTINENTAL {
                 s.orogeny = OROGENY_HIMALAYAN;
@@ -2989,7 +2993,10 @@ mod tests {
         // Jammed, only the ocean floor at the arc's ends feeds it, more slowly, and it breaks off
         // (a new slab may start from that ocean floor after).
         assert!(jam[0] < down[0], "jammed {jam:?}, going down {down:?}");
-        assert!(jam[..5].contains(&0.0), "the jammed slab did not break off: {jam:?}");
+        assert!(
+            jam[..5].contains(&0.0),
+            "the jammed slab did not break off: {jam:?}"
+        );
     }
 
     /// The crust that stacks is the crust that crossed the front: the volume added is the
