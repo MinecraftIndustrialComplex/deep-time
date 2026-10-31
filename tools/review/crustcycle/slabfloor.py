@@ -18,7 +18,11 @@ For each front sample it reads the subducting plate at the map's time:
   from the ridge, where the plate's ridge has not moved);
 
 and prints, pooled over the snapshots and runs, the intra-oceanic front on floor younger than 55 Myr and on older
-floor by each of these bands (shares of each), with the arm's mean front length.
+floor by each of these bands (shares of each), with the arm's mean front length. Where the run records its onsets
+(the onset trace, branch oceanic-fronts), each front sample is linked to its contact's onset as gapfronts.py links it
+(the pair's latest onset still active, or one side for a split's copy), and the front is banded by the contact's age
+(the map's time less the onset's) and by the floor that first went down at the onset (`slab_age_myr`), and the floor
+going under now is given by the contact's age: over a contact's life, does its trench reach older floor?
 """
 import json
 import sys
@@ -28,6 +32,7 @@ import numpy as np
 from scipy.spatial import cKDTree
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import gapfronts  # noqa: E402
 import oofronts  # noqa: E402
 import probe  # noqa: E402
 
@@ -41,11 +46,13 @@ BANDS = {
     "ridge distance, km": ([0, 500, 1000, 2000, 4000], lambda r: r["ridge_km"]),
     "own youngest over planet's, Myr": ([0, 5, 20, 55, 100], lambda r: r["own_young"]),
     "implied half rate, mm/yr": ([0, 10, 20, 40, 80], lambda r: r["rate"]),
+    "contact age, Myr": ([0, 10, 25, 55, 100], lambda r: r["contact_age"]),
+    "first floor down, Myr": ([0, 6, 12, 25, 55], lambda r: r["first_floor"]),
 }
 ORIGINS = ["initial", "rift", "fission", "back_arc", "subduction_initiation", "margin_propagation", "other"]
 
 
-def snapshot(run, t, lives):
+def snapshot(run, t, lives, onsets=None, by_pair=None):
     a, _ = probe.read(run, t)
     nm = probe.name_of(t)
     plate = np.fromfile(run / "maps" / "plate" / nm, "<u4").astype(np.int64)
@@ -96,7 +103,16 @@ def snapshot(run, t, lives):
             ridge_km = oofronts.arc_km(dd)
         slab_age = float(age[k])
         life = lives.get(u, {})
+        contact_age, first_floor = np.nan, np.nan
+        if onsets:
+            j, _ = gapfronts.link(by_pair, onsets, u, q, t)
+            if j is not None:
+                contact_age = t - onsets[j]["t"]
+                first_floor = onsets[j]["slab_age_myr"]
         out.append({
+            "slab_age": slab_age,
+            "contact_age": contact_age,
+            "first_floor": first_floor,
             "young": slab_age < YOUNG_MYR,
             "plate_age": t - float(life.get("born_myr", -1000.0)),
             "origin": life.get("origin", "other") if life.get("origin") in ORIGINS else "other",
@@ -125,10 +141,15 @@ def main(argv):
         rows, snaps, km = [], 0, 0.0
         runs = probe.runs_of(arg)
         for r in runs:
-            lives = {int(x["id"]): x for x in json.loads((r / "rec.json").read_text()).get("plates") or []}
+            rec = json.loads((r / "rec.json").read_text())
+            lives = {int(x["id"]): x for x in rec.get("plates") or []}
+            onsets = rec.get("onsets") or []
+            by_pair = {}
+            for i, o in enumerate(onsets):
+                by_pair.setdefault((o["under"], o["over"]), []).append(i)
             for t in ts:
                 try:
-                    got, sp = snapshot(r, t, lives)
+                    got, sp = snapshot(r, t, lives, onsets, by_pair)
                 except (FileNotFoundError, ValueError):
                     got = None
                 if got is None:
@@ -165,7 +186,26 @@ def main(argv):
                 c = np.cumsum(w[order]) / w.sum()
                 print(f"    ridge distance, km, length-weighted median {d[order][np.searchsorted(c, 0.5)]:.0f}"
                       f" (p25 {d[order][np.searchsorted(c, 0.25)]:.0f}, p75 {d[order][np.searchsorted(c, 0.75)]:.0f})")
+        by_contact_age(rows)
     return 0
+
+
+def by_contact_age(rows):
+    linked = [x for x in rows if np.isfinite(x["contact_age"])]
+    if not linked:
+        return
+    print("    the floor going under by the contact's age (all intra-oceanic front linked): km share, floor age p25/p50/p75,"
+          " share under 55 Myr")
+    edges = [0, 10, 25, 55, 100, 200]
+    tot = sum(x["km"] for x in linked)
+    for lo, hi in zip(edges, edges[1:] + [np.inf]):
+        sel = [x for x in linked if lo <= x["contact_age"] < hi]
+        if not sel:
+            continue
+        a = np.array([x["slab_age"] for x in sel])
+        w = sum(x["km"] for x in sel)
+        print(f"      {lo:g}-{hi:g} Myr: {w / tot:.3f}  {np.percentile(a, 25):.0f}/{np.percentile(a, 50):.0f}/"
+              f"{np.percentile(a, 75):.0f}  {np.mean(a < YOUNG_MYR):.3f}")
 
 
 if __name__ == "__main__":
