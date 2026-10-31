@@ -13334,3 +13334,50 @@ between oceanic plates comes to converge often enough to start 0.57 of the intra
 on Earth ridges are where plates part. One trace would split them: at each contact's onset, what
 its boundary was the step before (spreading, transform, incipient convergence) and for how long
 its plates had been parting there.
+
+**The onset trace (2026-10-31, the next step's trace).** oo-onset (branch oceanic-fronts at
+30530ae6, key 38f75a09f9a8, base34's argkey, `pool.sh run oo-onset --seeds 1
++DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`), bit for bit base34's seed 1
+(`same_run.py`, the new fields taken out). The record keeps each pair of plates' boundary every
+step (`dynamics::PairBound`: its length by class, the velocity across it, both plates' boundary
+floor and its age) and their history (`PairHist`: since when it has converged, when it last
+spread, when the pair first met), and writes each subduction contact's onset with its pair's
+boundary the step before (`OnsetRec`; route: plates that came to converge, a reversal, an
+initiation's pair). The fronts carry their contact's onset (`front_bands.onset_kind`,
+`onset_route`, `onset_buoyant`). Read with `tools/review/crustcycle/onsets.py`.
+
+- Onsets per 1,000 Myr of one run: 531 of plates that came to converge (368 ocean-ocean at the
+  onset, 101 ocean-continent, 62 continent-continent), 92 reversals, 27 initiations' pairs.
+- The ocean-ocean onsets of plates that came to converge (737 over both runs), their boundary the
+  step before: spreading 0.28, converging 0.09, a transform 0.08, a front 0.003, none 0.54 (the
+  boundary is read on the lattice, which is rebuilt only at resamplings, so two plates that came
+  to touch since the last one have none). 0.90 had not converged at all before the onset step
+  (0.06 for up to 2 Myr, 0.05 for longer); the velocity across the step before was parting or
+  nil for 0.89.
+- The floors at that boundary, where known (0.45 of them): both younger than 10 Myr (FRC-005's
+  buoyancy line, Cloos 1993) at 0.06 of the onsets, neither at 0.36. The intra-oceanic front at
+  any time by its contact's onset: both floors younger than 10 Myr 0.03, neither 0.53, unknown
+  0.40; by the boundary the step before: spreading 0.36, none 0.35, converging 0.13, a transform
+  0.13; by the route: plates that came to converge 0.79, reversals 0.14, initiations 0.07.
+- The onsets cluster on few steps: 38 to 39 steps of 500 hold 0.42 to 0.45 of them; the busiest
+  include steps 21, 31, 41, 61, 71 and 111, ten steps apart (the resampling's 20 Myr floor,
+  `resample_min_myr`). The record keeps no resampling times; plates born by fission (PLT-532) are
+  born at resamplings (at 18 and 23 distinct times in the two runs; scattered-1 resampled 53
+  times), and the step after one of those holds 0.19 to 0.21 of the onsets against 0.04 to 0.05 at
+  random. Those onsets' first floor down is young: younger than 12 Myr for
+  0.82 to 0.88 of them, median 7.2 to 7.4 Myr, against 0.38 to 0.45 and 15 to 22 Myr for the rest:
+  the resampling's new floor (a gap point's age is α times the time since the last resampling,
+  PLT-502), which the step before's boundary floor (0.17 younger than 12 Myr, where known) is not.
+
+**What the onset trace says.** The start condition in the sense of buoyancy is not the term: the
+onsets between two floors younger than 10 Myr make 0.03 of the intra-oceanic front. Nor is it a
+convergence the boundary accumulated: nine onsets in ten come at pairs that had not converged
+before, parting or not touching the step before, and about half fall on the step after a
+resampling, where the floor that first goes under is the resampling's new floor. The contacts
+begin where the lattice's rebuilding and the plates' motion first make two plates overlap, and
+the incipient stage (100 km of slab, PLT-611) then decides; the 57 % of the intra-oceanic front
+that began on floor younger than 12 Myr is mostly that new floor. Per the coordinator's rule
+(plate motion: report before building), nothing is built. The measure that would name the law: at
+each resampling, where the new overlaps of the next step come from (the gap fill's new floor
+given across a boundary that then closes, PLT-502 and PLT-542, or the footprints themselves), and
+which of those contacts pass incipient and through what convergence.

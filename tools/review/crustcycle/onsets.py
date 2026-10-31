@@ -11,7 +11,8 @@ reversal's new onset, with its pair of plates' boundary the step before) and the
   for the onsets of plates that came to converge, ocean-ocean at the onset: the boundary the step before (spreading,
   converging, transform, front, collision, none), how long it had converged, since it last spread, the boundary's
   age, the velocity across it, the two floors' ages there (the subducting plate's and the overriding plate's) and
-  their buoyancy against 10 Myr (FRC-005);
+  their buoyancy against 10 Myr (FRC-005); and, of those whose boundary the step before was spreading or absent, the
+  younger plate's age and origin and the plates' relation (rec.json's plate lives);
   and the subducting fronts' mean length at any time, km, by their contact's onset (ocean-ocean and ocean-continent
   now), the median of the runs.
 """
@@ -57,7 +58,13 @@ def main(argv):
                 continue
             runs += 1
             length_myr += float(steps[-1]["t"]) - float(rec.get("t0_myr", steps[0]["t"]))
+            lives = {int(x["id"]): x for x in rec.get("plates") or []}
             for o in rec.get("onsets") or []:
+                lu, lo = lives.get(o["under"], {}), lives.get(o["over"], {})
+                o["lives"] = (lu, lo)
+                pu, po = lu.get("parent"), lo.get("parent")
+                o["relation"] = ("parent" if pu == o["over"] or po == o["under"]
+                                 else "siblings" if pu is not None and pu == po else "other")
                 onsets.append(o)
             acc = {}
             n = 0
@@ -114,6 +121,19 @@ def main(argv):
         share_table("the overriding plate's floor there, Myr", new, lambda o: floor(o, o["over"]), names)
         share_table("buoyancy against 10 Myr", new,
                     lambda o: BUOYANT[buoyant(o)], BUOYANT)
+        # The plates' lives at the onset: the younger plate's age and how it was born, by the boundary the step before.
+        for kind in (0, 5):
+            sub = [o for o in new if o["kind"] == kind]
+            if not sub:
+                continue
+            print(f"  of those with the boundary {KINDS[kind]} the step before ({len(sub)}):")
+            share_table("    the younger plate's age, Myr", sub,
+                        lambda o: band(young_age(o), [0, 2.001, 10, 50], ["<=2", "2-10", "10-50", ">50"]),
+                        ["<=2", "2-10", "10-50", ">50"])
+            share_table("    the younger plate's origin", sub, lambda o: young_origin(o),
+                        ["rift", "fission", "back_arc", "subduction_initiation", "margin_propagation", "initial",
+                         "other"])
+            share_table("    the plates' relation", sub, lambda o: o.get("relation", "?"), ["parent", "siblings", "other"])
     print("# the subducting fronts by their contact's onset, mean km at any time, median of the runs")
     for key, names in (("onset_kind", KINDS), ("onset_route", ROUTES), ("onset_buoyant", BUOYANT)):
         for setting in ("oo", "oc"):
@@ -121,6 +141,19 @@ def main(argv):
             tot = max(sum(vals), 1e-9)
             print(f"  {key:13s} {setting}: " + "  ".join(f"{n} {v:6.0f} ({v / tot:.3f})" for n, v in zip(names, vals)))
     return 0
+
+
+def young_age(o):
+    born = [float(x.get("born_myr", -1e9)) for x in o["lives"] if x]
+    return o["t"] - max(born) if born else 1e9
+
+
+def young_origin(o):
+    known = [x for x in o["lives"] if x]
+    if not known:
+        return "other"
+    x = max(known, key=lambda x: float(x.get("born_myr", -1e9)))
+    return x.get("origin", "other")
 
 
 def buoyant(o):
