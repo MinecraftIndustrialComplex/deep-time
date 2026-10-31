@@ -279,9 +279,14 @@ reaches more of them.
 
 ## Measuring it
 
-`pool.sh run small-terrane --key <this branch's key> --seeds 1,2,3,4 --set tectonics.terrane_docking_cover=true
-+DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps` against `base34-s4`, with the default,
-`guard`, `collcoast` and `coastset` measures, and the two tools above over both arms.
+On the collision orogen's physics (the coordinator, 2026-10-31: docking interacts with where the
+collision crust goes, and the two wedges and the retro plateau go on by default next): this branch
+with origin/collision-orogen merged in, `pool.sh run small-terrane --seeds 1,2,3,4 --set
+tectonics.terrane_docking_cover=true --set tectonics.collision_two_wedges=true --set
+tectonics.collision_retro_plateau=true +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`
+against the cached arm orog-cum (key f2d6412d801f, argkey d3261b0a, 8 runs, the same physics without
+the docking law; or `base35-s4` once base35 exists), with the default, `guard`, `collcoast` and
+`coastset` measures, and the two tools above over both arms.
 
 Unit tests: `a_slab_drags_down_buoyant_crust_as_far_as_its_pull_outweighs_it` (shortening.rs: S*'s
 values and the balance at it), `a_terrane_its_slab_drags_down_subducts_stripped_of_its_cover` (belts.rs:

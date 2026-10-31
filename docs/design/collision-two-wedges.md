@@ -2,7 +2,8 @@
 
 Status: **built behind the switch** (2026-10-29, the coordinator; PLT-730, PLT-731, `fill_two_wedges` in
 `plates/belts.rs`, plates.md "Step 20"). **Off by default**: the arm tw-wedges raised the coast with high
-ground (0.159 to 0.207) and put collision land nearer the sea, so the lead below is refuted (plates.md "Step 20"). For V1's one missed target, the coast
+ground (0.159 to 0.207) and put collision land nearer the sea, so the lead below is refuted (plates.md "Step 20").
+Read again on the freeboard physics (2026-10-31, the orogen lane): docs/design/collision-orogen.md. For V1's one missed target, the coast
 with high ground (0.159 on base29 against at most 0.11; the coast in a collision belt 0.257 of the
 coast). Undoable; built behind a switch, measured on the pool against base29, on by default only if it
 is correct and the numbers do not get worse elsewhere.

@@ -159,6 +159,43 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 - **Built** (`tectonics.terrane_docking_cover`, off; docs/design/small-terrane-docking.md, plates.md "How small terranes dock"): a terrane whose extent across the front is within its slab's reach against its buoyancy, S* = L / (1 + 2.25 T / 30 km) from FRC-028 to FRC-030 and PLT-184 (215 km under 30 km of crust, 329 km under 15 km), subducts: only its cover (sediment, sedimentary and volcanic rock, PLT-761) stays, and it does not transfer at the threshold. No new constant. Measurement fields on the records (`peak_height_m`, `stacked_km2_m`, `stripped_km2_m`, `centroid`) and the global `plates/collision_stripped_km3` (cb_globals `stripped`). An earlier build that stripped every terrane under `collision_suture_frac` was replaced before any run: it would have stripped continental fragments the sources dock by collision, about 2 km³ a year by the project's estimate.
 - **Expected** (before the arm): small; the coast with high ground by less than the small terranes' 0.006 to 0.008, the crust by a few hundredths of a km³ a year. The small-terrane share of the excess is not missing physics; the open, large collisions near the sea are the bulk (the orogen lane's).
 - **Next.** The coordinator schedules the 8-run arm: `pool.sh run small-terrane --seeds 1,2,3,4 --set tectonics.terrane_docking_cover=true +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps` from this branch against `base34-s4`, then `dock_records.py` and `dock_maps.py` over both; on by default if the guard stays clean.
+### 2026-10-31: the collision orogen as a doubly vergent wedge, measured on the freeboard; the plateau's retro-ward growth behind a switch (PLT-740) (the orogen lane, worktree agent-a52784a4e4ef20e33, branch `collision-orogen`)
+
+- **Why.** Ben's order "Freeboard, then orogen (Recommended)" (decisions log 2026-10-30); the audit
+  (docs/research/notes/coast-high-ground-audit-2026-10-30.md): 96 % of the kept collision crust on the overriding plate,
+  no Tibet-class plateau; with the freeboard on the land above 2 km fell to 0.013.
+- **The two wedges on the freeboard physics** (arm orog-tw-sedm, key 31c7c70bd7c7 argkey c7aa72cc, PLT-660/661 set and
+  `collision_two_wedges=true`, seeds 1 to 4 of both starts; its base sedmargin is base34-s4 bit for bit, the eight
+  `state_sha256` equal): the pro-wedge holds 0.545 of the kept crust (0.054 with the taper belt), the guard clean; land
+  0.238 to 0.214, the largest landmass 0.097 to 0.075 (p 0.028), continental crust under the sea 0.527 to 0.590, land
+  above 2 km 0.013 to 0.017 (0.96), coast with high ground 0.064 to 0.101 (0.23), net crust change +0.065 to +0.100. The
+  freeboard did not dry the colliding margins (incoming crust at the front above the sea 0.586 on base33, 0.320 on
+  base34-s4: PLT-661's distal margins collide first).
+- **Where the high ground goes** (`tools/review/orogen/`: hiseries.py over every 50 Myr crust-budget map, orostats.py,
+  hiclimate.py, dock.py, m5arm.sh): Tibet-class ground forms in the largest collisions (base34-s4 supercontinent-1 at
+  −100 Myr: 0.065 of the land above 2 km, about 3.6 million km² above 4 km on 65 to 68 km of crust) and is gone 100 Myr
+  later; flat high ground is arid or polar by its Köppen class yet wears at 109 to 129 m/Myr against the Altiplano's 20
+  (Bookhagen & Strecker 2012). Land above 2 km through time: base34 0.030, the two-wedge arms 0.022 and 0.024; above
+  4 km 0.0023, 0.0008 and 0.0012.
+- **The design** (docs/design/collision-orogen.md, research by a Sonnet sub-agent: Vanderhaeghe et al. 2003, Wolf et
+  al. 2021, Medvedev & Beaumont's preprint, Strecker et al. 2009, Bookhagen & Strecker 2012 in full; Sobel et al. 2003,
+  Jamieson & Beaumont 2013, Willett & Beaumont 1994, Yakovlev & Clark 2014 abstracts): O1 the two wedges (PLT-730/731,
+  unchanged); O2 the plateau past the strength height grows retro-ward with no set width (PLT-740, built); O3 the
+  overriding share limited by the wedges' geometry, the block's width and the plateau (no new rule); O4 an interior
+  plateau needs the plateau's wear to fall, which is the surface stage's (the Follow-ups row on plateau wear).
+- **Built** (PLT-740, `tectonics.collision_retro_plateau`, off): when the two wedges' fill leaves crust with the retro
+  flank within `collision_belt_km` at its limits, the flank is searched again through the overriding plate's continental
+  samples (twice the reach each time) and refilled, until placed or the connected crust is all taken; counted in
+  `plates/collision_retro_plateau_km3`. Test `the_retro_plateau_grows_past_the_belt_through_its_own_crust`. Gate on the
+  branch: fmt and clippy clean, deeptime-core 1,146 passed (VM).
+- **The cumulative arm** (orog-cum, key f2d6412d801f argkey d3261b0a, both switches, 8 runs) against base34-s4: the
+  guard clean; the plateau rule placed a median 0.0005 of the kept crust; coast with high ground 0.067 (0.96), land
+  above 2 km 0.013, the largest landmass 0.074, continental crust under the sea 0.605 (base34 0.540, p 0.046). orog-cum
+  and orog-tw-sedm are the same physics but for that thousandth, so their spread (coast with high ground 0.101 against
+  0.067) is an 8-run arm's noise floor.
+- **Next.** The coordinator's call on O1 and O2's defaults (sourced, tested, the guard clean; the costs above). For a
+  Tibet-class plateau at a run's end, the plateau's wear (internal drainage under aridity: Sobel et al. 2003, Strecker et
+  al. 2009); then small terranes (Ben's third item).
 
 ### 2026-10-31: Freeboard thinning lane: why the continents thin with the margin's sediment continental, traced; physics, nothing built (lane agent, worktree .claude/worktrees/agent-a9075656e73c301d7, branch freeboard-thinning on origin/freeboard b53fffde; sub-agent of session 88bb1af2-7722-4f74-9e04-4e8b8af667a9; not merged)
 
