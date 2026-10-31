@@ -22,7 +22,8 @@ floor) it walks each ocean-ocean step's overriding-side normal from 50 km every 
 walks the model's, and of the walks that meet continental crust prints the distance and the floor's age along the
 strip between: the first and the last dated floor (the arcs and their forearcs carry no age), at the middle, and
 where the youngest lies (young at the front, young behind, about even, by 10 Myr). Also the first dated floor's age
-behind every ocean-ocean step (the model's floor at its front sample). No plate bounds the walk (the steps file
+behind every ocean-ocean step, anywhere from 50 km and from 200 to 600 km (behind the arc, as transect.py reads the
+model's). No plate bounds the walk (the steps file
 names the plates but this reads no plate outlines), so it can cross a back-arc's spreading axis.
 """
 import math
@@ -35,6 +36,8 @@ R_KM = 6371.0
 ARC_KM = 200.0  # ledger: PLT-042
 FAR_KM = 2400
 BANDS = [0.0, 200.0, 300.0, 600.0, 1200.0, 2400.0]
+# plates/dynamics.rs NORMAL_BANDS_MM_YR: the model's subducting fronts by their convergence across the boundary.
+NORMAL = [0.0, 5.0, 10.0, 20.0, 40.0, 80.0]
 
 
 def read_steps(path):
@@ -48,6 +51,8 @@ def read_steps(path):
                 "lon0": float(line[12:20]), "lat0": float(line[21:28]),
                 "lon1": float(line[29:37]), "lat1": float(line[38:45]),
                 "length": float(line[46:51]), "cls": line[92:95],
+                # The relative velocity's component across the step (Bird 2003, Table 2; negative converges), mm/yr.
+                "div": float(line.split()[10]),
             })
     return rows
 
@@ -105,6 +110,23 @@ def walk_strip(st, grid, crust, m, over, th, km):
         a = age_at(grid, p)
         if np.isfinite(a):
             ages.append(a)
+    behind = None
+    for d in range(200, 601, 50):
+        ang = d / R_KM
+        p = m * math.cos(ang) + over * math.sin(ang)
+        i, j = cell(p)
+        if crust[i, j] >= th:
+            break
+        a = age_at(grid, p)
+        if np.isfinite(a):
+            behind = a
+            break
+    if behind is None:
+        st["behind_none"] += km
+    else:
+        for lo, hi in ((0, 10), (10, 30), (30, 60), (60, 120), (120, 1e9)):
+            if lo <= behind < hi:
+                st[f"behind_age_{lo}"] += km
     first = ages[0] if ages else None
     if first is None:
         st["first_undated"] += km
@@ -141,6 +163,8 @@ def main(argv):
     strip = {t: defaultdict(float) for t in thresholds}
     total = sum(s["length"] for s in steps)
     oo = {t: 0.0 for t in thresholds}
+    conv = {t: [0.0, 0.0, 0.0, 0.0] for t in thresholds}
+    conv_bands = {t: [[0.0] * len(NORMAL), [0.0] * len(NORMAL)] for t in thresholds}
     by_pair = {t: defaultdict(float) for t in thresholds}
     dist = {t: defaultdict(float) for t in thresholds}
     for s in steps:
@@ -160,7 +184,13 @@ def main(argv):
             i, j = cell(p)
             thick.append((d, crust[i, j]))
         for th in thresholds:
-            if max(c for d, c in thick if d <= ARC_KM) < th:
+            is_oo = max(c for d, c in thick if d <= ARC_KM) < th
+            k = 0 if is_oo else 2
+            conv[th][k] += -s["div"] * s["length"]
+            conv[th][k + 1] += s["length"]
+            b = max(i for i, lo in enumerate(NORMAL) if -s["div"] >= lo) if -s["div"] >= 0.0 else 0
+            conv_bands[th][0 if is_oo else 1][b] += s["length"]
+            if is_oo:
                 oo[th] += s["length"]
                 by_pair[th][s["bid"]] += s["length"]
             if grid is not None and max(c for d, c in thick if d <= ARC_KM) < th:
@@ -171,7 +201,17 @@ def main(argv):
             dist[th][band] += s["length"]
     print(f"# Bird 2003 SUB steps: {len(steps)}, {total:.0f} km")
     for th in thresholds:
-        print(f"threshold {th:4.0f} km: ocean-ocean {oo[th]:7.0f} km, share {oo[th] / total:.3f}")
+        c = conv[th]
+        print(f"threshold {th:4.0f} km: ocean-ocean {oo[th]:7.0f} km, share {oo[th] / total:.3f}; convergence across"
+              f" the step, mm/yr: ocean-ocean {c[0] / max(c[1], 1e-9):.1f}, ocean-continent {c[2] / max(c[3], 1e-9):.1f},"
+              f" all {(c[0] + c[2]) / max(c[1] + c[3], 1e-9):.1f}")
+    print("# SUB km by the convergence across the step, the model's bands (0-5, 5-10, 10-20, 20-40, 40-80, >80 mm/yr;"
+          " shares of the class)")
+    for th in thresholds:
+        for k, cls in enumerate(("ocean-ocean", "ocean-continent")):
+            row = conv_bands[th][k]
+            tot = max(sum(row), 1e-9)
+            print(f"threshold {th:4.0f} km {cls:16s}: " + "  ".join(f"{x / tot:.3f}" for x in row))
     names = [f"{lo:.0f}-{hi:.0f}" for lo, hi in zip(BANDS, BANDS[1:])] + ["none"]
     print(f"# SUB km by the distance to the first continental crust along the overriding-side normal (none within"
           f" {FAR_KM} km); in brackets the share of the fronts past {ARC_KM:.0f} km")

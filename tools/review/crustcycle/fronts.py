@@ -12,6 +12,7 @@ to the end, as the median and range of the runs:
   thermal floor's alone); the sum is what the arcs' counters `plates/arc_front_{oceanic,continental}_km_myr` take
   (subduction::fronts_finish counts every oceanic-slab front sample, incipient ones included);
   the subducting fronts with a Benioff zone (`benioff`, PLT-615);
+  the subducting fronts by their convergence across the boundary (`normal`, NORMAL_BANDS_MM_YR, mm/yr);
   the ocean-ocean front past incipient by its contact's age (`age[0]`, AGE_BANDS_MYR), by its slab (`slab[0]`), by the
   overriding plate's continental share (`oo_over_cont`), by the distance to that plate's nearest continental crust
   (`oo_coast`, COAST_BANDS_KM; the last band holds plates with none) and by how its two plates are related (`oo_pair`:
@@ -33,6 +34,7 @@ from pathlib import Path
 AGE = ["0-6", "6-12", "12-24", "24-50", "50-100", ">100"]
 SLAB = ["0-50", "50-100", "100-150", "150-300", "300-600", ">600"]
 SHARE = ["0-1%", "1-5%", "5-15%", "15-30%", "30-50%", ">50%"]
+NORMAL = ["0-5", "5-10", "10-20", "20-40", "40-80", ">80"]
 COAST = ["0-150", "150-300", "300-600", "600-1200", "1200-2400", ">2400/none"]
 PAIR = ["initiation", "rift", "other"]
 OCEAN = ["<500", "500-1500", "1500-3000", ">3000/none"]
@@ -67,7 +69,7 @@ def one(run, t_from):
         add("oc_slow", slow[1])
         add("oo_ben", ben[0])
         add("oc_ben", ben[1])
-        for name, key, labels in (("age", "age", AGE), ("slab", "slab", SLAB)):
+        for name, key, labels in (("age", "age", AGE), ("slab", "slab", SLAB), ("normal", "normal", NORMAL)):
             rows = fb.get(key)
             if rows:
                 for i, lab in enumerate(labels):
