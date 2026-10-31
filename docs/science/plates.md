@@ -10037,7 +10037,8 @@ et al. 1993, p. 373), and Taiwan's 90 km belt is the Chinese margin's crust with
 ### Step 20: two wedges about the suture (PLT-730, PLT-731; 2026-10-29)
 
 The coordinator, inline, from the lead above and the design `docs/design/collision-two-wedges.md`. A switch,
-`tectonics.collision_two_wedges`, off by default (its pool arm below).
+`tectonics.collision_two_wedges`, off by default when built (its pool arm below); **on by default since 2026-10-31**
+(the coordinator's call, decisions log 2026-10-31; "The collision orogen (PLT-740)" below).
 
 - **The rule.** A doubly vergent orogen grows as two critical wedges about the point S where the lower plate's mantle
   goes down: a pro-wedge over the lower plate at the minimum critical taper, a retro-wedge over the upper plate,
@@ -10077,7 +10078,8 @@ The coordinator, inline, from the lead above and the design `docs/design/collisi
 - **At the model's resolution.** The quick planet's samples are about 71 km apart on the model sphere, so a 3 km crest's
   pro-wedge (115 km at 1.5 degrees) is one or two rows and its retro-wedge one; the unit fixture's 16,000 samples
   (about 180 km apart) make each wedge its front row.
-- **On the pool: the lead is refuted, the switch stays off** (arm tw-wedges, key cfdf228e0c4c, `--set
+- **On the pool: the lead is refuted, the switch stays off** (this was the 2026-10-29 reading, set aside on 2026-10-31:
+  the switch is on by default, "The collision orogen (PLT-740)" below; arm tw-wedges, key cfdf228e0c4c, `--set
   tectonics.collision_two_wedges=true` and base29's crust-budget environment, earthlike_quick_16k, 1000 Myr, seeds 1 to
   4 from both starts, 8 runs against base29's 24, medians, Mann-Whitney p in brackets; the arm ran with the first
   draft's absolute retro slope, 2.5 degrees, a ratio of 1.67 against the default's 1.55). The mechanism works: the
@@ -11533,6 +11535,254 @@ pro-wedge on the incoming plate, are off): a lead, not a finding. The measure's 
 docs/research/notes/m5-coast-high-ground-2026-10-25.md: Earth's coast within 200 km of a collision
 boundary, 0.093 of the coast, is high for 0.135 of it) reads settings differently from `coastset`
 (the model's collision belt coast, 0.084, high for 0.685), so the two are not compared here.
+
+### The collision orogen (PLT-740, 2026-10-31)
+
+The orogen lane, after Ben's order "Freeboard, then orogen (Recommended)" (decisions log 2026-10-30); the design
+`docs/design/collision-orogen.md`. Measurement first, then one rule behind a switch. **Both switches,
+`tectonics.collision_two_wedges` (PLT-730, PLT-731) and `tectonics.collision_retro_plateau` (PLT-740), are on by
+default since 2026-10-31** (the coordinator's call under Ben's rule of 2026-10-23, "Always, fix V1 elsewhere";
+decisions log 2026-10-31): sourced, unit-tested, the guard clean on the arm orog-cum, and the costs read below go to
+the crust-budget lane.
+
+- **The two wedges on the freeboard physics** (arm orog-tw-sedm, key 31c7c70bd7c7, argkey c7aa72cc: the two
+  freeboard switches PLT-660 and PLT-661 set, as base34 has them on, and `tectonics.collision_two_wedges=true`;
+  seeds 1 to 4 from both starts with the crust-budget environment, against the arm sedmargin, the same with the two
+  wedges off; medians of 8, Mann-Whitney p in brackets). Land 0.238 to 0.214 (0.23), the largest landmass 0.097 to
+  0.075 (0.028), continental crust under the sea 0.527 to 0.590 (0.13), land above 2 km 0.013 to 0.017 (0.96), coast
+  with high ground 0.064 to 0.101 (0.23), the continental crust's net change +0.065 to +0.100 (0.010), criteria met
+  6.5 to 5.5 (0.16), the sea at the end 169 to 221 m. The guard clean (worst 9,948 m from the sea against 9,964, no
+  step beyond two Earth reliefs), the highest plate elevation 4,288 to 4,476 m (0.72). The incoming plate's wedge
+  holds 0.545 of the kept crust (0.054 with the taper belt; `tools/review/orogen/dock.py` on the globals), the
+  interior's share 0.072 to 0.051: about Wolf et al. 2021's partition of the shortening, 60 % on the pro side once
+  the retro-wedge shortens (p. 13). The colliding margins are still drowned with the freeboard on: the incoming crust
+  at the front above the sea, front-time weighted over collision states under 30 Myr, is 0.586 on base33 and 0.320 on
+  sedmargin (PLT-661 makes the distal margins continental crust under the sea, and they collide first); with the two
+  wedges 0.543 (the pro-wedge raises it before it reaches the front). `collcoast`: the collision regime's land within
+  150 km of the sea 0.591 to 0.656, its median distance to the sea 121 to 104 km (0.19). `coastset`: the rifted
+  margins' share of the high coasts 0.042 to 0.122 (the pro-wedge on the incoming plate's rifted margin). On the
+  census grid (`tools/review/m5diag`, against SRTM15+): M5 0.067 to 0.099 (Earth 0.084), M4 0.013 to 0.017 (0.055),
+  the high ground near the coast 0.49 to 0.52 (0.115). So the mechanism works on dry and drowned margins alike, and it
+  does not rebuild the mountains: for the same cross-section the two wedges' crest stands at sqrt(1 / (1 + tan α /
+  tan β)), 0.78, of the one-sided belt's (the lane's arithmetic), and the pro-wedge fills drowned margins first.
+- **Where the high ground goes** (`tools/review/orogen/hiseries.py`: every 50 Myr crust-budget map after the first
+  100 Myr). The land above 2 km, mean over a run's maps (median of the runs), is 0.048 on base33 (24 runs), 0.027 on
+  sedmargin, 0.022 with the two wedges; the land above 4 km 0.0050, 0.0020 and 0.0008, at its largest 0.022, 0.010 and
+  0.0056. Tibet-class ground forms in large collisions and does not last: on sedmargin's supercontinent-1 a collision
+  from −166 to −104 Myr (front 5,529 km, shortening 5,848 km) left 0.065 of the land above 2 km at −100 Myr, 724
+  samples (about 3.6 million km²) above 4 km on crust 65 to 68 km thick, and 0.011 at the end
+  (`tools/review/orogen/orostats.py`). On two runs of each arm (`erosion_bands`), flat high ground (above 2 km,
+  relief under 500 m) loses 109 to 129 m/Myr of rock, steep high ground 465 to 509 m/Myr, though the flat high
+  ground is arid or polar by its Köppen class (`tools/review/orogen/hiclimate.py`, the final fields: arid 0.475 on
+  base33 and 0.567 on sedmargin, polar 0.428 and 0.268); the Altiplano-Puna's internally drained interior erodes at
+  0.02 ± 0.0004 mm/yr (one sample, Bookhagen & Strecker 2012, pp. 103-104), southern Tibet's under 0.01 km/Myr
+  (ERO-174). The plateau's wear, not the orogen's placement, is what keeps a Tibet-class plateau from lasting to a
+  run's end (STATUS Follow-ups, "High plateaus still wear too fast").
+- **The rule** (PLT-740, `tectonics.collision_retro_plateau`, on by default since 2026-10-31; with
+  `collision_two_wedges` only). Past the
+  strength height the two wedges' plateau grows retro-ward through the overriding plate's continental crust as far
+  as the step's crust needs, not to `collision_belt_km` only: when the fill leaves crust with the retro flank's
+  samples within the belt's reach at their limits, the flank is searched again through that plate's continental
+  samples (twice the reach each time) and the same fill runs over it, until the crust is placed or the connected crust
+  is all taken. Vanderhaeghe et al. 2003 (full text): the orogen stays back-to-back wedges until the base of the
+  thickened crust weakens, then "the plateaux grow laterally at constant thickness between characteristic edge peaks"
+  (p. 27), "it is the net retro-ward flow that accounts for retro-ward growth of the plateau" (p. 41), and the
+  plateau's crustal thickness "is determined mainly by the properties of the cold crust" of the flanking wedges
+  (pp. 28-29), which the strength height (PLT-253) stands for. Wolf et al. 2021 (p. 25): a large hot plateau forms
+  "located mostly on the retro-side". Medvedev & Beaumont (preprint, p. 3): "plateaus grow outward by tectonic
+  thickening and accretion of adjacent crust in the transition zone". Before it, what the belt's reach could not hold
+  went to the no-room rule (PLT-700), stacked above the strength height by the belt's profile, nearest the front, and
+  moved on by the step's ceiling and the surface's channel flow; on the two-wedge arm that was 0.010 of the kept
+  crust, so the rule changes where little crust lands, and only in large collisions.
+- **Structures on the plateau** (2026-10-31, after PR #50's review). The plateau's samples are stamped as the
+  collision's orogeny (the regime, the provinces, the young-orogen weakness) but stay outside the collision's footprint
+  (PLT-260: no convergence, shortening or carrier), so the structure stage gives them no collision folds or thrusts.
+  Their crust comes by the orogen's flow from the front, not by shortening their own upper crust: Tibet's eastern margin
+  was "uplifted without significant shortening of the upper crust along large-magnitude thrust faults" and its
+  thickening is "mainly in the deep crust" (Clark & Royden 2000, p. 703, full text), with "little crustal shortening"
+  there since about 4 Ma (Royden et al. 1997, abstract); the interior extends east-west (Armijo et al. 1986, abstract:
+  normal faulting "the dominant tectonic regime north of the Himalayas in the last 2 ± 0.5 m.y.", extension N96°E;
+  Blisniuk et al. 2001, abstract: graben in central Tibet since at least 13.5 Myr). Against it, Vanderhaeghe et al.
+  2003 find one model's plateau velocity field "indicates pure shear thickening in the upper crust" (p. 40), beside
+  "low deformation rates in the upper crust during the later, plateau stage" (p. 42). Not modelled: the interior's
+  normal faults and rifts, and Clark & Royden's southern margin, "where crustal thickening can be explained by
+  shortening of the upper crust through faulting and folding" (p. 703), which the belt within its reach stands for.
+- **What limits the overriding plate's share** (no new rule). While the crest is under the strength height the
+  retro-wedge at the greater taper holds tan α / (tan α + tan β) of an even-ground cross-section, 0.39; a narrow
+  overriding block holds what its retro flank reaches before its far coast, which stands at H − w tan β for a block w
+  wide (Taiwan's belt is the lower plate's margin, its arc the backstop: Dahlen 1990, pp. 83-84; Simoes et al. 2007,
+  p. 1); past the strength height every new step's crust goes to the retro plateau, as Tibet holds most of its
+  orogen's crust on the upper plate; and the interior's thin-sheet share (PLT-652, PLT-733).
+- **The cumulative arm** (orog-cum, the branch `collision-orogen` on master f80d75a8, key f2d6412d801f, argkey
+  d3261b0a: `--set tectonics.collision_two_wedges=true --set tectonics.collision_retro_plateau=true`, seeds 1 to 4
+  from both starts, the crust-budget environment) against base34-s4 (the freeboard merge's seeds 1 to 4; sedmargin's
+  runs bit for bit) and base34 (24 runs), medians, p in brackets against base34-s4 and then base34. Land 0.238 to
+  0.205 (0.13; base34 0.227, 0.057), the largest landmass 0.097 to 0.074 (0.16), continental crust under the sea 0.527
+  to 0.605 (0.23; base34 0.540, 0.046: over the check's 0.56), land above 2 km 0.013 to 0.013 (0.72; base34 0.022,
+  0.22), coast with high ground 0.064 to 0.067 (0.96; base34 0.078, 0.48), the continental crust's net change +0.065
+  to +0.094 (0.083; base34 +0.063, 0.013), criteria met 6.5 to 6, the sea at the end 169 to 203 m. The guard clean
+  (worst 9,945 m, no step beyond two Earth reliefs, the highest plate elevation 4,162 m). The plateau rule placed a
+  median 0.0005 of the kept crust beyond the belt's reach (0.0037 at most; `dock.py`), the no-room rule 0.0087; the
+  pro-wedge 0.533, the interior 0.052. `collcoast`: the collision regime 0.023 to 0.013 of the land, 0.729 of it within
+  150 km of the sea, belts not elongated 0.196 to 0.075 (0.001). `coastset`: the collision belt's rate on its own coast
+  0.564 to 0.353, the rifted margins' share of the high coasts 0.042 to 0.125. The census grid: M5 0.092, M4 0.013, the
+  coast within 200 km of a collision high for 0.37 of it (base34-s4 0.48, Earth 0.135). The high ground through time
+  (`hiseries.py`): above 2 km 0.030 on base34 (24 runs) to 0.024, above 4 km 0.0023 to 0.0012.
+  Since the plateau rule moved under a thousandth of the crust, orog-cum and orog-tw-sedm are the same physics but for
+  that, and their differences are the seeds' chaos re-rolled: coast with high ground 0.101 against 0.067, the
+  collision belt's rate on its coast 0.539 against 0.353. That is the noise floor of an 8-run arm for these measures.
+  What both arms show alike: the largest landmass down (0.075 and 0.074), continental crust under the sea up (0.590
+  and 0.605), the crust's net change up (+0.100 and +0.094, p 0.001 and 0.013 against base34), the high ground through
+  time down (above 2 km 0.022 and 0.024 against 0.030, above 4 km 0.0008 and 0.0012 against 0.0023). The two wedges
+  keep more crust (the pro-wedge's crust crosses whole, PLT-400) and put it on the incoming plate's drowned margins,
+  where it thickens crust that stays under the sea, and their crest stands lower; the coast with high ground is not
+  resolved either way.
+- **Tests.** `the_retro_plateau_grows_past_the_belt_through_its_own_crust`: a head-on collision whose pro side and
+  retro flank within the belt's reach stand at the strength height, and whose overriding lowland stands 20 m under it
+  for 400 km up to a 400 km strip of ocean floor (so that one step's crust reaches the ocean; on 300 m lowland it fills
+  about 120 km); with the switch every sample of that lowland rises, at most to the strength height, nothing on the
+  ocean floor or across it does, the no-room rule (PLT-700) takes the rest, more than none and less than without the
+  switch, and the crust kept is the same as without it, to 1e-6; off, nothing beyond the belt rises. The plateau
+  grows through continental crust under the sea too; it stops at ocean floor. `an_arc_in_collision_takes_the_crust_on_its_edge_on_the_shipped_path`:
+  the shipped switches (two wedges, the plateau, PLT-700) on an arc in collision whose incoming continent already
+  stands at the strength height; no plateau, and the no-room rule puts the step's crust on the arc's edge at the
+  front, all of it kept.
+
+## How small terranes dock (PLT-770, PLT-771, 2026-10-30)
+
+The coast-with-high-ground audit (docs/research/notes/coast-high-ground-audit-2026-10-30.md) read
+the model's small terranes as turned into collision belts: terranes under 50 samples are 0.54 of the
+hand-offs, they dock in 0 to 2 Myr, and 0.95 of the crust that crosses their fronts stays as thickness
+on the overriding plate (PLT-242), where "on Earth such fragments accrete as area or subduct". The
+docking lane measured base33's cached runs, read the sources and built the missing branch behind a
+switch, `tectonics.terrane_docking_cover` (on by default since 2026-10-31, decisions log). Design: docs/design/small-terrane-docking.md (its
+tables in full).
+
+### What base33 does with them (24 runs, measurement only)
+
+`tools/review/terranes/dock_records.py` (the dynamics record, the crust budget) and
+`tools/review/terranes/dock_maps.py` (the crust-budget maps), on key 31c7c70bd7c7:
+
+- **How many and how fast.** Hand-offs of terranes under 50 samples (about 255,000 km², a sample
+  5,100 km²) come 29.2 times per 100 Myr, 50 to 200 samples 13.3, 200 to 1,000 samples 8.6, larger 3.9
+  (medians over the runs); partings 15.0 parted, 4.3 reversed, 4.9 closed, 1.2 open at the end. Under 50 samples a hand-off lasts 0 / 0 / 4 Myr (p25 / p50 / p75) with 123 / 151 /
+  200 km of shortening, all on PLT-068's threshold, at a convergence that does not slow (54.8 mm/yr at
+  the onset, 60.1 at the end): half dock in the step they begin, one step's convergence crossing.
+- **How much each crossing keeps.** 30,200 / 42,500 / 62,400 km² of crust crosses, 0.086 of all the
+  crust crossing collision fronts by area; at the run's mean crossing thickness (32.8 km) and kept
+  share (0.946), 0.94 / 1.31 / 1.93 million km³ a hand-off. Of what reached the front, 0.35 (the median;
+  0.52 pooled) crossed and the rest moved to the overriding plate as area.
+- **How high their belts stand.** The front's largest uplift, summed over the steps, is 3.5 / 5.1 /
+  7.6 km; at the run's end the land those hand-offs stamped (0.046 of the land) stands 219 / 498 / 702
+  m over the sea (p90 1,244 m), 0.056 of it above 2 km, a median 374 km from the sea.
+- **How much of the coast with high ground they make.** On the final map (the plate model's ground on
+  100,000 Fibonacci points, M5 0.142 against the census grid's 0.1325; each collision stamp matched to
+  its collision state by plate and time, 0.66 of the points with more than one candidate), the
+  nearest qualifying high ground of 0.0099 of the coast is a hand-off under 50 samples', 0.0037 one of
+  50 to 200; without those two classes' high ground M5 is 0.1288, 0.0055 lower (0.0082 by the mean
+  over runs). The collisions open at the end hold 0.0547 (without them M5 is 0.095), the Andean
+  margins 0.0284.
+- **What they are.** The bodies of one plate's continental crust under 50 samples, not their plate's
+  largest (127 a snapshot from -900 to -50 Myr), have 19.0 km of own crust at the median (8.9 to 34.2
+  from p10 to p90), 0.73 of them island arcs by their magma (14.4 km on 7 km of ocean crust), the
+  rest 28.6 km; 0.18 of them dry.
+- **How big they are across the front.** The hand-offs under 50 samples reach 333 / 455 / 642 km
+  across the front (the shortening plus the rest's area over the front's length; p10 254, p90 887);
+  the larger classes 1,236 km and more at the median.
+
+### What Earth does
+
+A Sonnet research sub-agent read the sources (copied in the design with pages; the full texts of
+Cloos 1993 and Tetreault & Buiter 2012 could not be got, their abstracts were read). Small buoyant
+bodies go down with the slab, scraped of a sliver: "the force of the subducting slab drives
+subduction and can most likely overcome the buoyancy of small crustal units (Molnar and Gray, 1979;
+Cloos, 1993)", "Seamounts and submarine volcanics subduct easily if they are not incorporated into the
+accretionary prism" (Tetreault & Buiter 2014, p. 1265); "in most cases only the upper 2–5 km of arc
+crust are accreted onto continents through thin-skinned thrusting and preserved. This most likely
+occurs when island arcs are on the subducting plate" (p. 1251); seamounts "generally subducted, with
+only thin slices of basalts (<1 km thick) being offscraped" (Clift et al. 2009, p. 95); "lithospheric
+buoyancy does not prevent FAT subduction during constant convergence" (Tetreault & Buiter 2012,
+abstract). Larger ones jam and dock: "Many of the larger FATs such as oceanic plateaus and continental
+fragments are accreted by collision" (Tetreault & Buiter 2014, p. 1246), underplating "perhaps the
+most common type of terrane accretion" (p. 1245), "terrane–continent collision leaving behind accreted
+terranes 25–40 km thick" (p. 1243). The size between: Yan et al. 2021 (abstract) find steep subduction
+"without subduction zone reorganization" for a "small‐sized (≤150 km)" plateau and a breakoff and flat
+slab, or a jump behind the plateau, for a "moderate‐sized (≥300 km)" one with a depleted root. The
+upper plate over a docking body: the Cordillera de Talamanca over the subducting Cocos Ridge, "rock
+uplift ... no greater than ∼2 km" and "40 km since the Pliocene" of shortening (Morell et al. 2012);
+the Yakutat terrane's "Earth’s highest coastal mountain range" (Enkelmann et al. 2008); Taiwan's
+accreting Luzon arc 0 to 1.68 km (Lai et al. 2022).
+
+### Reading the model against them
+
+At the quick planet's 71-km lattice the model's "small" terranes are moderate bodies: 333 to 642 km
+across the front (p25 to p75), Yan et al.'s reorganizing size, island arcs at Cloos's 15 km and
+continental fragments near Tetreault & Buiter's 24.8 km mean. Docking them as collisions is in kind
+Earth's (the rest of the terrane accretes as area, the crossing underplates the overriding plate's
+edge), and the land they leave stands at Talamanca's and the Coastal Range's heights. They hold about
+0.006 to 0.008 of M5 at most (the audit's +0.01 about), and that part is not missing physics. What is
+missing is the small branch: a body the slab can pull down is docked as a collision too.
+
+### The law (`tectonics.terrane_docking_cover`, PLT-770, PLT-771; on by default since 2026-10-31)
+
+Each step, at each collision front whose contact still has a slab of the pair: the slab's reach
+against a body's buoyancy, S* = L / (1 + 2.25 T / 30 km) (FRC-030's buoyancy of the dragged length
+against the pull of the dense slab left; L the slab's length up to 700 km, PLT-184; T the body's crust
+thickness at the front): 215 km under 30 km of crust, 329 km under 15 km. Each body at the front is
+judged on its own, its extent across the front being all its area (the part already under the
+overriding plate and the rest) over its share of the front's length; the front goes down when every
+body is within its S*, a body beyond holding the whole front, and keeps that judgment while its
+bodies go down (each body remembered by its samples; one that crust joins is judged again, alone,
+by all its samples over the share of the front it was judged with). Then of the crossing crust only the cover
+(sediment, sedimentary and volcanic rock, PLT-771: 2.5 km of a model island arc of 15 km, inside the
+"upper 2–5 km") and the crust this collision stacked on it stay, pool by pool, by PLT-242's share, all
+of it on the overriding plate (no pro-wedge on a terrane going down: the cover is offscraped against
+the overriding plate, "added onto the accretionary prism"); the rest is counted as
+`plates/collision_stripped_km3`; it does not transfer at PLT-068's threshold, and its front feeds the
+slab instead of blocking it (FRC-019). A larger terrane jams and collides as before. The extent
+condition is the project's reading of Cloos's buoyancy for a body of finite size along the slab
+(Cloos's own result is a thickness). It is not bracketed by Yan et al.: it takes in their 150 km at any
+thickness but passes their 300 km under crust thinner than about 18 km, where they find the slab
+breaks off and subducts flat or the subduction jumps (the model has neither); nor is it conservative
+either way (it leaves out the help of the slab beside a body short along the trench, and takes the
+slab's whole pull with no resistance of the mantle). The pull is not applied at the terrane's own
+front samples (continental front samples resist only): it goes down at the convergence the plates'
+other forces keep.
+
+On base33 the hand-offs within that reach are 0.054 (220 km, continental fragments) to 0.127 (270 km,
+arcs) of those under 50 samples and almost none of the larger, so the law is expected to move the
+coast with high ground by less than the small terranes' 0.006 to 0.008 and the continental crust by a
+few hundredths of a km³ a year (the project's estimates before the arm). On base34 (the freeboard
+merge) the small bodies are fewer and thinner (60 a snapshot against 127, a median 10 km of own crust
+against 19, 0.75 of their samples under Cloos's 15 km), so the reach is longer (308 km under 17 km of
+crust, 391 km under 10.5 km, on a full slab) and 0.18 to 0.38 of the hand-offs under 50 samples are
+within it, while their share of the coast with high ground fell to 0.002 to 0.004: the expected move is
+less than that, and about 0.02 to 0.07 km³ a year of crust (the project's estimates). A finer lattice
+resolves smaller bodies, and there it reaches more of them.
+
+On the pool (2026-10-31; arm small-terrane, key dcf0d7480ef3, 8 runs, on the collision orogen's
+physics, PLT-730, PLT-731 and PLT-740 set on, against orog-cum, the same physics without the law;
+medians, Mann-Whitney p in brackets): the guard clean (the worst 10,154 m from the sea against 9,945,
+p 0.51; no step beyond 2 Earth reliefs). Hand-offs under 50 samples 12.3 per 100 Myr against 17.6
+(p 0.014), the larger classes unchanged; partings 29.2 against 23.3, 5.8 per 100 Myr of them terranes
+that went down whole; crust stripped 0.035 km³ a year (p25 to p75 0.029 to 0.043), about 1 % of Stern &
+Scholl's 3.2 km³ a year of additions. No V1 number beyond the seeds' spread: land 0.222 against 0.205
+(p 0.19), the largest landmass 0.083 against 0.074 (p 0.33), continental crust under the sea 0.567
+against 0.605 (p 0.16), the coast with high ground 0.091 against 0.067 (p 0.38); collision high coasts on
+landmasses under 0.02 of the land 0.359 against 0.668 (p 0.44). The design's "What the arm showed" has
+the rest. That arm ran the first build, which PR #51's review (2026-10-31) corrected: the two wedges put
+the kept cover on the terrane going down (its pro flank), where it crossed again and was stripped;
+the restacked rock took the cover's mix; two bodies at one front were pooled; the slab broke off
+under a body slower than 10 Myr; and the extent, read each step as the shortening plus the visible
+rest, overshot halfway down by the lattice's lag. The build above is the corrected one.
+
+Its arm (small-terrane-2, key a7bb6d240ebe, the same settings and seeds, against orog-cum; master's
+heat flow of late continental crust, PLT-469, is in it too): hand-offs under 50 samples 13.3 per 100
+Myr against 17.6 (p 0.010), partings 30.4 against 23.3 (p 0.005), collision high coasts on landmasses
+under 0.02 of the land 0.346 against 0.668 (p 0.038), crust stripped 0.033 km³ a year; no step beyond
+2 Earth reliefs, the deepest trench floor 10,243 m against 9,945 (p 0.001), half the guard's 19.8 km;
+no V1 number beyond the seeds' spread (the coast with high ground 0.092 against 0.067, p 0.33; land
+0.210 against 0.205, p 0.80; continental crust under the sea 0.582 against 0.605, p 1.0).
 
 ## Sediment by margin type and the margin's sediment (PLT-660 to PLT-662, 2026-10-25)
 
