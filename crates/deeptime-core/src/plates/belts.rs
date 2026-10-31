@@ -49,8 +49,8 @@
 //!    the metre (the sliver rule above and the strength height's passes): only where it lands
 //!    moves.
 //!
-//!    With `collision_two_wedges` (PLT-730, off: its pool arm put more collision land at the
-//!    coast, plates.md "Step 20") the orogen
+//!    With `collision_two_wedges` (PLT-730, on by default since 2026-10-31; plates.md "Step 20"
+//!    and "The collision orogen") the orogen
 //!    is two wedges about the front instead: a doubly vergent orogen grows as a pro-wedge over
 //!    the lower plate at the lesser critical taper and a retro-wedge over the upper plate at the
 //!    greater, about the point where the lower plate's mantle goes down (Willett, Beaumont &
@@ -64,6 +64,20 @@
 //!    capped), and past the strength height the crest widens as a plateau on the overriding side.
 //!    The pro-wedge's crust rides its plate to the front and crosses whole (PLT-400), to be
 //!    stacked again on both sides.
+//!
+//!    With `collision_retro_plateau` too (PLT-740, on by default since 2026-10-31; the design
+//!    `docs/design/collision-orogen.md`, O2) that plateau has no set width: when the step's crust
+//!    is not all placed with the retro flank's samples within `collision_belt_km` at their
+//!    limits, the flank is searched again through the overriding plate's continental samples
+//!    (twice the reach each time) and the same fill runs over it, until the crust is placed or
+//!    the plate's connected continental crust is all taken. A doubly vergent orogen turns into a
+//!    plateau that grows "laterally at constant thickness" (Vanderhaeghe et al. 2003, p. 27),
+//!    retro-ward (p. 41), "located mostly on the retro-side" (Wolf et al. 2021, p. 25); its pro
+//!    edge staying near the subduction point is a research sub-agent's reading of Vanderhaeghe et
+//!    al.'s Fig. 11c, not a sentence of theirs. A plateau grows "by tectonic thickening and
+//!    accretion of adjacent crust in the transition zone" (Medvedev & Beaumont, preprint, p. 3).
+//!    It grows through its own continental crust, under the sea or not, never across ocean floor.
+//!    Only what the connected crust cannot hold goes to the no-room rule below.
 //!
 //!    With `collision_noroom_stays` (PLT-700, on) nothing goes down for want of room: the belt's
 //!    passes run until the crust is placed or every sample stands at the strength height (no
@@ -82,7 +96,14 @@
 //! Both are stamped as a collision orogeny where they rose by more than 5 m/Myr (the subduction
 //! fronts' rule): the `collision` regime the structure stage folds and thrusts, the orogen
 //! provinces, the young-orogen weakness of the flexure. The fold direction is the shortening
-//! direction, the front's normal.
+//! direction, the front's normal. The retro plateau beyond the belt's reach (PLT-740) is stamped
+//! too but stays outside the collision's footprint (no convergence, shortening or carrier, PLT-260),
+//! so the structure stage gives it no collision folds or thrusts: its crust comes by the orogen's
+//! flow from the front, not by shortening its own upper crust. Tibet's eastern margin rose
+//! "without significant shortening of the upper crust" (Clark & Royden 2000, p. 703) and the
+//! plateau's interior extends east-west (Armijo et al. 1986; Blisniuk et al. 2001; abstracts).
+//! The limits: Vanderhaeghe et al. (2003, p. 40) find "pure shear thickening in the upper crust"
+//! of one model's plateau, and the interior's normal faults are not modelled.
 //!
 //! **The foreland basin** is not built here. The uplift on continental crust is a load the
 //! surface stage's flexure solve (`surface/flexure.rs`) carries, and the stiff incoming plate
@@ -207,6 +228,10 @@ pub const STAYS_GLOBAL: &str = "plates/collision_noroom_stays_km3";
 /// only; ledger: PLT-601): the toe advancing, so whether the width `collision_belt_km` (PLT-241)
 /// bounds the belt at all. Zero without `collision_belt_taper`.
 pub const TOE_GLOBAL: &str = "plates/collision_taper_toe_km3";
+/// With `collision_retro_plateau` (PLT-740): the crust the two wedges' retro plateau took beyond
+/// the belt's reach (`collision_belt_km`), km³ of crust (in [`KEPT_GLOBAL`] too; measurement only,
+/// written only with the switch so a run without it keeps its globals list).
+pub const PLATEAU_GLOBAL: &str = "plates/collision_retro_plateau_km3";
 /// The overriding plates' share (`collision_upper_plate_shortening`, PLT-652; measurement only,
 /// written only with the switch): the crust their interiors took instead of the fronts, km³ (in
 /// [`KEPT_GLOBAL`] too) …
@@ -309,6 +334,10 @@ pub struct Stacked {
     /// What the critical-taper belt took after it was full to its width, km² × m of crust
     /// (measurement only, [`TOE_GLOBAL`]).
     pub toe_km2_m: f64,
+    /// What the two wedges' retro plateau took beyond the belt's reach
+    /// (`collision_retro_plateau`, PLT-740), km² × m of crust (measurement only; in
+    /// `belt_km2_m` too).
+    pub plateau_km2_m: f64,
     /// Crust added to the belt and to the wedge, km² × m: Σ added thickness × a sample's area.
     pub belt_km2_m: f64,
     pub wedge_km2_m: f64,
@@ -810,6 +839,8 @@ fn stack_front(
     };
     // The pro-wedge's crust with two wedges (PLT-730), km² × m of rise.
     let mut pro_km2_m = 0.0;
+    // … and what its retro plateau took beyond the belt's reach (PLT-740), km² × m of rise.
+    let mut plateau_km2_m = 0.0;
     if belt_weight > 0.0 && belt_rise_km2_m > 0.0 {
         let cap_m = k.strength_height_m(env.gravity);
         let z_of: Vec<f64> = belt
@@ -833,23 +864,78 @@ fn stack_front(
                 .iter()
                 .map(|&(i, _)| f64::from(samples[i].elevation_m))
                 .collect();
-            let retro_d: Vec<f64> = belt_d.iter().map(|&(_, _, d)| norm.km(d)).collect();
             let retro_tan = tan * k.retro_slope_ratio;
-            let (pro_g, retro_g) = fill_two_wedges(
-                Flank {
-                    d_km: &pro_d,
-                    z: &pro_z,
-                    tan,
-                },
-                Flank {
-                    d_km: &retro_d,
-                    z: &z_of,
-                    tan: retro_tan,
-                },
-                belt_rise_km2_m,
-                area,
-                cap_m,
-            );
+            let fill = |retro_d: &[f64], retro_z: &[f64]| {
+                fill_two_wedges(
+                    Flank {
+                        d_km: &pro_d,
+                        z: &pro_z,
+                        tan,
+                    },
+                    Flank {
+                        d_km: retro_d,
+                        z: retro_z,
+                        tan: retro_tan,
+                    },
+                    belt_rise_km2_m,
+                    area,
+                    cap_m,
+                )
+            };
+            let retro_d: Vec<f64> = belt_d.iter().map(|&(_, _, d)| norm.km(d)).collect();
+            let (mut pro_g, mut retro_g) = fill(&retro_d, &z_of);
+            // ledger: PLT-740. With `collision_retro_plateau`, crust the two could not hold with
+            // the belt's samples at their limits goes on retro-ward as a plateau: the flank is
+            // searched again, through the overriding plate's continental samples only, to twice
+            // the reach, until the step's crust is placed or the connected crust is all taken
+            // (a doubling that reaches no new sample has reached all of it: no edge is longer than
+            // the reach). The plateau's samples are those beyond the belt's reach, each at its
+            // distance through its own crust; the fill is the same, so they stand at the
+            // strength height nearest the belt first, the flank beyond them at the retro slope.
+            let mut plateau: Vec<(usize, f64)> = Vec::new();
+            if k.collision_retro_plateau && cap_m > 0.0 {
+                let left = |p: &[f64], r: &[f64]| {
+                    belt_rise_km2_m - (p.iter().sum::<f64>() + r.iter().sum::<f64>()) * area
+                };
+                let (mut rad, mut reached) = (w_rad, 0usize);
+                while left(&pro_g, &retro_g) > 1e-9 * belt_rise_km2_m {
+                    rad *= 2.0;
+                    let field = dijkstra_sorted(
+                        geo,
+                        &reach.src_over,
+                        |_, b| reach.over_ok(b) && samples[b as usize].kind == CONTINENTAL,
+                        rad,
+                    );
+                    if field.len() <= reached {
+                        break;
+                    }
+                    reached = field.len();
+                    plateau = field
+                        .into_iter()
+                        .filter(|&(i, d, _)| {
+                            d > w_rad
+                                && samples[i as usize].kind == CONTINENTAL
+                                && belt_d.binary_search_by_key(&(i as usize), |e| e.0).is_err()
+                        })
+                        .map(|(i, d, _)| (i as usize, d))
+                        .collect();
+                    let d_all: Vec<f64> = retro_d
+                        .iter()
+                        .copied()
+                        .chain(plateau.iter().map(|&(_, d)| norm.km(d)))
+                        .collect();
+                    let z_all: Vec<f64> = z_of
+                        .iter()
+                        .copied()
+                        .chain(
+                            plateau
+                                .iter()
+                                .map(|&(i, _)| f64::from(samples[i].elevation_m)),
+                        )
+                        .collect();
+                    (pro_g, retro_g) = fill(&d_all, &z_all);
+                }
+            }
             for (&(i, d), g) in pro.iter().zip(pro_g) {
                 if g > 0.0 {
                     rises.push((i, g, Part::Wedge, d));
@@ -857,9 +943,16 @@ fn stack_front(
                     pro_km2_m += g * area;
                 }
             }
+            for (&(i, d), &g) in plateau.iter().zip(&retro_g[belt_d.len()..]) {
+                if g > 0.0 {
+                    rises.push((i, g, Part::Plateau, d));
+                    plateau_km2_m += g * area;
+                }
+            }
             // What the two could not hold with every sample at the strength height.
             let placed = pro_km2_m + retro_g.iter().sum::<f64>() * area;
             capped_km2_m = (belt_rise_km2_m - placed).max(0.0) * COLUMN_ISOSTATIC_FACTOR;
+            retro_g.truncate(belt_d.len());
             retro_g
         } else {
             let old = fill_belt(
@@ -912,7 +1005,8 @@ fn stack_front(
         let mut edge_rise: Vec<(usize, f64)> = Vec::new();
         if k.collision_noroom_stays {
             let left_km2_m =
-                (belt_rise_km2_m - pro_km2_m - given.iter().sum::<f64>() * area).max(0.0);
+                (belt_rise_km2_m - pro_km2_m - plateau_km2_m - given.iter().sum::<f64>() * area)
+                    .max(0.0);
             let edge: Vec<usize> = f
                 .edge
                 .iter()
@@ -1008,6 +1102,10 @@ fn stack_front(
         match part {
             Part::Wedge => out.stacked.wedge_km2_m += added * area,
             Part::Belt => out.stacked.belt_km2_m += added * area,
+            Part::Plateau => {
+                out.stacked.belt_km2_m += added * area;
+                out.stacked.plateau_km2_m += added * area;
+            }
             Part::Upper => {
                 // The interior's columns: stamped as the belt's are (with
                 // `collision_upper_stamp_resolvable` only at a resolvable strain rate, PLT-732),
@@ -1051,7 +1149,8 @@ fn stack_front(
 
     // The collision's footprint, for the structure stage (`structure::deform::emplace`): every
     // sample of the belt, the wedge and the foreland within reach of the basin carries the
-    // convergence and the shortening of this collision; the foreland on the incoming plate
+    // convergence and the shortening of this collision (not the retro plateau beyond the belt's
+    // reach, PLT-740: grown by the orogen's flow, the module docs); the foreland on the incoming plate
     // beyond the wedge's toe is flagged. Where two collisions meet the larger values stay and a
     // belt or wedge sample is never a foreland one.
     // ledger: PLT-260 (the footprint); PLT-249 (the basin's reach).
@@ -1395,11 +1494,13 @@ fn fill_two_wedges(
 }
 
 /// Where a rise of the step's stacking goes: the wedge on the incoming plate, the belt behind the
-/// front, or the overriding plate's interior (PLT-652).
+/// front, the two wedges' retro plateau beyond the belt's reach (PLT-740, counted with the belt),
+/// or the overriding plate's interior (PLT-652).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Part {
     Wedge,
     Belt,
+    Plateau,
     Upper,
 }
 
@@ -1903,6 +2004,10 @@ mod tests {
         // taper (the default) the front's edge in this fixture stands at its own height until
         // the toe advances (ledger: PLT-600, PLT-601); the taper's own tests check it.
         fx.preset.tectonics.collision_belt_taper = false;
+        // The old law (PLT-243, PLT-244): crust on the overriding plate within the belt and the
+        // capped wedge only, whatever the default (the two wedges, PLT-730, on since 2026-10-31,
+        // put the pro-wedge's crust on the incoming plate and the retro plateau's behind the belt).
+        fx.preset.tectonics.collision_two_wedges = false;
         // The old default share (0.5), so twelve steps stay under the strength height (PLT-253)
         // and every step's rise shows in the belt's height.
         fx.preset.tectonics.collision_stacking_share = 0.5;
@@ -1996,11 +2101,10 @@ mod tests {
     fn a_collisions_own_wedge_crosses_whole_with_the_switch() {
         let mut fx = Fixture::new();
         fx.preset.tectonics.collision_threshold_km = 1.0e9;
-        // PLT-243's profile, so the wedge (PLT-244) builds from the first step and its crust
-        // reaches the front within six. Under the critical taper the front's edge in this
-        // fixture stands at its own height until the toe advances, and the wedge waits for it
-        // (ledger: PLT-600, PLT-601).
-        fx.preset.tectonics.collision_belt_taper = false;
+        // The two wedges (PLT-730, on since 2026-10-31) give the incoming plate its pro-wedge
+        // from the first step, so its crust reaches the front within six; the belt's taper
+        // (PLT-600) is the old belt laws' and plays no part here.
+        assert!(fx.preset.tectonics.collision_two_wedges);
         let share = 0.5;
         fx.preset.tectonics.collision_stacking_share = share;
         let mut restacked = false;
@@ -2630,7 +2734,12 @@ mod tests {
     /// little more.)
     #[test]
     fn the_front_keeps_its_taper_and_strength_height_beside_the_interiors_share() {
-        let weak = |fx: &mut Fixture| fx.preset.tectonics.crust_strength_mpa = 40.0;
+        let weak = |fx: &mut Fixture| {
+            fx.preset.tectonics.crust_strength_mpa = 40.0;
+            // The belt from critical taper (PLT-600, PLT-601), lowest at the front, whatever the
+            // default: the two wedges (PLT-730, on since 2026-10-31) stand their crest at the front.
+            fx.preset.tectonics.collision_two_wedges = false;
+        };
         let off = upper_run(150.0, false, 12, weak);
         let r = upper_run(150.0, true, 12, weak);
         let k = &r.fx.preset.tectonics;
@@ -3166,6 +3275,157 @@ mod tests {
         );
     }
 
+    /// PLT-740 on a head-on collision with two wedges whose retro flank within the belt's reach
+    /// and whose pro side already stand at the strength height: with the switch the step's crust
+    /// goes beyond `collision_belt_km` through the overriding plate's continental crust as a plateau
+    /// at the strength height and stops at ocean floor between two of its continents: every
+    /// sample before the ocean rises, nothing on it or across it, and the no-room rule (PLT-700,
+    /// the shipped path) takes what the connected crust cannot hold. The volume is kept; off, the
+    /// no-room rule takes all of it and nothing beyond the belt rises.
+    #[test]
+    fn the_retro_plateau_grows_past_the_belt_through_its_own_crust() {
+        let mut out = Vec::new();
+        for on in [false, true] {
+            let mut fx = Fixture::new();
+            fx.preset.tectonics.collision_threshold_km = 1.0e9;
+            fx.preset.tectonics.collision_two_wedges = true;
+            fx.preset.tectonics.collision_retro_plateau = on;
+            // The front alone: the interior's share (PLT-652) rises elsewhere on the plate.
+            fx.preset.tectonics.collision_upper_plate_shortening = false;
+            let belt_km = fx.preset.tectonics.collision_belt_km;
+            let cap = fx.preset.tectonics.strength_height_m(9.81);
+            let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
+            let pts = fx.geo.points();
+            let norm = fx.norm;
+            // The overriding side: at the strength height within the belt's reach (and a sample
+            // spacing more), 20 m under it for 400 km beyond, ocean floor 400 km wide, then
+            // lowland at 300 m. One step's crust (about 285,000 m km per km of front, PR #50's
+            // review) fills a 300 m lowland only about 120 km past the belt; 20 m under the
+            // strength height it fills the 400 km to the ocean with crust left over.
+            let spacing = norm.km(norm.spacing_rad());
+            let (low, sea_from, sea_to) = (
+                cap - 20.0,
+                belt_km + spacing + 400.0,
+                belt_km + spacing + 800.0,
+            );
+            let behind = |p: DVec3| norm.km((-p.x).clamp(-1.0, 1.0).asin());
+            for (i, s) in st.samples.iter_mut().enumerate() {
+                let p = pts[i];
+                if s.kind != CONTINENTAL {
+                    continue;
+                }
+                if p.x >= 0.0 {
+                    // The incoming side, pro-wedge and all, at the strength height: no room.
+                    s.elevation_m = cap as f32;
+                    continue;
+                }
+                let x = behind(p);
+                if x <= belt_km + spacing {
+                    s.elevation_m = cap as f32;
+                } else if x <= sea_from {
+                    s.elevation_m = low as f32;
+                } else if x <= sea_to {
+                    let mut sea = Sample::blank(0);
+                    sea.elevation_m = -4000.0;
+                    *s = sea;
+                }
+            }
+            let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
+            let t0: Vec<f32> = st.samples.iter().map(|s| s.thickness_m).collect();
+            let area = fx.norm.sample_area_km2();
+            let before = crust_km2_m(&st, area);
+            let (stacked, _) = fx.step(&mut st, 1, None);
+            let s = stacked[&0].clone();
+            let added = crust_km2_m(&st, area) - before;
+            let kept = s.belt_km2_m + s.wedge_km2_m + s.upper_km2_m;
+            assert!(
+                (added - kept).abs() < 1e-4 * added.max(1.0),
+                "on {on}: the record is the crust added, {added} vs {kept}"
+            );
+            // On the overriding side beyond the belt (the samples set at the strength height
+            // reach a spacing past it): the lowland before the ocean (its rise, its samples, those
+            // that rose, its highest), the lowland across it, and the ocean floor.
+            let (mut near, mut count, mut rose) = (0.0f64, 0usize, 0usize);
+            let (mut top, mut far, mut ocean) = (f64::NEG_INFINITY, 0.0f64, 0.0f64);
+            let (mut strip, mut beyond) = (0usize, 0usize);
+            for (i, x) in st.samples.iter().enumerate() {
+                let p = pts[i];
+                if p.x >= 0.0 {
+                    continue;
+                }
+                let dz = f64::from(x.elevation_m - z0[i]);
+                let d = behind(p);
+                if x.kind != CONTINENTAL {
+                    if arc(p) && d > sea_from && d <= sea_to {
+                        ocean += (dz.abs() + f64::from((x.thickness_m - t0[i]).abs())) * area;
+                        strip += 1;
+                    }
+                    continue;
+                }
+                if d > belt_km + spacing && d <= sea_from {
+                    near += dz.max(0.0) * area;
+                    count += 1;
+                    rose += usize::from(dz > 0.0);
+                    top = top.max(f64::from(x.elevation_m));
+                } else if d > sea_to {
+                    far += dz.abs() * area;
+                    beyond += 1;
+                }
+            }
+            assert!(strip > 0 && beyond > 0, "an ocean between two continents");
+            out.push((s, near, far, top, cap, count, rose, ocean));
+        }
+        let (off, on) = (&out[0], &out[1]);
+        assert!(
+            off.0.stays_km2_m > 0.0,
+            "off: the no-room rule takes it: {:?}",
+            off.0
+        );
+        assert_eq!(off.0.plateau_km2_m, 0.0);
+        assert!(
+            off.1 < 1e-6 && off.2 < 1e-6 && off.6 == 0,
+            "off: nothing beyond the belt rose: {off:?}"
+        );
+        assert!(
+            on.0.plateau_km2_m > 0.0 && on.1 > 0.0,
+            "on: the plateau took crust: {:?}",
+            on.0
+        );
+        assert!(
+            on.5 > 0 && on.6 == on.5,
+            "on: every sample of the lowland before the ocean rose: {} of {}",
+            on.6,
+            on.5
+        );
+        assert!(on.2 < 1e-6, "on: nothing across the ocean rose: {on:?}");
+        assert!(
+            on.7 < 1e-6 && off.7 < 1e-6,
+            "nothing on the ocean floor: {} and {}",
+            on.7,
+            off.7
+        );
+        assert!(
+            on.3 <= on.4 + 1e-3,
+            "on: the plateau stands at most at the strength height: {} vs {}",
+            on.3,
+            on.4
+        );
+        assert!(
+            on.0.stays_km2_m > 0.0 && on.0.stays_km2_m < off.0.stays_km2_m,
+            "on: the no-room rule takes what the connected crust cannot hold: {} vs {}",
+            on.0.stays_km2_m,
+            off.0.stays_km2_m
+        );
+        // The same crust is kept either way, only where it lands moves.
+        let kept = |s: &Stacked| s.belt_km2_m + s.wedge_km2_m + s.upper_km2_m;
+        assert!(
+            (kept(&on.0) - kept(&off.0)).abs() < 1e-6 * kept(&off.0),
+            "{} vs {}",
+            kept(&on.0),
+            kept(&off.0)
+        );
+    }
+
     /// PLT-600 on a head-on collision: the belt's ground rises behind the front, not at it (the
     /// front is the toe), and the step keeps the crust the old profile kept.
     #[test]
@@ -3175,6 +3435,8 @@ mod tests {
             let mut fx = Fixture::new();
             fx.preset.tectonics.collision_threshold_km = 1.0e9;
             fx.preset.tectonics.collision_belt_taper = taper;
+            // The belt laws of PLT-243 and PLT-600, not the two wedges (PLT-730, on since 2026-10-31).
+            fx.preset.tectonics.collision_two_wedges = false;
             let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
             let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
             let (stacked, _) = fx.step(&mut st, 1, None);
@@ -3235,8 +3497,10 @@ mod tests {
             fx.preset.tectonics.collision_threshold_km = 1.0e9;
             fx.preset.tectonics.collision_belt_km = 2000.0;
             fx.preset.tectonics.collision_belt_taper = taper;
-            // The sliver rule itself (PLT-700 off).
+            // The sliver rule itself (PLT-700 off), under the old belt laws: the two wedges
+            // (PLT-730, on since 2026-10-31) have no sliver rule.
             fx.preset.tectonics.collision_noroom_stays = false;
+            fx.preset.tectonics.collision_two_wedges = false;
             let mut st = sliver_plates(&fx);
             let (stacked, _) = fx.step(&mut st, 1, None);
             let s = &stacked[&0];
@@ -3321,6 +3585,9 @@ mod tests {
                 fx.preset.tectonics.collision_belt_km = 2000.0;
                 fx.preset.tectonics.collision_belt_taper = taper;
                 fx.preset.tectonics.collision_noroom_stays = on;
+                // The old belt laws, whose sliver rule loses the crust for want of room: the two
+                // wedges (PLT-730, on since 2026-10-31) hold it on the incoming plate too.
+                fx.preset.tectonics.collision_two_wedges = false;
                 let mut st = sliver_plates(&fx);
                 let area = fx.norm.sample_area_km2();
                 let before = crust_km2_m(&st, area);
@@ -3363,6 +3630,9 @@ mod tests {
             let mut fx = Fixture::new();
             fx.preset.tectonics.collision_threshold_km = 1.0e9;
             fx.preset.tectonics.collision_noroom_stays = on;
+            // The old belt laws, whose belt part goes down for want of room: the two wedges
+            // (PLT-730, on since 2026-10-31) put the pro-wedge's crust on the incoming plate.
+            fx.preset.tectonics.collision_two_wedges = false;
             // The interior's share (PLT-652) rises elsewhere on the plate: the front alone here.
             fx.preset.tectonics.collision_upper_plate_shortening = false;
             let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
@@ -3399,6 +3669,57 @@ mod tests {
             "{} vs {}",
             on.0.stays_km2_m,
             off.0.capped_km2_m
+        );
+    }
+
+    /// PLT-700 on the shipped path (the two wedges, PLT-730, and the retro plateau, PLT-740, on):
+    /// an arc in collision whose incoming continent already stands at the strength height has no
+    /// room in either wedge and no continental crust for a plateau, so the no-room rule puts the
+    /// step's crust on the arc's edge at the front, and the step keeps it.
+    #[test]
+    fn an_arc_in_collision_takes_the_crust_on_its_edge_on_the_shipped_path() {
+        let mut fx = Fixture::new();
+        fx.preset.tectonics.collision_threshold_km = 1.0e9;
+        let k = &fx.preset.tectonics;
+        assert!(k.collision_two_wedges && k.collision_retro_plateau && k.collision_noroom_stays);
+        // The interior's share (PLT-652) rises elsewhere on the plate: the front alone here.
+        fx.preset.tectonics.collision_upper_plate_shortening = false;
+        let cap = fx.preset.tectonics.strength_height_m(9.81);
+        let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
+        for s in st.samples.iter_mut() {
+            if s.group == 0 {
+                let mut ocean = Sample::blank(0);
+                ocean.elevation_m = -2000.0;
+                *s = ocean;
+            } else if s.kind == CONTINENTAL {
+                s.elevation_m = cap as f32;
+            }
+        }
+        let t0: Vec<f32> = st.samples.iter().map(|s| s.thickness_m).collect();
+        let area = fx.norm.sample_area_km2();
+        let before = crust_km2_m(&st, area);
+        let (stacked, _) = fx.step(&mut st, 1, None);
+        let s = stacked[&0].clone();
+        assert_eq!(s.belt_class, BeltClass::Empty);
+        let added = crust_km2_m(&st, area) - before;
+        let kept = s.belt_km2_m + s.wedge_km2_m + s.upper_km2_m;
+        assert!(
+            (added - kept).abs() < 1e-4 * added.max(1.0),
+            "the record is the crust added, {added} vs {kept}"
+        );
+        assert_eq!(s.plateau_km2_m, 0.0, "no continental crust to grow through");
+        assert!(s.capped_km2_m == 0.0 && s.stays_km2_m > 0.0, "{s:?}");
+        let over: f64 = st
+            .samples
+            .iter()
+            .zip(&t0)
+            .filter(|(s, _)| s.group == 0)
+            .map(|(s, &t)| f64::from(s.thickness_m - t) * area)
+            .sum();
+        assert!(
+            (over - s.stays_km2_m).abs() < 1e-3 * s.stays_km2_m,
+            "the edge took what found no room: {over} vs {}",
+            s.stays_km2_m
         );
     }
 

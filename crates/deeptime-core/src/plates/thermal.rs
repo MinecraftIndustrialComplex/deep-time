@@ -383,10 +383,13 @@ pub fn sample_heat_flow(l_km: f32, flags: u8) -> f32 {
     heat_flow_mw_m2(f64::from(l_km), flags) as f32
 }
 
-/// The final pass after the step's resampling (ledger: PLT-469): crust that became continental
-/// after the step set its heat flow (the rate guard's spreading onto old floor, `collapse::spread`)
-/// kept the floor's; each continental sample gets at least its law's conductive value: the state's
-/// with `thermal_state`, else the old proxy's (55 + 35 e^(−t/60), PLT-137).
+/// The final pass after the step's resampling (ledger: PLT-469). Crust that became continental
+/// after the step set its heat flow (the rate guard's spread onto ocean floor after the
+/// resampling, `collapse::spread`) has none, since its floor's went with the floor's kind
+/// ([`Sample::make_continental`]): it gets its law's, as `finish_samples` sets it
+/// ([`continental_heat_flow`](super::continental_heat_flow)), with its floor's lithosphere under the
+/// state. Each other continental sample gets at least its law's conductive value: the state's with
+/// `thermal_state`, else the old proxy's (55 + 35 e^(−t/60), PLT-137).
 pub fn refresh_heat_flow(state: &mut PlateState, k: &TectonicParams, t_myr: f64) {
     if !(k.heat_flow_refresh || k.thermal_state) {
         return;
@@ -395,6 +398,10 @@ pub fn refresh_heat_flow(state: &mut PlateState, k: &TectonicParams, t_myr: f64)
     let reference = k.thermal_reference_km;
     state.samples.par_iter_mut().for_each(|s| {
         if s.kind != CONTINENTAL {
+            return;
+        }
+        if s.heat_flow_mw_m2 <= 0.0 {
+            s.heat_flow_mw_m2 = super::continental_heat_flow(s, t_myr, thermal, reference as f32);
             return;
         }
         let floor = if thermal {

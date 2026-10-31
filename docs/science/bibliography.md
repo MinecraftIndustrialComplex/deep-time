@@ -1002,7 +1002,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Clark, M. K. and Royden, L. H. (2000). Topographic ooze: Building the eastern margin of Tibet by lower crustal flow. Geology 28(8):703-706.
 - DOI or URL: 10.1130/0091-7613(2000)28<703:TOBTEM>2.0.CO;2.
 - Cited as: (ERO, ISO, HYP) "Clark & Royden 2000, Geology 28(8):703-706" (spread.rs). (PLT) "Clark & Royden 2000, Geology 28:703".
-- Ledger ids: ISO-018, ISO-020, ISO-022; ISO-070 (from memory: the law is derived with local isostasy); PLT-300, PLT-301 (2026-10-20: the channel flow out of Tibet and its 15 km channel, from memory; verified 2026-10-25, p. 705); PLT-414 (2026-10-22: the channel viscosities, abstract); PLT-581 (2026-10-25: the flow goes where the crust is weak, Fig. 5 caption, p. 706)
+- Ledger ids: ISO-018, ISO-020, ISO-022; ISO-070 (from memory: the law is derived with local isostasy); PLT-300, PLT-301 (2026-10-20: the channel flow out of Tibet and its 15 km channel, from memory; verified 2026-10-25, p. 705); PLT-414 (2026-10-22: the channel viscosities, abstract); PLT-581 (2026-10-25: the flow goes where the crust is weak, Fig. 5 caption, p. 706); PLT-740 (2026-10-31: the plateau's margin thickened with little upper-crustal shortening, p. 703)
 - Access: paywalled (GeoScienceWorld 403). Full text read 2026-10-25 (the front lane, by a Sonnet sub-agent) from a course copy: http://basin.earth.ncu.edu.tw/Course/SeminarII/abstract2014_1/2014.10.02_Sun,%20Yuan-Cheng/Topographic%20ooze%20building%20the%20eastern%20margin%20fo%20Tibet%20by%20low%20crustal%20flow.pdf (not stored in the library). Read: p. 705 "We chose a channel thickness of 15 km"; p. 705, the best fit with the channel "uniformly weak at the initiation of flux into the channel, suggesting that the low-gradient margins of Tibet were already weak before the onset of crustal thickening"; p. 706, Fig. 5 caption, "lower crust escapes from beneath thickened, elevated central plateau through regions where crust is weak"; p. 706, "the strength of the crust beneath the Sichuan Basin inhibits flow of lower crustal material from central Tibet". [other sections: paywalled (GSA; not tested).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -1011,18 +1011,20 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Read in this pass: (ERO, ISO, HYP) not fetched. (PLT) metadata only.
 - Reference check: (ERO, ISO, HYP) Crossref matches title, authors, volume 28, issue 8, first page 703 (the end page 706 is not in the Crossref record, taken as written). Attribution of "D0 range 10^2 to 10^5" to this paper cannot be checked. (PLT) correct.
 - Read in the high-ground task (2026-10-22, PLT-414): the abstract from OpenAlex's record. "For an assumed 15-km-thick channel", viscosities of "10^18 Pa · s beneath the low-gradient margins, 10^21 Pa · s beneath the steep margins" and "an upper bound of 10^16 Pa · s beneath the plateau" (the record drops the exponents' superscripts). The 15 km channel of PLT-301 is now read in the abstract. The abstract gives no diffusivity: the 10^2 to 10^5 km²/Myr range follows from the channel law K = ρ g h³ / (12 μ) with these viscosities (2.4 × 10^5 km²/Myr at 10^18 Pa s, 240 at 10^21), the project's arithmetic (plates.md, "As a thin viscous sheet").
+- Read for PLT-740 (2026-10-31, the orogen lane, by a Sonnet sub-agent; the same course copy, also byte-identical in the Wayback Machine's snapshot 20220629095913): p. 703, abstract, "the lack of significant upper crustal shortening across much of the eastern plateau margin implies that the crustal thickening occurs mainly in the deep crust"; p. 703, "Unlike the southern plateau margin, where crustal thickening can be explained by shortening of the upper crust through faulting and folding, most of the eastern margin has been uplifted without significant shortening of the upper crust along large-magnitude thrust faults"; p. 705, where the lower crust is weak it "escapes and flows over distances of 1000-2000 km; the result is the lack of a distinct edge to the plateau margin and little shortening deformation in the upper crust". The paper does not discuss the interior's east-west extension.
 
 ### Royden1997
 - Reference: Royden, L. H., Burchfiel, B. C., King, R. W., Wang, E., Chen, Z., Shen, F. and Liu, Y. (1997). Surface deformation and lower crustal flow in eastern Tibet. Science 276(5313):788-790.
 - DOI or URL: 10.1126/science.276.5313.788.
 - Cited as: (ERO, ISO, HYP) "Royden et al. 1997, Science 276:788-790". (PLT) "Royden et al. 1997".
-- Ledger ids: ISO-018, ISO-020; PLT-300 (2026-10-20, as the channel flow's background; not fetched)
+- Ledger ids: ISO-018, ISO-020; PLT-300 (2026-10-20, as the channel flow's background; not fetched); PLT-740 (2026-10-31, the abstract)
 - Access: paywalled; not fetched. [other sections: paywalled (abstract only).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
 - Read so far (by the project): (ERO, ISO, HYP) bibliographic check only. (PLT) not stated; not in code.
 - Read in this pass: (ERO, ISO, HYP) not fetched. (PLT) abstract fetched.
 - Reference check: (ERO, ISO, HYP) Crossref matches title, volume 276, issue 5313, pages 788-790. (PLT) identifiable; correct.
+- Read for PLT-740 (2026-10-31, the orogen lane, by a Sonnet sub-agent): the abstract, the same text in the Crossref, OpenAlex and Europe PMC (PMID 9115202) records; the full text was blocked. "Field observations and satellite geodesy indicate that little crustal shortening has occurred along the central to southern margin of the eastern Tibetan plateau since about 4 million years ago"; the model has "the lower crust so weak that upper crustal deformation is decoupled from the motion of the underlying mantle" and "also predicts east-west extension on the high plateau".
 
 ### EnglandMcKenzie1982
 - Reference: England, P. and McKenzie, D. (1982). A thin viscous sheet model for continental deformation. Geophysical Journal of the Royal Astronomical Society 70(2):295-321 (now Geophysical Journal International). Correction: England, P. and McKenzie, D. (1983), 73(2):523-532.
@@ -10025,3 +10027,84 @@ The sources of the old-floor lane (plates.md "Step 16"; build log 2026-10-27). T
 - Bird2003: paragraph [3] read in the source library's copy (`Bird2003/Bird2003.txt`, 2026-10-27): "I overlook measured or suspected internal velocity variations of as much as 2 to 8 mm/a; the lower threshholds apply in regions of slow relative plate motion (e.g., North America, Atlantic Ocean, Mediterranean, Africa) and the higher thresholds apply to regions of rapid relative plate motion (e.g., Indian and Pacific oceans and their margins)"; section 5.9 gives "the threshold for plate differentiation used in this paper (8 mm/a in the Pacific basin)". PLT-246 (the weld speed, 2 mm/yr), PLT-721.
 - Read for the weld by two Sonnet research sub-agents (2026-10-27; their reads, not the coordinator's, except Bird 2003 above). Plate mergers in reconstructions: no source gives a rate; Matthews2016 (read) 9 to 45 plates since 410 Ma; Morra2013 (read) names "Alaska-North America, East-West Antarctica and India-Australia plates merging" in the last 50 Myr; Seton et al. 2012 (Earth-Science Reviews 113:212, read by the agent) date the Wharton Basin's spreading (India-Australia) ceasing at 43 Ma, Greenland fused to North America at 33 Ma and Iberia "captured" by Eurasia at 28 Ma. Collisions go on converging: van Hinsbergen et al. 2011 (read by the agent) India-Asia from about 16 cm/yr at 50 Ma to 40 to 50 mm/yr since about 20 Ma; Africa-Eurasia 4.5 to 5.5 mm/yr today (Nocquet 2012, a search snippet only), onset about 83 Ma (a snippet citing Rosenbaum 2002). Trapped ocean floor: the Caribbean's captured Panthalassa and Farallon floor (Müller et al. 2016, Seton et al. 2012, read by the agent); remnant basins' areas from Wikipedia only (Herodotus 130,000 km², Levantine Sea 320,000 km², Black Sea 436,400 km²), not used for a value. Slow plate pairs kept apart: MORVEL (DeMets, Gordon and Argus 2010, Geophysical Journal International 181:1-80, read by the agent) keeps Sur-South America at 1.3 ± 0.6 mm/yr (Fig. 18 caption) and Lwandle-Somalia at 1.3 ± 0.5 mm/yr (section 5.5.3); Bird 2003 section 5.21 drops Capricorn, whose motion does not differ from zero. plates.md Step 19.
 
+
+## The collision orogen: plateau growth and plateau wear (PLT-740), added 2026-10-31
+
+Read for the orogen lane by a Sonnet research sub-agent (2026-10-31); the quotes are the agent's, from the copies
+named. Copies kept outside the repository only (temporary).
+
+### Vanderhaeghe2003
+- Reference: Vanderhaeghe, O., Medvedev, S., Fullsack, P., Beaumont, C. and Jamieson, R. A. (2003). Evolution of orogenic wedges and continental plateaux: insights from crustal thermal-mechanical models overlying subducting mantle lithosphere. Geophysical Journal International 153(1):27-51. (the initials and the title as the lane's request named them; the read confirms the surnames, journal, volume, pages and DOI)
+- DOI or URL: 10.1046/j.1365-246X.2003.01861.x; read at https://academic.oup.com/gji/article-pdf/153/1/27/1719393/153-1-27.pdf
+- Cited as: "Vanderhaeghe et al. 2003".
+- Ledger ids: PLT-740.
+- Access: open (the publisher's PDF).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. Model: 35 km crust, 1 cm/yr, 75 Myr, mantle subduction at S, the retro mantle stationary (Table 1). p. 27: "A reduction in the viscosity ratio (ηb/ηc ∼ 10−2) is sufficient to cause a transition of the central wedge region to a plateau"; "In most models, the plateaux grow laterally at constant thickness between characteristic edge peaks". pp. 28-29: "once a plateau develops (Ftb << Ftc), the plateau crustal thickness is insensitive to the properties of the weak basal layer (ηb and hb) and is determined mainly by the properties of the cold crust and parameters that limit value of Ftc (e.g. z*)". p. 30: "the hottest crust is located below the retro-plateau". p. 34: "The maximum thickness increases without limit" (uniform crust). p. 41: "it is the net retro-ward flow that accounts for retro-ward growth of the plateau"; the transition "does not result from a gradual decrease in surface slope ... Instead, two edge peak barriers are created and the plateau grows between them". p. 43: "By 45 Myr, TMoho > T* = 700°C across a significant zone retro-ward of S, leading to basal decoupling and the onset of the transition to a plateau"; a weaker upper crust (ca. 3 × 10^22 Pa s) gives elevations that "approach observations from Tibet and the Altiplano (ca. 5500 m)". pp. 39-40: at 75 Myr (750 km of convergence) "The plateau is now 300 km wide". The pro-side edge staying near S is the agent's reading of Fig. 11c. No pro/retro mass share is given.
+- Read again for PLT-740's structures (2026-10-31, a Sonnet sub-agent, the publisher's PDF; the figure panels not read): p. 40, at 75 Myr in model V(23/19)z(40/50) "the velocity field in the plateau region indicates pure shear thickening in the upper crust", with outward lower-crustal flow beneath the plateau; p. 42, "low deformation rates in the upper crust during the later, plateau stage"; p. 43, "After 60 Myr a plateau has formed and the orogen now widens rather than thickens"; p. 30, "Vertical advection is, however, negligible in the plateau crust because the thickness remains almost constant". The text does not say where in the plateau the pure-shear thickening is, and says nothing of folds or thrusts at the plateau's advancing edge.
+
+### Wolf2021
+- Reference: Wolf et al. (2021). Journal of Geophysical Research: Solid Earth 126:e2020JB021168 (the title and the full author list not recorded by the read: to complete from the copy).
+- DOI or URL: 10.1029/2020JB021168; read at https://diposit.ub.edu/bitstreams/03990b7d-7da6-4614-9357-02061c018e4a/download
+- Cited as: "Wolf et al. 2021".
+- Ledger ids: PLT-730 (the 60/40 pro- and retro-side partition, p. 13); PLT-740.
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. p. 13: "Convergence is partitioned to 60% pro- and 40% retro-side deformation after onset of retro-wedge shortening". p. 14: "The onset of plateau formation is dependent on viscous weakening resulting from crustal thickening and associated radioactive heating, and has a thermal equilibration timescale independent of convergence rate". p. 25 (conclusion 3): "If crustal shortening creates CA > ~12.5 × 10^9 m2, a large and hot plateau forms, located mostly on the retro-side as a consequence of underthrusting of the retro-mantle". p. 24: the present-day Indian S-point lies "below the accreted Tibetan terranes and not below thickened Indian crust".
+- Reference check: the first author, year, journal, DOI and article number as the agent printed them; the title and authors to complete.
+
+### MedvedevBeaumontPreprint
+- Reference: Medvedev and Beaumont. Growth of Continental Plateaus by Channel Injection: Constraints and Thermo-Mechanical Consistency. Preprint (later in a Geological Society of London Special Publication, pages not checked).
+- DOI or URL: http://geodynamics.oceanography.dal.ca/LHO/MB_Plateau_ChanFlow04.pdf (the host's TLS certificate does not match its name).
+- Cited as: "Medvedev & Beaumont (preprint)".
+- Ledger ids: PLT-740.
+- Access: open preprint.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (page numbers the preprint's). p. 3: "These models also predict that plateaus grow outward by tectonic thickening and accretion of adjacent crust in the transition zone between the plateau and the surrounding foreland"; pp. 3-4: weak mid- to lower crust cannot maintain long-wavelength topography, "and therefore plateaus flatten like pancake batter", while the flanking transition zones "laterally support (like bookends) the plateau".
+
+### BookhagenStrecker2012
+- Reference: Bookhagen and Strecker (2012). Earth and Planetary Science Letters 327-328:97-110 (the title not recorded by the read: to complete from the copy).
+- DOI or URL: read at https://bodobookhagen.github.io/pdf/bookhagen12_central_Andes_erosion_rates.pdf
+- Cited as: "Bookhagen & Strecker 2012".
+- Ledger ids: none yet (design and plates.md "The collision orogen": a reference line for plateau wear, ERO-174's lead).
+- Access: open (the author's copy).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. pp. 103-104: erosion rates "of basins immediately to the east of the Altiplano-Puna Plateau drainage divide are similar (0.02 ± 0.01 mm/yr, n = 5) to erosion rates on the internally drained plateau (0.02 ± 0.0004 mm/yr, n = 1)"; 0.50 ± 0.3 mm/yr on the wet, steep eastern orographic barriers.
+
+### Strecker2009
+- Reference: Strecker et al. (2009). Geology 37(7):643-646 (title and full author list not recorded by the read).
+- DOI or URL: 10.1130/G25545A.1; read at https://bodobookhagen.github.io/pdf/strecker09_topography_andes.pdf
+- Cited as: "Strecker et al. 2009".
+- Ledger ids: none yet (the design's lead for plateau wear).
+- Access: open (an author's copy).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. pp. 644-645: "the low internal plateau relief appears to result from the long-term climatic evolution of the plateau margin, which involves the creation and sustenance of an effective orographic barrier promoting internal drainage and protracted aridity ... the low internal relief reflects basin isolation from the foreland base level as erosional efficiency decreases in the arid plateau"; p. 644: the plateau interior's peak-to-basin relief "<0.7 km".
+
+### Sobel2003
+- Reference: Sobel, Hilley and Strecker (2003). Formation of internally drained contractional basins by aridity-limited bedrock incision (the title as the lane's request named it). Journal of Geophysical Research 108(B7):2344.
+- DOI or URL: 10.1029/2002JB001883; the abstract from https://api.openalex.org/works/doi:10.1029/2002JB001883
+- Cited as: "Sobel, Hilley & Strecker 2003".
+- Ledger ids: none yet (the design's lead for plateau wear).
+- Access: paywalled; the abstract only.
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31: "Low internal relief, aridity, and internal drainage characterize the Puna-Altiplano Plateau and the Tibetan Plateau and the Tarim basin"; "We hypothesize that these large, internally drained areas persist indefinitely when uplift overwhelms the fluvial systems and defeats the channel network"; "Most coupled tectonic-landscape development models prevent the development of internal drainage and so may overestimate the voracity of erosion in regimes that favor internal drainage, profoundly influencing predicted orogenic growth patterns".
+
+### Armijo1986
+- Reference: Armijo, Tapponnier, Mercier and Han (1986). Quaternary extension in southern Tibet: Field observations and tectonic implications. Journal of Geophysical Research 91(B14):13803-13872 (the initials not recorded by the read).
+- DOI or URL: 10.1029/JB091iB14p13803; the abstract from the Crossref and OpenAlex records.
+- Cited as: "Armijo et al. 1986".
+- Ledger ids: PLT-740 (the plateau's interior extends; not modelled).
+- Access: the abstract only.
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31 (the orogen lane, by a Sonnet sub-agent): "normal faulting has been the dominant tectonic regime north of the Himalayas in the last 2 ± 0.5 m.y."; extensional strains "principally localized within seven regularly spaced rift zones"; "The extension direction is determined to be N96° E ± 7°"; "The rate of Quaternary extension is about 1% m.y.-1 along an 1100-km-long ESE traverse across south Tibet".
+- Reference check: the surnames, title, journal, volume, issue, pages and DOI as the agent printed them from the records; the initials to complete.
+
+### Blisniuk2001
+- Reference: Blisniuk, P. M., Hacker, B. R., Glodny, J., Ratschbacher, L., Bi, S., Wu, Z., McWilliams, M. and Calvert, A. (2001). Normal faulting in central Tibet since at least 13.5 Myr ago. Nature 412(6847):628-632.
+- DOI or URL: 10.1038/35088045 (PMID 11493918); the abstract from the Europe PMC record.
+- Cited as: "Blisniuk et al. 2001".
+- Ledger ids: PLT-740 (the plateau's interior extends; not modelled).
+- Access: paywalled; the abstract only.
+- Library: not kept.
+- Read so far (by the project): the abstract, 2026-10-31 (the orogen lane, by a Sonnet sub-agent): "observed east-west thinning of the upper crust"; "we report a minimum age of approximately 13.5 Myr for the onset of graben formation in central Tibet"; "Thinning of the upper crust is most plausibly the result of potential-energy increases resulting from spatially and temporally heterogeneous changes in thermal structure and density distribution within the crust and upper mantle beneath Tibet".
+- Reference check: as the agent printed it from the record.

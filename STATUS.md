@@ -172,6 +172,105 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 - **Lanes:** the crust budget (Opus; additions against Stern & Scholl 2010; a simulation slot), small-terrane docking (Opus; the other slot, on the orogen's physics, against orog-cum or base35-s4), plateau wear under aridity (Opus, cached runs only; the orogen lane's O4 lead and the Follow-ups row on plateau wear), the orogen flip (Sonnet builder).
 - **Ben's instances** on f80d75a8: `/data/ban/deeptime-cache/deploy-f80d.sh` (detached: `install.sh mic` and `mic-lite`, `:devmap:assemble`, `play-client-stage.sh` for both sets), then `play-client-apply.py --hash f80d75a8` into "MIC Deep Time Test", "MIC Deep Time 2026-10-24" (`--instance`) and "MIC Deep Time Lite" (`--set lite`), no client running; Deep Time jar e34566aa99a0 in all three (and in the build, both server sets and both stages), the dev map 44a546a2a4b8.
 - **Next.** Land collision-orogen-on, the gate, base35, the instances; the crust-budget lane's arm against base34-s4; the plateau lane's arm when a slot frees.
+### 2026-10-31: PR #50's review answered on collision-orogen-on: the plateau test reaches its ocean, the plateau's structures, stale docs (the orogen lane, worktree agent-a52784a4e4ef20e33)
+
+- **The review.** An Opus reviewer stood in for Graphide, which is out of free reviews. It found no correctness bug.
+- **The plateau test.** `the_retro_plateau_grows_past_the_belt_through_its_own_crust` never reached its sea: one step's
+  crust fills a 300 m lowland only about 120 km past the belt. Its lowland now stands 20 m under the strength height
+  for the 400 km before a strip of ocean floor. Every sample there rises, nothing on the ocean floor or across it does,
+  and the no-room rule (the shipped PLT-700 path) takes more than none and less than with the switch off.
+- **New test.** `an_arc_in_collision_takes_the_crust_on_its_edge_on_the_shipped_path`: the shipped switches on an arc
+  whose incoming continent stands at the strength height. There is no plateau, and the arc's edge takes everything.
+- **The plateau's structures: documented, not marked.** Its samples are stamped as the collision's orogeny but stay
+  outside the footprint (PLT-260), so they get no collision folds or thrusts. The reason is that the crust comes by
+  the orogen's flow, not by shortening their own upper crust:
+  - Tibet's eastern margin, "without significant shortening of the upper crust": Clark & Royden 2000, p. 703, full text.
+  - Royden et al. 1997, abstract.
+  - The interior extends east-west: Armijo et al. 1986 and Blisniuk et al. 2001, abstracts.
+
+  The limits: Vanderhaeghe et al. 2003, p. 40, find pure-shear upper-crust thickening in one model's plateau, and the
+  interior's normal faults are not modelled. This is recorded in belts.rs, PLT-740, PLT-260, plates.md and the design.
+- **Stale docs fixed:**
+  - `heat_flow_refresh` (params.rs) and `make_continental` (state.rs; now lists every caller).
+  - "never across a sea" is now "never across ocean floor" (belts.rs, PLT-740, the design).
+  - The Vanderhaeghe Fig. 11c reading is labelled as the research agent's.
+  - Wolf2021 now lists PLT-730.
+  - The wedge test's taper comment.
+  - The recording test's seed comment: it shares seed 2 with the weld test now.
+- **Tools.** `tools/review/orogen/adv_maps.py` is copied in from the advisor's VM folder, and advmaps.sh runs it.
+- **Follow-up recorded** (lithosphere-thermal-state.md, Open questions): with the state, the continental law over a
+  young floor's lithosphere has no ceiling.
+- **Gate (VM).** `cargo test --workspace --no-fail-fast`: 1,438 passed, 0 failed, 13 ignored (deeptime-core lib
+  1,154). clippy `-D warnings` and fmt are clean.
+
+### 2026-10-31: young floor made continental kept its 300 mW/m² (PLT-469); the bake test on collision-orogen-on fixed (the orogen lane, worktree agent-a52784a4e4ef20e33, branch heatflow-fix pushed to `collision-orogen-on`)
+
+- **The failure.** On collision-orogen-on (e23c2317, both orogen switches on) `bake::tests::the_release_pace_bakes_continental_heat_flow_with_the_final_pass`
+  baked 300 mW/m² at (45, 140), over its 200.1.
+- **Cause** (a per-stage print on the last step, since removed). The rate guard after the resampling (`rate::limit` →
+  `collapse::spread`) spread 9.3 km of rock from continental sources onto 2.4 Myr floor (and some onto 6.6 Myr floor),
+  which turned continental at once under PLT-662. The step had already set every heat flow, so the samples kept the
+  floor's 300 (and 198.8), and PLT-469's final pass, an "at least", leaves a value above the law alone. The plateau
+  (PLT-740) was not involved: it grows only through continental samples. PLT-662's label is kept (continental rock on
+  the floor's own crust, PLT-331); the heat flow was wrong.
+- **Fix.** Heat flow belongs to the crust's kind, as the resampling already treats it. `Sample::make_continental` sets it
+  to 0. The final pass gives a continental sample with none its law's full value through `plates::continental_heat_flow`,
+  the law `finish_samples` now shares (the proxy with its terms; the state over the sample's own lithosphere). With both
+  `heat_flow_refresh` and `thermal_state` off, such a sample keeps 0, which is the fault the pass exists to fix. Test
+  `young_floor_made_continental_after_the_step_takes_the_continental_law`. Docs:
+  lithosphere-thermal-state.md "Young floor (2026-10-31)"; ledger PLT-469, PLT-467 and PLT-137 rows.
+- **Master has it too.** A temporary scan ran the plate stage alone on the test's preset: 60 Myr, release pace on,
+  scattered_continents and supercontinent, seeds 1-12, orogen off and on, state off and on, 96 runs. Before the fix,
+  with master's switches and the proxy, 22 of 24 planets had crust keeping a floor's value above its law, and 6 of 24
+  had continental heat flow over 200.1 at the final frame. With the state (the shipped default), 1 of 24 at the final
+  frame and 7 at some step, up to 300. With the orogen on: 11 of 24 (proxy) and 3 of 24 (state) at the final frame.
+  After the fix, none of the 96 runs keeps a floor's value, and none passes 200.1 with the proxy. With the state and
+  the orogen, 3 runs reach 203.4 to 204.5 at one step and none at the final frame; that comes from the state's own law,
+  which has no ceiling at 200. So `the_thermal_state_bakes_its_own_heat_flow`'s 200.1 bound holds only for its planet.
+  The pool's base34 runs do not dump heat flow, so they could not be checked.
+- **Found, not changed.** Floor that the resampling makes is born with no lithosphere state (`Sample::blank`). If it turns
+  continental in that same step, it takes the frame's 225 km under the state, and so does `thermal::step` afterwards.
+- **Gate (VM).** `cargo test --workspace --no-fail-fast`: 1,437 passed, 0 failed, 13 ignored (deeptime-core lib 1,153).
+  clippy `-D warnings` clean; fmt clean after its layout of the new test.
+- **Next.** The coordinator lands collision-orogen-on.
+
+### 2026-10-31: the collision orogen as a doubly vergent wedge, measured on the freeboard; the plateau's retro-ward growth behind a switch (PLT-740) (the orogen lane, worktree agent-a52784a4e4ef20e33, branch `collision-orogen`)
+
+- **Why.** Ben's order "Freeboard, then orogen (Recommended)" (decisions log 2026-10-30); the audit
+  (docs/research/notes/coast-high-ground-audit-2026-10-30.md): 96 % of the kept collision crust on the overriding plate,
+  no Tibet-class plateau; with the freeboard on the land above 2 km fell to 0.013.
+- **The two wedges on the freeboard physics** (arm orog-tw-sedm, key 31c7c70bd7c7 argkey c7aa72cc, PLT-660/661 set and
+  `collision_two_wedges=true`, seeds 1 to 4 of both starts; its base sedmargin is base34-s4 bit for bit, the eight
+  `state_sha256` equal): the pro-wedge holds 0.545 of the kept crust (0.054 with the taper belt), the guard clean; land
+  0.238 to 0.214, the largest landmass 0.097 to 0.075 (p 0.028), continental crust under the sea 0.527 to 0.590, land
+  above 2 km 0.013 to 0.017 (0.96), coast with high ground 0.064 to 0.101 (0.23), net crust change +0.065 to +0.100. The
+  freeboard did not dry the colliding margins (incoming crust at the front above the sea 0.586 on base33, 0.320 on
+  base34-s4: PLT-661's distal margins collide first).
+- **Where the high ground goes** (`tools/review/orogen/`: hiseries.py over every 50 Myr crust-budget map, orostats.py,
+  hiclimate.py, dock.py, m5arm.sh): Tibet-class ground forms in the largest collisions (base34-s4 supercontinent-1 at
+  −100 Myr: 0.065 of the land above 2 km, about 3.6 million km² above 4 km on 65 to 68 km of crust) and is gone 100 Myr
+  later; flat high ground is arid or polar by its Köppen class yet wears at 109 to 129 m/Myr against the Altiplano's 20
+  (Bookhagen & Strecker 2012). Land above 2 km through time: base34 0.030, the two-wedge arms 0.022 and 0.024; above
+  4 km 0.0023, 0.0008 and 0.0012.
+- **The design** (docs/design/collision-orogen.md, research by a Sonnet sub-agent: Vanderhaeghe et al. 2003, Wolf et
+  al. 2021, Medvedev & Beaumont's preprint, Strecker et al. 2009, Bookhagen & Strecker 2012 in full; Sobel et al. 2003,
+  Jamieson & Beaumont 2013, Willett & Beaumont 1994, Yakovlev & Clark 2014 abstracts): O1 the two wedges (PLT-730/731,
+  unchanged); O2 the plateau past the strength height grows retro-ward with no set width (PLT-740, built); O3 the
+  overriding share limited by the wedges' geometry, the block's width and the plateau (no new rule); O4 an interior
+  plateau needs the plateau's wear to fall, which is the surface stage's (the Follow-ups row on plateau wear).
+- **Built** (PLT-740, `tectonics.collision_retro_plateau`, off): when the two wedges' fill leaves crust with the retro
+  flank within `collision_belt_km` at its limits, the flank is searched again through the overriding plate's continental
+  samples (twice the reach each time) and refilled, until placed or the connected crust is all taken; counted in
+  `plates/collision_retro_plateau_km3`. Test `the_retro_plateau_grows_past_the_belt_through_its_own_crust`. Gate on the
+  branch: fmt and clippy clean, deeptime-core 1,146 passed (VM).
+- **The cumulative arm** (orog-cum, key f2d6412d801f argkey d3261b0a, both switches, 8 runs) against base34-s4: the
+  guard clean; the plateau rule placed a median 0.0005 of the kept crust; coast with high ground 0.067 (0.96), land
+  above 2 km 0.013, the largest landmass 0.074, continental crust under the sea 0.605 (base34 0.540, p 0.046). orog-cum
+  and orog-tw-sedm are the same physics but for that thousandth, so their spread (coast with high ground 0.101 against
+  0.067) is an 8-run arm's noise floor.
+- **Next.** The coordinator's call on O1 and O2's defaults (sourced, tested, the guard clean; the costs above). For a
+  Tibet-class plateau at a run's end, the plateau's wear (internal drainage under aridity: Sobel et al. 2003, Strecker et
+  al. 2009); then small terranes (Ben's third item).
 
 ### 2026-10-31: Freeboard thinning lane: why the continents thin with the margin's sediment continental, traced; physics, nothing built (lane agent, worktree .claude/worktrees/agent-a9075656e73c301d7, branch freeboard-thinning on origin/freeboard b53fffde; sub-agent of session 88bb1af2-7722-4f74-9e04-4e8b8af667a9; not merged)
 
