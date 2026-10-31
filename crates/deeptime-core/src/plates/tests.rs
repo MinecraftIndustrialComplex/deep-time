@@ -544,8 +544,12 @@ fn sutures_and_initiations_keep_continents_whole() {
     // 5, 6, 8, 9, 11 to 13, 16 to 22 and 24, so supercontinent 2 and scattered 8 still; both
     // still weld with the island-arc class carried through the resamplings and no suture magma on
     // a terrane going down, PR #53's re-review, the same day: supercontinent 1 to 4, 10, 12, 14,
-    // 18 and 21 to 24, scattered 1, 3 to 6, 8 to 10, 12, 13, 15 to 17 and 21 to 23).
-    for (start, seed) in [("supercontinent", 2), ("scattered_continents", 8)] {
+    // 18 and 21 to 24, scattered 1, 3 to 6, 8 to 10, 12, 13, 15 to 17 and 21 to 23; with the
+    // continental lid's floor, PLT-820 and PLT-821, 2026-10-31, supercontinent 2 still welds and
+    // scattered 8 no more, the sweep's welding seeds supercontinent 1, 2, 4 to 6, 8 to 12, 14, 16,
+    // 21 and 24 and scattered 1, 2, 4, 5, 9, 12 to 19 and 21 to 24, so supercontinent 2 and
+    // scattered 1).
+    for (start, seed) in [("supercontinent", 2), ("scattered_continents", 1)] {
         let mut p = preset(8000, 300.0, start, seed);
         // The old law (PLT-585 off, PLT-540 on): under Forsyth & Uyeda's balance on this small
         // planet, whose ridge push is several times Earth's (`plates_quick_16k`, ridge -1,000 m,
@@ -899,8 +903,11 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // the supercontinent 2, 5, 7, 9, 13 to 15, 17, 20, 21 and 23; 16 of seeds 1 to 24 with the
     // island-arc class carried through the resamplings and no suture magma on a terrane going
     // down, PR #53's re-review, the same day: 1, 3 to 6, 8 to 10, 12, 13, 15 to 17 and 21 to 23,
-    // seed 3 still welds; from the supercontinent 1 to 4, 10, 12, 14, 18 and 21 to 24).
-    let mut p = preset(8000, 300.0, "scattered_continents", 3);
+    // seed 3 still welds; from the supercontinent 1 to 4, 10, 12, 14, 18 and 21 to 24; 17 of seeds
+    // 1 to 24 with the continental lid's floor, PLT-820 and PLT-821, 2026-10-31, the sweep
+    // `weld_seed_sweep`: 1, 2, 4, 5, 9, 12 to 19 and 21 to 24, seed 3 no more, so seed 1; from the
+    // supercontinent 1, 2, 4 to 6, 8 to 12, 14, 16, 21 and 24).
+    let mut p = preset(8000, 300.0, "scattered_continents", 1);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: under Forsyth & Uyeda's
     // balance on this small planet, whose ridge push is several times Earth's
     // (`plates_quick_16k`, ridge -1,000 m, floor -10,000 m), the speed guard bound on every
@@ -1113,8 +1120,11 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // 2026-10-31: it still welds (the sweep's welding seeds 1, 3, 5, 6, 8, 9, 11 to 13, 16 to 22
     // and 24, the guard binding on none), so the two tests still share this planet; and after PR
     // #53's re-review, the same day (the sweep's welding seeds 1, 3 to 6, 8 to 10, 12, 13, 15 to 17
-    // and 21 to 23, the guard binding on none)).
-    let mut p = preset(8000, 300.0, "scattered_continents", 3);
+    // and 21 to 23, the guard binding on none); seed 1 since the continental lid's floor, PLT-820
+    // and PLT-821, 2026-10-31, when seed 3 no longer welds: the sweep's welding seeds 1, 2, 4, 5,
+    // 9, 12 to 19 and 21 to 24, the guard binding on none, seed 1 the first, and the weld test
+    // above takes seed 1 too, so the two tests still share this planet).
+    let mut p = preset(8000, 300.0, "scattered_continents", 1);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: the guard asserted below
     // bound under Forsyth & Uyeda's balance on every welding seed of 1 to 24 of this small planet
     // but supercontinent 11, whose ridge push is several times Earth's (`plates_quick_16k`, ridge
@@ -6385,7 +6395,10 @@ fn a_continental_lithosphere_reaches_down_to_at_least_its_moho() {
         s.lithosphere_km
     );
     let q = f64::from(continental_heat_flow(s, t, true));
-    assert!((q - (26.0 + 3375.0 / 87.5 + ARC_HEAT_MW_M2)).abs() < 1e-2, "{q}");
+    assert!(
+        (q - (26.0 + 3375.0 / 87.5 + ARC_HEAT_MW_M2)).abs() < 1e-2,
+        "{q}"
+    );
     // The crust with no state: its floor's lithosphere at its lid's floor, then cooling towards
     // L_cold (one step from 11.25 km).
     let mut once = before.clone();

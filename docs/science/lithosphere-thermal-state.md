@@ -267,6 +267,26 @@ mW/m² over any crust (McKenzie 1978: Fc / β after stretching; Jaupart & Maresc
 thinned crust's heat flux "will reflect the smaller amount of radioactive elements"), stay as they
 were.
 
+Traced after the gate (temporary prints, not kept). On the plate stage alone of the bake tests'
+planet (`pipeline_quick_16k` at 3,000 samples, 60 Myr, the state with thermal isostasy and strength,
+seeds 1 to 6 from both starts), continental heat flow passed 200.1 mW/m² at some step in 6 of the 12
+runs and at the final frame in 1, by two paths: crust with no state on floor 1.5 to 1.6 Myr old
+(PLT-821: 264.3 over an 8.3 km column, 212.1 over 14.5 km), under its floor's own 2.32 √(κt),
+deeper than its lid's floor, where it read 41 before; and an arc's 40 over floor made continental
+2 to 4 Myr before, a 7.0 to 7.9 km column under 24.5 km of lithosphere (203.4 to 203.8), the 203.4
+to 204.5 of the young-floor scan above, its samples now traced. In the full pipeline,
+`the_thermal_state_bakes_its_own_heat_flow` bakes 259.8 at (21, 279), the run's one sample over
+200.1: crust with no state at the final frame, a 7.3 km column on 1.54 Myr floor (14.4 km of
+lithosphere). Both are the law at the floor's age, and the floor bounds them: the most the state
+gives is its law over the thinnest crust the model makes continental, the ocean's 7 km column (floor
+made continental starts from it; a stretch leaves a source at least its target crust, PLT-261) at
+its 8.75 km floor, 412 mW/m² before the magmatic terms and 492 with both. The bake tests now hold the
+state to that ceiling (`state_heat_flow_ceiling` in bake/tests.rs) in place of the proxy's 200.1,
+which held for their planets, not for the law; the release-pace test, with the proxy, keeps 200.1.
+Those columns are not Earth's continental crust of PLT-823's regional maxima (100 to 150): a 7 to 15
+km column on floor a few Myr old is a margin's sediment or an arc's crust on a spreading centre's
+lithosphere, and its heat flow is that lithosphere's.
+
 ### The order of the stages
 
 1. **Stage 1:** the state, heat flow from it with the fault's final pass, thermal isostasy and
