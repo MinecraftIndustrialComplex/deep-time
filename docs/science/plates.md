@@ -13381,3 +13381,29 @@ that began on floor younger than 12 Myr is mostly that new floor. Per the coordi
 each resampling, where the new overlaps of the next step come from (the gap fill's new floor
 given across a boundary that then closes, PLT-502 and PLT-542, or the footprints themselves), and
 which of those contacts pass incipient and through what convergence.
+
+**What Earth's sources say about a start between young plates** (a Sonnet research sub-agent,
+2026-10-31; copied from its report, its labels kept). Gurnis et al. 2004 (full text): "The large
+initial bending resistance can be entirely eliminated in ridge models" (abstract), but none of
+their ridge models (Table 3, cases 14 to 17) has a critical convergence entry, and "A
+self-sustaining subduction zone does not form from a homogeneous plate"; a mid-ocean ridge under
+compression "is unlikely to have a thermal structure with zero age lithosphere as there will
+always be some time interval between termination of spreading and initiation of compression. For
+example, in the case of the northern Macquarie Ridge, this period could be from several million
+to 10 Myr" ([53]). Their fracture-zone cases go self-sustaining after 100 to 130 km of
+convergence for every pair of ages tried, young ones included (0 and 20 Myr: 107 km; 10 and 20:
+105; 20 and 40: 130; Table 3), but "Models that reach a self-sustained state with less than 200 km
+of convergence require very low coefficients of friction (<0.02)" ([77]). Crameri et al. 2020
+(full text): no event is typed as begun at a spreading boundary (Table 1's former settings:
+convergent, transform, intact plate, unclear), and "we find no event that is purely
+plate-buoyancy driven"; the subducting plates' ages next to the new trench in Supplementary Data
+1 run from minima of 1.6 (South Sandwich) and 4.0 Myr (Izu-Bonin-Mariana) to means of 31.7 to
+117.4. Stern & Gerya 2018 (full text, selected sections): "Inversion of spreading ridges to
+trenches" is among the proposed induced modes, with the Oman ophiolite "A well documented possible
+example of a 'fossil' SI by mid-ocean ridge inversion" (p. 184). The sub-agent found no
+documented case of subduction starting at an active ridge between two young plates. When
+lithosphere outweighs the asthenosphere: about 10 Myr (Cloos 1993, abstract), 10 to 20 Myr (Stern
+& Gerya 2021), 20 to 50 Myr (Stern 2004, p. 276, citing Davies 1992 and Oxburgh & Parmentier
+1977). So the model's onsets at boundaries that spread the step before (0.28 of the ocean-ocean
+onsets, the last spreading within 2 Myr for 0.42) have no Earth example with the lag Gurnis et al.
+describe; the step that makes them is the question the resampling trace would answer.
