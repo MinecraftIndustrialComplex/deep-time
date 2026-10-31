@@ -247,6 +247,8 @@ and volcanic margins from sources (2026-10-31)". Switches off, the branch is bas
   the tails' own magma. A tails-only arm (hs-tails, 4 runs) carries 0.9 of the net's rise.
 - The next step: a hotspot's cones and its tail as one budget, counted by the cone's hotspot
   (`Volcano::hotspot`) and capped at the tail's lavas (PLT-793, PLT-794), the rest of the cone relief
-  over rock the plate model already holds; then this arm again. `plume_heads_sourced` and
+  over rock the plate model already holds; then this arm again. Built (docs/design/hotspot-cone-budget.md,
+  `tectonics.hotspot_cone_budget`, PLT-803); hs-cum2 with it: the net +0.53 km³ a year, the sea
+  679 m, criteria 4.5; the tails' 0.43 on continental crust leave the lid as the next step. `plume_heads_sourced` and
   `volcanic_margins` are correct as built, but were run only beside the sourced tails (alone, the
   heads' share caps at the preset's 3 births per 100 Myr).
