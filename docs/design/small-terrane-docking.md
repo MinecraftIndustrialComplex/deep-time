@@ -403,3 +403,42 @@ jam at the end (the front shrinks to its last samples while the hidden part lies
 So a body is judged as it arrives, by all its samples, and keeps the judgment while it goes down.
 It likely lies behind the first arm's hand-offs that stripped at some step and then transferred (2.5
 per 100 Myr under 50 samples, 1.2 at 50 to 200; the project's reading, not traced).
+
+## The second arm (after the review, 2026-10-31)
+
+Arm small-terrane-2: branch `small-terrane-on` at 705f4500, key a7bb6d240ebe, argkey 35ce6e09 (the
+first arm's settings: the docking law and both orogen laws set on, which master now has by default),
+8 runs, against orog-cum (medians, two-sided Mann-Whitney p in brackets; the first arm's medians
+after the slash). The base is not clean: master's source key since orog-cum (fe4c1b633535 against
+f2d6412d801f) also holds the continental heat flow of crust made continental late in a step (PLT-469,
+b1b7a79e) and PR #50's review; `base35-s4` is the clean base once base35 exists.
+
+- **The guard.** No step beyond 2 Earth reliefs, no plate cells 5 km over Airy, the highest plate
+  elevation 4,194 m against 4,162 (p 0.80). The farthest any cell stood from the sea (a trench's
+  floor) 10,243 m against 9,945 (p 0.001; the first arm 10,154, p 0.51): about 300 m deeper, half the
+  guard's 19.8 km; whether the slabs fed under docking fronts or master's heat flow made it is not
+  told apart by this base.
+- **What the law did.** Hand-offs under 50 samples 13.3 per 100 Myr against 17.6 (p 0.010; / 12.3),
+  50 to 200 10.6, 200 to 1,000 7.7, 1,000 or more 4.7 (all as orog-cum's); partings 30.4 against 23.3
+  (p 0.005), the parted share of them 0.538 against 0.484 (p 0.003), 5.3 per 100 Myr of the parted
+  stripped (/ 5.8). Crust stripped 0.033 km³ a year (p25 to p75 0.031 to 0.038; / 0.035). Hand-offs
+  that stripped at some step and then transferred: 1.33 per 100 Myr under 50 samples (/ 2.5), 0.61 at
+  50 to 200 (/ 1.17), 0.50 at 200 to 1,000 (/ 0.56): the judgment kept on the way down halved the
+  small ones; the rest are fronts crust joined (judged again) or stalls.
+- **V1** (none beyond the seeds' spread): land 0.210 against 0.205 (p 0.80), largest landmass 0.068
+  against 0.074 (p 0.72), continental crust under the sea 0.582 against 0.605 (p 1.0), land above
+  2 km 0.011 against 0.013 (p 0.80), the coast with high ground 0.092 against 0.067 (p 0.33),
+  collisions per 100 Myr 4.75 against 4.60 (p 0.96), criteria met 5 and 5.50 against 6 and 5.75
+  (p 0.40). coastset's coast with high ground 0.096 against 0.092; the collision belt's share of
+  the high coasts 0.742 against 0.535 (/ 0.606), the arc's 0.131 against 0.240.
+- **Small landmasses.** Collision high coasts on landmasses under 0.02 of the land 0.346 against 0.668
+  (p 0.038; / 0.359, p 0.44): the island belts the audit read as small terranes turned collision
+  belts are half as many.
+- **The maps** (`dock_maps.py`): the coast whose nearest high ground a hand-off under 50 samples
+  stamped 0.0001 against 0.0018 (p 0.61); the map's M5 0.114 against 0.079 (p 0.51), its rise the open
+  collisions' share (0.068 against 0.033, p 0.083), not the small terranes'.
+
+So the corrected law does on the planet what the first build did, more cleanly: fewer small
+hand-offs and more partings, both now significant, half the small landmasses' collision high coasts,
+the crust stripped at about 1 % of the continents' additions, and no V1 number beyond the spread. The
+deeper trench floor is the one significant change to read again against base35-s4.
