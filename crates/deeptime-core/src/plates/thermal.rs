@@ -98,6 +98,44 @@ pub fn conductive_mw_m2(l_km: f64) -> f64 {
     CRUST_HEAT_MW_M2 + MANTLE_HEAT_MW_M2_KM / l_km.max(1.0)
 }
 
+/// The depth of a column's Moho, km: all of its rock, sediment to basement (the pools).
+pub fn moho_km(s: &Sample) -> f64 {
+    f64::from(s.pools.iter().sum::<f32>()) / 1000.0
+}
+
+/// A continental column's thermal lithosphere, km: its L, never above its Moho. The crust
+/// conducts its heat up and the convecting mantle's adiabat begins under it, so the base of the
+/// thermal lithosphere lies at or below the base of the crust (the lithosphere is crust and mantle
+/// lithosphere; a back-arc's or a rift's thinning takes the mantle part); the same floor as stage
+/// 3's drop-off "to the Moho" (PLT-477). It bounds the heat-flow law, the conductive flux k T_m / L
+/// of the adiabat through the lid (PLT-467), by the crust's thickness: at most 26 + 3,375 / Moho.
+// ledger: PLT-820
+pub fn continental_l_km(l_km: f64, moho_km: f64) -> f64 {
+    l_km.max(moho_km)
+}
+
+/// The lithosphere continental crust with no state yet starts from, km: crust made continental
+/// on floor the resampling made in the same step (the rate guard's spread onto a gap point, a
+/// volcanic margin) had no ocean state set; it takes its floor's, 2.32 √(κt) at the floor's
+/// age (PLT-466), never above its Moho (PLT-820), in place of the frame's depth (until
+/// 2026-10-31, an old craton's 225 km under a floor days old).
+// ledger: PLT-821
+pub fn unset_continental_l_km(s: &Sample, t_myr: f64) -> f64 {
+    let age = (t_myr - f64::from(s.formed_myr)).max(0.0);
+    continental_l_km(ocean_km(age), moho_km(s))
+}
+
+/// The lithosphere a continental sample's laws read, km: its own, never above its Moho, or its
+/// floor's where it has none ([`unset_continental_l_km`]).
+// ledger: PLT-820, PLT-821
+pub fn sample_l_km(s: &Sample, t_myr: f64) -> f64 {
+    if s.lithosphere_km > 0.0 {
+        continental_l_km(f64::from(s.lithosphere_km), moho_km(s))
+    } else {
+        unset_continental_l_km(s, t_myr)
+    }
+}
+
 /// Continental heat flow of a sample with flags `flags` over a lithosphere `l_km` deep, mW/m².
 // ledger: PLT-467, PLT-468
 pub fn heat_flow_mw_m2(l_km: f64, flags: u8) -> f64 {
@@ -337,7 +375,6 @@ pub fn step(state: &mut PlateState, env: &Env) {
         return;
     }
     let (t, dt) = (env.t_myr, env.dt_myr);
-    let reference = k.thermal_reference_km as f32;
     state.samples.par_iter_mut().for_each(|s| {
         if s.kind == OCEANIC {
             s.lithosphere_km = ocean_km(s.age_myr(t)) as f32;
@@ -345,12 +382,14 @@ pub fn step(state: &mut PlateState, env: &Env) {
             return;
         }
         if s.lithosphere_km <= 0.0 {
-            // Continental crust with no state yet (made mid-run from nothing): the frame's depth,
-            // no keel.
-            s.lithosphere_km = reference;
+            // Continental crust with no state yet (made on floor the last resampling made): its
+            // floor's lithosphere, no keel (ledger: PLT-821).
+            s.lithosphere_km = unset_continental_l_km(s, t) as f32;
             s.keel_km = 0.0;
         }
+        let moho = moho_km(s);
         if s.is_hidden() {
+            s.lithosphere_km = continental_l_km(f64::from(s.lithosphere_km), moho) as f32;
             return;
         }
         let (l, keel) = advance_with_root(
@@ -360,21 +399,28 @@ pub fn step(state: &mut PlateState, env: &Env) {
             root_crust_km(k, s),
             dt,
         );
+        // Never above the Moho: an arc's or a rift's heating towards L_hot takes the mantle
+        // lithosphere, not the crust (ledger: PLT-820).
+        let l = continental_l_km(l, moho);
         s.lithosphere_km = l as f32;
-        s.keel_km = keel as f32;
+        s.keel_km = keel.min(l) as f32;
     });
 }
 
 /// Stage 2: a continental column whose crystalline crust the transition thins
 /// to `keep` of what it was (a stretch by β = 1 / `keep`) has its lithosphere and keel thinned by
 /// the same factor, L / β and K / β (McKenzie 1978's uniform stretching of the whole lithosphere,
-/// pure shear); a sample with no state keeps none.
-// ledger: PLT-476
+/// pure shear), the lithosphere never above the stretched column's Moho (`s` is the column after
+/// its thinning; PLT-820; until 2026-10-31 never under 1 km); a sample with no state keeps none.
+// ledger: PLT-476, PLT-820
 pub fn stretch(s: &mut Sample, keep: f64) {
     if s.kind != CONTINENTAL || s.lithosphere_km <= 0.0 || !(0.0..1.0).contains(&keep) {
         return;
     }
-    s.lithosphere_km = (f64::from(s.lithosphere_km) * keep).max(1.0) as f32;
+    // (The 1 km keeps the state set for a column of no rock, which the transition never leaves:
+    // a source keeps its target crust, PLT-261.)
+    s.lithosphere_km =
+        continental_l_km(f64::from(s.lithosphere_km) * keep, moho_km(s)).max(1.0) as f32;
     s.keel_km = (f64::from(s.keel_km) * keep).min(f64::from(s.lithosphere_km)) as f32;
 }
 
@@ -395,22 +441,17 @@ pub fn refresh_heat_flow(state: &mut PlateState, k: &TectonicParams, t_myr: f64)
         return;
     }
     let thermal = k.thermal_state;
-    let reference = k.thermal_reference_km;
     state.samples.par_iter_mut().for_each(|s| {
         if s.kind != CONTINENTAL {
             return;
         }
         if s.heat_flow_mw_m2 <= 0.0 {
-            s.heat_flow_mw_m2 = super::continental_heat_flow(s, t_myr, thermal, reference as f32);
+            s.heat_flow_mw_m2 = super::continental_heat_flow(s, t_myr, thermal);
             return;
         }
         let floor = if thermal {
-            let l = if s.lithosphere_km > 0.0 {
-                f64::from(s.lithosphere_km)
-            } else {
-                reference
-            };
-            conductive_mw_m2(l)
+            // ledger: PLT-820, PLT-821
+            conductive_mw_m2(sample_l_km(s, t_myr))
         } else {
             let since = (t_myr - f64::from(s.orogeny_myr)).max(0.0);
             55.0 + 35.0 * (-since / 60.0).exp() // ledger: PLT-137
