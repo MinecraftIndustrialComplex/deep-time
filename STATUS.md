@@ -319,6 +319,20 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
   its balance, against 129.9 spilling; four new tests; a log warning when `hydro.lake_balance` is off. Docs: Sobel et
   al. 2003 was read in full (the line above said abstracts only), Langbein 1961's pages, ERO-080's note, a stray
   abstract line in Richardson2019's entry.
+- **The arm after the fixes** (`pool.sh run plat-cb1 --seeds 1,2,3,4 +DEEPTIME_CRUST_BUDGET=1
+  +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`, key 6c199eaeaab7 at 5a8082ff, argkey cd665cef, 8 runs; read against
+  plat-cb0, orog-cum and small-terrane, the nearest plate control; the design's "The arm after the fixes").
+  - The guard is clean: worst 10,504 m against small-terrane's 10,154 (p 0.38), 0 steps beyond one relief.
+  - No V1 number beyond the spread (coast with high ground 0.102, p 0.13).
+  - The ground draining to a closed basin wears at 30.6 m/Myr against plat-cb0's 52.8 (the runs' ranges apart; stream
+    power 3.8 against 24.6).
+  - 0.101 of the land drains to closed basins (0.127). R3 opens 4.8e4 filled lake-substeps a run; lakes passing part
+    of their inflow fell from 6.3e4 to 1.7e4 a run (the false exits).
+  - K is intact (all land 38.3 against 38.1 m/Myr). The flat high ground still wears at 124 m/Myr, frozen 0.62 of it.
+  - plat-cb0's larger guard worst and rounder belts are the plates' changes, not the law's (small-terrane gives the
+    same).
+  - Not in these numbers: the young step (the pool stops before it); a young-step test holding a closed basin is a
+    follow-up. Also `tools/review/plateau/words.py` (the summaries' words per run).
 ### 2026-10-31: Docking lane: how small terranes dock, measured, read, built behind a switch (off) and measured on the pool, on recommended (PLT-770, PLT-771; lane agent, worktree .claude/worktrees/agent-a6cb992bc704b30f3, branch small-terrane-docking, master f80d75a8 and origin/collision-orogen 0e8a5ac9 merged in; sub-agent of session 88bb1af2-7722-4f74-9e04-4e8b8af667a9; not merged)
 
 - **Measured, cached runs only** (base33, key 31c7c70bd7c7, cd665cef, 24 runs; `tools/review/terranes/dock_records.py` and `dock_maps.py` on the VM's numpy python, outputs in `/data/ban/deeptime-runs/terranes/`): hand-offs under 50 samples 29.2 per 100 Myr, lasting 0 / 0 / 4 Myr with 123 / 151 / 200 km of shortening, all on PLT-068's threshold, at an undiminished 55 to 60 mm/yr; 42,500 km² of crust crossing each (median), 1.3 million km³ kept, 0.35 of what reached the front crossing and the rest moving as area; the front's largest uplift 5.1 km, the land they stamped a median 0.5 km over the sea at the run's end (p90 1.2 km). They are the nearest qualifying high ground of 0.0099 of the coast (50 to 200 samples 0.0037); without both classes' high ground M5 falls 0.142 to 0.129 on the map (the open collisions hold 0.055). The small bodies are island arcs (0.73; 14.4 km of own crust on 7 km of ocean crust) and continental fragments (28.6 km), 333 / 455 / 642 km across the front: not small in the sources' sense (Yan et al. 2021: 150 km subducts, 300 km reorganizes), 0.054 to 0.127 of them within the slab's reach.
