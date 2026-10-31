@@ -16,7 +16,11 @@ to the end, as the median and range of the runs:
   overriding plate's continental share (`oo_over_cont`), by the distance to that plate's nearest continental crust
   (`oo_coast`, COAST_BANDS_KM; the last band holds plates with none) and by how its two plates are related (`oo_pair`:
   split by an initiation, rifted, neither);
-  and the front's turnover (`gain`, `loss`, km a Myr, by setting and state).
+  the front's turnover (`gain`, `loss`, km a Myr, by setting and state);
+  and, in records made since the intra-oceanic fronts diagnosis (2026-10-31), the subducting fronts by their arc's age
+  (`arc_age`, the contact's PLT-669 onset, which a polarity reversal resets; `no_arc`), by their contact's slab age at
+  its onset (`onset_slab`), and the ocean-ocean front by the ocean left on the subducting side (`oo_age_ocean`,
+  `oo_arc_ocean`) and by its contact's age against the overriding floor's age at the front (`oo_over_floor`).
 
 Earth: Bird 2003, subduction zones 51,310 km; Stern & Scholl 2010, intra-oceanic arcs 14,500 km and continental arcs
 27,500; Clift et al. 2009's Table 1, 40,225 km, of it 13,550 intra-oceanic by the crust-budget lane's split.
@@ -31,6 +35,7 @@ SLAB = ["0-50", "50-100", "100-150", "150-300", "300-600", ">600"]
 SHARE = ["0-1%", "1-5%", "5-15%", "15-30%", "30-50%", ">50%"]
 COAST = ["0-150", "150-300", "300-600", "600-1200", "1200-2400", ">2400/none"]
 PAIR = ["initiation", "rift", "other"]
+OCEAN = ["<500", "500-1500", "1500-3000", ">3000/none"]
 
 
 def runs_of(folder):
@@ -73,6 +78,25 @@ def one(run, t_from):
             if row:
                 for i, lab in enumerate(labels):
                     add(f"{key}_{lab}", row[i])
+        # The trace's fields (the intra-oceanic fronts diagnosis, 2026-10-31; absent from older records): the
+        # subducting fronts by their arc's age and with no arc onset, by their contact's slab age at the onset, and
+        # the ocean-ocean front by the ocean left on the subducting side against its contact's and its arc's age,
+        # and by its contact's age against the overriding floor's age at the front.
+        for key in ("arc_age", "onset_slab"):
+            rows = fb.get(key)
+            if rows:
+                for i, lab in enumerate(AGE):
+                    add(f"oo_{key}_{lab}", rows[0][i])
+                    add(f"oc_{key}_{lab}", rows[1][i])
+        if fb.get("no_arc"):
+            add("oo_no_arc", fb["no_arc"][0])
+            add("oc_no_arc", fb["no_arc"][1])
+        for key, labels in (("oo_age_ocean", OCEAN), ("oo_arc_ocean", OCEAN), ("oo_over_floor", AGE)):
+            m = fb.get(key)
+            if m:
+                for i, row_lab in enumerate(labels):
+                    for j, lab in enumerate(AGE):
+                        add(f"{key}_{row_lab}_{lab}", m[i][j])
         for key in ("gain", "loss"):
             g = fb.get(key)
             if g:
