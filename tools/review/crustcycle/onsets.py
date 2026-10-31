@@ -218,11 +218,16 @@ def resampling_report(onsets, resamples, length_myr, step_ts):
             # A front sample needs a converging, non-transform neighbour of the subducting plate
             # (dynamics.rs `front_index`), so an onset with none had no converging front that step.
             none = sum(1 for o in sub if o["prov"]["n"] == 0)
+            idle = [o for o in sub if o["prov"]["n"] == 0]
+            km_idle = [sum(o["front_km_myr"][k] for o in idle) / max(length_myr, 1e-9) for k in (0, 1)]
+            passed_idle = sum(1 for o in idle if o["subducting_after_myr"] >= 0) / max(len(idle), 1)
             print(f"    at the onset: no converging front sample {none / len(sub):.3f}, front samples median"
                   f" {statistics.median([o['prov']['n'] for o in sub]):.0f}; relative speed median"
                   f" {statistics.median([o['convergence_mm_yr'] for o in sub]):.0f} mm/yr; the boundary the step"
                   f" before: " + "  ".join(
                       f"{k} {sum(1 for o in sub if KINDS[o['kind']] == k) / len(sub):.3f}" for k in KINDS[:6]))
+            print(f"    of them with no converging front sample at the onset: passed incipient {passed_idle:.3f};"
+                  f" front made, mean km over the run: oo {km_idle[0]:.0f}, oc {km_idle[1]:.0f}")
 
 
 def young_age(o):
