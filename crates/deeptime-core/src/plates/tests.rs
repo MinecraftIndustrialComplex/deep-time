@@ -4743,6 +4743,10 @@ fn arc_cones_are_counted_inside_the_arc_rate() {
 fn hotspot_cones_are_counted_inside_the_hotspot_rate() {
     let mut p = preset(6000, 20.0, "supercontinent", 3);
     p.tectonics.hotspot_births_per_100myr = 0.0;
+    // The kernel's netting (PLT-286) is the old law: with the cone budget (PLT-803, on by default
+    // since 2026-10-31) the cones are netted by their hotspot instead
+    // (`a_budgeted_tail_nets_its_cones_by_their_hotspot`).
+    p.tectonics.hotspot_cone_budget = false;
     let stage = PlatesStage::new(p.clone());
     let env = stage.env(&p.tectonics, 1);
     let (mut st, geo) = init::initial_state(&p, &env).unwrap();
@@ -7715,6 +7719,10 @@ fn a_sourced_tail_adds_its_buoyancy_fluxs_magma() {
     use super::hotspots::sourced as src;
     let mut p = preset(6000, 20.0, "supercontinent", 3);
     p.tectonics.hotspots_sourced = true;
+    // Its last check is the kernel's netting (PLT-286), the old law: with the cone budget (PLT-803,
+    // on by default since 2026-10-31) the cones are netted by their hotspot instead
+    // (`a_budgeted_tail_nets_its_cones_by_their_hotspot`).
+    p.tectonics.hotspot_cone_budget = false;
     let stage = PlatesStage::new(p.clone());
     let env = stage.env(&p.tectonics, 1);
     let (mut st, geo) = init::initial_state(&p, &env).unwrap();

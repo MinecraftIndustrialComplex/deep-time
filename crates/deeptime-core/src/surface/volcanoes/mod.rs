@@ -1460,7 +1460,8 @@ impl VolcanoStage {
             for &(vi, dh) in &held_dh {
                 let v = &mut st.volcanoes[vi];
                 let hid = v.hotspot.expect("held cones are a hotspot's");
-                v.rock_m += share[&hid] * dh;
+                // A growth whose footprint holds no cell handed no rock.
+                v.rock_m += share.get(&hid).copied().unwrap_or(0.0) * dh;
             }
         }
         self.time("build", started);
