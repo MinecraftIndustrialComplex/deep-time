@@ -10569,6 +10569,7 @@ Why base35's continents stand low against Earth (sea-level.md, "Why base35's con
 - Ledger ids: none.
 - Access: open (the repository copy; full text, not every section).
 - Read so far (by the project): 2026-10-31 (the research sub-agent): "~50-70°C cooling, which is interpreted as a response to the unroofing of erodible strata overlying basement", onset "~420-350 Ma" and "~350-300 Ma"; "between ~4.5 and 2.5 km of strata may have been unroofed from this region"; no rate stated (about 21 to 38 m/Myr over 120 Myr, the agent's arithmetic); the cover, not the basement.
+- Used: read and not cited (a cover's unroofing, not a craton's basement rate).
 
 ### Kaban2003
 - Reference: Kaban, M. K., Schwintzer, P., Artemieva, I. M. and Mooney, W. D. (2003). Density of the continental roots: compositional and thermal contributions. Earth and Planetary Science Letters 209:53-69.
@@ -10609,6 +10610,7 @@ Why base35's continents stand low against Earth (sea-level.md, "Why base35's con
 - Ledger ids: none.
 - Access: the abstract only.
 - Read so far (by the project): the abstract, 2026-10-31 (the research sub-agent): "a broad bathymetric swell in the southeastern Atlantic Ocean with an amplitude of about 500m", which "together with the contiguous eastern and southern African plateaus, form a superswell", attributed "at least in part, to heating of the lithosphere". No height against other cratons in the abstract.
+- Used: read and not cited (no height against the other cratons).
 
 ### Korenaga2017
 - Reference: Korenaga, J., Planavsky, N. J. and Evans, D. A. D. (2017). Global water cycle and the coevolution of the Earth's interior and surface environment. Philosophical Transactions of the Royal Society A 375:20150393.
@@ -10625,9 +10627,10 @@ Why base35's continents stand low against Earth (sea-level.md, "Why base35's con
 - Ledger ids: none.
 - Access: the abstract only (the NASA record).
 - Read so far (by the project): the abstract, 2026-10-31 (the research sub-agent): "variation in TP far outweighs the other factors in importance, with freeboard decreasing by 1 km for every TP increase of about 80 C".
+- Used: read and not cited (the mantle's potential temperature, which the model holds fixed).
 
 ### BaldwinWhippleTucker2003
-- Reference: Baldwin, Whipple and Tucker (2003). Journal of Geophysical Research: Solid Earth 108(B3). (The initials and the title not recorded by the read; the title as the agent's brief named it: "Implications of the shear stress river incision model for the timescale of postorogenic decay of topography".)
+- Reference: Baldwin, Whipple and Tucker (2003). Journal of Geophysical Research: Solid Earth 108(B3). The initials and the title were not recorded by the read; the lane's brief to the agent named the paper by a title, which is not cited here as read.
 - DOI or URL: 10.1029/2001JB000550; the abstract from the Crossref record.
 - Cited as: "Baldwin, Whipple & Tucker 2003".
 - Ledger ids: none.
@@ -10635,4 +10638,5 @@ Why base35's continents stand low against Earth (sea-level.md, "Why base35's con
 - Read so far (by the project): the abstract, 2026-10-31 (the research sub-agent): the detachment-limited stream power model "predicts, for reasonable initial topographies, relatively short postorogenic decay times of 1–10 Myr"; "Pure Airy isostatic rebound of a thick crustal root results in decay times that are at most a factor of 6 longer than the detachment‐limited result"; transport-limited conditions "a factor of 2–3"; "including critical shear stress results increases decay time by approximately a factor of 20"; "a model combining isostasy, a transition to transport‐limited conditions, and a critical shear stress for erosion could account for the presence of residual topography for hundreds of million years".
 
 ### Not read, or read and not used (the low-continents lane)
+- Read and not cited: Morón et al. 2020, Nyblade & Robinson 1994 and Galer 1991 (their entries above say why).
 - Jordan 1978 and 1988 (no abstract obtained); Poudjom Djomani et al. 2001 (not found); Wise 1974 (quoted through Korenaga 2017 and Wilkinson & McElroy 2007 only); Wilkinson 2005; Kohn et al. 2002 (its record gives no rates); Gunnell 2003 and Belton et al. 2004 (not fetched); Lachenbruch & Morgan 1990 (only a fetch tool's paraphrase of the USGS abstract page; the elevation formula not obtained); Harris et al. 2014's shelf area (blocked; the shelf share in sea-level.md is the lane's SRTM15+ measure); Peters 2006 and Algeo & Seslavinsky 1995 (no abstract); Tasistro-Hart & Macdonald 2023 (read in full by the research sub-agent, qualitative: "Five flooding events, each <50 My in duration, are well resolved"); Eakins & Sharman 2012 (the NOAA report read in full by the research sub-agent: no mean elevation printed in its text; "the continents, several hundred meters above sea level, and the oceanic abyssal plains, roughly 4,300 meters below sea level").

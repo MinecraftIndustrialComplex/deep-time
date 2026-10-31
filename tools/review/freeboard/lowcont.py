@@ -3,35 +3,54 @@
 """Why base35's continents stand low, against Earth: lowcont.py <mode> ...
 
 base35 (master 9d9e4c94) against base34: land 0.227 to 0.209, continental crust under the sea 0.540 to 0.602, the sea
-at the end 154 to 316 m (sea-level.md, "Why base35's continents stand low"). This splits a continental column's height
-over the sea into its thickness, the height line it stands on at that thickness, and the sea, against CRUST1.0 and
-SRTM15+, on the pool's cached runs only.
+at the end 174 to 319 m over the datum (the final frames' climate/sea_level_m, medians; sea-level.md, "Why base35's
+continents stand low"). This splits a continental column's height over the sea into its thickness, the height line
+it stands on at that thickness, and the sea, against CRUST1.0 and SRTM15+, and the area of the crust at least 20 km
+thick into its sources through time, on the pool's cached runs only.
 
 Modes:
   series <arm folder> ...
-      summary.txt per run: the crust budget's cb_t lines (continental share, volume, mean thickness, land, the sea,
-      the dry share of the continental crust) at every 50 Myr, the surface's hypsometry line and its erosion_bands
-      line (the land's net lowering and its parts, m/Myr, by height band, window relief wz* and cell relief rz*).
-      Medians over the runs.
+      summary.txt per run: the crust budget's cb_t lines (the continental label's share of the visible samples, its
+      volume and mean own thickness, land, the record's sea, the dry share) at every 50 Myr, the label's area changes
+      by process so far (cb_parts cont, shares of the visible samples), the surface's hypsometry line and its
+      erosion_bands line (the land's net lowering and its parts, m/Myr, by height band, window relief wz* and cell
+      relief rz*). Medians over the runs.
+  area <arm folder>[@N] ...
+      The crust budget's maps (maps/t*.bin, maps/pools/t*.bin, as thinning.py reads them) every 50 Myr: the crust at
+      least 20 km thick, whatever its label, as a share of the planet (each sample 1/N of it, N the samples at the
+      start, all visible; between resamplings the plates' samples keep their area and the gaps between them are
+      unsampled new floor), by source: the start's continents and what grew on them (continental, no ocean basement),
+      ocean floor made continental (an ocean basement over 1 km, Sample::basement: a matured island arc, a collision
+      belt, the rest: the transition's margins and their resampled ring, the thickening's spread and the collapse's
+      fill, PLT-254), and ocean-labelled crust; its mean thickness and volume; the planet's crust at 35 to 50 km; and
+      at the end the interiors no orogeny raised (thinning.py's "never") over all their samples and their land only.
   earth <crust1.bnds> <earth_relief_15m_p.grd>
-      Earth: CRUST1.0 (Laske et al. 2013, 1 x 1 degree, read as m5earthbands.py reads it: column 1 the top of the ice
-      or rock, 2 the rock, 8 the Moho, cells by cos latitude) by crust thickness: the share of the planet, the share
-      above the sea, the solid surface's mean and p50 over the sea; the crust at least 20 km thick (the census's
-      like-for-like continental crust, RLC-030); the cratons' boxes (m4cold.py's); and SRTM15+ at 15' (Tozer et al.
-      2019) hypsometry: the land's mean and quantiles, its shares above 1 to 4 km, the shelf (0 to 200 m deep) and
-      the slope (200 to 2,000 m) as shares of the planet, with and without the two ice sheets (cc.ice_sheets).
-      Writes earth.json beside nothing: prints JSON on its last line.
+      Earth: CRUST1.0 (Laske et al. 2013, 1 x 1 degree; its bnds columns as its documentation counts them: 1 the
+      water's top, 2 the ice's top (the solid surface, ice or rock), 3 the sediments' top (the rock), 9 the mantle's
+      top (the Moho); cells by cos latitude) by crust thickness (column 3 less 9): the share of the planet, the share
+      above the sea, the solid surface's mean and p50 over the sea, with the ice sheets in and out (cc.ice_sheets);
+      the crust at least 20 km thick (the census's like-for-like continental crust, RLC-030); the cratons' boxes
+      (m4cold.py's), the land only and every cell of crust at least 20 km thick; the fill on Earth's own histograms
+      (a binning check) and at other continental areas; and SRTM15+ at 15' (Tozer et al. 2019) hypsometry: the land's
+      mean and quantiles, its shares above 1 to 4 km, the shelf (0 to 200 m deep) and the slope (200 to 2,000 m) as
+      shares of the planet, with and without the two ice sheets. Prints JSON on its last line (earth.json).
   model <earth.json> <arm folder>[@N] ...
       The same on each run's final frame (fields/ on the L1 grid, equal-area rows; the surface's elevation, the
-      plate model's thickness and kind, the climate's sea), medians over runs, and the split against Earth:
+      plate model's thickness and kind, the climate's sea; cells with no elevation or thickness dropped and
+      counted), and the split against Earth:
         D = sum_b s_b d_b (the dry share of crust >= 20 km), H = sum_b s_b m_b (its mean height over the sea),
         s_b the band's share of that crust, d_b its dry share, m_b its mean height over the sea, 1-km bands;
         thickness term  sum (s_M - s_E) x_E,
-        line term       sum s_M (x_M0 - x_E)   (x_M0 the model's band read against its datum, not its sea),
+        line term       sum s_M (x_M0 - x_E)   (x_M0 the model's band with the sea at the datum: a drowned column's
+                                               Airy height S + (z - S) / 1.454 (ISO-078's water load, settle.rs),
+                                               reloaded under a sea at 0),
         sea term        sum s_M (x_M - x_M0),
-      which add up to D_M - D_E (or H_M - H_E) exactly; and the sea's fill on four factors against Earth's (Shapley,
-      m5sea.fill): the water, the share of crust >= 20 km, its height histogram, and the thinner crust's.
-Needs numpy (the VM's .pyenv-numpy, run with -I); earth needs h5py."""
+      which add up to D_M - D_E (or H_M - H_E) exactly per run, so their means over the runs add too (medians do
+      not: printed with a residual); against Earth with its ice sheets in and out. And the sea's fill on four
+      factors against Earth's (Shapley, m5sea.fill): the water, the share of crust >= 20 km, its height histogram
+      and the thinner crust's, with the run's sea less its own fill as a fifth term (the residual: the steering's
+      nudge and the open-sea rule, m5sea.py's), so the five add to the run's sea less Earth's fill.
+Needs numpy (the VM's .pyenv-numpy, run with -I); area needs scipy (thinning.py), earth needs h5py."""
 import itertools
 import json
 import re
@@ -43,6 +62,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "m5diag"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # thinning.py (-I leaves the script's folder off the path)
 import continents_census as cc  # noqa: E402
 
 T_MIN = 20.0  # km: the census's like-for-like continental crust (RLC-030, PLT-261's 20 km boundary)
@@ -52,6 +72,10 @@ COARSE = [(0, 10), (10, 15), (15, 20), (20, 25), (25, 30), (30, 35), (35, 40), (
 HIST_EDGES = np.arange(-12000.0, 9000.0 + 1.0, 25.0)
 WATER_LAYER_M = 2664.0  # ledger: ISO-085
 RHO_ICE_OVER_SEA = 917.0 / 1028.0  # ledger: CLM-210
+WATER_LOADED = 3300.0 / (3300.0 - 1030.0)  # settle.rs WATER_LOADED (flexure.rs's mantle and water; ISO-078)
+START_AREA = 0.4225  # cb_t t=-1000 cont on every run: the preset's start, (1 - 0.7) / (1 - 0.29) (Cogley 1984)
+Z0_M, T_N_KM, AIRY_F = 525.0, 35.1, 3300.0 / 470.0  # PLT-281's line: z_0, T_n, pools::COLUMN_ISOSTATIC_FACTOR
+AREA_TIMES = list(range(-1000, 1, 50))
 CRATONS = [
     ("East European platform", (45, 70, 20, 60)),
     ("Siberian platform", (55, 75, 85, 130)),
@@ -65,6 +89,11 @@ CRATONS = [
 def med(xs):
     xs = [x for x in xs if x is not None and np.isfinite(x)]
     return statistics.median(xs) if xs else float("nan")
+
+
+def mn(xs):
+    xs = [x for x in xs if x is not None and np.isfinite(x)]
+    return statistics.fmean(xs) if xs else float("nan")
 
 
 def wq(x, w, q):
@@ -174,12 +203,19 @@ def runs_of(arg):
     return out
 
 
+PART = re.compile(r"([a-z_]+):(-?[0-9.]+(?:e-?[0-9]+)?)")
+
+
 def parse_summary(run):
-    cb, hyp, bands = {}, {}, {}
+    cb, hyp, bands, parts = {}, {}, {}, {}
     for line in (run / "summary.txt").read_text().splitlines():
         if line.startswith("cb_t "):
             d = {k: float(v) for k, v in NUM.findall(line)}
             cb[int(d["t"])] = d
+        elif line.startswith("cb_parts "):
+            t = int(float(line.split()[1].split("=")[1]))
+            m = re.search(r" cont=\[([^]]*)\]", line)
+            parts[t] = {k: float(v) for k, v in PART.findall(m.group(1))} if m else {}
         elif "hypsometry land_frac_area" in line:
             hyp = {k: float(v) for k, v in NUM.findall(line.split("hypsometry", 1)[1])}
         elif "erosion_bands" in line:
@@ -191,7 +227,10 @@ def parse_summary(run):
                     bands[name] = [float(x) for x in vals.split("/")]
                 except ValueError:
                     pass
-    return cb, hyp, bands
+    return cb, hyp, bands, parts
+
+
+PART_TIMES = (-950, -900, -800, -500, 0)
 
 
 def main_series(args):
@@ -199,7 +238,7 @@ def main_series(args):
         rs = runs_of(arg)
         parsed = [parse_summary(r) for r in rs]
         print(f"== series {arg} ({len(rs)} runs)")
-        cols = ["cont", "vol_km3", "mean_t_km", "land", "sea_m", "dry", "dry_sl", "above_2km", "felsic_km3",
+        cols = ["vis", "cont", "vol_km3", "mean_t_km", "land", "sea_m", "dry", "dry_sl", "above_2km", "felsic_km3",
                 "felsic_ocean_km3"]
         print(f"{'t':>6} " + " ".join(f"{c:>12}" for c in cols))
         ts = sorted({t for p in parsed for t in p[0]})
@@ -215,6 +254,83 @@ def main_series(args):
         for nm in names:
             v = [med([p[2][nm][i] for p in parsed if nm in p[2] and len(p[2][nm]) > i]) for i in range(6)]
             print(f"  {nm:>8} " + " ".join(f"{x:>8.4g}" for x in v))
+        print("-- the label's area changes by process so far (cb_parts cont, shares of the visible samples), medians:")
+        names = sorted({k for p in parsed for t in PART_TIMES for k in p[3].get(t, {})})
+        print(f"{'t':>6} " + " ".join(f"{n[:11]:>11}" for n in names) + f" {'sum':>8}")
+        for t in PART_TIMES:
+            rows = [p[3][t] for p in parsed if t in p[3]]
+            if rows:
+                print(f"{t:>6} " + " ".join(f"{med([r.get(n, 0.0) for r in rows]):>11.4f}" for n in names) +
+                      f" {med([sum(r.values()) for r in rows]):>8.4f}")
+
+
+# ------------------------------------------------------------------------------------------------ area
+
+SOURCES = ("start", "arc", "belt", "other", "ocean")
+
+
+def area_run(run):
+    import thinning as th  # noqa: E402 (needs scipy)
+    ser = th.sea_series(run)
+    a, _ = th.read(run, -1000)
+    n0 = len(a)  # every sample visible at the start (cb_t vis 100000)
+    out = {}
+    for t in AREA_TIMES:
+        try:
+            a, pp = th.read(run, t)
+        except FileNotFoundError:
+            continue
+        hid = (a[:, 10].astype(np.int64) & 1) > 0
+        assert not hid.any(), "the maps hold visible samples only"
+        T = a[:, 3] / 1000.0
+        cont = a[:, 4] > 0.5
+        base = np.where(cont, np.clip(np.minimum(pp[:, 7], pp[:, 5] + pp[:, 6]), 0.0, None), 0.0)
+        conv = cont & (base > 1000.0)
+        src = {"start": cont & ~conv, "arc": conv & (a[:, 7] > 0.0)}
+        src["belt"] = conv & ~src["arc"] & (a[:, 5] > 1.5)
+        src["other"] = conv & ~src["arc"] & ~src["belt"]
+        src["ocean"] = ~cont
+        c = T >= T_MIN
+        r = {"sea": th.sea_at(ser, t), "vis": len(a) / n0, "c20": c.sum() / n0, "c20_of_vis": float(c.mean()),
+             "label": cont.sum() / n0, "label_of_vis": float(cont.mean()), "T20": float(T[c].mean()),
+             "vol20": float(T[c].sum() / n0), "b35_50": float(((T >= 35) & (T < 50)).sum() / n0),
+             "b30_35": float(((T >= 30) & (T < 35)).sum() / n0), "start_under20": float((src["start"] & ~c).sum() / n0)}
+        for k, m in src.items():
+            km = c & m
+            r[f"c20_{k}"] = float(km.sum() / n0)
+            r[f"T_{k}"] = float(T[km].mean()) if km.any() else float("nan")
+        out[t] = r
+    # The interiors no orogeny raised, at the end: over all their samples and their land only (thinning.py's classes).
+    a, pp = th.read(run, 0)
+    cls, _, _ = th.classify(a, pp)
+    sea = th.sea_at(ser, 0)
+    nv = cls["never"]
+    zs = a[nv, 2] - sea
+    T = a[nv, 3] / 1000.0
+    land = zs > 0
+    out["never"] = {"share": float(nv.sum() / n0), "T_p50": float(np.median(T)), "zs_p50": float(np.median(zs)),
+                    "land": float(land.mean()), "T_p50_land": float(np.median(T[land])) if land.any() else float("nan"),
+                    "zs_p50_land": float(np.median(zs[land])) if land.any() else float("nan"),
+                    "z_p50": float(np.median(a[nv, 2]))}
+    return out
+
+
+def main_area(args):
+    for arg in args:
+        rs = runs_of(arg)
+        res = [area_run(r) for r in rs]
+        print(f"== area {arg} ({len(rs)} runs): the crust >= 20 km as a share of the planet, by source; medians")
+        cols = ["sea", "vis", "label", "label_of_vis", "c20", "c20_of_vis", "T20", "vol20", "b30_35", "b35_50",
+                "start_under20"] + [f"c20_{k}" for k in SOURCES] + [f"T_{k}" for k in SOURCES]
+        print(f"{'t':>6} " + " ".join(f"{c[:11]:>11}" for c in cols))
+        for t in AREA_TIMES:
+            rows = [r[t] for r in res if t in r]
+            if rows:
+                print(f"{t:>6} " + " ".join(f"{med([x[c] for x in rows]):>11.4g}" for c in cols))
+        print("-- means: " + " ".join(f"t{t}:c20 {mn([r[t]['c20'] for r in res if t in r]):.4f}" for t in
+                                     (-1000, -950, -900, -800, -700, -500, 0)))
+        print("-- the interiors no orogeny raised, the end (all samples; land only): " +
+              " ".join(f"{k} {med([r['never'][k] for r in res]):.4g}" for k in res[0]["never"]))
 
 
 # ------------------------------------------------------------------------------------------------ earth
@@ -234,11 +350,15 @@ def main_earth(bnds, relief):
     lat, lon, w, top, solid, rock, T = earth_crust(bnds)
     sheets = cc.ice_sheets(lat, lon)
     out = {"source": "CRUST1.0 (Laske et al. 2013) and SRTM15+ 15' (Tozer et al. 2019)"}
-    # The solid surface (ice or rock under the water) over the sea: what the sea fills.
+    # The solid surface (ice or rock under the water) over the sea: what the sea fills. For height against
+    # thickness the ice sheets are also taken out (the model's surface carries no ice sheets).
     h = solid
     out["coarse"] = coarse(T, h, w, 0.0)
+    out["coarse_no_sheets"] = coarse(T[~sheets], h[~sheets], w[~sheets], 0.0)
     s, d, m = profile(T, h, w, 0.0)
     out["profile"] = {"s": s.tolist(), "d": d.tolist(), "m": m.tolist()}
+    s, d, m = profile(T[~sheets], h[~sheets], w[~sheets], 0.0)
+    out["profile_no_sheets"] = {"s": s.tolist(), "d": d.tolist(), "m": m.tolist()}
     c = T >= T_MIN
     out["cont20"] = {"share": float(w[c].sum() / w.sum()), "T_mean": wmean(T[c], w[c]),
                      "T_p10": wq(T[c], w[c], 0.1), "T_p50": wq(T[c], w[c], 0.5), "T_p90": wq(T[c], w[c], 0.9),
@@ -249,19 +369,23 @@ def main_earth(bnds, relief):
     out["cont20_no_sheets"] = {"T_mean": wmean(T[c2], w[c2]), "dry": float((w[c2] * (h[c2] > 0)).sum() / w[c2].sum()),
                                "h_mean": wmean(h[c2], w[c2]), "h_p50": wq(h[c2], w[c2], 0.5)}
     # The rock height at the sea: the thickness at which the band's p50 crosses 0, by interpolation on 1-km bands.
-    p50 = []
-    for a in np.arange(20.0, 60.0, 1.0):
-        k = (T >= a) & (T < a + 1)
-        p50.append(wq(h[k], w[k], 0.5) if k.any() else float("nan"))
-    out["p50_by_km"] = dict(zip([float(a) for a in np.arange(20.0, 60.0, 1.0)], p50))
-    # The cratons' boxes, land only.
+    for key, keep in (("p50_by_km", np.ones(T.shape, bool)), ("p50_by_km_no_sheets", ~sheets)):
+        p50 = []
+        for a in np.arange(20.0, 60.0, 1.0):
+            k = keep & (T >= a) & (T < a + 1)
+            p50.append(wq(h[k], w[k], 0.5) if k.any() else float("nan"))
+        out[key] = dict(zip([float(a) for a in np.arange(20.0, 60.0, 1.0)], p50))
+    # The cratons' boxes: the land only, and every cell of crust at least 20 km thick (wet ones too: Hudson Bay, the
+    # Baltic, the White Sea), the solid surface over the sea.
     land = (top - solid <= 0.0) & (top > 0.0)
-    cr = {}
-    for name, (la0, la1, lo0, lo1) in CRATONS:
-        k = land & (lat >= la0) & (lat <= la1) & (lon >= lo0) & (lon <= lo1)
-        cr[name] = {"T_p50": wq(T[k], w[k], 0.5), "T_mean": wmean(T[k], w[k]), "h_mean": wmean(h[k], w[k]),
-                    "h_p50": wq(h[k], w[k], 0.5), "h_p25": wq(h[k], w[k], 0.25), "h_p75": wq(h[k], w[k], 0.75)}
-    out["cratons"] = cr
+    for key, sel in (("cratons", land), ("cratons_all20", c)):
+        cr = {}
+        for name, (la0, la1, lo0, lo1) in CRATONS:
+            k = sel & (lat >= la0) & (lat <= la1) & (lon >= lo0) & (lon <= lo1)
+            cr[name] = {"T_p50": wq(T[k], w[k], 0.5), "T_mean": wmean(T[k], w[k]), "h_mean": wmean(h[k], w[k]),
+                        "h_p50": wq(h[k], w[k], 0.5), "h_p25": wq(h[k], w[k], 0.25), "h_p75": wq(h[k], w[k], 0.75),
+                        "dry": float((w[k] * (h[k] > 0)).sum() / w[k].sum())}
+        out[key] = cr
     # The sea's fill on Earth's own surface, the check that the factors start at Earth's sea.
     wet = solid < 0
     W = float((w * np.where(wet, -solid, 0.0)).sum() / w.sum())
@@ -269,6 +393,8 @@ def main_earth(bnds, relief):
     out["fill"] = {"f": float(w[c].sum() / w.sum()), "hc": hist(h[c], w[c]).tolist(), "ho": hist(h[~c], w[~c]).tolist(),
                    "W": W}
     out["fill_check_m"] = fill(W, out["fill"]["f"], np.array(out["fill"]["hc"]), np.array(out["fill"]["ho"]))
+    # The same fill with Earth's histograms and water but another area of crust at least 20 km thick: the start's.
+    out["fill_at_start_area_m"] = fill(W, START_AREA, np.array(out["fill"]["hc"]), np.array(out["fill"]["ho"]))
     # SRTM15+ hypsometry.
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "m5diag"))
     import m5earth  # noqa: E402
@@ -290,11 +416,19 @@ def print_earth(e):
               f"mean {r.get('mean', float('nan')):8.0f} p50 {r.get('p50', float('nan')):8.0f}")
     print("-- crust >= 20 km:", json.dumps(e["cont20"]))
     print("-- crust >= 20 km, the ice sheets out:", json.dumps(e["cont20_no_sheets"]))
+    print("-- the ice sheets out, by crust thickness:")
+    for r in e["coarse_no_sheets"]:
+        print(f"  {r['band']:>7} share {r['share']:.4f} dry {r.get('dry', float('nan')):.3f} "
+              f"mean {r.get('mean', float('nan')):8.0f} p50 {r.get('p50', float('nan')):8.0f}")
     print("-- p50 height by thickness:", " ".join(f"{k:g}:{v:.0f}" for k, v in e["p50_by_km"].items()))
-    print("-- cratons (land):")
-    for k, v in e["cratons"].items():
-        print(f"  {k:>28} " + " ".join(f"{a} {b:.1f}" for a, b in v.items()))
-    print(f"-- water over the planet {e['water_m']:.0f} m; Earth's fill on its own histograms {e['fill_check_m']:.0f} m")
+    print("-- the same, the ice sheets out:", " ".join(f"{k:g}:{v:.0f}" for k, v in e["p50_by_km_no_sheets"].items()))
+    for key, what in (("cratons", "land only"), ("cratons_all20", "every cell of crust >= 20 km, wet ones too")):
+        print(f"-- cratons ({what}):")
+        for k, v in e[key].items():
+            print(f"  {k:>28} " + " ".join(f"{a} {b:.3g}" for a, b in v.items()))
+    print(f"-- water over the planet {e['water_m']:.0f} m; Earth's fill on its own histograms {e['fill_check_m']:.0f} m "
+          f"(a binning check: W is read from the same surface); at the start's area {START_AREA} of crust >= 20 km "
+          f"{e['fill_at_start_area_m']:.0f} m")
     print("-- SRTM15+ hypsometry, all:", json.dumps(e["hypso_all"]))
     print("-- SRTM15+ hypsometry, without Antarctica and Greenland:", json.dumps(e["hypso_no_sheets"]))
 
@@ -310,17 +444,26 @@ def model_run(run):
     lat_r, ok_r = cc.lat_of_rows(h_, r_, w_ * r_)
     ok = np.repeat(ok_r[:, None], w_, 1)
     sea = float(g["globals"]["climate/sea_level_m"])
-    hs = np.nan_to_num(f["surface/elevation_m"][ok])
-    T = np.nan_to_num(f["plates/thickness_m"][ok]) / 1000.0
-    cont = np.nan_to_num(f["plates/crust_type"][ok]) > 0.5
-    ice = np.nan_to_num(f["climate/ice_thickness_m"][ok])
-    zc = (f["elevation"][ok] - cc.SEA_Y) * cc.M_PER_BLOCK_V  # the census's ground over the sea
+    hs = f["surface/elevation_m"][ok]
+    T = f["plates/thickness_m"][ok] / 1000.0
+    # A cell with no elevation or thickness is dropped and counted, not read as a 0 m, 0 km column.
+    good = np.isfinite(hs) & np.isfinite(T)
+    hs, T = hs[good], T[good]
+    cont = np.nan_to_num(f["plates/crust_type"][ok][good]) > 0.5
+    ice = np.nan_to_num(f["climate/ice_thickness_m"][ok][good])
+    zc = (f["elevation"][ok][good] - cc.SEA_Y) * cc.M_PER_BLOCK_V  # the census's ground over the sea
     w = np.ones(hs.shape)  # equal-area rows
-    out = {"run": run.name, "sea": sea, "land_census": float((zc > 0).mean())}
+    out = {"run": run.name, "sea": sea, "land_census": float((zc > 0).mean()), "dropped": int((~good).sum())}
     out["coarse"] = coarse(T, hs, w, sea, label=cont.astype(float))
+    # The surface with the sea at the datum: a drowned column's Airy height S + (z - S) / WATER_LOADED (ISO-078's
+    # settling inverted), reloaded under a sea at 0 where it stays below it; a dry column keeps its height.
+    za = np.where(hs < sea, sea + (hs - sea) / WATER_LOADED, hs)
+    h0 = np.where(za < 0.0, za * WATER_LOADED, za)
     s, d, m = profile(T, hs, w, sea)
-    s0, d0, m0 = profile(T, hs, w, 0.0)
-    out["profile"] = {"s": s.tolist(), "d": d.tolist(), "m": m.tolist(), "d0": d0.tolist(), "m0": m0.tolist()}
+    _, d0, m0 = profile(T, h0, w, 0.0)
+    _, d0l, m0l = profile(T, hs, w, 0.0)
+    out["profile"] = {"s": s.tolist(), "d": d.tolist(), "m": m.tolist(), "d0": d0.tolist(), "m0": m0.tolist(),
+                      "d0_loaded": d0l.tolist(), "m0_loaded": m0l.tolist()}
     c = T >= T_MIN
     out["cont20"] = {"share": float(c.mean()), "T_mean": float(T[c].mean()), "T_p10": float(np.quantile(T[c], 0.1)),
                      "T_p50": float(np.quantile(T[c], 0.5)), "T_p90": float(np.quantile(T[c], 0.9)),
@@ -335,91 +478,148 @@ def model_run(run):
     lat = np.repeat(lat_r[:, None], w_, 1)[ok]
     out["hypso"] = hypso(hs - sea, w)
     out["hypso_census"] = hypso(zc, w)
-    p50 = {}
-    for a in np.arange(20.0, 60.0, 1.0):
-        k = (T >= a) & (T < a + 1)
-        p50[float(a)] = float(np.median(hs[k] - sea)) if k.sum() > 20 else float("nan")
-    out["p50_by_km"] = p50
+    # p50 by 1-km band [a, a + 1): over the sea, over the datum as it stands, and with the sea at the datum (h0).
+    for key, x in (("p50_by_km", hs - sea), ("p50_datum_by_km", hs), ("p50_unloaded_by_km", h0)):
+        p50 = {}
+        for a in np.arange(20.0, 60.0, 1.0):
+            k = (T >= a) & (T < a + 1)
+            p50[float(a)] = float(np.median(x[k])) if k.sum() > 20 else float("nan")
+        out[key] = p50
     W = WATER_LAYER_M - float(ice.mean()) * RHO_ICE_OVER_SEA
     out["fill"] = {"f": float(c.mean()), "hc": hist(hs[c], w[c]).tolist(), "ho": hist(hs[~c], w[~c]).tolist(), "W": W}
     out["fill_self_m"] = fill(W, out["fill"]["f"], np.array(out["fill"]["hc"]), np.array(out["fill"]["ho"]))
+    # The ocean floor and margins under 20 km: the mean height of the crust under 10 km, and of 10 to 20 km.
+    for lo, hi in ((0.0, 10.0), (10.0, 20.0)):
+        k = (T >= lo) & (T < hi)
+        out[f"under20_{lo:g}_{hi:g}"] = {"share": float(k.mean()), "h_mean": float(hs[k].mean()) if k.any() else
+                                         float("nan")}
     out["lat_abs_mean_cont"] = float(np.abs(lat[c]).mean())
     return out
 
 
 def split(sM, xM, xM0, sE, xE):
-    """Thickness, line and sea terms of sum s x between the model and Earth (NaN bins count as 0 weight)."""
-    xE = np.nan_to_num(xE)
-    xM, xM0 = np.nan_to_num(xM), np.nan_to_num(xM0)
+    """Thickness, line and sea terms of sum s x between the model and Earth. A band with no crust on one side has no
+    value there (NaN), counted as 0 since its share is 0; a band the model fills and Earth does not would put its whole
+    value into the line term, so it is refused."""
+    assert not ((sE <= 0.0) & (sM > 0.0)).any(), "a band the model fills and Earth does not"
+    xE = np.where(sE > 0.0, xE, 0.0)
+    xM, xM0 = np.where(sM > 0.0, xM, 0.0), np.where(sM > 0.0, xM0, 0.0)
+    assert np.isfinite(xE).all() and np.isfinite(xM).all() and np.isfinite(xM0).all()
     thick = float(((sM - sE) * xE).sum())
     line = float((sM * (xM0 - xE)).sum())
     sea = float((sM * (xM - xM0)).sum())
-    return {"model": float((sM * xM).sum()), "earth": float((sE * xE).sum()), "thickness": thick, "line": line,
-            "sea": sea}
+    out = {"model": float((sM * xM).sum()), "earth": float((sE * xE).sum()), "thickness": thick, "line": line,
+           "sea": sea}
+    assert abs(out["model"] - out["earth"] - thick - line - sea) < 1e-6 * max(1.0, abs(out["model"]))
+    return out
+
+
+TERMS = ("model", "earth", "thickness", "line", "sea")
+
+
+def print_terms(label, rows, keys, fmt="{:.4g}"):
+    """Means (which add, since each run's terms add) and medians with their residual (which do not)."""
+    means = {k: mn([x[k] for x in rows]) for k in keys}
+    meds = {k: med([x[k] for x in rows]) for k in keys}
+    print(f"-- {label}, means: " + " ".join(f"{k} {fmt.format(means[k])}" for k in keys))
+    print("   medians: " + " ".join(f"{k} {fmt.format(meds[k])}" for k in keys), end="")
+    if keys == TERMS:
+        resid = meds["model"] - meds["earth"] - meds["thickness"] - meds["line"] - meds["sea"]
+        print(f" (medians' residual {fmt.format(resid)})")
+    else:
+        print()
 
 
 def main_model(earth_json, args):
     e = json.loads(Path(earth_json).read_text().strip().splitlines()[-1])
-    sE = np.array(e["profile"]["s"])
-    dE, mE = np.array(e["profile"]["d"]), np.array(e["profile"]["m"])
+    earths = {"Earth": e["profile"], "Earth without its ice sheets": e["profile_no_sheets"]}
     for arg in args:
         rs = runs_of(arg)
         res = [model_run(r) for r in rs]
-        print(f"== model {arg} ({len(rs)} runs), final frame, medians")
-        print(f"  sea {med([r['sea'] for r in res]):.0f} m; census land {med([r['land_census'] for r in res]):.3f}")
+        print(f"== model {arg} ({len(rs)} runs), final frame, medians unless said")
+        print(f"  sea {med([r['sea'] for r in res]):.0f} m (mean {mn([r['sea'] for r in res]):.0f}); census land "
+              f"{med([r['land_census'] for r in res]):.3f}; cells dropped (no elevation or thickness) "
+              f"{sum(r['dropped'] for r in res)}")
         print("-- by crust thickness (share of the planet, continental label share, dry share, surface over the sea)")
         for i, (a, b) in enumerate(COARSE):
             rows = [r["coarse"][i] for r in res]
             print(f"  {rows[0]['band']:>7} share {med([x['share'] for x in rows]):.4f} cont "
                   f"{med([x.get('cont') for x in rows]):.2f} dry {med([x.get('dry') for x in rows]):.3f} mean "
                   f"{med([x.get('mean') for x in rows]):8.0f} p50 {med([x.get('p50') for x in rows]):8.0f}")
-        for key in ("cont20", "label"):
+        for key in ("cont20", "label", "under20_0_10", "under20_10_20"):
             ks = list(res[0][key])
             print(f"-- {key}: " + " ".join(f"{k} {med([r[key][k] for r in res]):.4g}" for k in ks))
         for key in ("hypso", "hypso_census"):
             ks = list(res[0][key])
             print(f"-- {key}: " + " ".join(f"{k} {med([r[key][k] for r in res]):.4g}" for k in ks))
-        print("-- p50 height over the sea by thickness, model / Earth:",
-              " ".join(f"{a:g}:{med([r['p50_by_km'][a] for r in res]):.0f}/{e['p50_by_km'][str(a)]:.0f}"
-                       for a in np.arange(20.0, 60.0, 2.0)))
-        # The split, per run, then medians.
-        parts = {"dry": [], "height": []}
-        for r in res:
-            p = r["profile"]
-            sM = np.array(p["s"])
-            parts["dry"].append(split(sM, np.array(p["d"]), np.array(p["d0"]), sE, dE))
-            parts["height"].append(split(sM, np.array(p["m"]), np.array(p["m0"]), sE, mE))
-        for k, v in parts.items():
-            print(f"-- split of the crust >= 20 km's {k} against Earth: " +
-                  " ".join(f"{t} {med([x[t] for x in v]):.4g}" for t in ("model", "earth", "thickness", "line", "sea")))
+        print("-- p50 height by 1-km band [T, T+1), m: the model over its sea / over the datum as it stands / with the "
+              "sea at the datum (unloaded); PLT-281's line at the band's centre over the datum; Earth over its sea "
+              "(ice sheets in / out):")
+        for a in np.arange(20.0, 60.0, 2.0):
+            line = Z0_M + (a + 0.5 - T_N_KM) * 1000.0 / AIRY_F
+            print(f"  {a:g}: {med([r['p50_by_km'][a] for r in res]):.0f} / "
+                  f"{med([r['p50_datum_by_km'][a] for r in res]):.0f} / "
+                  f"{med([r['p50_unloaded_by_km'][a] for r in res]):.0f}; line {line:.0f}; Earth "
+                  f"{e['p50_by_km'][str(a)]:.0f} / {e['p50_by_km_no_sheets'][str(a)]:.0f}")
+        # The split, per run (the terms add exactly per run); means and medians over the runs.
+        for ename, ep in earths.items():
+            sE = np.array(ep["s"])
+            dE, mE = np.array(ep["d"]), np.array(ep["m"])
+            for read, (kd, km) in (("the line read with the sea at the datum (unloaded)", ("d0", "m0")),
+                                   ("the line read on the surface as loaded", ("d0_loaded", "m0_loaded"))):
+                dry, height = [], []
+                for r in res:
+                    p = r["profile"]
+                    sM = np.array(p["s"])
+                    dry.append(split(sM, np.array(p["d"]), np.array(p[kd]), sE, dE))
+                    height.append(split(sM, np.array(p["m"]), np.array(p[km]), sE, mE))
+                print(f"-- split against {ename}, {read}:")
+                print_terms("the crust >= 20 km's dry share", dry, TERMS)
+                print_terms("the crust >= 20 km's mean height over the sea, m", height, TERMS, "{:.0f}")
         # Land: area x dry share.
         AE, DE = e["cont20"]["share"], e["cont20"]["dry"]
         la = []
         for r in res:
             AM, DM = r["cont20"]["share"], r["cont20"]["dry"]
             la.append({"area": (AM - AE) * DE, "dry": AM * (DM - DE), "land20_M": AM * DM, "land20_E": AE * DE})
-        print("-- land on crust >= 20 km, A x D: " + " ".join(f"{t} {med([x[t] for x in la]):.4g}" for t in la[0]))
-        # The sea against Earth's on four factors.
+        print_terms("land on crust >= 20 km, A x D (area + dry = land20_M - land20_E)", la, tuple(la[0]))
+        # The sea against Earth's fill on four factors, and the run's own residual.
         fe = e["fill"]
         base = {"W": fe["W"], "f": fe["f"], "hc": np.array(fe["hc"]), "ho": np.array(fe["ho"])}
+        fill_e = fill(base["W"], base["f"], base["hc"], base["ho"])
         sh = []
         for r in res:
             fm = r["fill"]
             arm = {"W": fm["W"], "f": fm["f"], "hc": np.array(fm["hc"]), "ho": np.array(fm["ho"])}
             part = shapley(base, arm)
-            part["total"] = fill(arm["W"], arm["f"], arm["hc"], arm["ho"]) - fill(base["W"], base["f"], base["hc"],
-                                                                                 base["ho"])
+            part["fill"] = fill(arm["W"], arm["f"], arm["hc"], arm["ho"])
+            part["total"] = part["fill"] - fill_e
+            part["residual"] = r["sea"] - r["fill_self_m"]
             part["run_sea"] = r["sea"]
+            part["run_less_earth_fill"] = r["sea"] - fill_e
+            # Earth's histograms and water at the model's own area of crust >= 20 km, and at its volume spread at
+            # Earth's mean thickness.
+            part["earth_at_model_area"] = fill(base["W"], arm["f"], base["hc"], base["ho"]) - fill_e
+            f_vol = r["cont20"]["vol_planet_km"] / e["cont20"]["T_mean"]
+            part["f_at_earth_T"] = f_vol
+            part["earth_at_model_volume"] = fill(base["W"], f_vol, base["hc"], base["ho"]) - fill_e
             sh.append(part)
-        print("-- the sea against Earth's (Shapley, m; total = the model's fill less Earth's): " +
-              " ".join(f"{k} {med([x[k] for x in sh]):.0f}" for k in ("W", "f", "hc", "ho", "total", "run_sea")))
-        print("-- per run: " + " ".join(f"{r['run']}:{r['sea']:.0f}/{r['fill_self_m']:.0f}" for r in res))
+        keys = ("W", "f", "hc", "ho", "total", "residual", "run_less_earth_fill", "run_sea", "fill",
+                "earth_at_model_area", "f_at_earth_T", "earth_at_model_volume")
+        print(f"-- the sea against Earth's fill ({fill_e:.0f} m on its own histograms), Shapley, m: total = the "
+              "model's fill less Earth's; residual = the run's sea less its own fill (the steering's nudge, the "
+              "open-sea rule); W + f + hc + ho + residual = run_less_earth_fill per run")
+        print_terms("the sea's terms", sh, keys, "{:.4g}")
+        print("-- per run (sea / own fill): " + " ".join(f"{r['run']}:{r['sea']:.0f}/{r['fill_self_m']:.0f}"
+                                                        for r in res))
 
 
 if __name__ == "__main__":
     mode = sys.argv[1]
     if mode == "series":
         main_series(sys.argv[2:])
+    elif mode == "area":
+        main_area(sys.argv[2:])
     elif mode == "earth":
         main_earth(sys.argv[2], sys.argv[3])
     elif mode == "model":
