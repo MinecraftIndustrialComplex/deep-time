@@ -96,11 +96,14 @@ def read(path, since=None):
     last = {}
     first_t = None
     at = {}
+    printed = []
     with open(path) as f:
         for line in f:
             m = re.match(r"(cb_t|cb_parts|cb_moves|cb_globals) t=(-?[0-9.]+)", line)
             if not m:
                 continue
+            if m.group(1) == "cb_globals":
+                printed.append(float(m.group(2)))
             kind, body = m.group(1), line[m.end():]
             if since is not None and abs(float(m.group(2)) - since) < 1e-6:
                 at[kind] = body
@@ -121,6 +124,11 @@ def read(path, since=None):
             else:
                 last["globals"] = kv(body)
     last["first"] = first_t
+    if since is not None and "cb_globals" not in at and printed:
+        # A window must start at a printed snapshot: otherwise the whole run's sums would be read
+        # as the window's.
+        sys.exit(f"{path}: no crust-budget snapshot at t={since:g}; printed: "
+                 + ", ".join(f"{t:g}" for t in printed))
     if since is not None and "cb_globals" in at and "globals" in last:
         g0 = kv(at["cb_globals"])
         last["globals"] = {k: v - g0.get(k, 0.0) for k, v in last["globals"].items()}
@@ -259,6 +267,12 @@ def budget(run, length):
     out["erosion_per_km"] = (g.get("forearc_c", 0.0) + g.get("forearc_o", 0.0)) / efront if efront > 0 else nan
     fio = g.get("front_io", nan)
     out["front_io_km"] = fio / length
+    # The collision fronts and those past incipient, where the suture magma acts (PLT-763): its
+    # contact's slab at 100 km or more, zeroed at the breakoff (FRC-019).
+    sfront, son = g.get("suture_front", nan), g.get("suture_front_on", nan)
+    out["front_suture_km"] = sfront / length
+    out["front_suture_on_km"] = son / length
+    out["suture_per_km"] = g.get("arc_s", 0.0) / son if son > 0 else nan
     out["arc_io_per_km"] = (g.get("arc_o", 0.0) + g.get("arc_cones_o", 0.0)) / fio if fio > 0 else nan
     out["v_n_o"] = g.get("front_n_o", nan) / max(g.get("front_o", 0.0), 1e-9)
     out["v_n_c"] = g.get("front_n_c", nan) / max(g.get("front_c", 0.0), 1e-9)
@@ -361,6 +375,9 @@ LENGTHS = [
     ("mean g, continental fronts, full speed", "g_c_full", "{:.3f}"),
     ("mean g, continental fronts, normal", "g_c_normal", "{:.3f}"),
     ("collision front at any time, km (Earth 6,000 to 12,000 of suture)", "front_coll_km", "{:.0f}"),
+    ("  the suture magma's front measure, km (all collision fronts)", "front_suture_km", "{:.0f}"),
+    ("  of it past incipient, the suture magma's, km (PLT-763)", "front_suture_on_km", "{:.0f}"),
+    ("  suture magma per km of that front, km3/km/Myr (PLT-763: 33.3)", "suture_per_km", "{:.1f}"),
     ("convergence across it, mm/yr (Bird's CCB 18.7)", "conv_coll", "{:.1f}"),
     ("crust crossing it, km", "h_coll", "{:.1f}"),
     ("area crossing, km2/yr (Bird's CCB 0.43)", "area_coll", "{:.3f}"),
