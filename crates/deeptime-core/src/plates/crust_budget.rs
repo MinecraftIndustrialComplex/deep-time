@@ -120,7 +120,7 @@ pub const EDGES_KM: [f64; 10] = [
 ];
 
 /// The globals each snapshot copies (cumulative over the run, km³ or km² Earth-normalized).
-const GLOBALS: [(&str, &str); 69] = [
+const GLOBALS: [(&str, &str); 75] = [
     ("flow_steps", super::flow::STEPS_GLOBAL),
     ("flow_substeps", super::flow::SUBSTEPS_GLOBAL),
     ("flow_short_myr", super::flow::SHORT_GLOBAL),
@@ -234,6 +234,21 @@ const GLOBALS: [(&str, &str); 69] = [
     ("slab_lattice", super::forces::SLAB_FRONT_LATTICE_GLOBAL),
     ("slab_normal", super::forces::SLAB_FRONT_NORMAL_GLOBAL),
     ("slab_straight", super::forces::SLAB_FRONT_STRAIGHT_GLOBAL),
+    // The additions against Stern & Scholl 2010's Table 1 (ledger: PLT-761, PLT-760): the felsic
+    // cones the arcs counted inside their rates, by the arc's law; the hotspots' basalt on
+    // continental crust and the cones they counted inside theirs; the intra-oceanic arcs' front.
+    (
+        "arc_cones_c",
+        super::subduction::ARC_CONES_CONTINENTAL_GLOBAL,
+    ),
+    ("arc_cones_o", super::subduction::ARC_CONES_OCEANIC_GLOBAL),
+    (
+        "front_io",
+        super::subduction::ARC_FRONT_INTRA_OCEANIC_GLOBAL,
+    ),
+    ("hotspot_magma_c", super::hotspots::MAGMA_CONTINENTAL_GLOBAL),
+    ("hotspot_cones", super::hotspots::CONES_GLOBAL),
+    ("hotspot_cones_c", super::hotspots::CONES_CONTINENTAL_GLOBAL),
 ];
 
 /// Earth's radius, km: the distances to the coast are Earth-normalized.

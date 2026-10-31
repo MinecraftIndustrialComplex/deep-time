@@ -932,6 +932,17 @@ pub struct TectonicParams {
     /// the split on intra-oceanic arcs). The young fronts are measured either way (PLT-670).
     /// ledger: PLT-668
     pub arc_front_loaded: bool,
+    /// An intra-oceanic arc keeps the island arcs' law on the crust it made (the crust-budget
+    /// lane, 2026-10-31; off by default): the arc's type is its setting at its onset (no visible
+    /// continental crust within `arc_distance_km` of its front, PLT-370's test, when the arc
+    /// begins), not its column's label, so an island arc whose own crust turned its column
+    /// continental (PLT-047, 8 km of arc crust: under one step of the early pulse at the axis)
+    /// goes on at the island law (`arc_front_loaded`'s pulse, then its mature rate) on that
+    /// crust. Off, the column's label picks the law, and a young island arc's pulse ends when its
+    /// axis turns continental. Stern & Scholl (2010, p. 11) give the front-loaded law for the
+    /// intra-oceanic arcs they list, the Izu-Bonin-Mariana among them, whose crust is far thicker
+    /// than 8 km. ledger: PLT-760
+    pub island_arc_own_crust: bool,
     /// Island-arc crust counts as continental once it is this thick, km: an oceanic sample turns
     /// continental once the arc crust it has built (`arc_oceanic_m`) on top of normal ocean crust
     /// (7 km) reaches it, whatever its height. Cloos (1993): crust thicker than about 15 km is
@@ -1481,6 +1492,7 @@ impl Default for TectonicParams {
             island_arc_convergence_ref_mm_yr: 86.6, // ledger: PLT-666
             continental_arc_convergence_ref_mm_yr: 58.6, // ledger: PLT-666
             arc_front_loaded: true, // ledger: PLT-668 (built 2026-10-25, on since 2026-10-26)
+            island_arc_own_crust: false, // ledger: PLT-760 (built 2026-10-31, off)
             arc_mature_crust_km: 15.0, // ledger: PLT-047
             cordillera_shortening_mm_yr: 0.0, // ledger: PLT-048
             cordillera_width_km: 120.0,

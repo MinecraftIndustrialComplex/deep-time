@@ -4999,6 +4999,90 @@ fn island_arcs_front_loaded_pulse_then_mature_rate() {
     );
 }
 
+/// An intra-oceanic arc keeps the island law on the crust it made (PLT-760): on [`arc_fixture`]'s
+/// front with the overriding plate's samples turned into a matured island arc (continental over
+/// its ocean basement, 9 km of island-arc crust, PLT-047 and PLT-331), a young arc whose contact
+/// began intra-oceanic adds Stern & Scholl's pulse, 500 × the band, with the switch on, and the
+/// continental arcs' law with it off (the column's label), as it does on the switch with an arc
+/// that began at a continent, or on a continent's own crust whatever the setting. The arc's
+/// setting comes from its onset: an arc begun over ocean floor is intra-oceanic, one begun at a
+/// continent is not, and the intra-oceanic front is measured.
+#[test]
+fn an_intra_oceanic_arc_keeps_the_island_law_on_the_crust_it_made() {
+    // A young arc (4 Myr) on a matured island arc's crust, its contact's setting `io`.
+    let matured = |switch: bool, io: bool| {
+        let (mut p, mut st, geo, pos) = arc_fixture(true, true, 150.0, Some(4.0), 50.0);
+        p.tectonics.island_arc_own_crust = switch;
+        for s in st.samples.iter_mut().filter(|s| s.group == 0) {
+            s.make_continental();
+            s.pools[pool::FELSIC_PLUTONIC] += 9000.0;
+            s.arc_oceanic_m = 9000.0;
+            s.thickness_m = pools::thickness(&s.pools);
+            assert!(subduction::island_arc_crust(s));
+        }
+        for c in &mut st.contacts {
+            c.arc_intra_oceanic = io;
+        }
+        arc_step(&p, &mut st, &geo, &pos, 1).0
+    };
+    let on = matured(true, true);
+    let burst = subduction::ISLAND_ARC_BURST_KM3_PER_KM_MYR * on.arc_band_km_myr;
+    eprintln!(
+        "matured arc, one step: on {:.4e} km³ island, {:.4e} continental (500 × the band {:.4e})",
+        on.arc_oceanic_km3, on.arc_continental_km3, burst
+    );
+    assert!(
+        (on.arc_oceanic_km3 - burst).abs() < 1e-6 * burst,
+        "{} km³ against the pulse's {burst}",
+        on.arc_oceanic_km3
+    );
+    assert_eq!(on.arc_continental_km3, 0.0);
+    assert!(on.front_intra_oceanic_km_myr > 0.0);
+    let off = matured(false, true);
+    assert!(off.arc_continental_km3 > 0.0, "no continental arc off");
+    assert_eq!(off.arc_oceanic_km3, 0.0);
+    assert!(
+        off.arc_continental_km3 < 0.2 * burst,
+        "{} km³ at the continental law",
+        off.arc_continental_km3
+    );
+    let at_continent = matured(true, false);
+    assert_eq!(at_continent.arc_continental_km3, off.arc_continental_km3);
+    assert_eq!(at_continent.arc_oceanic_km3, 0.0);
+    assert_eq!(at_continent.front_intra_oceanic_km_myr, 0.0);
+
+    // A continent's own crust (no basement) takes the continental law even under an arc that
+    // began intra-oceanic.
+    let (mut p, mut st, geo, pos) = arc_fixture(true, false, 150.0, Some(4.0), 50.0);
+    p.tectonics.island_arc_own_crust = true;
+    for c in &mut st.contacts {
+        c.arc_intra_oceanic = true;
+    }
+    assert!(
+        st.samples
+            .iter()
+            .filter(|s| s.group == 0)
+            .all(|s| !subduction::island_arc_crust(s))
+    );
+    let cont = arc_step(&p, &mut st, &geo, &pos, 1).0;
+    assert!(cont.arc_continental_km3 > 0.0);
+    assert_eq!(cont.arc_oceanic_km3, 0.0);
+
+    // The setting at the onset: over ocean floor intra-oceanic, at a continent not.
+    for (ocean, io) in [(true, true), (false, false)] {
+        let (p, mut st, geo, pos) = arc_fixture(true, ocean, 150.0, None, 50.0);
+        arc_step(&p, &mut st, &geo, &pos, 1);
+        let begun: Vec<bool> = st
+            .contacts
+            .iter()
+            .filter(|c| c.arc_onset_myr.is_some())
+            .map(|c| c.arc_intra_oceanic)
+            .collect();
+        assert!(!begun.is_empty());
+        assert!(begun.iter().all(|&x| x == io), "ocean {ocean}: {begun:?}");
+    }
+}
+
 /// An arc begins at the first step its contact's slab is past PLT-611's 100 km (PLT-669; the
 /// slab under the arcs' volcanoes lies about 105 km deep on Earth's average, Syracuse & Abers
 /// 2006): over a 90-km slab (incipient) the contact has no onset and no young front; over a
