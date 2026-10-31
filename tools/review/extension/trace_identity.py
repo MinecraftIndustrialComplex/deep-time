@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""The rift trace's runs against ext-cum2's own runs of the same seeds: summary.txt and globals.json equal?
 # SPDX-License-Identifier: LGPL-3.0-or-later
+"""The rift trace's runs against ext-cum2's own runs of the same seeds: summary.txt and globals.json equal?
 
 Run on the VM: python3 trace_identity.py
 """

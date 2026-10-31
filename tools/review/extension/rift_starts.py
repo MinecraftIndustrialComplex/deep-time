@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Where the rift trace's pairs start: each pair's first step, its edges' crust, lithosphere and heat flow (the model's
 # SPDX-License-Identifier: LGPL-3.0-or-later
+"""Where the rift trace's pairs start: each pair's first step, its edges' crust, lithosphere and heat flow (the model's
 own law, q = 26 + 3,375 / L mW/m2), against Kusznir & Park's 60 to 65 mW/m2 (significant extension of normal
 lithosphere needs that much under 3 TN/m) and Buck's wide band.
 
