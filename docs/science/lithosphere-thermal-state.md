@@ -83,7 +83,10 @@ A resampling copies both numbers from the nearest corner of the sample's kind (`
   (`collapse::spread`, PLT-331). That happens after the step set every sample's heat flow, so the
   converted sample kept the sea floor's value (33.7 mW/m² on 229 Myr floor) into the bake's
   continental heat-flow layer. A final pass after the resampling gives every continental sample at
-  least its law's conductive value.
+  least its law's conductive value. Young floor's value is above the law (up to 300 mW/m² under
+  about 3 Myr), which "at least" kept, so since 2026-10-31 the floor's value goes with the floor's
+  kind (`Sample::make_continental` leaves none) and the pass gives such a sample its law's value, as
+  the step would have ("The two faults folded in", young floor).
 - **Thermal isostasy** (`tectonics.thermal_isostasy_m` > 0; off by default, "On by default" says
   why): the Airy height a continental column
   settles to (`settle.rs`) and the height the thin sheet takes its potential energy from
@@ -138,6 +141,39 @@ rerun), and `the_release_pace_bakes_continental_heat_flow_with_the_final_pass` b
 release pace on and holds every continental cell to at least 54.9;
 `the_thermal_state_bakes_its_own_heat_flow` bakes it with the state on and holds them to the
 state's floor, an old craton's 41.
+
+**Young floor (2026-10-31).** With the collision orogen on by default (branch collision-orogen-on,
+PLT-730, PLT-731, PLT-740) the release-pace test's planet baked 300 mW/m² at (45, 140), over the
+test's 200.1 (the proxy's most is 55 + 35 + 40 + 40 + 30 = 200). A per-stage print on its last step
+found the path: the rate guard after the resampling (`rate::limit`, PLT-287, spreading by PLT-277)
+put 9.3 km of rock from continental sources onto 2.4 Myr floor (a 16.3 km column) and some onto
+6.6 Myr floor, and both turned continental at once (PLT-662, the margin's sediment continental, on
+by default since 2026-10-31). The plateau (PLT-740) placed nothing there: it grows only through
+continental samples. The step had set every heat flow before that, so the two kept the floor's,
+510 / √2.4 capped at 300 (ISO-016) and 198.8, and the pass's "at least" left a value above the
+law alone: the fault of 2026-10-23 seen from the other side, since old floor's value is under the
+law and young floor's over it. The label stays as PLT-662 gives it (the spread rock is continental
+crust, its floor's 7 km are its basement, PLT-331); the heat flow is what was wrong. The fix keeps
+the rule the resampling already follows, heat flow belongs to the crust's kind: a kind change
+leaves no heat flow (`Sample::make_continental` sets 0), and the pass gives a continental sample
+with none its law's full value, as `finish_samples` would (`continental_heat_flow`, the one law
+both call: the proxy with its terms; the state over the sample's own lithosphere, the floor's
+2.32 √(κt) where `thermal::step` set it, the frame's depth for floor the resampling made that step,
+which has no state yet). Test: `young_floor_made_continental_after_the_step_takes_the_continental_law`.
+
+Master has the same fault without the orogen. A scan of the plate stage alone on the test's preset
+(`pipeline_quick_16k` at 3,000 samples, the release pace on, 60 Myr, scattered_continents and
+supercontinent, seeds 1 to 12; a temporary test, not kept), before the fix: crust that kept a
+floor's heat flow above its law in 22 of the 24 planets of master's switches with the proxy, and
+continental heat flow over 200.1 mW/m² at the final frame in 6 of 24 (13 at some step); with the
+state, the shipped default, 1 of 24 at the final frame (7 at some step, up to 300); with the orogen
+on, 11 of 24 with the proxy and 3 of 24 with the state. After it no crust in the 96 runs keeps a
+floor's value, and none passes 200.1 with the proxy. With the state and the orogen, 3 of 24 runs
+reach 203.4 to 204.5 at one step (none at the final frame); two of them baked the same value
+before the fix, and no sample there kept a floor's. That is the state's own law, which has no
+ceiling at 200 (26 + 3,375 / L reaches 204 with an arc's 40 at L = 24 km, or with an arc's and a
+hotspot's at L = 34 km: arithmetic, the samples were not traced), so the 200.1 of the state's bake
+test holds for its planet, not for the law.
 
 **The savanna pit's craton** (build log 2026-10-23, savanna pit part B: Ben's seed, L1 cell
 (396, 231)). An Andean arc's subduction zone reached a craton at step 498: its regime went from
@@ -293,7 +329,7 @@ Measured below as the switch `tectonics.root_removal`, removed when it went on b
 | PLT-466 | the ocean floor's lithosphere | min(2.32 √(κ t), 125), κ = 0.80 × 10⁻⁶ m²/s from McKenzie's τ and a | km | McKenzie 1978 (a, τ); the 2.32 (the 90 % isotherm of a half-space) is from memory | `from-memory` |
 | PLT-467 | continental heat flow | q = q_c + B / L, q_c = 26 mW/m², B = 3,375 mW/m² × km | mW/m² | Archean mean 41 (Nyblade & Pollack 1993 as two open papers cite it); mantle heat flow 11 to 17 (Rolandone et al. 2002; Sleep 2003 citing Jaupart & Mareschal 1999), 15 taken at L_cold | `abstract-only` |
 | PLT-468 | the magmatic terms | +40 arc, +40 hotspot (PLT-137's); the rift's +30 dropped | mW/m² | PLT-137 (uncited) | `uncited` |
-| PLT-469 | the final heat-flow pass | after the resampling, continental q ← max(q, the law's conductive value) | mW/m² | the bake test's fault (2026-10-23) | `game-choice` (a bookkeeping fix, on by default since 2026-10-23) |
+| PLT-469 | the final heat-flow pass | after the resampling, crust made continental after the step (no heat flow since 2026-10-31) q ← its law's value; other continental q ← max(q, the law's conductive value) | mW/m² | the bake test's faults (2026-10-23; young floor, 2026-10-31) | `game-choice` (a bookkeeping fix, on by default since 2026-10-23) |
 | PLT-470 | the backstop | a source's share of the cordillera's strain w = e^(−t_eq / τ_s), τ_s = 62.8 (PLT-415) | none | Hyndman, Currie & Mazzotti 2005 (back-arcs weaker than cratons "by more than a factor of 10"); the weight is PLT-415's law | `game-choice` |
 | PLT-475 | stage 2's margin profile | T* = T_o + (T_n − T_o) S(1/2 + d / W), S(s) = 3s² − 2s³ (PLT-261's S(s) = s until 2026-10-23) | km | Manatschal & Chenin 2023 (the proximal, necking and hyperextended domains; full text); Montadert et al. 1979 (the Moho 25 km at the shelf break, 12 km on the lower margin; full text) | `game-choice` (the form) |
 | PLT-476 | stage 2's lithosphere | a source thinned to `keep`: L ← L · keep, K ← min(K · keep, L) | km | McKenzie 1978 (uniform stretching of the lithosphere and its crust by β; eq. 1 and Table 2 read); Lang, ten Brink & Makovsky 2026 (the mantle stretches more; full text) | `verified` |
