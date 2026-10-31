@@ -541,7 +541,10 @@ fn sutures_and_initiations_keep_continents_whole() {
     // scattered 8; with the crust budget's PLT-760, PLT-762 and PLT-763, the two wedges and
     // small-terrane docking on by default, 2026-10-31, supercontinent 8 no more, the sweep's
     // welding seeds supercontinent 2, 5, 7, 9, 13 to 15, 17, 20, 21 and 23 and scattered 1, 3,
-    // 5, 6, 8, 9, 11 to 13, 16 to 22 and 24, so supercontinent 2 and scattered 8 still).
+    // 5, 6, 8, 9, 11 to 13, 16 to 22 and 24, so supercontinent 2 and scattered 8 still; both
+    // still weld with the island-arc class carried through the resamplings and no suture magma on
+    // a terrane going down, PR #53's re-review, the same day: supercontinent 1 to 4, 10, 12, 14,
+    // 18 and 21 to 24, scattered 1, 3 to 6, 8 to 10, 12, 13, 15 to 17 and 21 to 23).
     for (start, seed) in [("supercontinent", 2), ("scattered_continents", 8)] {
         let mut p = preset(8000, 300.0, start, seed);
         // The old law (PLT-585 off, PLT-540 on): under Forsyth & Uyeda's balance on this small
@@ -893,7 +896,10 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // 20, 23 and 24; 17 of seeds 1 to 24 on the merged tree, the crust budget's PLT-760, PLT-762
     // and PLT-763 with the two wedges and small-terrane docking, 2026-10-31, the sweep
     // `weld_seed_sweep`: 1, 3, 5, 6, 8, 9, 11 to 13, 16 to 22 and 24, seed 3 still welds; from
-    // the supercontinent 2, 5, 7, 9, 13 to 15, 17, 20, 21 and 23).
+    // the supercontinent 2, 5, 7, 9, 13 to 15, 17, 20, 21 and 23; 16 of seeds 1 to 24 with the
+    // island-arc class carried through the resamplings and no suture magma on a terrane going
+    // down, PR #53's re-review, the same day: 1, 3 to 6, 8 to 10, 12, 13, 15 to 17 and 21 to 23,
+    // seed 3 still welds; from the supercontinent 1 to 4, 10, 12, 14, 18 and 21 to 24).
     let mut p = preset(8000, 300.0, "scattered_continents", 3);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: under Forsyth & Uyeda's
     // balance on this small planet, whose ridge push is several times Earth's
@@ -1105,7 +1111,9 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // 2 no longer welds: the sweep's welding seeds 1, 3, 7 to 9, 13 to 16, 18 and 20 to 24, the
     // guard binding on none, seed 3 the first after seed 1; seed 3 kept on the merged tree,
     // 2026-10-31: it still welds (the sweep's welding seeds 1, 3, 5, 6, 8, 9, 11 to 13, 16 to 22
-    // and 24, the guard binding on none), so the two tests still share this planet).
+    // and 24, the guard binding on none), so the two tests still share this planet; and after PR
+    // #53's re-review, the same day (the sweep's welding seeds 1, 3 to 6, 8 to 10, 12, 13, 15 to 17
+    // and 21 to 23, the guard binding on none)).
     let mut p = preset(8000, 300.0, "scattered_continents", 3);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: the guard asserted below
     // bound under Forsyth & Uyeda's balance on every welding seed of 1 to 24 of this small planet
