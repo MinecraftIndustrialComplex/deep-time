@@ -23,8 +23,9 @@ walks the model's, and of the walks that meet continental crust prints the dista
 strip between: the first and the last dated floor (the arcs and their forearcs carry no age), at the middle, and
 where the youngest lies (young at the front, young behind, about even, by 10 Myr). Also the first dated floor's age
 behind every ocean-ocean step, anywhere from 50 km and from 200 to 600 km (behind the arc, as transect.py reads the
-model's). No plate bounds the walk (the steps file
-names the plates but this reads no plate outlines), so it can cross a back-arc's spreading axis.
+model's). No plate bounds the walk (the steps file names the plates but this reads no plate outlines), so it can
+cross a back-arc's spreading axis. And, for every step, the floor going under: the first dated floor on the subducting
+side, 20 to 200 km out (oofronts.py's slab_oo and slab_oc read the subducting plate's sample nearest the front).
 """
 import math
 import sys
@@ -161,6 +162,7 @@ def main(argv):
     crust = read_crust(argv[1])
     thresholds = [float(x) for x in argv[2:]] or [15.0, 20.0, 25.0]
     strip = {t: defaultdict(float) for t in thresholds}
+    slab = {t: defaultdict(float) for t in thresholds}
     total = sum(s["length"] for s in steps)
     oo = {t: 0.0 for t in thresholds}
     conv = {t: [0.0, 0.0, 0.0, 0.0] for t in thresholds}
@@ -193,6 +195,20 @@ def main(argv):
             if is_oo:
                 oo[th] += s["length"]
                 by_pair[th][s["bid"]] += s["length"]
+            if grid is not None:
+                sa = None
+                for d in range(20, 201, 20):
+                    ang = d / R_KM
+                    q = m * math.cos(ang) - over * math.sin(ang)
+                    a = age_at(grid, q)
+                    if np.isfinite(a):
+                        sa = a
+                        break
+                cls = "oo" if is_oo else "oc"
+                band = "undated" if sa is None else next(
+                    f"{lo}" for lo, hi in ((0, 10), (10, 30), (30, 55), (55, 100), (100, 1e9)) if lo <= sa < hi)
+                slab[th][f"slab_{cls}_{band}"] += s["length"]
+                slab[th][f"n_{cls}"] += s["length"]
             if grid is not None and max(c for d, c in thick if d <= ARC_KM) < th:
                 walk_strip(strip[th], grid, crust, m, over, th, s["length"])
             first = next((d for d, c in thick if c >= th), None)
@@ -221,6 +237,11 @@ def main(argv):
                           for k, n in enumerate(names))
         print(f"threshold {th:4.0f} km: {cells}")
     if grid is not None:
+        for th in thresholds:
+            sl = slab[th]
+            print(f"# threshold {th:.0f} km: the floor going under (first dated 20 to 200 km out), shares of the class")
+            for k in sorted(k for k in sl if k.startswith("slab_")):
+                print(f"  {k:22s} {sl[k] / sl['n_' + k.split('_')[1]]:.3f}")
         for th in thresholds:
             st = strip[th]
             oo_km = oo[th]
