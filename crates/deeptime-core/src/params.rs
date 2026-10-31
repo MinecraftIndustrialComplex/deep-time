@@ -1618,11 +1618,11 @@ impl Default for TectonicParams {
             collision_arc_magma: true, // ledger: PLT-763 (built 2026-10-31, on since 2026-10-31)
             trench_pile_in_place: true, // ledger: PLT-762 (built 2026-10-31, on since 2026-10-31)
             contact_needs_convergence: true, // ledger: PLT-810 (built 2026-10-31, on since 2026-10-31)
-            hotspots_sourced: false, // ledger: PLT-790 (built 2026-10-31, off)
-            plume_heads_sourced: false, // ledger: PLT-795 (built 2026-10-31, off)
-            volcanic_margins: false, // ledger: PLT-799 (built 2026-10-31, off)
-            hotspot_cone_budget: true, // ledger: PLT-803 (on since 2026-10-31)
-            arc_mature_crust_km: 15.0, // ledger: PLT-047
+            hotspots_sourced: false,         // ledger: PLT-790 (built 2026-10-31, off)
+            plume_heads_sourced: false,      // ledger: PLT-795 (built 2026-10-31, off)
+            volcanic_margins: false,         // ledger: PLT-799 (built 2026-10-31, off)
+            hotspot_cone_budget: true,       // ledger: PLT-803 (on since 2026-10-31)
+            arc_mature_crust_km: 15.0,       // ledger: PLT-047
             cordillera_shortening_mm_yr: 0.0, // ledger: PLT-048
             cordillera_width_km: 120.0,
             cordillera_height_m: 2500.0,               // ledger: PLT-050
