@@ -4853,7 +4853,10 @@ mod tests {
         for &i in &ocean {
             assert_eq!(st.plate_of(i as usize), 0, "{i} stayed with its plate");
         }
-        for &i in terrane.iter().filter(|&&i| !st.samples[i as usize].stacked()) {
+        for &i in terrane
+            .iter()
+            .filter(|&&i| !st.samples[i as usize].stacked())
+        {
             assert_eq!(st.plate_of(i as usize), 1, "{i} stayed with its plate");
         }
         assert_eq!(omega(&st, 0), o0);
@@ -4957,7 +4960,10 @@ mod tests {
             }
             for &i in &crossed {
                 let s = &st.samples[i as usize];
-                assert!(s.is_hidden() && s.stacked(), "weld {weld}: {i} came back up");
+                assert!(
+                    s.is_hidden() && s.stacked(),
+                    "weld {weld}: {i} came back up"
+                );
                 if !weld {
                     assert_eq!(st.plate_of(i as usize), 1, "{i} moved with the terrane");
                 }
