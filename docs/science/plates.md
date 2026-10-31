@@ -13034,3 +13034,143 @@ chosen; the excess the comparisons fix is at the trenches. The model's trench in
 bound for the continents' share: it holds the sediment the ocean floor's own arcs and seamounts shed
 and the one-way slab's 0.33 to 0.38. (In the verdicts above, cb-cum2's export is 4.07 km³ a year
 over the whole run and 4.28 over the late half.)
+
+### The trenches' input split by source and by delivery term (2026-10-31, a diagnosis)
+
+The question: why the model's trenches take about twice Earth's rock per km (above) on a trench
+1.37 times as long. From cached runs and two measurement traces, nothing built: base34-s4's 8 runs,
+and its seed 1 on both starts again with measurement globals (`tools/review/pool/pool.sh run
+ti-base --seeds 1 +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps
++DEEPTIME_CRUST_BUDGET_STEPS=1`, branch trench-input at 8d07ba4d, key cd35f62bf41d, argkey
+daea7fd0; `ti-src` the same at 277e8d94), whose state.json files and rec.json are base34-s4's bit
+for bit (only globals.json differs). The surface stage's `surface/trench_diag/*` globals
+(`surface::TRENCH_DIAG_GLOBALS`) are in its own metric and are read as shares; the plate side's
+books (`DEEPTIME_CRUST_BUDGET_STEPS`, `tools/review/crustcycle/steps.py`,
+`tools/review/loss-budget.py`) are rock, km³ a year, Earth-normalized.
+
+**By delivery term** (`tools/review/crustcycle/trench_terms.py` on base34-s4; Clift et al. 2009's
+Table 1 rows split by the overriding crust by this page, the intra-oceanic ones Mariana,
+Izu-Bonin, South Luzon, Philippine-Mindanao, Tonga, Kermadec, Solomons, South Sandwich, Lesser
+Antilles, Aleutians and Taiwan-North Luzon; solid under ERO-215, this page's derivation; Clift's
+convergence is the full rate):
+
+| fronts | model km³/yr | km of front | per km | v_n mm/yr | pile, km of rock | Clift km | solid km³/yr | solid per km | convergence | solid pile, km |
+|---|---|---|---|---|---|---|---|---|---|---|
+| continental overriding plate | 1.61 | 29,436 | 54.7 | 55.5 | 0.98 | 26,675 | 0.91 | 34.1 | 64 | 0.53 |
+| oceanic overriding plate | 0.97 | 25,744 | 37.6 | 43.6 | 0.86 | 13,550 | 0.25 | 18.4 | 87 | 0.21 |
+| the one-way slab (no front) | 0.33 | | | | | | | | | |
+| all | 2.90 | 55,180 | 52.7 | 50.0 | 1.05 | 40,225 | 1.16 | 28.8 | 72 | 0.40 |
+
+Bird 2003's subduction boundaries: 51,310 km at 53.2 mm/yr across the trench.
+
+- The convergence is not the term: the model's fronts close more slowly than Earth's (50.0 mm/yr
+  across them against Bird's 53.2).
+- The length is a term at the intra-oceanic fronts only: 25,744 km against Clift's 13,550 (Stern
+  & Scholl's 14,500), 1.9 times; the continental margins' fronts are 1.10 times Clift's, and the
+  whole trench 1.08 times Bird's.
+- The pile at the trench (the delivery over v_n) is the term on both kinds: 0.98 km of rock
+  against 0.53 at continental margins (1.85 times), 0.86 against 0.21 at intra-oceanic ones (4.1
+  times, at half Clift's convergence).
+- Of the 1.74 km³ a year above Clift's rows, the continental margins' fronts carry 0.70, the
+  intra-oceanic fronts 0.72 and the one-way slab 0.33. The one-way slab's is floor sediment that
+  goes down with the held crust at resamplings (PLT-542) without a front counting it: part of what
+  goes under, as on Earth, but in no front's class.
+
+**By route** (ti-base, the plate side's books over the run; supercontinent-1, scattered-1):
+
+| km³ a year of rock | supercontinent-1 | scattered-1 |
+|---|---|---|
+| reaching the trenches | 2.65 | 3.08 |
+| laid on the trench samples by the surface stage (`d_tr`'s erosion part) | 1.11 (0.42) | 1.32 (0.43) |
+| carried in on the incoming floor (the rest) | 1.27 (0.48) | 1.43 (0.46) |
+| the one-way slab's | 0.28 (0.11) | 0.33 (0.11) |
+| the surface stage's deposits on the visible ocean floor (`d_ov`'s erosion part) | 3.88 | 4.33 |
+| of them off continental crust (the loss budget's "off the continents by the surface stage", net) | 3.53 | 4.11 |
+| of them on the trench samples | 0.29 | 0.30 |
+
+Besides the one-way slab's tenth, about half of what the trenches take is laid straight onto the
+trench samples and half onto floor the plates then carry in. The floor gets 0.35 and 0.22 more
+than the continents lose: the pelagic rain's volume above the rock it dissolved (at Earth's balance
+0.51 km³ a year of dissolved rock comes back as 0.54 of opal and 0.20 of calcite,
+erosion-and-sediment.md, "The pelagic rain") and the land on oceanic crust (below).
+
+**Where the rivers reach the sea** (ti-base's surface globals): the mouths at subduction-zone
+coasts (a sea cell of the ARC, BACK_ARC or TRENCH regime) take 0.335 and 0.368 of the river load,
+at collisions 0.102 and 0.092, elsewhere (passive margins, rifts, ocean islands) 0.562 and 0.540.
+Milliman & Syvitski 1992 (full text, through the research sub-agent): the large rivers ("nearly
+all of which discharge onto passive margins or marginal seas") and the small rivers of mountainous
+islands and active or collision margins, which "collectively ... may transport similar amounts of
+sediment as do passive margin rivers" (p. 541), with no share stated: about half each. The model's
+0.44 to 0.46 to active and collision coasts is not above it, so the drainage geometry is not the
+excess.
+
+**How the trench cells fill** (the same globals, gross, as shares of the river load): the mouths'
+own fills put 0.091 and 0.103 of the load on TRENCH cells (0.20 of the subduction-zone coasts'
+load), the slope failure 0.33 and 0.34, the submarine diffusion 0.03 and 0.05. The failure brings
+seven tenths of what lands there (Earth's trench floors hold "axial turbidite deposits", von Huene
+& Scholl 1991, p. 306, full text through the research sub-agent). The TRENCH cells' net change,
+0.24 and 0.25, is smaller because the flexure answers the load there; it is not a sediment volume.
+
+**Where the land's erosion happens** (ti-src's surface globals: the gross erosion of the cells
+above the sea at each step's start, by the regime and crust there; supercontinent-1,
+scattered-1): the subduction zone's regimes on continental crust (continental arcs, matured
+island arcs, forearc highs) 0.284 and 0.308, on oceanic crust (island arcs) 0.003 and 0.004, the
+rest of the oceanic crust (ocean islands) 0.011 and 0.007, collisions 0.203 and 0.191, the rest
+of the continents 0.499 and 0.490. The arcs' own erosion is 1.28 to 1.29 times the load that
+reaches the sea at subduction-zone coasts, so those coasts' rivers can be wholly the arcs' and
+forearcs' own: the trench catchments are the arcs, the interiors drain elsewhere, as Milliman &
+Syvitski describe Earth's. The island arcs and ocean islands shed 1.1 to 1.4 % of the land's
+erosion: the sediment at the intra-oceanic fronts is not their own. The pelagic rain is 0.17 to
+0.18 of the river load; 1.0 to 1.2 % of it falls on TRENCH cells (0.4 % of what reaches them), so
+the trenches get the rain only as the floor carries it in. Earth's subducting sediment is about a
+fifth to a quarter non-terrigenous by mass (Rea & Ruff 1996: 79 % terrigenous; Plank & Langmuir
+1998: 76 %).
+
+**The export and the share.** What reaches the trenches is the export times the share of it that
+gets there. Clift et al. 2009 give both of Earth's numbers in one budget (above): the rivers' 1.77
+km³ a year of rock, a Cenozoic mean, and Table 1's delivery, 1.16 in rock by this page's
+derivation, a share of 0.65; they read the two as "close to equilibrium". The model's are 3.82 and
+2.90, a share of 0.76. So the excess, 2.5 times in all, is the export's 2.16 times the share's
+1.17; per km of trench, over a trench 1.37 times as long, 1.8 times. The model's land is Earth's
+size (0.30 of the visible samples above the sea, base34-s4's runs' mean over the run), so its
+land sheds about twice Clift's rock per km² a year.
+
+The other Earth sources spread 3.5 times among themselves (rock or solid, km³ a year; read through
+the research sub-agent): von Huene & Scholl 1991 (full text, p. 308) 1.9 entering 43,500 km of
+margin today, "ocean basin and trench axis deposits"; Plank & Langmuir 1998 (snippets) 0.73
+globally, solid by the sub-agent's inference; Rea & Ruff 1996 (the abstract) 1.4 x 10^15 g a year,
+about 0.55 at 2.5 to 2.65 g/cm³ (this page's arithmetic). Paired with modern rivers (Milliman &
+Syvitski 1992: about 20 billion tons a year, about 7.5 km³ of rock at 2.65 g/cm³, this page's
+arithmetic) the share is 0.25 (von Huene & Scholl) or about a tenth (Rea & Ruff: "an order of
+magnitude more sediment enters the ocean than leaves it via subduction"). Both modern numbers are
+high for a long run: von Huene & Scholl find the Pacific trench wedges perhaps twice their
+pre-glacial thickness and give 1.0 long-term against 1.5 today for what goes down, and Clift et
+al. read the modern rivers as unrepresentative of long periods. The model's numbers are 1,000 Myr
+means, so the long-run pair, Clift's, is the like-for-like one.
+
+**The long run's own check.** The ocean floor's sediment is the supply's integral over the floor's
+age, not a modern rate. On base34-s4's crust-budget maps (`MODE=floor tools/review/crustcycle/probe.py`,
+the snapshots -950 to -50, in place under ERO-215) the ocean younger than 82 Myr holds 514 m
+against GlobSed's 267 (1.9 times), the deep ocean 576 against 404 (1.4 times), the sea's mean
+1,819 against 927 (2.0 times); the margins hold 3,189 against 3,044, where the room fills and the
+rest spills seaward. The floor takes about twice Earth's supply where the floor's age is matched,
+not only at its trenches.
+
+**With the export at Earth's.** Scaling the model's trench input by 1/2.16 leaves, per km of
+front, 17.4 km³ a year at the intra-oceanic fronts against Clift's 18.4 in rock, and 25.3 at the
+continental margins against 34.1: the routing is Earth's or below it. What is then left above
+Clift's rows (1.35 against 1.16 km³ a year) is the intra-oceanic fronts' length, 1.9 times
+Earth's (+0.20), and the one-way slab's floor (+0.15), less the continental margins' (-0.16).
+
+**The lead.** The term that makes the excess is the continents' export: the land sheds 2.2 times
+Clift et al.'s long-run mean of rock to the sea, on an Earth-sized land. It is a rate, not a trench
+law: the drainage and the routes are Earth's in kind, the share that reaches the trenches is
+within a fifth of Clift's (0.76 against 0.65), the share that goes down is Clift's (0.90 against
+0.93), and the convergence is slower than Earth's. It is not a measurement mismatch either, as
+long as the long-run pair is the reference: the floor's stock, which no modern rate enters, holds
+the same twice. Against modern rivers the export would be about half of Earth's and the share
+three times, but both modern numbers are inflated for a long run (above). Which law sets the rate
+is the next question: the erosion laws (the surface stage's efficiency at the model's relief) or
+the uplift they keep pace with (the plates' arcs, collisions and crust made continental). The
+second term is a plate-geometry one: the intra-oceanic fronts are 1.9 times Earth's length
+(25,744 km against Clift's 13,550; Stern & Scholl's 14,500). Nothing is built on this diagnosis.
