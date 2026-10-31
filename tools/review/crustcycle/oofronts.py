@@ -38,7 +38,15 @@ def arc_km(chord):
     return 2.0 * np.arcsin(np.clip(chord / 2.0, 0.0, 1.0)) * R_KM
 
 
-def snapshot(run, t):
+ORIGINS = ["initial", "rift", "fission", "back_arc", "subduction_initiation", "margin_propagation"]
+
+
+def lives_of(run):
+    import json
+    return {int(x["id"]): x for x in json.loads((run / "rec.json").read_text()).get("plates") or []}
+
+
+def snapshot(run, t, lives=None):
     a, _ = probe.read(run, t)
     nm = probe.name_of(t)
     plate = np.fromfile(run / "maps" / "plate" / nm, "<u4").astype(np.int64)
@@ -54,6 +62,8 @@ def snapshot(run, t):
     d_over = np.full(len(idx), np.inf)
     near = np.full(len(idx), -1)
     d_under = np.full(len(idx), np.inf)
+    slab_age = np.full(len(idx), np.nan)
+    under_plate = np.full(len(idx), -1)
     trees = {}
     for q in np.unique(plate[cont]):
         m = np.nonzero(cont & (plate == q))[0]
@@ -70,6 +80,8 @@ def snapshot(run, t):
         other = [k for k in np.atleast_1d(ks) if plate[k] != q]
         if other:
             u = plate[other[0]]
+            under_plate[j] = u
+            slab_age[j] = age[other[0]]
             if u in trees:
                 dd, _ = trees[u][0].query(p[i])
                 d_under[j] = arc_km(dd)
@@ -109,6 +121,25 @@ def snapshot(run, t):
     du = d_under[oo]
     for lo, hi in ((0, 500), (500, 1500), (1500, 3000), (3000, np.inf)):
         rec[f"under_{lo}"] = float(((du >= lo) & (du < hi)).sum())
+    # The floor going under (the subducting plate's nearest sample), ocean-ocean and ocean-continent fronts.
+    for name, sel in (("slab_oo", oo), ("slab_oc", ~oo)):
+        sa = slab_age[sel]
+        for lo, hi in ((0, 10), (10, 30), (30, 55), (55, 100), (100, 1e9)):
+            rec[f"{name}_{lo}"] = float(((sa >= lo) & (sa < hi)).sum())
+    rec["n_oc"] = float((~oo).sum())
+    # The plates' origins (rec.json's plate lives): the overriding and the subducting plate, by front class, and the
+    # overriding plate's age.
+    if lives:
+        for side, plates in (("over", plate[idx]), ("under", under_plate)):
+            for cls, sel in (("oo", oo), ("oc", ~oo)):
+                for o in ORIGINS + ["other"]:
+                    hit = np.array([(lives.get(int(q), {}).get("origin", "other") if q >= 0 else "other") == o
+                                    for q in plates[sel]], dtype=bool) if sel.any() else np.zeros(0, bool)
+                    rec[f"{side}_{cls}_{o}"] = float(hit.sum())
+        born = np.array([lives.get(int(q), {}).get("born_myr", -1000.0) for q in plate[idx[oo]]])
+        pa = t - born
+        for lo, hi in ((0, 25), (25, 50), (50, 100), (100, 200), (200, 1e9)):
+            rec[f"over_oo_plate_age_{lo}"] = float(((pa >= lo) & (pa < hi)).sum())
     return rec
 
 
@@ -118,9 +149,10 @@ def main(argv):
     for arg in argv:
         for r in probe.runs_of(arg):
             runs += 1
+            lives = lives_of(r)
             for t in ts:
                 try:
-                    rec = snapshot(r, t)
+                    rec = snapshot(r, t, lives)
                 except (FileNotFoundError, ValueError):
                     rec = None
                 if not rec:
@@ -139,8 +171,11 @@ def main(argv):
     print(f"by the substrate (no continental crust but island arcs' within {ARC_KM:.0f} km): share of the subducting"
           f" front {tot['n_io_substrate'] / tot['n_front']:.3f}")
     print("shares of the ocean-ocean front:")
-    for k in sorted(k for k in tot if k not in ("snapshots", "km_front", "km_oo", "n_front", "n_oo", "n_io_substrate")):
-        print(f"  {k:22s} {tot[k] / oo:.3f}")
+    for k in sorted(k for k in tot if k not in ("snapshots", "km_front", "km_oo", "n_front", "n_oo", "n_io_substrate",
+                                                 "n_oc")):
+        oc_key = k.startswith("slab_oc") or "_oc_" in k
+        den = tot["n_oc"] if oc_key else oo
+        print(f"  {k:34s} {tot[k] / den:.3f}" + ("  (of the ocean-continent front)" if oc_key else ""))
 
 
 if __name__ == "__main__":
