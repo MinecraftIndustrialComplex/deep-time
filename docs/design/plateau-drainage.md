@@ -1,9 +1,10 @@
 # What wears the plateaus, and lakes that pass on what their water balance leaves: design
 
-Status: **measured on cached runs, designed and built behind a switch, off** (2026-10-31, the plateau lane, branch
-`plateau-drainage` on `collision-orogen`). `surface.closed_basins` (`crates/deeptime-core/src/surface/closed.rs`;
-ERO-217, ERO-218), with a split of the flat high ground by its water (ERO-220). The controlled plateau is ERO-219. One
-cumulative 8-run arm is ready to queue ("How it is judged"); no simulation was run for this design.
+Status: **measured on cached runs, designed and built behind a switch, off; its arm ran** (2026-10-31, the plateau lane,
+branch `plateau-drainage` on `collision-orogen`). `surface.closed_basins` (`crates/deeptime-core/src/surface/closed.rs`;
+ERO-217, ERO-218), with a split of the flat high ground by its water (ERO-220). The controlled plateau is ERO-219. The
+arm plat-cb0 against orog-cum ("The arm"): the law is sound and cheap and gives the planets internally drained land,
+but it does not keep the plateaus; their flat tops wear on frozen ground, whose runoff is the next lead.
 
 ## Why
 
@@ -64,7 +65,9 @@ all of P runs off, ERO-010) reaches almost no ice-free flat high ground: the col
 and its precipitation reaches the rivers below as the ice's melt would. The flat high ground the rivers wear is the
 ice-free, mostly arid part; the controlled plateau with an arid interior (below) wears at 3.8 m/Myr, not 134, so on the
 planets its rivers carry water from elsewhere: wet or glaciated ground upstream, and every depression's whole catchment
-over its spill.
+over its spill. **Corrected by the arm:** this was one frame, the run's end, and the whole run says otherwise. The
+erosion bands' split over every step (`flatf`, "The arm") puts 0.67 of the flat high ground's area x time below 0 °C,
+wearing at 141 m/Myr, and the two arms' final frames disagree (below 0 °C 0.81 and 0.20 of the flat high ground).
 
 At the run's end (`closed.py`: a priority flood from the sea on the final surface, then the steepest descent), 0.224
 (base34) and 0.340 (orog-cum) of the land above 2 km, 0.340 and 0.544 of the flat high ground and 0.278 and 0.307 of
@@ -223,9 +226,9 @@ balance closes them.
   retro-edge peak (collision-orogen.md); the model's plateau stands at the strength height with no range above it, so
   its depressions are the surface's and the plates' own relief, not ranges that dam it. The law closes what depressions
   there are; whether a plateau has the ranges that make an Altiplano is the orogen's.
-- Frozen ground's runoff (ERO-010's PET 0 below 0 °C): it reaches 0.004 to 0.029 of the flat high ground (the rest of the
-  cold part is under the climate's ice), so it is left; the glaciers' melt, not routed by the surface, is why the ice's
-  precipitation still reaches the rivers below.
+- Frozen ground's runoff (ERO-010's PET 0 below 0 °C): left here, on a final-frame read (0.004 to 0.029 of the flat high
+  ground) that the arm overturned: over the run 0.67 of the flat high ground is below 0 °C and it wears at 141 m/Myr. It
+  is the next lead ("The arm").
 - The young landscape (`young.rs`): the L2 refinement of the last step for the game routes as before; the bake's lakes
   keep HYD-050's balance for the world.
 - The runoff weight's 5 % floor (ERO-011, uncited): kept, since K was calibrated with it (2026-10-18).
@@ -256,3 +259,137 @@ seed). Read: the guard, `v1census`, the high ground through time (above 2 and 4 
 and `closed_lake_steps`, `partial_lake_steps`, `closed_km2_myr`; the land's mean lowering and the sea's sediment
 (`bands.py`); and, for K's calibration, the regions' erosion against Montgomery & Brandon (the bands' `wz` classes, as
 `tools/review/erosion-recal.py` reads them). No V1 number is a gate (decisions log 2026-10-23).
+
+## The arm: plat-cb0 against orog-cum (2026-10-31)
+
+Queued by the coordinator before base35 existed. `pool.sh alias HEAD f2d6412d801f --check-seed 1` was identical (world
+state 628e6d3abce00513 and `rec.json`), so the switch off is orog-cum's physics. Then `pool.sh run plat-cb0 --seeds 1,2,3,4
+--set tectonics.collision_two_wedges=true --set tectonics.collision_retro_plateau=true --set surface.closed_basins=true
++DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps` ran on key e751b2344693, argkey 5e8a748c, 8 runs.
+Orog-cum is f2d6412d801f, d3261b0a, 8 runs.
+
+The reads (VM): `tools/review/plateau/wear.sh platcb0=<folder> orogcum=<folder>`, which now also runs `series.py` (land
+above 2, 3 and 4 km per 50-Myr map, and the run's extremes) and `tools/review/orogen/hiseries.py`. Also
+`tools/review/plateau/recal.sh` (erosion-recal.py's relief and region table) and `closedshare.py`. Outputs are in
+`/data/ban/deeptime-runs/plateau/` (`wear-platcb0.txt`, `wear-orogcum.txt`, `recal.txt`). Values are medians of the 8
+runs, closed against open.
+
+**The pool's tables (the coordinator's, 8 and 8).** Every row is within spread except three:
+- **Inside spread:** land 0.233 against 0.205 (p 0.33), crust under the sea 0.538 against 0.605 (p 0.51), land above
+  2 km 0.016 against 0.013 (p 0.65), coast with high ground 0.109 against 0.067 (p 0.38), land under ice 0.069 against
+  0.037 (p 0.23). The V1 criteria met are a median 6 in both.
+- **The guard's worst:** 10,482 against 9,945 m (p 0.005); 0 steps beyond one Earth relief in all 16 runs.
+- **The plates' peak at the end:** 4,463 against 4,162 m.
+- **collcoast's "belt not elongated"** (`geom_round`): 0.256 against 0.075 (p 0.005).
+
+**Did closed basins keep the arid plateau interiors? No.** The flat high ground wears as before:
+
+| class (part of the flat high ground) | arm | net m/Myr (per run) | stream power (the cut) | diffusion | ice | gross shares: stream power, cut, diffusion, ice |
+|---|---|---|---|---|---|---|
+| flat high ground | closed | 141.4 (114 to 196) | 103.8 (51.7) | 37.7 | 8.9 | 0.372, 0.316, 0.250, 0.054 |
+| flat high ground | orog-cum | 134.3 (114 to 228) | 97.0 (50.8) | 37.1 | 9.8 | 0.366, 0.316, 0.241, 0.060 |
+| draining to a closed basin, 0.30 | closed | 52.8 (47 to 84) | 24.6 (10.9) | 28.5 | 9.2 | 0.201, 0.181, 0.467, 0.121 |
+| dry (runoff weight up to 0.1), 0.22 | closed | 37.6 (25 to 90) | 13.4 (6.8) | 24.2 | 0.5 | 0.157, 0.189, 0.621, 0.009 |
+| frozen (mean below 0 °C), 0.67 | closed | 140.8 (100 to 211) | 99.4 (69.0) | 38.4 | 12.2 | 0.208, 0.443, 0.255, 0.073 |
+
+The three parts overlap. The stream-power share (0.37, or 0.69 with the cut it drives) did not fall: 0.372 against 0.366.
+
+The closed part's 53 m/Myr and the dry part's 38 compare with Earth's internally drained plateaus as follows:
+- southern Tibet's peneplain: "6-11 m/m.y." locally and "11-16 m/m.y." catchment-wide (Hetzel et al. 2011, p. 983);
+- Strobl et al. 2012: means 8.1 and 11.8 m/Myr;
+- southern and central Tibet: "<30 mm/ka", that is under 30 m/Myr (Lal et al. 2003, abstract);
+- the internally drained Altiplano-Puna: 0.02 mm/yr, 20 m/Myr (Bookhagen & Strecker 2012, p. 103).
+
+So the closed part wears 3 to 5 times Tibet's catchment rates and twice Lal's bound. The dry part wears 2 to 3 times
+Tibet's catchment rates, just above Lal's bound. Diffusion is half and more of what wears both, and the law does not
+touch diffusion: κ 2 m²/yr on relief under 500 m at 4.8-km cells (ERO-177's κ alone was tried). Stream power is a third.
+The flat high ground as a whole wears at its frozen part's rate.
+
+Why the law moved so little:
+- **R2 takes water only below a closed lake.** Above the lake, inside its catchment, the rivers keep their own area and
+  their sediment stays in the lake (HYD-110), as it already did. So the law only changes ground that drains over the
+  spill, and on the planets closed basins form where that water was already small.
+- **The frozen flat high ground, 0.67 of it, is where the wear is.** It wears at 141 m/Myr, two thirds of it by stream
+  power and the cut. The surface's runoff there is all of the precipitation (`surface/climate.rs`: PET 60 mm/°C x T, 0
+  below 0 °C, ERO-010). The bake's budget dropped that rule on 2026-10-01 (`HydroParams::budget`: "in a cold one the land
+  still evaporates in its summer (before 2026-10-01 a land with a mean below freezing evaporated nothing, and all its
+  precipitation ran off)"). The bake's budget has three parts:
+  - rain only in the thawed share of the year (HYD-036);
+  - snow melted by degree-days (HYD-037), so what does not melt is the glaciers', not the rivers';
+  - PET from Holdridge's biotemperature (HYD-029, HYD-030, HYD-035).
+
+  That budget is the one the closure's balance already uses, so a frozen lake's balance and its rivers disagree. The
+  summary does not split the frozen part by ice. Its 99 m/Myr of stream power says its rivers run, and under 100 m of
+  ice they do not.
+
+The plateaus' crust and high ground did not change beyond spread:
+- **Cohorts above 3 km:** thinning 105.3 m/Myr, plates 47.6 and top 57.7, against 112.5, 58.9 and 53.6.
+- **Cohorts above 4 km:** 152.5, 81.0 and 71.5 against 172.1, 119.5 and 52.6.
+- **Land above 2, 3 and 4 km,** each run's mean over its maps after the first 100 Myr: 0.0232, 0.0086 and 0.0010
+  against 0.0245, 0.0091 and 0.0012. The largest: 0.062, 0.030 and 0.0101 against 0.076, 0.040 and 0.0085. Earth's land
+  above 4 km is 0.0195.
+
+**What the law does do.**
+- **Internally drained land, where there was none.** Over the run 0.127 of the land (0.093 to 0.148) drains to a basin
+  that passes nothing (`closedshare.py`, against the dynamics record's land share; the surface's own land is smaller,
+  so this is a lower bound). Earth: "Endorheic basins occupy 20% of the Earth's land surface" (Garcia-Castellanos et
+  al. 2003, p. 8-1).
+- **Lake counts.** Lake-substeps closed: 3.6e4 a run. Lakes passing part of their inflow: 6.3e4.
+- **Sediment.** The lakes keep 0.285 km³ a year against 0.242. The sea gets 3.36 against 3.03, within spread run by
+  run. The land's mean lowering is 36.8 against 37.1 m/Myr.
+- **K's calibration is untouched.** By relief class and by region the land erodes as before:
+  - regions of 500 m relief or more: 219.9 against 218.2 m/Myr;
+  - regions of 1,000 m or more: 394.2 against 400.9 m/Myr;
+  - all land: 37.5 against 38.1 m/Myr (`recal.txt`).
+- **The cost** is 3.7 s of the surface's 445 s a run (the timing line's `closed`).
+
+**What the guard's 500 m larger worst means.** The worst is the farthest any L1 cell stood from the sea after any step
+(`surface/guard.rs`). The guard records the distance, not the side or the step. Paired by start and seed, the closed arm's
+worst is larger in all 8 runs, by 40 to 1,362 m.
+
+| run extreme, m (medians) | closed | orog-cum |
+|---|---|---|
+| guard worst (any step) | 10,482 | 9,945 |
+| deepest, the maps' samples (every 50 Myr) | 9,465 | 9,454 |
+| deepest, the final surface | 8,875 | 8,824 |
+| highest, the maps' samples | 5,876 | 5,718 |
+| highest, the final surface | 5,092 | 4,628 |
+| the largest one-step rise of a cell | 7,562 | 7,106 |
+| the largest one-step fall of a cell | 7,119 | 7,370 |
+
+The worst stands past every snapshot on both sides, so it is a one-step transient. The standing deep side did not move.
+The standing high side, and the largest one-step rise, rose by 0.2 to 0.5 km. The plates' peak rose 0.3 km (4,162 to
+4,463). That fits rock kept on the orogens: high ground held a little higher, and larger transients on it when the
+plates move it. Which side the worst is on is not recorded.
+
+Either way it is not a divergence:
+- 10.5 km is under the Challenger Deep's 10,925 m (ISO-071);
+- it is 0.044 of the guard's 237-km bound;
+- no step went beyond one Earth relief.
+
+A signed worst and its step would settle the side. That is a measurement-only change to `guard.rs` and `run.rs`, and
+the next arm's key changes anyway after the merge.
+
+**The belt shape (collcoast's `geom_round`, 0.256 against 0.075).** This is a final-frame read: the share of the
+collision high coasts whose collision cells within 400 km are round, not elongated. The law does not act on it.
+- **The population it is read on changed.** High coasts rose from 0.092 to 0.107 (coastset). The collision belt's rate
+  on its coast rose from 0.353 to 0.523, and the rifted margin's share fell from 0.125 to 0.058.
+- **The end frame's collision land doubled:** 0.025 against 0.013 of the land, per run 0.006 to 0.039 against 0.002 to
+  0.045.
+
+So more of the final high coasts sit on broad collision regions. Not explained here.
+
+**Verdict on default-on: yes.**
+- **The project's rule is met** (CLAUDE.md, decisions log 2026-10-23: physics goes on once built and correct; the rule
+  it replaces goes off with it):
+  - unit tests against its sources;
+  - no divergence or guard failure on the pool;
+  - K's calibration intact;
+  - under 1 % of the surface's time.
+- **The rule it replaces is ERO-080's routing of every depression over its rim.**
+- **It gives the planets internally drained land,** 0.13 of it against Earth's 0.20.
+
+It is not the fix for O4. The plateaus wear on their frozen flat tops. The next sourced law: the surface's runoff from
+the bake's own budget (`HydroParams::budget`, the closure's balance), in place of `surface/climate.rs`'s PET 0 below
+0 °C. One budget for the rivers and the lakes, no knob. K was calibrated on the surface's runoff (2026-10-18), so that
+arm reads the regions' table again rather than retuning K.

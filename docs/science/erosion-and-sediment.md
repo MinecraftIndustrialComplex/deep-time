@@ -1282,9 +1282,10 @@ ground (above 2 km, 3 x 3 relief under 500 m at the step's start) the surface's 
 the critical slope's cut 0.37, the cut 0.32 to 0.34, diffusion 0.21 to 0.24, ice 0.06 to 0.07 (net 134 to 138 m/Myr).
 The cut on ground that was flat at the step's start follows the receiver's lowering in the same solve: it is the
 threshold hillslope behind an incising river, so stream power through the plateau's drainage, with the cut it drives, is
-0.69 to 0.71 of the wear. Almost nothing the flat high ground loses is laid back on it. The frozen-ground runoff of
-`surface/climate.rs` (all of P below 0 °C) reaches 0.004 to 0.029 of the flat high ground: the rest of its cold part
-is under the climate's ice, where the rivers do not erode. A third to a half of the flat high ground drains into a
+0.69 to 0.71 of the wear. Almost nothing the flat high ground loses is laid back on it. At the runs' end the
+frozen-ground runoff of `surface/climate.rs` (all of P below 0 °C) reaches only 0.004 to 0.029 of the flat high
+ground, but that is one frame: over the whole run 0.67 of it is below 0 °C (the arm, below). A third to a half of the
+flat high ground drains into a
 depression at a run's end, and every depression spills (ERO-080). After its collision a plateau's crust goes 0.57 to
 0.69 to the plates' collapse and flow (PLT-254 to PLT-259, PLT-300, PLT-412 to PLT-415, sourced) and 0.31 to 0.43 to
 the surface, read from the rock pools of the crust-budget maps. The plateaus' own wear is 1 to 2 % of the land's mean
@@ -1314,4 +1315,17 @@ away where the balance closes them.
 **Left as it is.** The plates' collapse and flow; the frozen ground's runoff (ERO-010); the 5 % floor of the runoff
 weight (ERO-011, which K was calibrated with); the lakes' evaporation at the bake's 200 + 60 T+ mm a year (HYD-040,
 HYD-041), about half Tibet's 650 to 1,300 (Wang et al. 2020) and Titicaca's 1,100 to 1,270; ranges above the plateau
-(the orogen's edge peaks). Measured on the pool: not yet (the arm is the design's "How it is judged").
+(the orogen's edge peaks).
+
+**Measured on the pool** (the arm plat-cb0 against orog-cum, 8 and 8 runs; the design's "The arm"):
+- **Internally drained land.** 0.13 of the land over a run (0.09 to 0.15) drains to basins that pass nothing, against
+  Earth's 20 % (Garcia-Castellanos et al. 2003, p. 8-1).
+- **K's calibration holds.** The land's erosion by relief and by region is unchanged (regions of 500 m relief 220
+  against 218 m/Myr).
+- **The guard holds.** No divergence: the worst cell stood 10.5 km from the sea against 9.9.
+- **The plateaus are not kept.** The flat high ground wears at 141 against 134 m/Myr. The part of it draining to a closed
+  basin (0.30) wears at 53 m/Myr, half by diffusion. That is 3 to 5 times southern Tibet's catchment rates (Hetzel et
+  al. 2011). The part below 0 °C, 0.67 of the flat high ground over the run, wears at 141 m/Myr.
+- **The next lead is frozen ground's runoff.** The surface still runs off all precipitation below 0 °C (ERO-010). The
+  bake's budget has not done so since 2026-10-01: rain share HYD-036, degree-day melt HYD-037, biotemperature PET
+  HYD-029, HYD-030 and HYD-035.
