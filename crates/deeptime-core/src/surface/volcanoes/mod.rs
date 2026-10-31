@@ -68,7 +68,7 @@ pub mod shape;
 #[cfg(test)]
 mod tests;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::time::Instant;
 
 use deeptime_format::{EventId, GridDesc, ParamValue, Place};
@@ -205,6 +205,10 @@ pub struct Volcano {
     pub segment: u64,
     /// Set when it left the catalogue.
     pub gone: Option<Gone>,
+    /// With `tectonics.hotspot_cone_budget` (PLT-803): the part of `built_m` its rock backs in
+    /// the plate model's pools, m (the rest is relief over the column's own rock).
+    #[serde(default)]
+    pub rock_m: f64,
 }
 
 impl Volcano {
@@ -490,6 +494,211 @@ pub fn cell_extent_m(grid: &GridDesc, mh: f64, j: usize) -> (f64, f64) {
     }
 }
 
+/// The rock a metre over one L1 cell holds, km³ Earth-normalized: L1 is Lambert's cylindrical
+/// equal-area projection, so every cell covers `cell_m`² of the planet's sphere (radius
+/// `planet_radius_m`), scaled to the plate model's sphere (`model_radius_km`), whose units the
+/// plate model's budgets are in (the cone budget; ledger: PLT-803).
+pub fn cell_km3_per_m(cell_m: f64, planet_radius_m: f64, model_radius_km: f64) -> f64 {
+    let scale = model_radius_km * 1000.0 / planet_radius_m;
+    (cell_m * scale / 1000.0).powi(2) / 1000.0
+}
+
+/// The share of its growth's rock a hotspot's cones hand the pools under the cone budget (ledger:
+/// PLT-803): all of it while the tail's lavas cover it, else the lavas over the growth.
+pub fn cone_share(built_km3: f64, budget_km3: f64) -> f64 {
+    if built_km3 > 0.0 {
+        (budget_km3.max(0.0) / built_km3).min(1.0)
+    } else {
+        1.0
+    }
+}
+
+/// The cone budget's hand-over (ledger: PLT-803): a hotspot's cones hand the pools at most its
+/// tail's lavas of the last step (`budgets`, km³ Earth-normalized, by hotspot id), wherever they
+/// stand; the rest of their growth is relief. `held` is the frame's growth of the hotspots' cones
+/// per cell (volcano, cell, m) and `held_dh` each cone's growth (volcano, m). Every cone of a
+/// hotspot hands the same share of its growth ([`cone_share`] of the hotspot's growth over its
+/// budget), into `hot_rock` (felsic, or mafic for a shield), and its `rock_m` gains that share of
+/// its growth; a growth whose footprint held no cell hands nothing and backs nothing. Per hotspot,
+/// `hot_built` gains the growth's rock at full and `hot_handed` what it handed, and of it on the
+/// cells `continental` says (measurement, PLT-804).
+#[allow(clippy::too_many_arguments)]
+fn hand_held(
+    volcanoes: &mut [Volcano],
+    held: &[(usize, usize, f32)],
+    held_dh: &[(usize, f64)],
+    budgets: &BTreeMap<u32, f64>,
+    km3_per_m: f64,
+    continental: &dyn Fn(usize) -> bool,
+    hot_rock: &mut [[f32; 2]],
+    hot_built: &mut BTreeMap<u32, f64>,
+    hot_handed: &mut BTreeMap<u32, [f64; 2]>,
+) {
+    let mut grown: BTreeMap<u32, f64> = BTreeMap::new();
+    let mut with_cells: BTreeSet<usize> = BTreeSet::new();
+    for &(vi, _, dz) in held {
+        let hid = volcanoes[vi].hotspot.expect("held cones are a hotspot's");
+        *grown.entry(hid).or_insert(0.0) += f64::from(dz) * km3_per_m;
+        with_cells.insert(vi);
+    }
+    let share: BTreeMap<u32, f64> = grown
+        .iter()
+        .map(|(&hid, &b)| {
+            (
+                hid,
+                cone_share(b, budgets.get(&hid).copied().unwrap_or(0.0)),
+            )
+        })
+        .collect();
+    for (&hid, &b) in &grown {
+        *hot_built.entry(hid).or_insert(0.0) += b;
+    }
+    for &(vi, c, dz) in held {
+        let v = &volcanoes[vi];
+        let hid = v.hotspot.expect("held cones are a hotspot's");
+        let kind = usize::from(v.kind == Kind::Shield);
+        let rock = (share[&hid] * f64::from(dz)) as f32;
+        hot_rock[c][kind] += rock;
+        let r = f64::from(rock) * km3_per_m;
+        let e = hot_handed.entry(hid).or_insert([0.0; 2]);
+        e[0] += r;
+        if continental(c) {
+            e[1] += r;
+        }
+    }
+    for &(vi, dh) in held_dh {
+        // A growth whose footprint held no cell handed no rock, so it backs none (whatever its
+        // hotspot's other cones handed).
+        if !with_cells.contains(&vi) {
+            continue;
+        }
+        let v = &mut volcanoes[vi];
+        let hid = v.hotspot.expect("held cones are a hotspot's");
+        v.rock_m += share[&hid] * dh;
+    }
+}
+
+/// The share of a cone's relief its rock backs, for what its caldera takes back and lays (ledger:
+/// PLT-803): all of it but a budgeted hotspot's cone's, whose is its `rock_m` over its `built_m`.
+pub fn caldera_rock_share(v: &Volcano, cone_budget: bool) -> f64 {
+    if cone_budget && v.hotspot.is_some() {
+        if v.built_m > 0.0 {
+            (v.rock_m / v.built_m).clamp(0.0, 1.0)
+        } else {
+            0.0
+        }
+    } else {
+        1.0
+    }
+}
+
+/// What a caldera's collapse and its ignimbrite sheet moved ([`collapse`]).
+struct Collapsed {
+    /// The volume the collapse removed, m³ (the cone's body lost and the depression).
+    removed_m3: f64,
+    /// The rock moved, km³ Earth-normalized: at full and as its rock share backs it.
+    moved: [f64; 2],
+    /// … of the latter on continental cells.
+    moved_c: f64,
+}
+
+/// A caldera's collapse on L1 (ledger: VOL-030, VOL-031): the cone's body between its shapes
+/// `before` and `after` comes off the surface, and unless `summit` (a summit pit) half the volume
+/// erupted lays an ignimbrite sheet out to four rim radii (VOL-046), the rest the fill inside the
+/// rim `rc` (log only). `pit` is (`rc`, its depth, `summit`). The rock taken back and laid is the
+/// `rock_share` of the relief the cone's rock backs ([`caldera_rock_share`]), in `l1.hot_rock`
+/// when `hot` (a budgeted hotspot's cone; ledger: PLT-803), else in `l1.rock`; `continental`
+/// says which cells are continental crust (measurement).
+#[allow(clippy::too_many_arguments)]
+fn collapse(
+    l1: &mut L1,
+    v: &Volcano,
+    before: &Shape,
+    after: &Shape,
+    pit: (f64, f64, bool),
+    rock: (f64, bool),
+    km3_per_m: f64,
+    continental: &dyn Fn(usize) -> bool,
+    tuff: u16,
+    log_ops: &mut Vec<(usize, f32, u16)>,
+) -> Collapsed {
+    let ((rc, depth_m, summit), (rock_share, hot)) = (pit, rock);
+    let h = v.height_m;
+    let mut removed = 0.0;
+    let diff = |r: f64| before.body(r) - after.body(r);
+    let kind = usize::from(v.kind == Kind::Shield);
+    let mut moved = [0.0f64; 2];
+    let mut moved_c = 0.0f64;
+    for (c, wgt) in l1.render(v.x, v.z, v.radius_m, 1.0, &diff) {
+        let dz = (h * wgt) as f32;
+        l1.delta[c] -= dz;
+        let pool = l1.rock_at(c, hot);
+        if rock_share == 1.0 {
+            pool[kind] -= dz;
+        } else {
+            pool[kind] -= (rock_share * f64::from(dz)) as f32;
+        }
+        let r = f64::from(dz) * km3_per_m;
+        moved[0] -= r;
+        moved[1] -= rock_share * r;
+        if continental(c) {
+            moved_c -= rock_share * r;
+        }
+        removed += f64::from(dz);
+        log_ops.push((c, -dz, 0));
+    }
+    let removed_m3 = removed * l1.cell_m * l1.cell_m + std::f64::consts::PI * rc * rc * depth_m;
+    if !summit {
+        // The ignimbrite sheet to four rim radii (half the erupted volume) …
+        let big = 4.0 * rc; // ledger: VOL-046
+        let span = big - rc;
+        let t0 = (0.5 * removed_m3 / (std::f64::consts::PI * span * (span / 3.0 + rc))).min(250.0);
+        let (grid, mh, vx, vz) = (l1.grid, l1.mh, v.x, v.z);
+        for_cells(grid, mh, vx, vz, big, |c, dx, dz| {
+            let r = dx.hypot(dz);
+            if r > rc {
+                let th = (t0 * (1.0 - (r - rc) / span)) as f32;
+                if th > 0.0 {
+                    l1.delta[c] += th;
+                    let pool = l1.rock_at(c, hot);
+                    if rock_share == 1.0 {
+                        pool[0] += th;
+                    } else {
+                        pool[0] += (rock_share * f64::from(th)) as f32;
+                    }
+                    let r = f64::from(th) * km3_per_m;
+                    moved[0] += r;
+                    moved[1] += rock_share * r;
+                    if continental(c) {
+                        moved_c += rock_share * r;
+                    }
+                    log_ops.push((c, th, tuff));
+                }
+            } else {
+                // … and the fill inside the caldera (the rest; log only: the depression itself
+                // is cut at the finest grid).
+                let fill =
+                    (0.5 * removed_m3 / (std::f64::consts::PI * rc * rc)).min(0.8 * depth_m) as f32;
+                log_ops.push((c, fill, tuff));
+            }
+        });
+    }
+    Collapsed {
+        removed_m3,
+        moved,
+        moved_c,
+    }
+}
+
+/// World globals (measurement, the cone budget; ledger: PLT-804), km³ Earth-normalized, over the
+/// run: the rock the hotspots' cones would hand at full (their growth net of calderas), and what
+/// they handed (all of it without `tectonics.hotspot_cone_budget`), and of that on continental
+/// cells.
+pub const HOTSPOT_CONES_BUILT_GLOBAL: &str = "volcanoes/hotspot_cones_built_km3";
+pub const HOTSPOT_CONES_HANDED_GLOBAL: &str = "volcanoes/hotspot_cones_handed_km3";
+pub const HOTSPOT_CONES_HANDED_CONTINENTAL_GLOBAL: &str =
+    "volcanoes/hotspot_cones_handed_continental_km3";
+
 /// How far past a shape's reach (m) a footprint must look for every cell whose
 /// [`shape::cell_weight`] points (3/8 of the cell's extent either way from its centre) reach into
 /// it: one Lambert cell side (as before 2026-10-23), or the half-diagonal of those points in the
@@ -578,11 +787,25 @@ struct L1<'a> {
     /// The rock of that change per cell, felsic and mafic volcanic, m: what the plate model's
     /// pools receive (`surface/volcanic_felsic_m`, `surface/volcanic_mafic_m`; plate task 8).
     rock: Vec<[f32; 2]>,
+    /// … and of the hotspots' cones under the cone budget (ledger: PLT-803), apart
+    /// (`surface/volcanic_hotspot_felsic_m`, `surface/volcanic_hotspot_mafic_m`): their tails
+    /// net them by hotspot, so no arc counts them inside its rate by place.
+    hot_rock: Vec<[f32; 2]>,
     /// The surface's elevation at the start of the step, m.
     elev: &'a [f32],
 }
 
 impl L1<'_> {
+    /// The rock a cell's change gives the pools: the hotspots' budgeted cones' (`hot`) or the
+    /// rest's.
+    fn rock_at(&mut self, c: usize, hot: bool) -> &mut [f32; 2] {
+        if hot {
+            &mut self.hot_rock[c]
+        } else {
+            &mut self.rock[c]
+        }
+    }
+
     /// The rendered weight of a normalised radial function at every cell of its reach, with
     /// `f(cell, weight)`.
     fn render(
@@ -725,6 +948,18 @@ impl VolcanoStage {
                     .map(|e| (c.over, DVec3::from_array(c.centroid), e))
             })
             .collect();
+        // The cone budget (ledger: PLT-803): what each hotspot's cones may hand this frame.
+        let cone_budget = self.preset.tectonics.hotspot_cone_budget;
+        let budgets: BTreeMap<u32, f64> = if cone_budget {
+            plates
+                .hotspots
+                .iter()
+                .map(|h| (h.id, h.cones.budget_km3))
+                .collect()
+        } else {
+            BTreeMap::new()
+        };
+        let km3_per_m = cell_km3_per_m(cell_m, s.radius_m(), self.preset.tectonics.model_radius_km);
         let hotspot_ref = self.preset.tectonics.hotspot_uplift_mm_yr.max(1e-9);
         let lip_radius_m = self.preset.tectonics.lip_radius_km
             / self.preset.tectonics.model_radius_km
@@ -832,6 +1067,7 @@ impl VolcanoStage {
             cell_m,
             delta: vec![0.0; n],
             rock: vec![[0.0; 2]; n],
+            hot_rock: vec![[0.0; 2]; n],
             elev: &elev,
         };
         // Log changes: (cell, thickness (negative = erode), class) in order.
@@ -1052,6 +1288,7 @@ impl VolcanoStage {
                     cause: lip,
                     segment: 0,
                     gone: None,
+                    rock_m: 0.0,
                 };
                 *chain += 1;
                 st.next_id += 1;
@@ -1158,6 +1395,7 @@ impl VolcanoStage {
                     cause,
                     segment: segment_key(cause, plate),
                     gone: None,
+                    rock_m: 0.0,
                 });
                 st.next_id += 1;
                 st.counts.strato_born += 1;
@@ -1244,7 +1482,14 @@ impl VolcanoStage {
                 .collect()
         };
         let mut bases: Vec<f64> = Vec::new();
-        for (v, footprint) in st.volcanoes.iter_mut().zip(footprints) {
+        // The hotspots' cones' growth this frame, held for the cone budget (volcano, cell, metres).
+        let mut held: Vec<(usize, usize, f32)> = Vec::new();
+        let mut held_dh: Vec<(usize, f64)> = Vec::new();
+        // Per hotspot, km³ Earth-normalized: the rock its cones would hand at full; what they
+        // handed, and of it on continental cells (measurement, PLT-804).
+        let mut hot_built: BTreeMap<u32, f64> = BTreeMap::new();
+        let mut hot_handed: BTreeMap<u32, [f64; 2]> = BTreeMap::new();
+        for (vi, (v, footprint)) in st.volcanoes.iter_mut().zip(footprints).enumerate() {
             if !v.active() {
                 continue;
             }
@@ -1302,10 +1547,24 @@ impl VolcanoStage {
             // Stratovolcanoes and silicic centres are felsic volcanic rock, shields mafic.
             // ledger: PLT-286
             let kind = usize::from(v.kind == Kind::Shield);
+            let hold = cone_budget && v.hotspot.is_some();
             for (c, wgt) in cells {
                 let dz = (dh * wgt) as f32;
                 l1.delta[c] += dz;
-                l1.rock[c][kind] += dz;
+                if hold {
+                    held.push((vi, c, dz));
+                } else {
+                    l1.rock[c][kind] += dz;
+                    if let Some(hid) = v.hotspot {
+                        let r = f64::from(dz) * km3_per_m;
+                        *hot_built.entry(hid).or_insert(0.0) += r;
+                        let e = hot_handed.entry(hid).or_insert([0.0; 2]);
+                        e[0] += r;
+                        if crust[c] as u8 == CONTINENTAL {
+                            e[1] += r;
+                        }
+                    }
+                }
                 vol += f64::from(dz);
                 for (class, share) in layers {
                     if share > 0.0 {
@@ -1314,6 +1573,11 @@ impl VolcanoStage {
                 }
             }
             st.counts.built_km3 += vol * cell_km2 / 1000.0;
+            if hold {
+                held_dh.push((vi, dh));
+            } else if v.hotspot.is_some() {
+                v.rock_m += dh;
+            }
             v.height_m += dh;
             v.kept_m = v.kept_m.max(v.height_m);
             v.built_m += dh;
@@ -1349,6 +1613,21 @@ impl VolcanoStage {
                 seg.peak_m = seg.peak_m.max(v.peak_m);
             }
         }
+        if cone_budget {
+            // The cone budget (ledger: PLT-803): a hotspot's cones hand the pools at most its tail's
+            // lavas of the last step, wherever they stand; the rest of their growth is relief.
+            hand_held(
+                &mut st.volcanoes,
+                &held,
+                &held_dh,
+                &budgets,
+                km3_per_m,
+                &|c| crust[c] as u8 == CONTINENTAL,
+                &mut l1.hot_rock,
+                &mut hot_built,
+                &mut hot_handed,
+            );
+        }
         self.time("build", started);
 
         // 6. Calderas.
@@ -1379,42 +1658,25 @@ impl VolcanoStage {
                 caldera: true,
             });
             let after = v.shape();
-            let h = v.height_m;
-            let mut removed = 0.0;
-            let diff = |r: f64| before.body(r) - after.body(r);
-            let kind = usize::from(v.kind == Kind::Shield);
-            for (c, wgt) in l1.render(v.x, v.z, v.radius_m, 1.0, &diff) {
-                let dz = (h * wgt) as f32;
-                l1.delta[c] -= dz;
-                l1.rock[c][kind] -= dz;
-                removed += f64::from(dz);
-                log_ops.push((c, -dz, 0));
-            }
-            let removed_m3 = removed * cell_m * cell_m + std::f64::consts::PI * rc * rc * depth_m;
+            // A hotspot's cone takes back, and spreads in its ignimbrite, only the rock it holds:
+            // all of it at full, its share under the cone budget, from its own rock apart
+            // (ledger: PLT-803).
+            let rock_share = caldera_rock_share(v, cone_budget);
+            let hot = cone_budget && v.hotspot.is_some();
+            let done = collapse(
+                &mut l1,
+                v,
+                &before,
+                &after,
+                (rc, depth_m, summit),
+                (rock_share, hot),
+                km3_per_m,
+                &|c| crust[c] as u8 == CONTINENTAL,
+                rocks.tuff,
+                &mut log_ops,
+            );
+            let (removed_m3, moved, moved_c) = (done.removed_m3, done.moved, done.moved_c);
             if !summit {
-                // The ignimbrite sheet to four rim radii (half the erupted volume) …
-                let big = 4.0 * rc; // ledger: VOL-046
-                let span = big - rc;
-                let t0 = (0.5 * removed_m3 / (std::f64::consts::PI * span * (span / 3.0 + rc)))
-                    .min(250.0);
-                let (vx, vz) = (v.x, v.z);
-                for_cells(&grid, mh, vx, vz, big, |c, dx, dz| {
-                    let r = dx.hypot(dz);
-                    if r > rc {
-                        let th = (t0 * (1.0 - (r - rc) / span)) as f32;
-                        if th > 0.0 {
-                            l1.delta[c] += th;
-                            l1.rock[c][0] += th;
-                            log_ops.push((c, th, rocks.tuff));
-                        }
-                    } else {
-                        // … and the fill inside the caldera (the rest; log only: the
-                        // depression itself is cut at the finest grid).
-                        let fill = (0.5 * removed_m3 / (std::f64::consts::PI * rc * rc))
-                            .min(0.8 * depth_m) as f32;
-                        log_ops.push((c, fill, rocks.tuff));
-                    }
-                });
                 v.extinct_myr = Some(t);
                 st.counts.calderas += 1;
                 if v.kind == Kind::Silicic {
@@ -1425,6 +1687,12 @@ impl VolcanoStage {
                 }
             } else {
                 st.counts.summit_calderas += 1;
+            }
+            if let Some(hid) = v.hotspot {
+                *hot_built.entry(hid).or_insert(0.0) += moved[0];
+                let e = hot_handed.entry(hid).or_insert([0.0; 2]);
+                e[0] += moved[1];
+                e[1] += moved_c;
             }
             v.caldera = Some(Caldera {
                 t_myr: t,
@@ -1445,7 +1713,7 @@ impl VolcanoStage {
         // 8. Flood basalts from the plate model's new large igneous provinces.
         let started = Instant::now();
         let from = st.events_seen as usize;
-        let mut new_lips: Vec<(EventId, f32, f32, f64)> = Vec::new();
+        let mut new_lips: Vec<(EventId, f32, f32, f64, f64)> = Vec::new();
         for e in world.events.iter().skip(from) {
             if e.kind != LARGE_IGNEOUS_PROVINCE {
                 continue;
@@ -1455,13 +1723,21 @@ impl VolcanoStage {
                     Some(ParamValue::Float(x)) => *x,
                     _ => self.preset.tectonics.lip_thickness_m,
                 };
-                new_lips.push((e.id, lat, lon, th));
+                // A sourced plume head's own radius (`tectonics.plume_heads_sourced`, PLT-797),
+                // else the preset's.
+                let radius_m = match e.params.get("radius_km") {
+                    Some(ParamValue::Float(x)) => {
+                        *x / self.preset.tectonics.model_radius_km * s.radius_m()
+                    }
+                    _ => lip_radius_m,
+                };
+                new_lips.push((e.id, lat, lon, th, radius_m));
             }
         }
         st.events_seen = world.events.len() as u64;
         // The flows' log entries: the provinces count them (provenance `LIP_FLOW`).
         let lip_from = log_ops.len();
-        for (event, lat, lon, th) in new_lips {
+        for (event, lat, lon, th, lip_radius_m) in new_lips {
             let x = frame.x_of_lon(f64::from(lon));
             let z = frame.z_of_lat(f64::from(lat));
             let c = cell_of(&grid, x, z);
@@ -1522,6 +1798,30 @@ impl VolcanoStage {
             }
         }
 
+        // The hotspots' cones: what each handed, for its tail to net at the next plate step (the
+        // cone budget, ledger: PLT-803), and the measurement (PLT-804).
+        if cone_budget && let Some(ps) = world.plates.as_mut() {
+            for (&hid, e) in &hot_handed {
+                if let Some(h) = ps.hotspots.iter_mut().find(|h| h.id == hid) {
+                    h.cones.handed_km3 += e[0];
+                    h.cones.handed_continental_km3 += e[1];
+                }
+            }
+        }
+        for (name, v) in [
+            (HOTSPOT_CONES_BUILT_GLOBAL, hot_built.values().sum::<f64>()),
+            (
+                HOTSPOT_CONES_HANDED_GLOBAL,
+                hot_handed.values().map(|e| e[0]).sum::<f64>(),
+            ),
+            (
+                HOTSPOT_CONES_HANDED_CONTINENTAL_GLOBAL,
+                hot_handed.values().map(|e| e[1]).sum::<f64>(),
+            ),
+        ] {
+            *world.globals.entry(name.to_owned()).or_insert(0.0) += v;
+        }
+
         // Apply: the surface (offset, elevation, its fields) and the plate feedback; the log.
         let started = Instant::now();
         {
@@ -1573,6 +1873,29 @@ impl VolcanoStage {
                     f.data
                         .par_iter_mut()
                         .zip(l1.rock.par_iter())
+                        .for_each(|(x, r)| *x += r[k]);
+                }
+            }
+            // The budgeted hotspots' cones apart (ledger: PLT-803; written only while they hold
+            // rock, so a run without the budget keeps its fields).
+            for (k, name) in [
+                crate::surface::field::VOLCANIC_HOTSPOT_FELSIC,
+                crate::surface::field::VOLCANIC_HOTSPOT_MAFIC,
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                if l1.hot_rock.par_iter().all(|r| r[k] == 0.0) {
+                    continue;
+                }
+                let f = fields.entry(name.to_owned()).or_insert_with(|| Field {
+                    grid: grid.clone(),
+                    data: vec![0.0; n],
+                });
+                if f.data.len() == n {
+                    f.data
+                        .par_iter_mut()
+                        .zip(l1.hot_rock.par_iter())
                         .for_each(|(x, r)| *x += r[k]);
                 }
             }
