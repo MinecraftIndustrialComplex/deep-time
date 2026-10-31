@@ -1540,7 +1540,10 @@ mod tests {
             let src = [edge, floor, floor];
             let s = interpolate(&src, &cover([w0, w1, w1]), DQuat::IDENTITY, 0);
             assert_eq!(s.kind, CONTINENTAL);
-            assert!(s.basement() > 0.0 && s.arc_oceanic_m < mature, "{w0}: {s:?}");
+            assert!(
+                s.basement() > 0.0 && s.arc_oceanic_m < mature,
+                "{w0}: {s:?}"
+            );
             assert!(island(&s), "the matured arc's edge lost its class at {w0}");
         }
         // Leak A.
