@@ -13699,8 +13699,9 @@ flux applies under every lid. The lid (Courtillot et al. 2003: weak plumes "woul
 old lithosphere"; White & McKenzie's Fig. 3) is the sourced step before `hotspots_sourced` goes on.
 
 **The review's fixes** (an Opus review of 4d9ea6f5, 2026-10-31; docs/design/hotspot-cone-budget.md
-section 6). The arcs run before the hotspots and net every felsic cone within 1,800 km of an oceanic
-slab's front, a hotspot's silicic centres and ignimbrites included, so under the budget a
+section 6). The arcs run before the hotspots and net every felsic cone within `subduction_distance_km` of a
+front (800 km in every shipped preset; an oceanic slab's or a suture's), a hotspot's silicic centres
+and ignimbrites included, so under the budget a
 continental hotspot's near a front was netted by the arc and by its tail (on hs-budget 0.004 to
 0.007 km³ a year, about a fifth of what the tails netted by id, the reviewer's reading): the budgeted
 hotspots' cones now reach the plate model apart (`surface/volcanic_hotspot_felsic_m`,
