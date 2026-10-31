@@ -229,3 +229,17 @@ against 6.5 (p 0.35). Verdict: all three correct, on (PLT-760 with the substrate
   (25.3 against 34.1), and what is left is the intra-oceanic fronts' length, 1.9 times Earth's.
   The floor's stock agrees (young floor 1.9 times GlobSed in place). Next: which law sets the
   export's rate, the surface's erosion or the plates' uplift.
+- The intra-oceanic fronts' length (25,744 km against Clift's 13,550). Diagnosed 2026-10-31
+  (plates.md, "The intra-oceanic fronts' length"; trace oo-trace, measurement only, bit for bit
+  on base34's seed 1; Earth from Bird 2003's steps, CRUST1.0 and Seton et al. 2020's floor ages).
+  Part is the measure (the counter takes incipient fronts, 1.25 times; Clift's inventory is 0.78
+  of Bird's); the trench in all is Bird's length, and matched class by class the intra-oceanic
+  share is 1.3 to 2.1 times Earth's. The excess is intra-oceanic subduction of floor younger than
+  55 Myr (10,840 km against Earth's 2,240 to 3,860; on older floor the length is Earth's), which
+  Earth puts down at continental margins. 0.57 of that front belongs to contacts whose first floor
+  down was younger than 12 Myr; the young slabs converge more slowly than Earth's intra-oceanic
+  fronts, open no back-arcs (young floor behind 0.04 against 0.31 to 0.43) and last (arcs older
+  than 50 Myr: 0.61; Earth's zones began 55 Ma or later). A missing law by its signature: a
+  subduction zone starts at any converging boundary after 100 km of slab. Next: whether the start
+  condition or the kinematics that make young boundaries converge is missing (one trace: each
+  contact's boundary the step before its onset).
