@@ -561,7 +561,28 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
         t.closed_lakes,
         t.partial_lakes,
         t.closed_km2_myr,
-    ))
+    ) + &runoff_weight_words(&t.runoff_weight_km2_myr))
+}
+
+/// The stream power's mean runoff weight used and the climate snapshot's own, on land and on
+/// land above 2 km (`surface.runoff_budget`; nothing without it).
+fn runoff_weight_words(w: &[f64; 6]) -> String {
+    let pair = |a: f64, u: f64, o: f64| {
+        if a > 0.0 {
+            format!("{:.4}/{:.4}", u / a, o / a)
+        } else {
+            "NaN/NaN".into()
+        }
+    };
+    if w[0] > 0.0 {
+        format!(
+            " runoff_weight_land_used/own={} runoff_weight_high_used/own={}",
+            pair(w[0], w[1], w[2]),
+            pair(w[3], w[4], w[5])
+        )
+    } else {
+        String::new()
+    }
 }
 
 /// The planet's hypsometry at the end of the surface (P1-17 calibration), true-area weighted
