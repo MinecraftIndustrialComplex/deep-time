@@ -1493,10 +1493,10 @@ RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on);
 - Reference: Holdridge, Leslie R. 1967. Life Zone Ecology (revised edition). Tropical Science Center, San Jose, Costa Rica.
 - DOI or URL: none (book). A library scan is at https://app.ingemmet.gob.pe/biblioteca/pdf/Amb-56.pdf (title per its listing: "Life Zone Ecology by L.R. Holdridge, with photographic supplement prepared by Joseph A. Tosi Jr."). The scan's text layer starts at the table of contents, so I could not confirm the edition year from the scan itself; Lugo et al. 1999 cite it as "Holdridge, L.R. (1967) Life zone ecology. Tropical Science Center. San Jose, Costa Rica".
 - Cited as: "L. R. Holdridge 1967, Life Zone Ecology, Tropical Science Center: PET = 58.93 x the mean annual biotemperature"
-- Ledger ids: HYD-029, HYD-030, HYD-035, HYD-041, BIO-126 (the dry forest precipitation band, from memory: the band is read off the life-zone chart, which the scan's text layer does not carry; the text says "Most of these savannas are to be found in the Tropical Dry Forest Life Zone", read 2026-10-04)
+- Ledger ids: HYD-029, HYD-030, HYD-035, HYD-041, ERO-222, BIO-126 (the dry forest precipitation band, from memory: the band is read off the life-zone chart, which the scan's text layer does not carry; the text says "Most of these savannas are to be found in the Tropical Dry Forest Life Zone", read 2026-10-04)
 - Access: book (not online), plus an unofficial library scan
 - Library (the project's source library, not distributed): fetched (PDF, 149 pages, text layer, 330,833 characters). From: https://app.ingemmet.gob.pe/biblioteca/pdf/Amb-56.pdf. Text file: Holdridge1967.txt.
-- Read so far (by the project): nothing says it was consulted
+- Read so far (by the project): the runoff lane's research sub-agent, 2026-10-31 (the scan): "Moisture" (p. 28 of the contents): "the mean annual potential evapotranspiration in mm. at any site may be determined by multiplying the mean annual biotemperature by the factor 58.93"; the introduction: "All temperatures lower than O0 Celsius were considered as O0 for the calculation of the biotemperature" and "biotemperature is an average of the temperature between 0. and 300C. relative to the total period" (a cut at 30 C the code does not apply); p. 24 of the scan, Verkhoyansk: monthly means "-50.0, -44.4, -32.2, -15.5, 0, + 12.2, + 13.3, +9.4, + 1.7, -15.5, -37.2 and -47.8", "3.050 as a rough mean annual biotemperature", "mean annual precipitation 135 mm"
 - Read in this pass: full text fetched (scan OCR; the passages on biotemperature and on the factor 58.93)
 - Reference check: the title, publisher and the 58.93 factor match. The definition of biotemperature does not match the code: see Part 2, HYD-030.
 
@@ -1538,11 +1538,12 @@ RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on);
 - Reference: Zhang, Lu; Hickel, Klaus; Dawes, Warrick R.; Chiew, Francis H. S.; Western, Andrew W.; Briggs, Peter R. 2004. A rational function approach for estimating mean annual evapotranspiration. Water Resources Research 40(2), W02502.
 - DOI or URL: https://doi.org/10.1029/2003WR002710
 - Cited as: "Fu 1981; Zhang et al. 2004" (from the joint entry Fu1981 and Zhang2004: "Fu 1981; Zhang et al. 2004" (surface/climate.rs header and fu_et))
-- Ledger ids: HYD-034, HYD-035, YNG-011; notes: also MOI-068
+- Ledger ids: HYD-034, HYD-035, YNG-011, ERO-221, ERO-222; notes: also MOI-068
 - Access: only the abstract was reachable; open-access status not checked
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
 - Read so far (by the project): nothing stated
 - Read in this pass: abstract fetched (OpenAlex). The abstract is about a rational-function model of ET/PET; it does not mention Fu's equation or omega.
+- Read 2026-10-31 (the runoff lane's research sub-agent, the abstract again, OpenAlex): "Over 470 catchments worldwide with long‐term records of precipitation, potential evapotranspiration, and runoff were considered"; "The mean absolute error between modeled and observed evapotranspiration was 54 mm, and the model was able to explain 89% of the variance with a slope of 1.00 through the origin" (ERO-222's tolerance). The full text was still blocked; omega = 2.6 read only at second hand (Greve2015, ZhangHickelShao2005).
 - Reference check: authors, year, journal, volume match. Whether the paper contains "omega = 2.6" is not shown by the abstract. Needed for stage 2 (paywalled). (from the joint entry Fu1981 and Zhang2004: see the HYD file. The Zhang abstract does not mention Fu's equation or omega = 2.6.)
 
 ### Ohmura1992
@@ -10179,3 +10180,124 @@ The plateau lane's sources (docs/design/plateau-drainage.md, erosion-and-sedimen
 - Access: paywalled; the abstract only.
 - Library: not kept.
 - Read so far (by the project): the abstract, 2026-10-31: "The compilation reveals an overall trend in which D increases strongly with increasing moisture among relatively dry sites and less strongly with increasing moisture among relatively wet sites".
+
+## Cold lands' runoff (ERO-221, ERO-222; HYD-029, HYD-030, HYD-037), added 2026-10-31
+
+The runoff lane's sources (docs/design/surface-runoff-budget.md, erosion-and-sediment.md "Cold lands' runoff"). All read by one Sonnet research sub-agent on 2026-10-31, quotes as it printed them; downloads kept outside the repository. Author lists are as the agent printed them, "et al." where it did not. Not fetched: Zhang et al. 2004's full text (only its abstract, below under Zhang2004), Serreze et al. 2002 and 2006, Slater et al. 2007, Berezovskaya et al. 2004, Yang Kun et al. 2014, Woo 1980 and 1983 and Marsh & Woo 1979 (McMaster River, Resolute), Kane, Gieck & Hinzman 2008, Fu 1981.
+
+### Hock2003
+- Reference: Hock, R. (2003). Temperature index melt modelling in mountain areas. Journal of Hydrology 282:104-115.
+- DOI or URL: read from https://www.oocities.org/haniskywalker/hock2003.pdf
+- Cited as: "Hock 2003".
+- Ledger ids: HYD-037.
+- Access: a copy of the full text.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. Section 3.1, p. 105: the degree-day factor, "the factor of proportionality being the degree-day factor", in mm per day per degree C. Table 1, pp. 106-107, "Average degree-day factors (DDF) on snow and bare ice": on snow at non-glaciated sites Gooseberry Creek, Utah 2.5; Weissfluhjoch 4.5; "3 basins in USA" 2.7-4.9; former European USSR 5.5; "12 Sites in Finland" 2.8-4.9; on glaciers from 2.7 (John Evans Glacier) to 11.6 (Glacier AX010). Section 3.2, p. 108: "Degree-day factors for snow tend to be considerably lower than those for ice, due to generally higher albedo of snow compared to ice"; "low degree-day factors can also be expected for dry high-radiation areas where sublimation plays a major role in the heat budget"; "regional patterns of degree-day factors are not detectable in the reported data (Table 1)".
+
+### Greve2015
+- Reference: Greve, P., et al. (2015). A two-parameter Budyko function to represent conditions under which evapotranspiration exceeds precipitation. Hydrology and Earth System Sciences Discussions 12:6799-6830.
+- DOI or URL: the authors' response file, https://hess.copernicus.org/preprints/12/6799/2015/hessd-12-6799-2015-AR4.pdf
+- Cited as: "Greve et al. 2015" (secondary for Fu's omega).
+- Ledger ids: ERO-221, HYD-034.
+- Access: open (the discussion's author response).
+- Library: not kept.
+- Read so far (by the project): the author response, 2026-10-31: "The original formulation introduced by Budyko (1956, 1974) is best represented by setting ω = 2.6 (Zhang et al., 2004)"; a reviewer: "the Fu curve with the commonly accepted value for w = 2.6".
+
+### ZhangHickelShao2005
+- Reference: Zhang, L., Hickel, K., Shao, Q. Water Balance Modelling Over Variable Time Scales. MODSIM 2005 (Modelling and Simulation Society of Australia and New Zealand).
+- DOI or URL: https://www.mssanz.org.au/modsim05/papers/zhang.pdf
+- Cited as: "Zhang, Hickel & Shao, MODSIM 2005" (secondary for Fu's curve).
+- Ledger ids: ERO-221, HYD-034.
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. Eq. (5): "E/P = 1 + E0/P − [1 + (E0/P)^α]^(1/α), where E0 is potential evaporation and α is a model parameter"; over "265 catchments in Australia", "a single value of 2.63 was used for the α parameter and it resulted in a mean annual error (MAE) of 60 mm or 8%"; its reference for Fu: "On the calculation of the evaporation from land surface. Scientia Atmospherica Sinica, 5, 23-31 (in Chinese)".
+
+### MAGSWEBS
+- Reference: MAGS (Mackenzie GEWEX Study) Water and Energy Budget Synthesis, "Table 2.1 Summary of the features of the Mackenzie river basin".
+- DOI or URL: https://gwfnet.net/sites/mags/WEBS/html/2.html (a mirror of the University of Saskatchewan's MAGS pages)
+- Cited as: "MAGS Water and Energy Budget Synthesis, Table 2.1".
+- Ledger ids: ERO-222.
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): Table 2.1, 2026-10-31: "~1.8x10^6 km2"; "Mean annual precipitation: 410mm"; "Mean annual evapotranspiration: 237mm"; "Average monthly temperature: 15 C in the summer and -25 C in the winter" (the page's degree sign garbled); "Annual discharge: 300km 3".
+
+### WooThorne2003
+- Reference: Woo, M.-K., Thorne, R. (2003). Streamflow in the Mackenzie Basin, Canada. Arctic 56(4):328-340.
+- DOI or URL: https://journalhosting.ucalgary.ca/index.php/arctic/article/download/63689/47625/182254
+- Cited as: "Woo & Thorne 2003".
+- Ledger ids: ERO-222.
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. Table 2, p. 333: "Mackenzie at Arctic Red River", basin area 1 680 000 km², mean runoff 169 mm; sub-basins Northern Mountains 307, Liard 279, Peace 223, Athabasca 159, Great Bear 114, Low Plains 104, Great Slave 103 mm. "Annual precipitation declines notably from west to northeast, ranging from more than 1000 mm in the southwest".
+
+### Fountain2010
+- Reference: Fountain, A. G., Nylen, T. H., Monaghan, A., Basagic, H. J., Bromwich, D. Snow in the McMurdo Dry Valleys, Antarctica. International Journal of Climatology (2010), doi:10.1002/joc.1933 (the journal and DOI from a search listing; the manuscript prints none).
+- DOI or URL: the author manuscript, https://opensky.ucar.edu/system/files/2024-08/articles_18132.pdf
+- Cited as: "Fountain et al., Snow in the McMurdo Dry Valleys".
+- Ledger ids: ERO-222.
+- Access: the author manuscript.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. Abstract: "Annual values ranged from 3 - 50 mm water equivalent with the highest values nearest the coast and decreasing inland". Introduction: "The McMurdo Dry Valleys are a polar desert with annual temperatures averaging -18oC". Study area: "Air temperatures average about –17oC with the winter minimum about -40oC and the summer maximum a few degrees above freezing"; "In Wright Valley, annual values of snowfall have ranged 7 – 11 mm water equivalent ..., most of which is lost to sublimation (Chinn, 1993)". Discussion: "Modeling shows that in the valley bottom sublimation (not shown) far exceeds precipitation".
+
+### Myers2020
+- Reference: Myers, M. E., Doran, P. T., Myers, K. F. Summer valley-floor snowfall in Taylor Valley, Antarctica from 1995 - 2017. The Cryosphere Discussions, tc-2020-203.
+- DOI or URL: 10.5194/tc-2020-203; https://tc.copernicus.org/preprints/tc-2020-203/tc-2020-203.pdf
+- Cited as: "Myers et al. 2020".
+- Ledger ids: none (the Dry Valleys' precipitation, beside Fountain2010).
+- Access: open (preprint).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31: "annual precipitation ranging from 1 to 43 mm w.e. with an annual average precipitation of 8.5 mm w.e."; "Although ablation is dominated by sublimation and evaporation".
+
+### Biskop2016
+- Reference: Biskop, S., Maussion, F., Krause, P., Fink, M. (2016). Differences in the water-balance components of four lakes in the southern-central Tibetan Plateau. Hydrology and Earth System Sciences 20:209-225.
+- DOI or URL: 10.5194/hess-20-209-2016; https://hess.copernicus.org/articles/20/209/2016/hess-20-209-2016.pdf
+- Cited as: "Biskop et al. 2016".
+- Ledger ids: ERO-222.
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. Section 2.1: "The mean annual air temperature (MAAT) lies between 0 and −3 ◦C and the mean annual precipitation ranges between 150 and 500 mm, with 60–80 % of this total occurring between June and September". Table 4, p. 217 (the J2000g model driven by the HAR reanalysis, 2001-2010, land components, mm/yr, precipitation, AET, land runoff): Mapam Yumco 230, 170, 60; Paiku Co 250, 180, 70; Tangra Yumco 300, 210, 90; Nam Co 420, 290, 130. Modelled, not measured.
+
+### Yang2002
+- Reference: Yang, D., Kane, D. L., Hinzman, L. D., Zhang, X., Zhang, T., Ye, H. (2002). Siberian Lena River hydrologic regime and recent change. Journal of Geophysical Research 107(D23):4694.
+- DOI or URL: 10.1029/2002JD002542; https://stephenschneider.stanford.edu/Publications/PDF_Papers/YangEtAl2002.pdf
+- Cited as: "Yang et al. 2002".
+- Ledger ids: none (the Lena's and the Ob's runoff ratios, in the design).
+- Access: an open copy.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. p. 14-2: "The drainage area of the Lena basin is 2,430,000 km2, approximately 78– 93% of which is underlain by permafrost"; p. 14-3: "The runoff ratios (runoff/precipitation) are high (about 0.50) for the Lena basin compared with the Ob river (around 0.30) with only 30% permafrost [Serreze et al., 2002]".
+
+### Rawlins2010
+- Reference: Rawlins, M. A., et al. (2010). Analysis of the Arctic System for Freshwater Cycle Intensification: Observations and Expectations. Journal of Climate 23(21).
+- DOI or URL: https://journals.ametsoc.org/view/journals/clim/23/21/2010jcli3421.1.xml
+- Cited as: "Rawlins et al. 2010".
+- Ledger ids: none (the pan-Arctic budget, in the design).
+- Access: open (HTML; its Table 3 not in it).
+- Library: not kept.
+- Read so far (by the project): the text, 2026-10-31: the Serreze et al. (2006) best-estimate evapotranspiration "approximately 310 mm yr −1"; "Mean P − ET among the GCMs (220 mm yr −1 ) differs from pan-Arctic river discharge (runoff) by <5%, but it is notably higher than the estimate compiled by Serreze et al. (2006) of 180 mm yr −1".
+
+### Strasser2008
+- Reference: Strasser, U., Bernhardt, M., Weber, M., Liston, G. E., Mauser, W. (2008). Is snow sublimation important in the alpine water balance? The Cryosphere 2:53-66.
+- DOI or URL: https://tc.copernicus.org/articles/2/53/2008/tc-2-53-2008.pdf
+- Cited as: "Strasser et al. 2008".
+- Ledger ids: none (sublimation, in the design's gaps).
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. Abstract: "Sublimation from the ground and from most canopy types are spatially relatively homogeneous and sum up to about 100 mm of snow water equivalent (SWE) over the winter period"; "The fraction of these sublimation losses of winter snowfall is between 10 and 90%". Section 3.5: "This fraction amounts to 10 to 20% in large valley areas and on mountain slopes, up to 50% in the denser canopy stands, and up to 90% at the highest mountain crests".
+
+### MacDonald2010
+- Reference: MacDonald, M. K., Pomeroy, J. W., Pietroniro, A. (2010). On the importance of sublimation to an alpine snow mass balance in the Canadian Rocky Mountains. Hydrology and Earth System Sciences 14:1401-1415.
+- DOI or URL: 10.5194/hess-14-1401-2010; https://hess.copernicus.org/articles/14/1401/2010/hess-14-1401-2010.pdf
+- Cited as: "MacDonald et al. 2010".
+- Ledger ids: none (sublimation, in the design's gaps).
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. Abstract: "Snow mass losses to sublimation as a percentage of cumulative snowfall were estimated to be 20–32% with the blowing snow sublimation loss amounting to 17–19% of cumulative snowfall". Introduction (literature values): "Blowing snow sublimation losses of 15 to 41% of annual snowfall have been estimated for the Canadian Prairies (Pomeroy and Gray, 1995), 28% of annual snowfall over western Canadian Arctic tundra (Pomeroy et al., 1997), 18–25% of winter precipitation over the Alaskan arctic (Liston and Sturm, 2002)".
+
+### Killingtveit2003
+- Reference: Killingtveit, Å., Pettersson, L.-E., Sand, K. (2003). Water balance investigations in Svalbard. Polar Research 22(2):161-174.
+- DOI or URL: https://polarresearch.net/index.php/polar/article/download/2106/5357/
+- Cited as: "Killingtveit et al. 2003".
+- Ledger ids: none (glacier-fed catchments, not a test: in the design).
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31. Abstract: areal precipitation "548 mm/year in De Geerdalen, 486 mm/year in Endalen/Isdammen and 890 mm/year in Bayelva"; "the best estimates indicate an average annual evaporation of ca. 80 mm/year from glacier-free areas, and no net evaporation from glaciers"; "Annual runoff ranges from 545 mm in Endalen/Isdammen, 539 mm/year in De Geerdalen up to 1050 mm/year in Bayelva". The runoff includes the glaciers' mass loss.

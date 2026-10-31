@@ -24,6 +24,7 @@ Through the whole history, rivers cut into rising land (the stream power law: er
 | [ERO](ledger/ERO.md) | chemical denudation: the dissolved load of the carbon cycle's silicate weathering | ERO-205 to ERO-207 (3) |
 | [ERO](ledger/ERO.md) | the pelagic rain: dust, the dissolved load back as opal and carbonate, its test, its facies | ERO-208 to ERO-216 (9) |
 | [ERO](ledger/ERO.md) | closed basins: what a lake passes on by its water balance, the internally drained plateau test, the flat high ground split by its water | ERO-217 to ERO-220 (4) |
+| [ERO](ledger/ERO.md) | the stream power's runoff from the bake's water budget (cold lands evaporate in their summer, frozen ground runs off nothing) and its checks against cold basins | ERO-221 to ERO-222 (2) |
 
 Rows by status (2026-10-18, `tools/review/claims_counts.py`): `verified` 10, `cited-unverified` 82, `from-memory` 2, `abstract-only` 4, `calibrated` 8, `game-choice` 11, `uncited` 56.
 
@@ -1329,3 +1330,49 @@ HYD-041), about half Tibet's 650 to 1,300 (Wang et al. 2020) and Titicaca's 1,10
 - **The next lead is frozen ground's runoff.** The surface still runs off all precipitation below 0 °C (ERO-010). The
   bake's budget has not done so since 2026-10-01: rain share HYD-036, degree-day melt HYD-037, biotemperature PET
   HYD-029, HYD-030 and HYD-035.
+
+## Cold lands' runoff (the runoff lane, 2026-10-31)
+
+**What was asked.** The plateau lane's arm found the flat high ground's wear on frozen ground. Over the run, 0.67 of it
+is below 0 °C on the year and it wears at 141 m/Myr. There the surface's runoff is all of the precipitation (PET 60
+mm/°C x the mean temperature, 0 below 0 °C, MOI-067). The bake's water budget stopped doing that on 2026-10-01. The
+question: give the stream power the bake's budget, and test it against cold basins. The measurements and the arm are in
+docs/design/surface-runoff-budget.md; this is the summary.
+
+**What cold lands do.**
+- **Permafrost basins** run off part of their precipitation. The Mackenzie: P 410 mm, ET 237, runoff 169 (MAGS Water
+  and Energy Budget Synthesis, Table 2.1; Woo & Thorne 2003, Table 2). The Lena's runoff ratio is "about 0.50", the
+  Ob's "around 0.30" (Yang et al. 2002, p. 14-3).
+- **A polar desert** loses its snow: in the Dry Valleys 7 to 11 mm of snowfall, "most of which is lost to sublimation"
+  (Fountain et al.).
+- **The Tibetan Plateau's lakes** run off 0.26 to 0.31 of P at a MAAT of 0 to -3 °C (Biskop et al. 2016, Table 4,
+  modelled).
+- **Sublimation** takes 10 to 90 % of winter snowfall in the Alps (Strasser et al. 2008) and 20 to 32 % in the Rockies
+  (MacDonald et al. 2010).
+
+**The law (ERO-221; `surface.runoff_budget`, off).** The stream power's runoff weight (ERO-010) takes each cell's runoff
+from `HydroParams::budget`, the same budget the lakes' balance uses. Precipitation is rain in the thawed share of the
+year (HYD-036) and the snow melts by its degree-days (HYD-037: 4 mm per °C per day, inside Hock 2003's 2.5 to 5.5 for
+snow at non-glaciated sites). PET is Holdridge's 58.93, here 60, x the biotemperature (HYD-029, HYD-030), and Fu's curve
+acts on the liquid water (HYD-034, HYD-035). Without frost it is the old runoff to 1e-12. Ground that never thaws runs
+off nothing, so its weight sits at ERO-011's floor.
+
+**The checks (ERO-222).**
+- **The Mackenzie:** budget runoff 204 mm and ET 206, against 169 and 237 measured: within the 54 mm mean absolute
+  error of Fu's curve (Zhang et al. 2004). The old rule gives 410 and 0.
+- **The Dry Valleys:** nothing runs off when the warmest month stays below freezing. But a warmest month just above
+  0 °C melts all the snow and evaporates little, so 0.29 to 0.87 of P runs off: the budget has no sublimation.
+- **The Tibetan lakes:** the budget evaporates 69 to 141 mm against their modelled 170 to 290. It still runs off 0.46
+  to 0.83 of P, against all of it under the old rule.
+- **Verkhoyansk's biotemperature:** 2.65 °C from the sinusoid, against Holdridge's rough 3.05.
+- **The cold controlled plateau:** the interior wears 88.0 against 118.0 m/Myr; never thawing, 3.8.
+
+**Left as it is.**
+- Sublimation of the cold season's snow (its shares vary 10 to 90 % with no law read).
+- The plateau's higher evaporation (Holdridge's PET has no radiation term).
+- Land ice (HYD-038).
+- Holdridge's 30 °C cut (HYD-030).
+- The aridity index and the facies (they keep the snapshot's PET).
+- K and ERO-011's floor.
+
+Measured on the pool: not yet (the design's "The arm").
