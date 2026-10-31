@@ -15,6 +15,13 @@ reversal's new onset, with its pair of plates' boundary the step before) and the
   younger plate's age and origin and the plates' relation (rec.json's plate lives);
   and the subducting fronts' mean length at any time, km, by their contact's onset (ocean-ocean and ocean-continent
   now), the median of the runs.
+
+With the resampling trace's records (`resamples`, the onsets' `since_resample_myr`, `prov` and outcome) it also prints
+the resamplings (how many, their spacing, the share of new samples by how the resampling made them: a gap of the gap
+fill, PLT-502; a one-way slab gap, PLT-542; an orphan pocket; contested by two footprints; given another plate than the
+old sample nearest it), and the onsets by time since the last resampling: how many, how their first front samples were
+made (both sides), how many passed incipient and when, their slab's longest, and the front they made over the run
+(ocean-ocean and ocean-continent km x Myr, as a mean length over the run).
 """
 import json
 import statistics
@@ -48,7 +55,7 @@ def share_table(title, rows, key, order):
 
 
 def main(argv):
-    onsets, length_myr, fronts = [], 0.0, {}
+    onsets, length_myr, fronts, resamples = [], 0.0, {}, []
     runs = 0
     for folder in argv:
         for r in runs_of(folder):
@@ -59,6 +66,7 @@ def main(argv):
             runs += 1
             length_myr += float(steps[-1]["t"]) - float(rec.get("t0_myr", steps[0]["t"]))
             lives = {int(x["id"]): x for x in rec.get("plates") or []}
+            resamples.append(rec.get("resamples") or [])
             for o in rec.get("onsets") or []:
                 lu, lo = lives.get(o["under"], {}), lives.get(o["over"], {})
                 o["lives"] = (lu, lo)
@@ -134,6 +142,8 @@ def main(argv):
                         ["rift", "fission", "back_arc", "subduction_initiation", "margin_propagation", "initial",
                          "other"])
             share_table("    the plates' relation", sub, lambda o: o.get("relation", "?"), ["parent", "siblings", "other"])
+    if any(resamples):
+        resampling_report(onsets, resamples, length_myr)
     print("# the subducting fronts by their contact's onset, mean km at any time, median of the runs")
     for key, names in (("onset_kind", KINDS), ("onset_route", ROUTES), ("onset_buoyant", BUOYANT)):
         for setting in ("oo", "oc"):
@@ -141,6 +151,49 @@ def main(argv):
             tot = max(sum(vals), 1e-9)
             print(f"  {key:13s} {setting}: " + "  ".join(f"{n} {v:6.0f} ({v / tot:.3f})" for n, v in zip(names, vals)))
     return 0
+
+
+PROV = ["gap", "slab gap", "orphan", "contested", "moved"]
+
+
+def resampling_report(onsets, resamples, length_myr):
+    n_res = sum(len(r) for r in resamples)
+    gaps = [b["t"] - a["t"] for r in resamples for a, b in zip(r, r[1:])]
+    tot = [0] * len(PROV)
+    samples = 0
+    for r in resamples:
+        for x in r:
+            samples += x["samples"]
+            for i, c in enumerate(x["bits"]):
+                tot[i] += c
+    print(f"# resamplings: {n_res} over {len(resamples)} runs, spacing median {statistics.median(gaps) if gaps else 0:.0f}"
+          f" Myr; new samples by how they were made: " + "  ".join(f"{n} {c / max(samples, 1):.4f}" for n, c in
+                                                                   zip(PROV, tot)))
+    traced = [o for o in onsets if "since_resample_myr" in o and o.get("prov")]
+    if not traced:
+        return
+    bands = [("first step after", lambda x: 0 <= x <= 2.001), ("2-10 Myr after", lambda x: 2.001 < x <= 10),
+             ("over 10 Myr after", lambda x: x > 10), ("before any", lambda x: x < 0)]
+    for setting in (0, 1):
+        print(f"# onsets {SETTINGS[setting]} at the onset, by time since the last resampling (all routes)")
+        for name, test in bands:
+            sub = [o for o in traced if o["setting"] == setting and test(o["since_resample_myr"])]
+            if not sub:
+                continue
+            n = sum(o["prov"]["n"] for o in sub)
+            over = [sum(o["prov"]["over_bits"][i] for o in sub) / max(n, 1) for i in range(len(PROV))]
+            under = [sum(o["prov"]["under_bits"][i] for o in sub) / max(n, 1) for i in range(len(PROV))]
+            hidden = sum(o["prov"]["under_hidden"] for o in sub) / max(n, 1)
+            passed = [o for o in sub if o["subducting_after_myr"] >= 0]
+            km = [sum(o["front_km_myr"][k] for o in sub) / max(length_myr, 1e-9) for k in (0, 1)]
+            print(f"  {name:18s} {len(sub):4d} onsets ({len(sub) / len(traced):.3f}); passed incipient"
+                  f" {len(passed) / len(sub):.3f}, after median"
+                  f" {statistics.median([o['subducting_after_myr'] for o in passed]) if passed else -1:.0f} Myr;"
+                  f" longest slab median {statistics.median([o['max_slab_km'] for o in sub]):.0f} km;"
+                  f" front made, mean km over the run: oo {km[0]:.0f}, oc {km[1]:.0f}")
+            print("    front samples' provenance, overriding side: " + "  ".join(
+                f"{p} {v:.3f}" for p, v in zip(PROV, over)) + f"; subducting side: " + "  ".join(
+                f"{p} {v:.3f}" for p, v in zip(PROV, under)) + f" (gone under {hidden:.3f})")
 
 
 def young_age(o):

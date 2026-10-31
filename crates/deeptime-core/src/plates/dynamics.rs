@@ -184,6 +184,54 @@ pub struct Dynamics {
     /// … and the active contacts after the last step (under, over), to tell a reversal.
     #[serde(default)]
     pub prev_contacts: Vec<(u32, u32)>,
+    /// Measurement only (the resampling trace, 2026-10-31): each resampling ([`ResampleRec`]) …
+    #[serde(default)]
+    pub resamples: Vec<ResampleRec>,
+    /// … and how the last one made each sample ([`PROV_GAP`] and the other bits; set by
+    /// `ridges::resample`, one per sample, valid while the lattice stands). Saved with the state
+    /// so a resumed run is the same run; emptied at the run's last step, so the record keeps none.
+    #[serde(default)]
+    pub prov: Vec<u8>,
+}
+
+/// Measurement only (the resampling trace, 2026-10-31): how a resampling made each new sample
+/// ([`Dynamics::prov`], bits): in no group's footprint, new sea floor of the gap fill (PLT-502) …
+pub const PROV_GAP: u8 = 1;
+/// … covered only by held crust, new sea floor (PLT-542's one-way gap) …
+pub const PROV_SLAB_GAP: u8 = 2;
+/// … a gap pocket the gap fill does not reach, given the nearest old sample's plate …
+pub const PROV_ORPHAN: u8 = 4;
+/// … in more than one group's footprint (the top one took it) …
+pub const PROV_CONTESTED: u8 = 8;
+/// … given another plate than the old sample nearest it.
+pub const PROV_MOVED: u8 = 16;
+/// The number of [`Dynamics::prov`]'s bits.
+pub const PROV_BITS: usize = 5;
+
+/// Measurement only (the resampling trace): one resampling, at the end of the step that ends at
+/// `t` (Myr): the new samples and how many of them carry each of [`Dynamics::prov`]'s bits, in
+/// their order ([`PROV_GAP`], [`PROV_SLAB_GAP`], [`PROV_ORPHAN`], [`PROV_CONTESTED`],
+/// [`PROV_MOVED`]).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct ResampleRec {
+    pub t: f64,
+    pub step: u64,
+    pub samples: u32,
+    pub bits: [u32; PROV_BITS],
+}
+
+/// Measurement only (the resampling trace): one new contact's front samples in its first step
+/// ([`Mix::onset_prov`]): how many, and how many of them carry each of [`Dynamics::prov`]'s bits on
+/// the overriding side (the front sample) and on the subducting side (its lattice neighbour
+/// across the front, which may have gone under: `under_hidden`).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct OnsetProv {
+    pub under: u32,
+    pub over: u32,
+    pub n: u32,
+    pub over_bits: [u32; PROV_BITS],
+    pub under_bits: [u32; PROV_BITS],
+    pub under_hidden: u32,
 }
 
 /// One step's state of the planet and its plates.
@@ -1168,6 +1216,25 @@ pub struct OnsetRec {
     pub since_spread_myr: f64,
     pub slab_age_myr: f64,
     pub convergence_mm_yr: f64,
+    /// The resampling trace (2026-10-31): Myr since the last resampling's step ended (-1 with
+    /// none), the contact's front samples in its first step and their [`Dynamics::prov`] bits
+    /// ([`OnsetProv`]) …
+    #[serde(default)]
+    pub since_resample_myr: f64,
+    #[serde(default)]
+    pub prov: OnsetProv,
+    /// … and what became of it, with a split's copies: Myr from the onset to its first front past
+    /// incipient (-1 never), its slab's longest (the cumulative oceanic convergence, FRC-020), km,
+    /// its subducting front over the run by setting now (ocean-ocean, ocean-continent), km × Myr,
+    /// and the last step it was active, Myr.
+    #[serde(default)]
+    pub subducting_after_myr: f64,
+    #[serde(default)]
+    pub max_slab_km: f64,
+    #[serde(default)]
+    pub front_km_myr: [f64; 2],
+    #[serde(default)]
+    pub last_myr: f64,
 }
 
 impl OnsetRec {
@@ -1257,6 +1324,8 @@ pub struct Mix {
     pub pairs: Vec<PairFront>,
     /// Each pair of plates' common boundary, ordered by (lo, hi) (the onset trace).
     pub pair_bounds: Vec<PairBound>,
+    /// The contacts begun this step, their front samples' provenance (the resampling trace).
+    pub onset_prov: Vec<OnsetProv>,
 }
 
 /// One front sample of [`boundary_mix`], kept for the cross-tabs that need the whole step
@@ -1283,6 +1352,10 @@ struct FrontRec {
     over_floor_age: f64,
     /// The contact's onset (kind, route, buoyancy; FrontBands::onset_*).
     onset: [u8; 3],
+    /// The resampling trace: the subducting side's lattice neighbour, and whether the contact
+    /// began this step.
+    u: u32,
+    new: bool,
 }
 
 /// An active contact's measures for [`boundary_mix`]'s bands (measurement only): its slab, km,
@@ -1294,6 +1367,7 @@ struct ContactMeas {
     arc_age: f64,
     onset_slab_age: f64,
     onset: [u8; 3],
+    new: bool,
 }
 
 /// One pair of plates' boundary samples in a step, as integers so the sums do not depend on the
@@ -1449,6 +1523,7 @@ pub fn boundary_mix(
                     .get(&(c.onset_step, c.onset_slab_age_myr.to_bits()))
                     .copied()
                     .unwrap_or([ONSET_KINDS.len() as u8, 3, 4]),
+                new: c.onset_step == env.step,
             };
             (key, meas)
         })
@@ -1528,6 +1603,7 @@ pub fn boundary_mix(
                 side: Side::None,
             }; 16];
             let mut plate_buf = [0u32; 16];
+            let mut idx_buf = [0u32; 16];
             let mut n = 0;
             // The boundary's normal towards each plate met, found once per plate.
             let mut normals: [(u32, DVec3); 4] = [(u32::MAX, DVec3::ZERO); 4];
@@ -1578,6 +1654,7 @@ pub fn boundary_mix(
                     },
                 };
                 plate_buf[n] = pu;
+                idx_buf[n] = u;
                 n += 1;
             }
             if let Some((class, half)) = classify_boundary(sv.kind, &buf[..n]) {
@@ -1651,6 +1728,8 @@ pub fn boundary_mix(
                         onset_slab_age: meas.map_or(f64::NAN, |m| m.onset_slab_age),
                         over_floor_age: sv.age_myr(env.t_myr),
                         onset: meas.map_or([ONSET_KINDS.len() as u8, 3, 4], |m| m.onset),
+                        u: idx_buf[f],
+                        new: meas.is_some_and(|m| m.new),
                     });
                     if young {
                         acc.incipient[k] += u64::from(half);
@@ -1686,6 +1765,30 @@ pub fn boundary_mix(
         })
         .reduce(MixUnits::default, MixUnits::add);
     let mut recs = units.recs;
+    // The resampling trace: the contacts begun this step, their front samples' provenance.
+    let prov: &[u8] = st
+        .dynamics
+        .as_ref()
+        .map(|d| d.prov.as_slice())
+        .filter(|p| p.len() == samples.len())
+        .unwrap_or(&[]);
+    let mut onset_prov: BTreeMap<(u32, u32), OnsetProv> = BTreeMap::new();
+    for r in recs.iter().filter(|r| r.new) {
+        let e = onset_prov.entry((r.under, r.over)).or_insert(OnsetProv {
+            under: r.under,
+            over: r.over,
+            ..OnsetProv::default()
+        });
+        e.n += 1;
+        e.under_hidden += u32::from(samples[r.u as usize].is_hidden());
+        if prov.is_empty() {
+            continue;
+        }
+        for b in 0..PROV_BITS {
+            e.over_bits[b] += u32::from(prov[r.v as usize] & (1 << b) != 0);
+            e.under_bits[b] += u32::from(prov[r.u as usize] & (1 << b) != 0);
+        }
+    }
     let km = |u: u64| (u as f64 * 0.5 * spacing_km).round();
     let bands = |b: [[u64; BANDS]; 2]| b.map(|row| row.map(km));
     // The cross-tabs over the whole step's front samples (PLT-683), in sample order so the
@@ -1790,6 +1893,7 @@ pub fn boundary_mix(
         km: units.km.map(km),
         pairs,
         pair_bounds,
+        onset_prov: onset_prov.into_values().collect(),
         bands: FrontBands {
             slab: bands(units.slab),
             normal: bands(units.normal),
@@ -1941,8 +2045,18 @@ struct Tally {
 /// Measurement only (the onset trace, 2026-10-31): records each contact whose onset is this step
 /// ([`OnsetRec`]) with its pair's boundary the step before, then updates the pairs' history and
 /// keeps this step's boundaries and contacts for the next.
-fn record_onsets(d: &mut Dynamics, st: &PlateState, env: &Env<'_>, bounds: &[PairBound]) {
+fn record_onsets(
+    d: &mut Dynamics,
+    st: &PlateState,
+    env: &Env<'_>,
+    bounds: &[PairBound],
+    fronts: &[PairFront],
+    prov: &[OnsetProv],
+) {
     let t = env.t_myr;
+    let since_resample = d.resamples.last().map_or(-1.0, |r| t - r.t);
+    let prov_of: BTreeMap<(u32, u32), &OnsetProv> =
+        prov.iter().map(|p| ((p.under, p.over), p)).collect();
     let lives: BTreeMap<u32, (Option<u32>, &str)> = d
         .plates
         .iter()
@@ -1989,9 +2103,56 @@ fn record_onsets(d: &mut Dynamics, st: &PlateState, env: &Env<'_>, bounds: &[Pai
             slab_age_myr: c.onset_slab_age_myr,
             convergence_mm_yr: c.onset_convergence_mm_yr,
             before,
+            since_resample_myr: since_resample,
+            prov: prov_of
+                .get(&(c.under, c.over))
+                .map(|p| (*p).clone())
+                .unwrap_or_default(),
+            subducting_after_myr: -1.0,
+            max_slab_km: 0.0,
+            front_km_myr: [0.0; 2],
+            last_myr: t,
         });
     }
     d.onsets.extend(new);
+    // What became of each onset's contact and a split's copies of it (by its onset step and slab
+    // age, which the copies keep), this step.
+    let mut by_onset: BTreeMap<(u64, u64), Vec<usize>> = BTreeMap::new();
+    for (i, o) in d.onsets.iter().enumerate() {
+        by_onset
+            .entry((o.step, o.slab_age_myr.to_bits()))
+            .or_default()
+            .push(i);
+    }
+    let slab_of: BTreeMap<(u32, u32), f64> =
+        st.slabs.iter().map(|s| ((s.under, s.over), s.km)).collect();
+    let spacing_km = env.norm.km(env.norm.spacing_rad());
+    let mut contact_onset: BTreeMap<(u32, u32), usize> = BTreeMap::new();
+    for c in st.contacts.iter().filter(|c| c.active(env.step)) {
+        let Some(list) = by_onset.get(&(c.onset_step, c.onset_slab_age_myr.to_bits())) else {
+            continue;
+        };
+        let i = list
+            .iter()
+            .copied()
+            .find(|&i| d.onsets[i].under == c.under || d.onsets[i].over == c.over)
+            .unwrap_or(list[0]);
+        contact_onset.insert((c.under, c.over), i);
+        let o = &mut d.onsets[i];
+        o.last_myr = t;
+        let km = slab_of.get(&(c.under, c.over)).copied().unwrap_or(0.0);
+        o.max_slab_km = o.max_slab_km.max(km);
+    }
+    for f in fronts.iter().filter(|f| f.subducting) {
+        if let Some(&i) = contact_onset.get(&(f.under, f.over)) {
+            let o = &mut d.onsets[i];
+            o.front_km_myr[usize::from(f.setting.min(1))] +=
+                f.units as f64 * 0.5 * spacing_km * env.dt_myr;
+            if o.subducting_after_myr < 0.0 {
+                o.subducting_after_myr = t - o.t;
+            }
+        }
+    }
     let mut next: BTreeMap<(u32, u32), PairHist> =
         d.pair_hist.drain(..).map(|h| ((h.lo, h.hi), h)).collect();
     let now: BTreeSet<(u32, u32)> = bounds.iter().map(|b| (b.lo, b.hi)).collect();
@@ -2307,7 +2468,17 @@ pub fn record_step(
         front_bands.gain_slab = gain_slab.map(|r| r.map(units_km));
     }
     d.prev_pair_front = now;
-    record_onsets(&mut d, st, env, &seen.mix.pair_bounds);
+    record_onsets(
+        &mut d,
+        st,
+        env,
+        &seen.mix.pair_bounds,
+        &seen.mix.pairs,
+        &seen.mix.onset_prov,
+    );
+    if last {
+        d.prov.clear();
+    }
     d.steps.push(StepRec {
         t,
         visible,

@@ -1082,6 +1082,46 @@ pub fn resample(
         samples[i] = s;
         plate_new[i] = p1;
     }
+    // Measurement only (the resampling trace, 2026-10-31): how each new sample was made, and the
+    // resampling's counts, in the dynamics record.
+    if state.dynamics.is_some() {
+        let mut prov: Vec<u8> = found
+            .iter()
+            .map(|(top, rest)| match top {
+                None if rest.is_empty() => super::dynamics::PROV_GAP,
+                None => super::dynamics::PROV_SLAB_GAP,
+                Some(_) if !rest.is_empty() => super::dynamics::PROV_CONTESTED,
+                Some(_) => 0,
+            })
+            .collect();
+        for &i in &orphans {
+            prov[i] |= super::dynamics::PROV_ORPHAN;
+        }
+        // The plate the new sample took, against the old sample nearest it (orphans take
+        // theirs below, and the same test).
+        for (i, x) in prov.iter_mut().enumerate() {
+            let (j, _) = tree.nearest(new_pts[i]).unwrap_or((0, 0.0));
+            let near = group_plate[src[j as usize].group as usize];
+            if plate_new[i] != u32::MAX && plate_new[i] != near {
+                *x |= super::dynamics::PROV_MOVED;
+            }
+        }
+        let mut bits = [0u32; super::dynamics::PROV_BITS];
+        for &x in &prov {
+            for (b, c) in bits.iter_mut().enumerate() {
+                *c += u32::from(x & (1 << b) != 0);
+            }
+        }
+        if let Some(d) = state.dynamics.as_mut() {
+            d.resamples.push(super::dynamics::ResampleRec {
+                t,
+                step: env.step,
+                samples: n as u32,
+                bits,
+            });
+            d.prov = prov;
+        }
+    }
     for i in orphans {
         // Unreachable gap pockets: the nearest old sample's plate.
         let (j, _) = tree.nearest(new_pts[i]).unwrap_or((0, 0.0));
