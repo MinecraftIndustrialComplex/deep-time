@@ -191,6 +191,38 @@ pub const KEYFRAME_LAYERS: [&str; 7] = [
     field::ICE,
 ];
 
+/// World globals of the trench-input diagnosis (measurement only, 2026-10-31; km³ over the run
+/// in the surface's block metric, as [`Totals`], so read as shares, and km² × Myr): the river
+/// loads reaching the sea at cells of
+/// the subduction zone (ARC, BACK_ARC, TRENCH), of a collision, and elsewhere; of each, the mouth
+/// fill landing on TRENCH cells (the incoming floor at its front); the slope failure's and the
+/// diffusion's net change on the TRENCH cells; the TRENCH cells' whole net change over the steps
+/// (the flexure's answer to the load in it, so not a sediment volume); the TRENCH cells' area ×
+/// time; the land's gross erosion (`Parts::eroded` on the cells above the sea at the step's start)
+/// by where it happened: the subduction zone's regimes on continental crust (continental and
+/// matured arcs, forearc highs) and on oceanic crust (island arcs), the rest of the oceanic crust
+/// (ocean islands, emergent ridges), collisions, and the rest of the continental crust; and the
+/// pelagic rain (opal, chalk, carbonate and dust) laid in all and on the TRENCH cells.
+pub const TRENCH_DIAG_GLOBALS: [&str; 17] = [
+    "surface/trench_diag/load_subduction_km3",
+    "surface/trench_diag/load_collision_km3",
+    "surface/trench_diag/load_other_km3",
+    "surface/trench_diag/fill_on_trench_subduction_km3",
+    "surface/trench_diag/fill_on_trench_collision_km3",
+    "surface/trench_diag/fill_on_trench_other_km3",
+    "surface/trench_diag/failure_to_trench_km3",
+    "surface/trench_diag/diffusion_to_trench_km3",
+    "surface/trench_diag/net_on_trench_km3",
+    "surface/trench_diag/trench_area_km2_myr",
+    "surface/trench_diag/eroded_arc_continental_km3",
+    "surface/trench_diag/eroded_arc_oceanic_km3",
+    "surface/trench_diag/eroded_other_oceanic_km3",
+    "surface/trench_diag/eroded_collision_km3",
+    "surface/trench_diag/eroded_other_continental_km3",
+    "surface/trench_diag/rain_km3",
+    "surface/trench_diag/rain_on_trench_km3",
+];
+
 /// Cumulative volumes of the run, km³ (block metric: cell area (r·300 m)²).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Totals {
@@ -1430,6 +1462,26 @@ impl SurfaceStage {
             max_cells: 200_000,
         };
         let mut to_sea = 0.0;
+        // Measurement only (the trench-input diagnosis, 2026-10-31; no rule reads it): the river
+        // loads by the regime of the sea cell they reach (the subduction zone's ARC, BACK_ARC and
+        // TRENCH; COLLISION; the rest), the part of each mouth fill that lands on TRENCH cells (the
+        // incoming floor at its front), and the slope failure's and the diffusion's net change on
+        // the TRENCH cells.
+        let is_trench: Vec<bool> = (0..n)
+            .map(|c| pf.regime.get(c).is_some_and(|&r| r as u8 == regime::TRENCH))
+            .collect();
+        let trench_cells: Vec<usize> = (0..n).filter(|&c| is_trench[c]).collect();
+        let mouth_class = |c: usize| -> usize {
+            match pf.regime.get(c).map(|&r| r as u8) {
+                Some(regime::ARC | regime::BACK_ARC | regime::TRENCH) => 0,
+                Some(regime::COLLISION) => 1,
+                _ => 2,
+            }
+        };
+        let trench_sum = |h: &[f64]| trench_cells.iter().map(|&c| h[c]).sum::<f64>();
+        let tr_start = trench_sum(&sc.h);
+        let (mut tr_load, mut tr_fill) = ([0.0f64; 3], [0.0f64; 3]);
+        let (mut tr_failure, mut tr_diffusion) = (0.0f64, 0.0f64);
         let mut iterations = 0u64;
         let mut cg_iterations = 0u64;
         let mut sinks = sinks0;
@@ -1664,9 +1716,13 @@ impl SurfaceStage {
                 .into_par_iter()
                 .filter(|&m| kind[m] == BASE && qin[m] > 0.0)
                 .collect();
+            // (measurement: the heights before the fills, kept in step with each fill's cells)
+            let mut h_fill = crate::alloc::copied(&sc.h);
             for m in mouths {
                 let vol = sc.qin[m] * dts;
                 to_sea += vol;
+                let class = mouth_class(m);
+                tr_load[class] += vol;
                 marine::fill(
                     &d,
                     &sea_mask,
@@ -1677,6 +1733,13 @@ impl SurfaceStage {
                     &mut parts.marine,
                     &mut sc.fill,
                 );
+                for &c in &sc.fill.touched {
+                    let c = c as usize;
+                    if is_trench[c] {
+                        tr_fill[class] += sc.h[c] - h_fill[c];
+                    }
+                    h_fill[c] = sc.h[c];
+                }
                 if sub + 1 == subs
                     && let Some(code) = sc.mix.get(m).and_then(dominant)
                 {
@@ -1903,6 +1966,7 @@ impl SurfaceStage {
                 nm.diffusion_solver,
                 nm.diffusion_tol_m,
             ) as u64;
+            tr_diffusion += trench_sum(&sc.h) - trench_sum(&before);
             // The solved heights: the diffusion's exchanges follow from them.
             let solved = crate::alloc::copied(&sc.h);
             // The solve's own share of "diffusion" (P1-17's breakdown).
@@ -1915,8 +1979,10 @@ impl SurfaceStage {
                     .into_par_iter()
                     .map(|c| (avail0[c] + h[c] - h_step0[c]).max(0.0))
                     .collect();
+                let before_tr = trench_sum(&sc.h);
                 failed_m_cells +=
                     marine::slope_failure(&d, &sea_mask, sea, fp, &mut sc.h, &mut avail);
+                tr_failure += trench_sum(&sc.h) - before_tr;
             }
             self.time("slope_failure", failing);
             {
@@ -2060,6 +2126,8 @@ impl SurfaceStage {
         parts.dust = crate::alloc::filled(n, 0.0);
         // The dissolved load's total, in order: the rain's supply and the denudation (4b) read it.
         let dissolved_m3 = dissolved.as_ref().map_or(0.0, |dz| dz.iter().sum::<f64>());
+        // (measurement: the rain laid on the TRENCH cells, the heights' change there)
+        let before_rain_tr = trench_sum(&sc.h);
         let (rain_laid, rain_supply_m3) = {
             let (kind, ccd) = (&sc.kind, crate::structure::columns::CCD_M);
             // Each sea cell's water depth now (0 elsewhere): the floor, and the room it has.
@@ -2114,6 +2182,7 @@ impl SurfaceStage {
             }
             (laid, supply.volume_m3())
         };
+        let tr_rain = trench_sum(&sc.h) - before_rain_tr;
         self.time("pelagic", started);
 
         // 4. Strata log, regolith and weathering.
@@ -2573,6 +2642,48 @@ impl SurfaceStage {
         t.photic_warm_clear_km2_myr += photic[2] * km2_myr;
         t.evaporite_km3 += evap * km3;
         t.to_sea_km3 += to_sea / 1.0e9;
+        // The trench-input diagnosis (measurement only; above). The land's gross erosion by where
+        // it happened, in cell order.
+        let mut src = [0.0f64; 5];
+        for (c, &z0) in h_start.iter().enumerate() {
+            let e = f64::from(parts.eroded[c]);
+            if z0 <= sea || e <= 0.0 {
+                continue;
+            }
+            let cont = pf.crust_type[c] as u8 != OCEANIC;
+            let k = match (pf.regime[c] as u8, cont) {
+                (regime::ARC | regime::BACK_ARC | regime::TRENCH, true) => 0,
+                (regime::ARC | regime::BACK_ARC | regime::TRENCH, false) => 1,
+                (_, false) => 2,
+                (regime::COLLISION, true) => 3,
+                _ => 4,
+            };
+            src[k] += e;
+        }
+        for (name, v) in [
+            (TRENCH_DIAG_GLOBALS[0], tr_load[0] / 1.0e9),
+            (TRENCH_DIAG_GLOBALS[1], tr_load[1] / 1.0e9),
+            (TRENCH_DIAG_GLOBALS[2], tr_load[2] / 1.0e9),
+            (TRENCH_DIAG_GLOBALS[3], tr_fill[0] * km3),
+            (TRENCH_DIAG_GLOBALS[4], tr_fill[1] * km3),
+            (TRENCH_DIAG_GLOBALS[5], tr_fill[2] * km3),
+            (TRENCH_DIAG_GLOBALS[6], tr_failure * km3),
+            (TRENCH_DIAG_GLOBALS[7], tr_diffusion * km3),
+            (TRENCH_DIAG_GLOBALS[8], (trench_sum(&sc.h) - tr_start) * km3),
+            (
+                TRENCH_DIAG_GLOBALS[9],
+                trench_cells.len() as f64 * a / 1.0e6 * dt_myr,
+            ),
+            (TRENCH_DIAG_GLOBALS[10], src[0] * km3),
+            (TRENCH_DIAG_GLOBALS[11], src[1] * km3),
+            (TRENCH_DIAG_GLOBALS[12], src[2] * km3),
+            (TRENCH_DIAG_GLOBALS[13], src[3] * km3),
+            (TRENCH_DIAG_GLOBALS[14], src[4] * km3),
+            (TRENCH_DIAG_GLOBALS[15], rain_laid.total() * km3),
+            (TRENCH_DIAG_GLOBALS[16], tr_rain * km3),
+        ] {
+            *world.globals.entry(name.to_owned()).or_insert(0.0) += v;
+        }
         t.weathered_km3 += weathered * km3;
         t.dissolved_km3 += dissolved_m * km3;
         t.isostasy_km3 += iso * km3;

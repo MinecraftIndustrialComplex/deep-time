@@ -30,6 +30,13 @@ const CONTINENTAL_CEILING_M: f64 = 1500.0;
 /// World global: basalt the hotspots and their plume heads added to the pools over the run, km³
 /// (Earth-normalized; the volcano stage's cones over them are counted inside, plate task 8).
 pub const MAGMA_GLOBAL: &str = "plates/hotspot_magma_km3";
+/// World globals (measurement, the crust budget's additions at hotspots against Stern & Scholl
+/// 2010's Table 1; ledger: PLT-761): of [`MAGMA_GLOBAL`], the basalt added to continental crust,
+/// km³; the volcano stage's cones a hotspot counted inside its rate (its shields and silicic
+/// centres, PLT-286), km³, and of them those on continental crust.
+pub const MAGMA_CONTINENTAL_GLOBAL: &str = "plates/hotspot_magma_continental_km3";
+pub const CONES_GLOBAL: &str = "plates/hotspot_cones_km3";
+pub const CONES_CONTINENTAL_GLOBAL: &str = "plates/hotspot_cones_continental_km3";
 
 fn kernel(d: f64, r: f64) -> f64 {
     if d >= r {
@@ -53,6 +60,8 @@ pub fn step(
     let norm = env.norm;
     let t = env.t_myr;
     let mut magma_m = 0.0;
+    // Measurement (ledger: PLT-761): the basalt on continental crust, the cones counted inside.
+    let (mut magma_continental_m, mut cones_m, mut cones_continental_m) = (0.0, 0.0, 0.0);
     // Births.
     let mut expected = k.hotspot_births_per_100myr * env.dt_myr / 100.0;
     while expected > 0.0 {
@@ -122,9 +131,13 @@ pub fn step(
         for &(i, _, _) in &lifts {
             if let Some(c) = cones.get_mut(i) {
                 built += c[0] + c[1];
+                if state.samples[i].kind == CONTINENTAL {
+                    cones_continental_m += c[0] + c[1];
+                }
                 *c = [0.0; 2];
             }
         }
+        cones_m += built;
         let q = if rock > 0.0 {
             (rock - built).max(0.0) / rock
         } else {
@@ -136,6 +149,9 @@ pub fn step(
             s.pools[pool::MAFIC_VOLCANIC] += (dz * 3.0 * q) as f32;
             s.thickness_m = s.pools.iter().sum();
             magma_m += dz * 3.0 * q;
+            if s.kind == CONTINENTAL {
+                magma_continental_m += dz * 3.0 * q;
+            }
             if w > 0.2 {
                 s.flags |= HOTSPOT;
             }
@@ -152,6 +168,13 @@ pub fn step(
     }
     *world.globals.entry(MAGMA_GLOBAL.to_owned()).or_insert(0.0) +=
         magma_m * norm.sample_area_km2() / 1000.0;
+    for (name, m) in [
+        (MAGMA_CONTINENTAL_GLOBAL, magma_continental_m),
+        (CONES_GLOBAL, cones_m),
+        (CONES_CONTINENTAL_GLOBAL, cones_continental_m),
+    ] {
+        *world.globals.entry(name.to_owned()).or_insert(0.0) += m * norm.sample_area_km2() / 1000.0;
+    }
     Ok(())
 }
 
@@ -168,6 +191,7 @@ fn erupt(
     let norm = env.norm;
     let r = norm.rad(k.lip_radius_km);
     let mut volume_m3_model = 0.0;
+    let mut continental_m3_model = 0.0;
     let mut count = 0usize;
     for (i, _) in tree.within(at, r) {
         let s = &mut state.samples[i as usize];
@@ -180,6 +204,9 @@ fn erupt(
         s.thickness_m = s.pools.iter().sum();
         s.elevation_m = (f64::from(s.elevation_m) + pile / 3.0).min(k.max_elevation_m) as f32;
         volume_m3_model += pile * norm.sample_area_km2() * 1.0e6;
+        if s.kind == CONTINENTAL {
+            continental_m3_model += pile * norm.sample_area_km2() * 1.0e6;
+        }
         count += 1;
     }
     let plate = tree.nearest(at).map(|(j, _)| state.plate_of(j as usize));
@@ -187,6 +214,11 @@ fn erupt(
     let f = norm.planet_km / norm.model_km;
     let volume_km3 = volume_m3_model * f * f / 1.0e9;
     *world.globals.entry(MAGMA_GLOBAL.to_owned()).or_insert(0.0) += volume_m3_model / 1.0e9;
+    // ledger: PLT-761 (measurement)
+    *world
+        .globals
+        .entry(MAGMA_CONTINENTAL_GLOBAL.to_owned())
+        .or_insert(0.0) += continental_m3_model / 1.0e9;
     let mut e = events::event(world, env.t_myr, LARGE_IGNEOUS_PROVINCE, at)
         .magnitude((k.lip_thickness_m / 1000.0) as f32)
         .param("area_km2", area_km2)
