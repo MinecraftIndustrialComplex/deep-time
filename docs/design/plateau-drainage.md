@@ -267,7 +267,10 @@ and back, and, in `surface::young`, the young step's routing and solve on a clos
 `surface::plateau_check::an_arid_plateau_behind_its_rim_keeps_its_rock` (the table above; since the review it also
 checks the first step's lakes: the arid interior's 871-cell lake passes nothing, the humid one 0.69). Gate on the branch (VM,
 `tools/review/plateau/gate.sh full`, on c4fd3e38): fmt and clippy (workspace, all targets) clean, deeptime-core 1,150
-passed and 12 ignored, its integration tests passed.
+passed and 12 ignored, its integration tests passed. At the second review (2026-10-31, on the merge with master 47eab448
+and its fixes, code at e6b52023): `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`
+and `cargo test --workspace --no-fail-fast` on the VM, all clean: deeptime-core 1,174 passed and 12 ignored, the
+workspace 1,458 passed, 0 failed, 13 ignored.
 
 **The arm (one cumulative 8-run arm; to be queued by the coordinator).** On base35-s4 (the next 24-run base, after
 `collision-orogen-on` lands, so with the two orogen switches on by default): merge `origin/master` into this branch,

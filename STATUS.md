@@ -241,8 +241,23 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
   - K is intact (all land 38.3 against 38.1 m/Myr). The flat high ground still wears at 124 m/Myr, frozen 0.62 of it.
   - plat-cb0's larger guard worst and rounder belts are the plates' changes, not the law's (small-terrane gives the
     same).
-  - Not in these numbers: the young step (the pool stops before it); a young-step test holding a closed basin is a
-    follow-up. Also `tools/review/plateau/words.py` (the summaries' words per run).
+  - Not in these numbers: the young step (the pool stops before it); it has a test holding a closed basin since the
+    second review (next bullet). Also `tools/review/plateau/words.py` (the summaries' words per run).
+- **The second review's fixes** (a re-review of d19ada78; branch `plateau-drainage-on`, merged with master 47eab448;
+  docs/design/plateau-drainage.md "The second review").
+  - A downstream lake in a chain could still dam its own spill: `closed::open_until_stable` opens, accumulates again
+    and solves again until no lake opens (at most the number of lakes), in the surface, the young stage and the plateau
+    test. The chain test sets the lower basin's room between its supplies (2.561e9 and 2.700e9 m3): one round leaves it
+    closed and its spill rises 69.3 m; the loop opens both and the spill falls 236 m.
+  - The arm's lake counts: the drop in part-passing lakes (6.3e4 to 1.7e4) is about the 4.8e4 R3 opened, not the false
+    exits'; closed lakes fell only 0.8e4 (corrected in the entry above and in the design doc).
+  - The Sobel 2003 [26] "overtop the range" quote is removed from `closed.rs`, the design and ERO-217: it is in no
+    printed record (the bibliography's [26] is a different sentence); R3 rests on Garcia-Castellanos 2006 pp. 284-285.
+  - The young step's routing and solve are `route_lakes` and `solve_lakes` (the same code moved out of `lem`), with
+    `the_young_step_routes_a_closed_basin_and_opens_one_its_sediment_fills`. A lake's exit walk goes on through a lake
+    at the same level, with a test. `Totals` lake counts documented; the young estimate adds the 8 B a cell of the
+    lakes' water (`OWN_BYTES_PER_L2_CELL` 348; the test's holds by arithmetic, not measured again).
+  - Gate on e6b52023 (VM): fmt and clippy clean, workspace 1,458 passed, 0 failed, 13 ignored.
 ### 2026-10-31 (sixteenth entry): PR #50 landed (the orogen's two wedges and retro plateau on, a heat-flow fix); Graphide's free reviews used up, Opus review agents in its place; the instances and the gate on 43e73883; the VM disk; the lanes' verdicts (the coordinator, session 88bb1af2-7722-4f74-9e04-4e8b8af667a9, inline)
 
 - **PR #50 landed** (merge 43e73883): `collision_two_wedges` (PLT-730, PLT-731) and `collision_retro_plateau` (PLT-740) on by default (the coordinator's call, decisions log 2026-10-31), and a heat-flow fix found by the flip's test run: the rate guard's second pass after the resampling spread continental rock onto 2 to 7 Myr old floor, PLT-662 labelled it continental after the step set its heat flow, and the final pass (PLT-469) only raised values, so a young floor's 300 mW/m² baked onto continental crust; `make_continental` now clears heat flow and the final pass gives such a sample the continental law (`plates::continental_heat_flow`). On master's switches before the fix, 6 of 24 planets (the proxy) and 1 of 24 (the thermal state) baked a continental cell over 200.1 at the final frame. Also recorded: with the thermal state on, the continental law over a young floor's thin lithosphere has no ceiling (lithosphere-thermal-state.md, Open questions).
