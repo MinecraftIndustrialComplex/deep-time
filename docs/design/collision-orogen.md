@@ -19,10 +19,12 @@ earth but are still perfectly playable and physics backed > Results that are for
 
 ## The two wedges on the freeboard physics (the arm orog-tw-sedm, 2026-10-31)
 
-base34 (the 24-run base on the freeboard merge) did not exist yet. The freeboard merge only turns PLT-660 and PLT-661
-on, so the arm sedmargin (key 31c7c70bd7c7, argkey 5818ecce: both switches set, seeds 1 to 4 of both starts, the
-crust-budget environment) is base34-s4's physics; the two wedges were run against it with
-`--set tectonics.collision_two_wedges=true` (argkey c7aa72cc). Medians of 8, Mann-Whitney p in brackets:
+base34 (the 24-run base on the freeboard merge, master f80d75a8, key 122e4803cded) did not exist yet when this arm
+ran. The freeboard merge only turns PLT-660 and PLT-661 on, so the arm sedmargin (key 31c7c70bd7c7, argkey 5818ecce:
+both switches set, seeds 1 to 4 of both starts, the crust-budget environment) is base34-s4's physics, and its eight
+final states are base34-s4's bit for bit (`state_sha256` equal run by run, checked 2026-10-31); the two wedges were run
+against it with `--set tectonics.collision_two_wedges=true` (argkey c7aa72cc), and `pool.sh table --base base34-s4`
+reads the same. Medians of 8, Mann-Whitney p in brackets:
 
 | measure | sedmargin | two wedges |
 |---|---|---|
