@@ -4,8 +4,8 @@
 # Earth (CRUST1.0, SRTM15+), then per arm: lowcont.py series, area and model, thinning.py classes and census, m5sea.py
 # run; then m5sea.py table over the arms, m4cold.py and m5earthbands.py. Any failing step stops it (no DONE line).
 # Start it with
-#   tools/remote/mac.sh -- tools/remote/detach.sh start lowcont --kind light bash tools/review/freeboard/lowcont.sh \
-#     /data/ban/deeptime-runs/lowcont base35=<folder> base34=<folder>@4 ...
+#   tools/remote/mac.sh -- tools/remote/detach.sh start lowcont2 --kind light bash tools/review/freeboard/lowcont.sh \
+#     /data/ban/deeptime-runs/lowcont2 base35=<folder> base34=<folder>@4 ...
 set -euo pipefail
 PY=/data/ban/deeptime-runs/pool/.pyenv-numpy/bin/python3
 OUT=$1
@@ -25,7 +25,7 @@ for kv in "$@"; do
   dir=${arg%%@*}
   echo "== $name $arg"
   "$PY" -I "$HERE/lowcont.py" series "$arg" > "$OUT/series-$name.txt" 2>&1
-  "$PY" -I "$HERE/lowcont.py" area "$arg" > "$OUT/area-$name.txt" 2>&1
+  "$PY" -I "$HERE/lowcont.py" area "$OUT/earth.json" "$arg" > "$OUT/area-$name.txt" 2>&1
   "$PY" -I "$HERE/lowcont.py" model "$OUT/earth.json" "$arg" > "$OUT/model-$name.txt" 2>&1
   n=${arg#*@}
   [ "$n" = "$arg" ] && n=12

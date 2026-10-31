@@ -254,22 +254,35 @@ def main_series(args):
         for nm in names:
             v = [med([p[2][nm][i] for p in parsed if nm in p[2] and len(p[2][nm]) > i]) for i in range(6)]
             print(f"  {nm:>8} " + " ".join(f"{x:>8.4g}" for x in v))
-        print("-- the label's area changes by process so far (cb_parts cont, shares of the visible samples), medians:")
+        # cb_parts divides by the visible samples at the snapshot; times vis / N (N: the start's, all visible) gives
+        # shares of the planet. They are gross changes of the label at every thickness, not standing areas.
+        print("-- the label's gross area changes by process so far (cb_parts cont x vis / N: shares of the planet, "
+              "every thickness), medians:")
         names = sorted({k for p in parsed for t in PART_TIMES for k in p[3].get(t, {})})
         print(f"{'t':>6} " + " ".join(f"{n[:11]:>11}" for n in names) + f" {'sum':>8}")
         for t in PART_TIMES:
-            rows = [p[3][t] for p in parsed if t in p[3]]
+            rows = [(p[3][t], p[0][t]["vis"] / p[0][-1000]["vis"]) for p in parsed if t in p[3] and t in p[0]]
             if rows:
-                print(f"{t:>6} " + " ".join(f"{med([r.get(n, 0.0) for r in rows]):>11.4f}" for n in names) +
-                      f" {med([sum(r.values()) for r in rows]):>8.4f}")
+                print(f"{t:>6} " + " ".join(f"{med([r.get(n, 0.0) * f for r, f in rows]):>11.4f}" for n in names) +
+                      f" {med([sum(r.values()) * f for r, f in rows]):>8.4f}")
 
 
 # ------------------------------------------------------------------------------------------------ area
 
 SOURCES = ("start", "arc", "belt", "other", "ocean")
+SOURCE_NAMES = {
+    "start": "the start's continents (no ocean basement)",
+    "arc": "on ocean floor, island-arc crust (cb_origin's rule)",
+    "belt": "on ocean floor, a collision belt",
+    "other": "on ocean floor, the rest (margins, spread, fills)",
+    "ocean": "ocean-labelled",
+}
+# The log factors of the end's area of crust >= 20 km over Earth's, per run (they add exactly per run, so their means
+# add): A = V / T. Two groupings of the same five terms (see main_area).
+FACTORS = ("start_area", "start_volume", "run_own", "taken_in", "start_thinning", "thick_to_start_class", "mix")
 
 
-def area_run(run):
+def area_run(run, earth):
     import thinning as th  # noqa: E402 (needs scipy)
     ser = th.sea_series(run)
     a, _ = th.read(run, -1000)
@@ -282,24 +295,53 @@ def area_run(run):
             continue
         hid = (a[:, 10].astype(np.int64) & 1) > 0
         assert not hid.any(), "the maps hold visible samples only"
+        sea = th.sea_at(ser, t)
         T = a[:, 3] / 1000.0
+        z = a[:, 2]
         cont = a[:, 4] > 0.5
-        base = np.where(cont, np.clip(np.minimum(pp[:, 7], pp[:, 5] + pp[:, 6]), 0.0, None), 0.0)
-        conv = cont & (base > 1000.0)
-        src = {"start": cont & ~conv, "arc": conv & (a[:, 7] > 0.0)}
-        src["belt"] = conv & ~src["arc"] & (a[:, 5] > 1.5)
-        src["other"] = conv & ~src["arc"] & ~src["belt"]
+        base = np.where(cont, np.clip(np.minimum(pp[:, 7], pp[:, 5] + pp[:, 6]), 0.0, None), 0.0) / 1000.0
+        conv = cont & (base > 1.0)
+        # Island-arc crust as the crust budget's cb_origin reads it (crust_budget.rs `origin`): at least 1,000 m of
+        # island-arc magma and more than of continental-arc magma.
+        island = (a[:, 7] >= 1000.0) & (a[:, 7] > a[:, 8])
+        src = {"start": cont & ~conv, "arc": conv & island}
+        src["belt"] = conv & ~island & (a[:, 5] > 1.5)
+        src["other"] = conv & ~island & ~(a[:, 5] > 1.5)
         src["ocean"] = ~cont
         c = T >= T_MIN
-        r = {"sea": th.sea_at(ser, t), "vis": len(a) / n0, "c20": c.sum() / n0, "c20_of_vis": float(c.mean()),
+        own = np.where(cont, T - base, 0.0)
+        r = {"sea": sea, "vis": len(a) / n0, "c20": c.sum() / n0, "c20_of_vis": float(c.mean()),
              "label": cont.sum() / n0, "label_of_vis": float(cont.mean()), "T20": float(T[c].mean()),
-             "vol20": float(T[c].sum() / n0), "b35_50": float(((T >= 35) & (T < 50)).sum() / n0),
-             "b30_35": float(((T >= 30) & (T < 35)).sum() / n0), "start_under20": float((src["start"] & ~c).sum() / n0)}
+             "vol20": float(T[c].sum() / n0), "own20": float(own[c].sum() / n0),
+             "base20": float(base[c].sum() / n0), "ocean20": float(T[c & ~cont].sum() / n0),
+             "own_all": float(own.sum() / n0), "b35_50": float(((T >= 35) & (T < 50)).sum() / n0),
+             "b30_35": float(((T >= 30) & (T < 35)).sum() / n0), "start_under20": float((src["start"] & ~c).sum() / n0),
+             # The start's crust by when it formed: the start's continental samples carry formed_myr 0 (state.rs).
+             "c20_formed0": float((c & cont & (pp[:, 8] == 0.0)).sum() / n0)}
         for k, m in src.items():
             km = c & m
             r[f"c20_{k}"] = float(km.sum() / n0)
             r[f"T_{k}"] = float(T[km].mean()) if km.any() else float("nan")
+            r[f"dry_{k}"] = float((z[km] > sea).mean()) if km.any() else float("nan")
+            r[f"zs_{k}"] = float(np.median(z[km] - sea)) if km.any() else float("nan")
+            r[f"arc_p50_{k}"] = float(np.median(a[km, 7])) if km.any() else float("nan")
         out[t] = r
+    # The log factors at the end, against Earth's crust >= 20 km (A_E, V_E, T_E: CRUST1.0, earth.json).
+    a_e, t_e = earth["cont20"]["share"], earth["cont20"]["T_mean"]
+    v_e = a_e * t_e
+    r0, r1 = out[-1000], out[0]
+    v0, t0 = r0["vol20"], r0["T20"]
+    v1, t1, own1, tsc = r1["vol20"], r1["T20"], r1["own20"], r1["T_start"]
+    out["factors"] = {
+        "total": float(np.log(r1["c20"] / a_e)),
+        "start_area": float(np.log((v0 / t0) / a_e)),
+        "start_volume": float(np.log(v0 / v_e)),
+        "run_own": float(np.log(own1 / v0)),
+        "taken_in": float(np.log(v1 / own1)),
+        "start_thinning": float(np.log(t0 / tsc)),
+        "thick_to_start_class": float(np.log(t_e / tsc)),
+        "mix": float(np.log(tsc / t1)),
+    }
     # The interiors no orogeny raised, at the end: over all their samples and their land only (thinning.py's classes).
     a, pp = th.read(run, 0)
     cls, _, _ = th.classify(a, pp)
@@ -315,20 +357,39 @@ def area_run(run):
     return out
 
 
-def main_area(args):
+def main_area(earth_json, args):
+    e = json.loads(Path(earth_json).read_text().strip().splitlines()[-1])
     for arg in args:
         rs = runs_of(arg)
-        res = [area_run(r) for r in rs]
+        res = [area_run(r, e) for r in rs]
         print(f"== area {arg} ({len(rs)} runs): the crust >= 20 km as a share of the planet, by source; medians")
-        cols = ["sea", "vis", "label", "label_of_vis", "c20", "c20_of_vis", "T20", "vol20", "b30_35", "b35_50",
-                "start_under20"] + [f"c20_{k}" for k in SOURCES] + [f"T_{k}" for k in SOURCES]
+        cols = ["sea", "vis", "label", "label_of_vis", "c20", "c20_of_vis", "T20", "vol20", "own20", "base20",
+                "ocean20", "own_all", "b30_35", "b35_50", "start_under20", "c20_formed0"] + \
+            [f"c20_{k}" for k in SOURCES] + [f"T_{k}" for k in SOURCES]
         print(f"{'t':>6} " + " ".join(f"{c[:11]:>11}" for c in cols))
         for t in AREA_TIMES:
             rows = [r[t] for r in res if t in r]
             if rows:
                 print(f"{t:>6} " + " ".join(f"{med([x[c] for x in rows]):>11.4g}" for c in cols))
+        print("-- by source at -500 and 0 Myr (medians): share of the planet, mean T km, dry share, z - S p50 m, "
+              "island-arc magma p50 m")
+        for t in (-500, 0):
+            for k in SOURCES:
+                rows = [r[t] for r in res if t in r]
+                print(f"  t{t} {SOURCE_NAMES[k]:52s} " + " ".join(
+                    f"{nm} {med([x[f'{nm}_{k}'] for x in rows]):.4g}" for nm in ("c20", "T", "dry", "zs", "arc_p50")))
         print("-- means: " + " ".join(f"t{t}:c20 {mn([r[t]['c20'] for r in res if t in r]):.4f}" for t in
                                      (-1000, -950, -900, -800, -700, -500, 0)))
+        f = {k: mn([r["factors"][k] for r in res]) for k in ("total",) + FACTORS}
+        tot = f["total"]
+        print(f"-- log factors of the end's area over Earth's, per run then means (total {tot:.4f}, "
+              f"x{np.exp(tot):.3f}); each term's share of the total in brackets")
+        for name, keys in (("area first", ("start_area", "run_own", "taken_in", "start_thinning", "mix")),
+                           ("volume and thickness", ("start_volume", "run_own", "taken_in", "thick_to_start_class",
+                                                     "mix"))):
+            s = sum(f[k] for k in keys)
+            print(f"   {name}: " + " ".join(f"{k} {f[k]:+.4f} ({f[k] / tot:+.2f})" for k in keys) +
+                  f"; sum {s:.4f}")
         print("-- the interiors no orogeny raised, the end (all samples; land only): " +
               " ".join(f"{k} {med([r['never'][k] for r in res]):.4g}" for k in res[0]["never"]))
 
@@ -435,6 +496,39 @@ def print_earth(e):
 
 # ------------------------------------------------------------------------------------------------ model
 
+def steering_offset_m(run):
+    """The steering's sea offset at the end, m, emulated from the record (steering.rs `step`): over the tail, each
+    plate step moves the sea by -w x rate x dt x clamp(e / LAND_FULL_RATE), w the shape over the tail, e the land
+    share's distance outside its band, bounded by sea_max_m. The run's own offset is in its manifest's notes
+    (notes.climate.steering.sea_offset_m), which the pool's folders do not keep; the land here is the record's (plate
+    samples above the sea over the visible ones), not the climate's grid, so this is an estimate."""
+    text = (run / "summary.txt").read_text()
+    if "preset " not in text:
+        return float("nan")
+    line = text.split("preset ", 1)[1].splitlines()[0]
+    st = json.JSONDecoder().raw_decode(line[line.index("{"):])[0].get("steering")
+    if not st or not st.get("enabled"):
+        return float("nan")
+    rec = json.loads((run / "rec.json").read_text())
+    steps = rec["steps"]
+    t0, t1 = float(rec["t0_myr"]), float(steps[-1]["t"])
+    tail = st["tail_fraction"] * (t1 - t0)
+    lo, hi = st["land_min"], st["land_max"]
+    shape = {"smoothstep": lambda x: x * x * (3.0 - 2.0 * x), "linear": lambda x: x}[st["shape"]]
+    off, prev = 0.0, t0
+    for s_ in steps:
+        t = float(s_["t"])
+        dt, prev = t - prev, t
+        x = (t - (t1 - tail)) / tail
+        if x <= 0.0 or dt <= 0.0:
+            continue
+        land = s_["land"] / max(s_["visible"], 1)
+        e = lo - land if land < lo else (hi - land if land > hi else 0.0)
+        off += -shape(min(x, 1.0)) * st["sea_rate_m_myr"] * dt * max(-1.0, min(1.0, e / 0.05))  # STE-010's 0.05
+        off = max(-st["sea_max_m"], min(st["sea_max_m"], off))
+    return off
+
+
 def model_run(run):
     import contextlib
     import io
@@ -488,6 +582,7 @@ def model_run(run):
     W = WATER_LAYER_M - float(ice.mean()) * RHO_ICE_OVER_SEA
     out["fill"] = {"f": float(c.mean()), "hc": hist(hs[c], w[c]).tolist(), "ho": hist(hs[~c], w[~c]).tolist(), "W": W}
     out["fill_self_m"] = fill(W, out["fill"]["f"], np.array(out["fill"]["hc"]), np.array(out["fill"]["ho"]))
+    out["steering_m"] = steering_offset_m(run)
     # The ocean floor and margins under 20 km: the mean height of the crust under 10 km, and of 10 to 20 km.
     for lo, hi in ((0.0, 10.0), (10.0, 20.0)):
         k = (T >= lo) & (T < hi)
@@ -595,6 +690,8 @@ def main_model(earth_json, args):
             part["fill"] = fill(arm["W"], arm["f"], arm["hc"], arm["ho"])
             part["total"] = part["fill"] - fill_e
             part["residual"] = r["sea"] - r["fill_self_m"]
+            part["steering_est"] = r["steering_m"]
+            part["residual_rest"] = part["residual"] - r["steering_m"]
             part["run_sea"] = r["sea"]
             part["run_less_earth_fill"] = r["sea"] - fill_e
             # Earth's histograms and water at the model's own area of crust >= 20 km, and at its volume spread at
@@ -604,14 +701,15 @@ def main_model(earth_json, args):
             part["f_at_earth_T"] = f_vol
             part["earth_at_model_volume"] = fill(base["W"], f_vol, base["hc"], base["ho"]) - fill_e
             sh.append(part)
-        keys = ("W", "f", "hc", "ho", "total", "residual", "run_less_earth_fill", "run_sea", "fill",
+        keys = ("W", "f", "hc", "ho", "total", "residual", "steering_est", "residual_rest", "run_less_earth_fill",
+                "run_sea", "fill",
                 "earth_at_model_area", "f_at_earth_T", "earth_at_model_volume")
         print(f"-- the sea against Earth's fill ({fill_e:.0f} m on its own histograms), Shapley, m: total = the "
               "model's fill less Earth's; residual = the run's sea less its own fill (the steering's nudge, the "
               "open-sea rule); W + f + hc + ho + residual = run_less_earth_fill per run")
         print_terms("the sea's terms", sh, keys, "{:.4g}")
-        print("-- per run (sea / own fill): " + " ".join(f"{r['run']}:{r['sea']:.0f}/{r['fill_self_m']:.0f}"
-                                                        for r in res))
+        print("-- per run (sea / own fill / the steering's offset, emulated): " + " ".join(
+            f"{r['run']}:{r['sea']:.0f}/{r['fill_self_m']:.0f}/{r['steering_m']:.0f}" for r in res))
 
 
 if __name__ == "__main__":
@@ -619,7 +717,7 @@ if __name__ == "__main__":
     if mode == "series":
         main_series(sys.argv[2:])
     elif mode == "area":
-        main_area(sys.argv[2:])
+        main_area(sys.argv[2], sys.argv[3:])
     elif mode == "earth":
         main_earth(sys.argv[2], sys.argv[3])
     elif mode == "model":
