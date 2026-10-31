@@ -88,8 +88,9 @@ freeboard symptom, not a refutation of Willett et al. 1993.
    600 km, the strength height stands about 4.5 km over the sea, and high plateaus wear at 63 m/Myr
    against Tibet's under 10 (erosion-and-sediment.md, ERO-174).
 2. Freeboard (above).
-3. Collision states lasting a step, 82 docking episodes per 100 Myr (2 to 5 times Macdonald et al.
-   2019's 15 to 46 sutures per 100 Myr, RLC-073, a loose comparison).
+3. Collision states lasting a step; 55.7 transfers and welds per 100 Myr (1.2 to 3.7 times
+   Macdonald et al. 2019's 15 to 46 sutures per 100 Myr, RLC-073, a loose comparison; the advisor's
+   82 added the 25.9 partings, which dock nothing: PR #48's review).
 4. Continental arcs 1.1 to 1.3 km against the Andes' 4 km (magmatic addition without Andean
    shortening).
 
