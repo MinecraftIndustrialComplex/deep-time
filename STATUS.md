@@ -152,6 +152,36 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 
 ## Build log
 
+### 2026-10-31: The rock the plates lift above the sea, split by process: no double count; the excess is collisional crust that only erosion returns (the runoff lane, worktree agent-a4e92fd13092b08b0, branch `uplift-trace` on `surface-runoff-budget` 1803fb56; measurement only, nothing built)
+
+- **What was built (measurement only):** the land ledger in the gap budget (`plates/gap_budget.rs`, with
+  `DEEPTIME_GAP_BUDGET`): per part, the change of the land's height above the sea and of the columns' thickness by where
+  they stood (land, shelf, ocean floor, hidden), the sea's own term, closure tested. `tools/review/uplift/`: `gate.sh`,
+  `ledger.py` (the split), `samestate.py` (two pool runs, the same world?), `gapsplit.py` (the gap budget by part and
+  thickness band).
+- **The trace:** `pool.sh run upl-trace --seeds 1 +DEEPTIME_GAP_BUDGET=1 +DEEPTIME_CRUST_BUDGET=1
+  +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps` (key 93891af8f54e, argkey ea7131f2, 2 runs). Both worlds are base34-s4's
+  seed 1 bit for bit (`samestate.py`: every field, the globals and `rec.json`).
+- **The split** (km³ a year, docs/design/uplift-trace.md):
+  - erosion lowers the land by 4.67 of H and its rebound gives back 3.71 (0.795; 0.80 to 0.81 on the bands above the
+    sea);
+  - the plates' lifts are the belts (+0.79 of H, stacking 3.90 km³ a year of crust under land and 5.30 under the shelf)
+    and the settling (+0.78);
+  - the sinks: the rate cap (2.10 off land), collapse (1.17) and flow (0.31);
+  - arcs +0.07 (0.95 of their 1.48 on the ocean floor);
+  - accretion +0.09.
+- **The double count: none.** The ledger's export, 3.81, equals the crust budget's 3.82; nothing is laid on hidden
+  crust. The accretion's 0.69 km³ a year under land is a real cycle, about 0.65 of the export eroded again. The
+  transition lifts nothing.
+- **The verdict:** not a double count, not the erosion law, not the isostatic response. The settling's column-mean
+  density (6/7 against the eroded rock's 0.80 to 0.82) sets heights, not the long-run export. The collisions take in
+  Bird 2003's 0.43 km² a year and keep Earth's share, but the model erodes 0.41 of what they stack against Earth's
+  0.12 to 0.23 (the agent's arithmetic from Bird and Clift). The missing sink is the lead: continental extension
+  returning thickened crust below the sea; rifting thins nothing here.
+- **Next:** the coordinator's call. A sourced extension law, read against the collapse, the thin sheet (PLT-733) and
+  the rate cap's 2.1 km³ a year; separately, the settling's Airy height for eroded top rock (PLT-281 against the
+  upper-crust 5.5).
+
 ### 2026-10-31: The continents' export is set by the plates' uplift, not by the erosion law (a diagnosis from cached runs; the runoff lane, worktree agent-a4e92fd13092b08b0, branch `surface-runoff-budget`; nothing built)
 
 - **The question** (the crust-budget lane, branch `trench-input`): the continents export 3.82 km³ of rock a year on
