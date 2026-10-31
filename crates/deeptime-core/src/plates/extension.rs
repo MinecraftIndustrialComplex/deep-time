@@ -24,21 +24,48 @@
 //! sides' continental lithosphere takes it in pure shear, the column's area growing as its crust
 //! thins:
 //!
-//!   Σ_i ε̇_i A = u W,   ε̇_i = u W w_i / (A Σ_j w_j),   w_i = e^(−x_i / L) · η_0 / η_i,
+//!   Σ_i ε̇_i A = u W,   ε̇_i = u W w_i / (A Σ_j w_j),
 //!
-//! over the visible continental columns of the two plates within reach of the rift along their
-//! own plate's continental crust, x_i a column's distance from the rift, A a sample's area, L the
-//! rift's half-width ([`half_width_km`], the rift's mode) and η_0 / η_i the column's weakness at
-//! its lithosphere's thermal age (`thermal::sheet_weakness`, PLT-415's law with ISO-112's age; 1
-//! everywhere with the thermal state off). The decay e^(−x / L) is the thin sheet's for a
-//! boundary of length W (England, Houseman & Sonder 1985, as the collision's push, PLT-733); the
-//! weakness puts the strain where the sheet is weakest, a game-choice. A column keeps
-//! e^(−ε̇ δt) of its crust in its own mix, never less than 10 km of crystalline crust (Brune et
-//! al. 2014's hyper-extended limit, PLT-661), its lithosphere and keel thinned by the same factor
-//! (`thermal::stretch`, McKenzie's uniform stretching, PLT-476), its surface down by the Airy
-//! change of what it lost (but not below the Airy height of what it keeps, `collapse::toward`).
-//! A column at the limit takes no share: what the rift's speed asks beyond the columns that can
-//! still thin is break-up, new sea floor.
+//! over the visible continental columns of the two plates that take part (below), A a sample's
+//! area and w_i a column's weight by its mode.
+//!
+//! # Narrow and wide
+//! Buck (1991) has three modes, "(1) core complex mode (concentrated upper crustal extension with
+//! lower crustal thinning over a broad area ...), (2) wide rift mode (uniform crustal and mantle
+//! lithospheric thinning over a width greater than the lithospheric thickness), and (3) narrow
+//! rift mode (concentrated crustal and mantle lithospheric extension)", set by "crustal
+//! thickness, heat flow, and strain rate" (abstract); "the wide rift and the 'core complex' modes
+//! are only predicted for thick, hot crust" (Buck 2007, p. 28), and Brun (1999, abstract) has the
+//! same split, necking where "the greatest strength [is] located in the sub-Moho mantle" against
+//! spreading where the strength peaks "at the base of upper brittle crust". The model's test is
+//! the Moho's temperature ([`moho_c`]: the plate model's own geotherm, `thermal::geotherm_share`,
+//! at the base of the column's crust): a side of a rift whose edge columns' Moho stands at
+//! [`WIDE_MOHO_C`], 700 °C, or hotter is wide, else narrow. 700 °C is Rey, Vanderhaeghe & Teyssier
+//! 2001's Moho for a weak, flowing lower crust ("≥700 °C, Sonder et al., 1987; Kaufman and
+//! Royden, 1994", p. 443) and the middle of Wernicke et al. 1987's "~650-750 °C" lower crust that
+//! extension needed to begin (p. 216). On the model's geotherm it puts each of Buck's (1991, his
+//! Fig. 30 as Buck 2007 reprints it) rifts in its mode (the test
+//! `the_moho_test_puts_bucks_rifts_in_their_modes`).
+//! - A narrow side takes the strain evenly over half the rift's width, the columns within
+//!   L_lith / 2 of the rift (L_lith its edge columns' mean lithosphere): "narrow means about as
+//!   wide as the lithosphere is thick" (Buck et al. 1999, p. 673); "on the order of 100 km wide"
+//!   (Buck 2007, p. 25: the Rhinegraben, Suez, East Africa, Baikal, the Rio Grande).
+//! - A wide side spreads it over its hot columns (each with its own Moho at 700 °C or more) by
+//!   the thin sheet's decay from the rift, e^(−x / L) with L = 2 W / π for a boundary W long
+//!   (England, Houseman & Sonder 1985, as the collision's push, PLT-733), x a column's distance
+//!   from the rift along its own plate's continental crust: the Basin and Range's region of
+//!   normal faulting "as much as 800 km wide" (Buck 2007, p. 25).
+//!
+//! With the thermal state off every side is narrow under `thermal_reference_km`.
+//!
+//! A column keeps e^(−ε̇ δt) of its crust in its own mix, never less than 10 km of crystalline
+//! crust (Brune et al. 2014's hyper-extended limit, PLT-661), its lithosphere and keel thinned by
+//! the same factor (`thermal::stretch`, McKenzie's uniform stretching, PLT-476), its surface down
+//! by the Airy change of what it lost (but not below the Airy height of what it keeps,
+//! `collapse::toward`). A column at the limit takes no share: what the rift's speed asks beyond
+//! the columns that can still thin is break-up, new sea floor. As its crust thins its Moho rises
+//! into colder rock, so a wide rift narrows as it goes on, Buck's "temporal progression from core
+//! complex mode to wide rift mode to narrow rift mode" (abstract).
 //!
 //! The crust a column gives moves into the opening, which is no sample yet: it waits on the pair
 //! ([`PlateState::rift_fill`]) until the next resampling lays it in the gap between the two
@@ -55,9 +82,12 @@
 //! died it goes to the continental samples nearest where it came from (counted apart).
 //!
 //! # What it is not
-//! A strain solve: the decay length and the weakness distribute the opening's area; the area
-//! itself is the plates' motion. Nor the collapse: a rift needs an opening boundary, and a
-//! collapse needs none.
+//! A strain solve: the mode and the decay distribute the opening's area; the area itself is the
+//! plates' motion. Nor the collapse: a rift needs an opening boundary (Rey et al. 2001's "free
+//! boundary", or "a phase of tectonic divergence", p. 445), and the fixed-boundary collapse
+//! (`collapse.rs`) needs none. Nor extension while the plates converge (Tibet's east-west
+//! extension, which Molnar, England & Martinod 1993 put at about 2.8 km of crustal thinning since
+//! 8 Ma, p. 374): a column needs a rift on its plate.
 
 use std::collections::BTreeMap;
 
@@ -107,11 +137,32 @@ pub struct Laid {
     pub samples: u32,
 }
 
-/// A rift's half-width L, km: the thin sheet's decay length for a boundary of length
-/// `length_km`, 2 W / π (`belts::sheet_reach_km`, PLT-733's form with n = 1).
+/// A wide rift's decay length L, km: the thin sheet's for a boundary of length `length_km`,
+/// 2 W / π (`belts::sheet_reach_km`, PLT-733's form with n = 1).
 // ledger: PLT-782
-pub fn half_width_km(length_km: f64) -> f64 {
+pub fn wide_length_km(length_km: f64) -> f64 {
     super::belts::sheet_reach_km(length_km)
+}
+
+/// The Moho temperature from which a rift's side is wide, °C (see the module docs).
+// ledger: PLT-782 (Rey, Vanderhaeghe & Teyssier 2001, p. 443; Wernicke et al. 1987, p. 216)
+pub const WIDE_MOHO_C: f64 = 700.0;
+
+/// The temperature at the base of a crust `crust_km` thick over a lithosphere `lith_km` deep,
+/// °C, on the plate model's geotherm (`thermal::geotherm_share`, T_m at L).
+// ledger: ISO-138, PLT-782
+pub fn moho_c(crust_km: f64, lith_km: f64) -> f64 {
+    thermal::MANTLE_C * thermal::geotherm_share(lith_km, crust_km.min(lith_km).max(0.0))
+}
+
+/// A sample's Moho temperature, °C; with no thermal state, `reference_km`'s.
+fn sample_moho_c(s: &Sample, reference_km: f64) -> f64 {
+    let l = if s.lithosphere_km > 0.0 {
+        f64::from(s.lithosphere_km)
+    } else {
+        reference_km
+    };
+    moho_c(f64::from(s.thickness_m) / 1000.0, l)
 }
 
 /// One side of a rift: a sample of plate `plate` on its boundary with `other`, the opening speed
@@ -238,8 +289,8 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Exte
     let area = env.norm.sample_area_km2();
     let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
     let g = env.gravity;
-    let tau = k.collapse_sheet_strength_myr;
     let thermal_on = k.thermal_state;
+    let reference = k.thermal_reference_km;
     let mut out = Extension::default();
     for (&(a, b), es) in &rifts {
         let len = |p: u32| -> f64 {
@@ -253,17 +304,34 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Exte
         if !(length_km > 0.0 && speed > 0.0) {
             continue;
         }
-        let l_km = half_width_km(length_km);
-        let reach = env.norm.rad(REACH_HALF_WIDTHS * l_km);
-        // The columns within reach on each side, along their own plate's continental crust.
+        let l_wide = wide_length_km(length_km);
+        // The columns that take part on each side, along their own plate's continental crust,
+        // with their weights by the side's mode (ledger: PLT-782).
         let mut cols: Vec<(u32, f64)> = Vec::new();
         for p in [a, b] {
-            let src: Vec<(u32, f64, u32)> = es
-                .iter()
-                .filter(|e| e.plate == p)
-                .map(|e| (e.v, 0.0, e.v))
-                .collect();
+            let side: Vec<u32> = es.iter().filter(|e| e.plate == p).map(|e| e.v).collect();
+            if side.is_empty() {
+                continue;
+            }
             let samples = &state.samples;
+            let mean = |f: &dyn Fn(&Sample) -> f64| -> f64 {
+                side.iter().map(|&v| f(&samples[v as usize])).sum::<f64>() / side.len() as f64
+            };
+            let wide = thermal_on && mean(&|s| sample_moho_c(s, reference)) >= WIDE_MOHO_C;
+            let lith = mean(&|s| {
+                if thermal_on && s.lithosphere_km > 0.0 {
+                    f64::from(s.lithosphere_km)
+                } else {
+                    reference
+                }
+            });
+            let half = 0.5 * lith;
+            let reach_km = if wide {
+                REACH_HALF_WIDTHS * l_wide
+            } else {
+                half
+            };
+            let src: Vec<(u32, f64, u32)> = side.iter().map(|&v| (v, 0.0, v)).collect();
             let on = |u: u32| {
                 let s = &samples[u as usize];
                 plate_of[u as usize] == p
@@ -271,28 +339,25 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Exte
                     && !s.is_hidden()
                     && s.flags & TRENCH == 0
             };
-            for (u, d, _) in dijkstra_sparse(geo, &src, |_, u| on(u), reach) {
-                cols.push((u, env.norm.km(d)));
+            for (u, d, _) in dijkstra_sparse(geo, &src, |_, u| on(u), env.norm.rad(reach_km)) {
+                let s = &samples[u as usize];
+                let x = env.norm.km(d);
+                let w = if least_keep(&s.pools) >= 1.0 {
+                    0.0
+                } else if !wide {
+                    1.0
+                } else if sample_moho_c(s, reference) >= WIDE_MOHO_C {
+                    (-x / l_wide).exp()
+                } else {
+                    0.0
+                };
+                cols.push((u, w));
             }
         }
+        // A column on both sides' reach (none: each side is its own plate) counts once.
         cols.sort_by_key(|c| c.0);
         cols.dedup_by_key(|c| c.0);
-        let weights: Vec<f64> = cols
-            .iter()
-            .map(|&(u, x)| {
-                let s = &state.samples[u as usize];
-                if least_keep(&s.pools) >= 1.0 {
-                    return 0.0;
-                }
-                // ledger: PLT-415, ISO-112 (the weakness), PLT-782 (its use here)
-                let weak = if thermal_on {
-                    thermal::sheet_weakness(tau, s.lithosphere_km)
-                } else {
-                    1.0
-                };
-                (-x / l_km).exp() * weak
-            })
-            .collect();
+        let weights: Vec<f64> = cols.iter().map(|c| c.1).collect();
         let rates = strain_rates(speed, length_km, area, &weights);
         let mut fill = RiftFill {
             a,
@@ -314,6 +379,7 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Exte
                 given += r;
             }
             s.thickness_m = thickness(&s.pools);
+            fill.basement_m += f64::from(s.basement_m) * (1.0 - keep);
             s.basement_m = (f64::from(s.basement_m) * keep) as f32;
             // ledger: ISO-091 (its height follows its crust), PLT-254 (not below what it keeps)
             let change = isostatic_change_m(&before, &s.pools, g);
@@ -346,6 +412,7 @@ fn merge(fills: &mut Vec<RiftFill>, fill: RiftFill) {
             *x += y;
         }
         f.lithosphere_km_m += fill.lithosphere_km_m;
+        f.basement_m += fill.basement_m;
         for (x, y) in f.centroid.iter_mut().zip(fill.centroid) {
             *x += y;
         }
@@ -390,7 +457,7 @@ pub fn lay(
     let mut kept = Vec::new();
     for fill in std::mem::take(fills) {
         let total = fill.total_m();
-        if !(total > 0.0) {
+        if total.is_nan() || total <= 0.0 {
             continue;
         }
         let lith = fill.lithosphere_km_m / total;
@@ -419,9 +486,11 @@ pub fn lay(
             ((crystalline_total / HYPER_EXTENDED_M).floor() as usize).clamp(1, n)
         };
         let column = total / m as f64;
+        let basement = (fill.basement_m / m as f64).min(column);
         for g in &members[..m] {
             let s = &mut samples[g.i as usize];
             *s = floor_sample(s.group, &mix, column, lith, k, gravity, z_0, sea_m);
+            s.basement_m = basement as f32;
             laid.samples += 1;
         }
         laid.floor_m += total;
@@ -683,7 +752,7 @@ mod tests {
         // The crust it gives is about the opening's area over the step times a column: the sides
         // move apart at 20 mm/yr (10 each way, along x at +y) over a rift of W km, u W δt T.
         let rift_km = out.stretched_m * e.norm.sample_area_km2() / (35_100.0 * 20.0 * 2.0);
-        assert!(rift_km > 500.0 && rift_km < 9000.0, "{rift_km}");
+        assert!(rift_km > 500.0 && rift_km < 12_000.0, "{rift_km}");
         // Nearer the rift the crust thinned more.
         let thinned = |lo: f64, hi: f64| -> f64 {
             let v: Vec<f64> = (0..N)
@@ -719,6 +788,37 @@ mod tests {
             Extension::default()
         );
         assert_eq!(still.samples, planet(&geo, omega_10mm()).samples);
+    }
+
+    /// The Moho test on the plate model's geotherm puts each of the rifts in Buck's (1991) Fig. 30
+    /// (as Buck 2007 reprints it; crustal thickness and surface heat flow read off the plot by
+    /// the research sub-agent, approximately) in its mode, the lithosphere from the heat flow by
+    /// the model's own law (`thermal::conductive_mw_m2`, q = 26 + 3,375 / L).
+    #[test]
+    fn the_moho_test_puts_bucks_rifts_in_their_modes() {
+        let lith = |q: f64| thermal::MANTLE_HEAT_MW_M2_KM / (q - thermal::CRUST_HEAT_MW_M2);
+        for (name, crust_km, q, wide) in [
+            ("northern Basin and Range", 33.0, 90.0, true),
+            ("Altiplano", 48.0, 90.0, true),
+            ("Tibet", 64.0, 87.0, true),
+            ("Rhinegraben", 36.0, 68.0, false),
+            ("East Africa and Baikal", 40.0, 51.0, false),
+            ("northern Red Sea", 30.0, 45.0, false),
+            ("southern Rio Grande", 26.0, 87.0, false),
+        ] {
+            let t = moho_c(crust_km, lith(q));
+            assert_eq!(t >= WIDE_MOHO_C, wide, "{name}: {t:.0} °C");
+        }
+        // The rift's own thinning narrows it: 35 km of crust over a 60 km lithosphere is wide,
+        // the same lithosphere under 20 km is not.
+        assert!(moho_c(35.0, 60.0) >= WIDE_MOHO_C);
+        assert!(moho_c(20.0, 60.0) < WIDE_MOHO_C);
+    }
+
+    /// A wide rift's decay length is the thin sheet's for its length, 2 W / π.
+    #[test]
+    fn a_wide_rifts_decay_length_is_the_sheets() {
+        assert!((wide_length_km(1000.0) - 2000.0 / std::f64::consts::PI).abs() < 1e-9);
     }
 
     /// A weaker side takes more of the opening: plate 1's lithosphere is hot, plate 0's cold.
@@ -767,6 +867,7 @@ mod tests {
             b: 1,
             pools: std::array::from_fn(|p| f64::from(column[p]) * columns),
             lithosphere_km_m: 80.0 * total_col * columns,
+            basement_m: 0.0,
             centroid: [0.0, 1.0, 0.0],
             waited: 0,
         };

@@ -759,6 +759,9 @@ pub struct RiftFill {
     /// The thinned lithosphere it came from, km summed with the same weights as its crust (its
     /// mean is the floor's lithosphere).
     pub lithosphere_km_m: f64,
+    /// Of its crust, the ocean basement of crust made from ocean floor (`Sample::basement_m`),
+    /// metres summed over samples: the floor carries it as its own.
+    pub basement_m: f64,
     /// Σ of the unit positions of the samples that gave it, weighted by their crust (where it
     /// goes if the pair cannot take it).
     pub centroid: [f64; 3],
