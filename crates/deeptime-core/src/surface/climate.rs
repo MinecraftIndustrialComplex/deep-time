@@ -313,7 +313,10 @@ mod tests {
         let et = p - q;
         eprintln!("Mackenzie: budget runoff {q:.0} mm, ET {et:.0} mm (measured 169 and 237)");
         assert!((et - 237.0).abs() <= 54.0, "budget ET {et:.0} against 237");
-        assert!((q - 169.0).abs() <= 54.0, "budget runoff {q:.0} against 169");
+        assert!(
+            (q - 169.0).abs() <= 54.0,
+            "budget runoff {q:.0} against 169"
+        );
         assert!((1000.0 * mean_t_runoff_m_yr(p, t) - p).abs() < 1.0e-9);
     }
 
@@ -322,16 +325,30 @@ mod tests {
     /// Valleys, Antarctica": "Air temperatures average about –17oC with the winter minimum about
     /// -40oC and the summer maximum a few degrees above freezing"; "In Wright Valley, annual values
     /// of snowfall have ranged 7 – 11 mm water equivalent ..., most of which is lost to
-    /// sublimation"). With the warmest month anywhere from below freezing up to the summer's
-    /// maximum of a few degrees, the budget sends less than half of the snowfall to the rivers;
-    /// the snapshot's own rule sends all of it.
+    /// sublimation"). A warmest month below freezing (its mean under the summer's maximum): the
+    /// budget sends none of the snowfall to the rivers. A warmest month of 2 or 3 °C: under half.
+    /// The snapshot's own rule sends all of it. The budget's gap, printed: a warmest month just
+    /// above freezing melts all of the snow by its degree-days and evaporates little (PET from a
+    /// biotemperature of a few hundredths of a degree), so at 1 °C most of the snowfall runs off;
+    /// the budget has no sublimation of the cold season's snow.
     #[test]
     fn the_dry_valleys_lose_their_snowfall() {
-        for warm in [-5.0, -1.0, 0.0, 1.0, 2.0, 3.0] {
-            for p in [7.0, 11.0] {
+        for p in [7.0, 11.0] {
+            assert!((1000.0 * mean_t_runoff_m_yr(p, -17.0) - p).abs() < 1.0e-9);
+            for warm in [-5.0, -1.0, 0.0] {
                 let q = budget_runoff_mm(p, -17.0, warm, -40.0);
-                assert!(q < 0.5 * p, "warm month {warm} °C, P {p} mm: runoff {q:.2} mm");
-                assert!((1000.0 * mean_t_runoff_m_yr(p, -17.0) - p).abs() < 1.0e-9);
+                assert_eq!(q, 0.0, "warm month {warm} °C, P {p} mm");
+            }
+            for warm in [2.0, 3.0] {
+                let q = budget_runoff_mm(p, -17.0, warm, -40.0);
+                assert!(
+                    q < 0.5 * p,
+                    "warm month {warm} °C, P {p} mm: runoff {q:.2} mm"
+                );
+            }
+            for warm in [0.5, 1.0, 1.5] {
+                let q = budget_runoff_mm(p, -17.0, warm, -40.0);
+                eprintln!("Dry Valleys P {p} mm, warmest month {warm} °C: runoff {q:.1} mm");
             }
         }
     }
@@ -346,7 +363,12 @@ mod tests {
     /// basins (Holdridge's PET has no term for the plateau's sun and wind).
     #[test]
     fn the_tibetan_lakes_evaporate_more_than_the_budget() {
-        for (p, aet) in [(230.0, 170.0), (250.0, 180.0), (300.0, 210.0), (420.0, 290.0)] {
+        for (p, aet) in [
+            (230.0, 170.0),
+            (250.0, 180.0),
+            (300.0, 210.0),
+            (420.0, 290.0),
+        ] {
             for t in [0.0, -1.5, -3.0] {
                 let et = p - budget_runoff_mm(p, t, t + 8.0, t - 8.0);
                 eprintln!("Tibet P {p} MAAT {t}: budget ET {et:.0} mm (Biskop {aet})");

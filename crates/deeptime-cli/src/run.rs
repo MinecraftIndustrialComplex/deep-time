@@ -484,7 +484,7 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
     let global = |k: &str| world.globals.get(k).copied().unwrap_or(0.0);
     let cap_share = global(deeptime_core::plates::CAP_BOUND_GLOBAL)
         / global(deeptime_core::plates::CONTINENTAL_GLOBAL).max(1.0);
-    Some(format!(
+    let line = format!(
         "surface_final={} land_frac={:.3} max_elevation_m={:.0} sea_level_m={:.1} sediment_km3={:.3e} \
          eroded_km3={:.3e} fluvial_km3={:.3e} lake_km3={:.3e} marine_km3={:.3e} carbonate_km3={:.3e} \
          evaporite_km3={:.3e} pelagic_km3={:.3e} periplatform_km3={:.3e} periplatform_source_km3={:.3e} photic_km2_myr={:.3e} photic_warm_km2_myr={:.3e} photic_warm_clear_km2_myr={:.3e} \
@@ -561,7 +561,8 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
         t.closed_lakes,
         t.partial_lakes,
         t.closed_km2_myr,
-    ) + &runoff_weight_words(&t.runoff_weight_km2_myr))
+    );
+    Some(line + &runoff_weight_words(&t.runoff_weight_km2_myr))
 }
 
 /// The stream power's mean runoff weight used and the climate snapshot's own, on land and on
