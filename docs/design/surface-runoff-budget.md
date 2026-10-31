@@ -1,9 +1,10 @@
 # The surface's runoff from the bake's water budget: design
 
-Status: **built behind a switch, off** (2026-10-31, the runoff lane, branch `surface-runoff-budget` on
-`plateau-drainage` 7df49df8). The switch is `surface.runoff_budget` (`crates/deeptime-core/src/surface/climate.rs`,
-ERO-221). The checks against cold basins are ERO-222. One cumulative 8-run arm is ready to queue ("The arm"); no
-simulation was run for this design.
+Status: **built behind a switch, off; its arm ran, verdict default-on** (2026-10-31, the runoff lane, branch
+`surface-runoff-budget` on `plateau-drainage` 7df49df8). The switch is `surface.runoff_budget`
+(`crates/deeptime-core/src/surface/climate.rs`, ERO-221). The checks against cold basins are ERO-222. The arm plat-rb0
+ran on the closed basins ("The arm's results"): the flat high ground wears a third less, the land above 4 km doubles,
+K's regions stay inside Montgomery & Brandon's lines, and the export to the sea does not move.
 
 ## Why
 
@@ -162,3 +163,70 @@ What they show:
   leaves.
 
 Plat-cb0 against plat-rb0 is the runoff alone. No V1 number is a gate (decisions log 2026-10-23).
+
+## The arm's results (plat-rb0, 2026-10-31)
+
+Queued by the coordinator against orog-cum. `pool.sh alias HEAD f2d6412d801f --check-seed 1` was identical (`rec.json`
+and the world state), so with both switches off the build is orog-cum's physics. Then plat-rb0 ran: key a3b047bb6ddb,
+argkey 7591e701, 8 runs, the orogen switches, `surface.closed_basins=true` and `surface.runoff_budget=true`.
+
+The reads (VM): `tools/review/plateau/arm_rb.sh` runs `wear.sh` on plat-rb0, `recal.sh` on the three arms,
+`closedshare.py`, and `measures.py`, the cached measures side by side. Before that, `pool.sh measure --arm plat-rb0
+--measures guard,coastset,collcoast --registry tools/review/pool/measures_gap4.json --registry
+tools/review/pool/measures_boundary.json`. Outputs are in `/data/ban/deeptime-runs/plateau/` (`wear-platrb0.txt`,
+`recal.txt`, `arm-rb.txt`). Medians of 8 runs; plat-rb0 against plat-cb0 (the closed basins alone) and orog-cum.
+
+**The pool's table (the coordinator's, against orog-cum):**
+- land 0.226 (p 0.19), largest landmass 0.102 (p 0.23), crust under the sea 0.567 (p 0.38);
+- land above 2 km 0.017 (p 0.38), coast with high ground 0.107 (p 0.19), land under ice 0.045;
+- collisions 5.00 per 100 Myr; criteria met a median 6 (mean 5.88);
+- sea at the end 153 m (orog-cum 203, plat-cb0 259).
+
+| read | plat-rb0 | plat-cb0 | orog-cum |
+|---|---|---|---|
+| runoff weight on land, used / the snapshot's own | 0.731 / 0.833 | (own) | (own) |
+| runoff weight on land above 2 km, used / own | 0.438 / 0.902 | (own) | (own) |
+| flat high ground: land share | 0.0043 | 0.0025 | 0.0027 |
+| flat high ground: net m/Myr (per run) | 91.9 (82 to 123) | 141.4 (114 to 196) | 134.3 (114 to 228) |
+| of it frozen (`flatf`): part, net | 0.68, 91.5 | 0.67, 140.8 | |
+| of it dry (`flatd`): part, net | 0.74, 63.5 | 0.22, 37.6 | |
+| of it draining to a closed basin (`flatc`): part, net | 0.39, 34.0 | 0.30, 52.8 | |
+| land above 2 / 3 / 4 km, each run's mean over its maps | 0.0270 / 0.0105 / 0.0022 | 0.0232 / 0.0086 / 0.0010 | 0.0245 / 0.0091 / 0.0012 |
+| land above 4 km, the largest snapshot | 0.0228 | 0.0101 | 0.0085 |
+| plateau cohorts above 3 km: plates, top (m/Myr of crust) | 68.8, 44.8 | 47.6, 57.7 | 58.9, 53.6 |
+| land with relief above 1 / 1.5 km | 0.0155 / 0.0035 | 0.0123 / 0.0025 | 0.0126 / 0.0026 |
+| regions of 500 / 1,000 / 1,500 m relief or more, m/Myr | 178.5 / 332.4 / 502.7 | 219.9 / 394.2 / 548.4 | 218.2 / 400.9 / 580.3 |
+| regions under 100 / 100 to 250 / 250 to 500 m of relief, m/Myr | 9.0 / 46.2 / 93.5 | 8.3 / 48.0 / 105.3 | 8.9 / 47.9 / 105.2 |
+| the land's mean net lowering, m/Myr | 38.9 | 36.8 | 37.1 |
+| to the sea / eroded gross, km³ a year (Earth-normalized) | 3.34 / 11.03 | 3.36 / 10.65 | 3.03 / 10.20 |
+| land draining to closed basins | 0.119 | 0.127 | |
+| guard worst, m; steps beyond one Earth relief | 10,518; 0 | 10,482; 0 | 9,945; 0 |
+| largest one-step rise, m; plate peak, m | 7,068; 4,352 | 7,562; 4,463 | 7,106; 4,162 |
+| coast with high ground (coastset); collision belt not elongated (collcoast) | 0.099; 0.188 | 0.107; 0.256 | 0.092; 0.075 |
+
+Reading:
+- **Where the weight fell.** The budget cut the stream power's runoff weight by half on the high ground and by an
+  eighth on the land as a whole.
+- **The flat high ground.** It wears a third less (92 against 141 m/Myr, the runs apart), and there is 1.7 times as
+  much of it.
+- **The high ground stands.** The land above 4 km doubles over the run (0.0022 against 0.0010; Earth's is 0.0195),
+  and above 3 km rises a fifth.
+- **What wears the dry flat top now.** It has no runoff to speak of: stream power without the cut is 2.7 m/Myr of its
+  63.5. The cut at its edge is 28.2 and diffusion 26.1: the escarpment's retreat and κ 2 at 4.8-km cells.
+- **K's regions.** Below 500 m of relief they are unchanged. At 500 m and more they wear 15 to 19 % slower, still
+  between Montgomery & Brandon's quiet-land line and their power law (at 500 m and more 150 and 210 against 178.5; at
+  1,000 m and more 250 and 525 against 332.4). K was not touched.
+- **The export did not move:** 3.34 against 3.36 km³ a year, the runs' pairs off in both directions. The land kept its
+  mean lowering (38.9 against 36.8 m/Myr) by standing higher: the export is set by what the plates lift, not by the erosion law.
+- **The guard** is plat-cb0's (10.5 km, under the Challenger Deep), and the largest one-step rise is back to orog-cum's.
+- **The belt-shape read** moves halfway back (0.188).
+
+**Verdict: default-on.** It meets the project's rule:
+- unit tests against its sources (ERO-222);
+- no divergence or guard failure on the pool;
+- K's regions inside Montgomery & Brandon's lines;
+- the criteria at a median 6.
+
+It replaces the snapshot's rule that a land below freezing evaporates nothing (MOI-067's PET for the runoff), which the
+bake dropped on 2026-10-01, so the rivers and the lakes then share one budget. It does not reach Tibet's 6 to 16 m/Myr.
+The plateaus' flat tops now wear by the edge's cut and by diffusion, not by runoff.

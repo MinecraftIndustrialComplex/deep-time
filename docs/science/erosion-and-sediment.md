@@ -1375,4 +1375,7 @@ off nothing, so its weight sits at ERO-011's floor.
 - The aridity index and the facies (they keep the snapshot's PET).
 - K and ERO-011's floor.
 
-Measured on the pool: not yet (the design's "The arm").
+Measured on the pool (the arm plat-rb0, 8 runs, on the closed basins; the design's "The arm's results"): the flat high
+ground wears 92 against 141 m/Myr and the land above 4 km doubles (0.0022 against 0.0010 of the land, Earth 0.0195);
+K's regions of 500 m relief and more wear 15 to 19 % slower, inside Montgomery & Brandon's lines; the export to the sea
+does not move (3.34 against 3.36 km³ a year). Verdict: default-on.
