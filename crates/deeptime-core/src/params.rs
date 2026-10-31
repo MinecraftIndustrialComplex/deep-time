@@ -1287,23 +1287,27 @@ pub struct TectonicParams {
     /// reversals per 100 Myr). ledger: PLT-737
     pub collision_backarc_reversal: bool,
     /// `true`: a terrane its slab can drag down whole subducts, stripped of its cover. A collision
-    /// front's terrane goes down with the contact's slab when its extent across the front (the
-    /// shortening so far and the rest's area over the front's length) is within the slab's reach
-    /// against the terrane's buoyancy (`shortening::dragged_length_km`: the slab's length over
-    /// 1 + 2.25 T / 30 km, FRC-028 to FRC-030's law); then only the supracrustal cover of its
-    /// crossing crust (sediment, sedimentary and volcanic rock, `pools::COVER`) stays, by
-    /// `collision_stacking_share`, the plutonic and metamorphic crust under it going down with
-    /// the slab, and it does not transfer at `collision_threshold_km`. A larger terrane jams the
-    /// slab and collides as before. Tetreault & Buiter 2014: "the force of the subducting slab
+    /// front's terranes go down with the contact's slab when each body at the front has its
+    /// extent across the front (all its area, hidden and visible, over its share of the front's
+    /// length) within the slab's reach against its buoyancy (`shortening::dragged_length_km`: the
+    /// slab's length over 1 + 2.25 T / 30 km, FRC-028 to FRC-030's law), judged as the body
+    /// arrives and kept while it goes down, a body that crust joins judged again by all its
+    /// samples over the share of the front it was judged with (`shortening::docking`); then only the
+    /// supracrustal cover of its crossing crust (sediment, sedimentary and volcanic rock,
+    /// `pools::COVER`) and the crust this collision stacked on it (PLT-400) stay, pool by pool,
+    /// by `collision_stacking_share`, all of it on the overriding plate (no pro-wedge on a
+    /// terrane going down), the plutonic and metamorphic crust under it going down with the slab;
+    /// it does not transfer at `collision_threshold_km`, and its front feeds the slab instead of
+    /// blocking it (FRC-019). A body beyond its reach jams the slab and the front collides as
+    /// before. Tetreault & Buiter 2014: "the force of the subducting slab
     /// ... can most likely overcome the buoyancy of small crustal units"; accretion adds "slivers
     /// of thrusted crustal units ... rather than collision and addition of the entire crustal
     /// thickness"; "only the upper 2–5 km of arc crust" where the arc is on the subducting plate.
     /// `shortening::advance` classes the front, `belts::stack` strips it; the design
     /// docs/design/small-terrane-docking.md. On by default since 2026-10-31 (the coordinator's
     /// call, under Ben's rule of 2026-10-23: physics goes on by default once built and correct;
-    /// decisions log 2026-10-31; the arm small-terrane against orog-cum: the guard clean,
-    /// hand-offs of terranes under 50 samples 17.6 to 12.3 per 100 Myr). `false`: every
-    /// terrane collides and transfers as before (PLT-068). ledger: PLT-770, PLT-771
+    /// decisions log 2026-10-31; its pool arms against orog-cum in PLT-770's row and the design).
+    /// `false`: every terrane collides and transfers as before (PLT-068). ledger: PLT-770, PLT-771
     pub terrane_docking_cover: bool,
     /// Contacts unseen for longer than this are closed, Myr (12 steps at the 2-Myr step).
     /// Ledger PLT-059.

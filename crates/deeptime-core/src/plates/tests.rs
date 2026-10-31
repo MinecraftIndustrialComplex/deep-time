@@ -2316,6 +2316,8 @@ fn a_collision() -> state::Collision {
         stalled_since_myr: None,
         jam_km: None,
         subducting: false,
+        docking: Vec::new(),
+        docking_resample: 0,
         belt: Default::default(),
     }
 }
