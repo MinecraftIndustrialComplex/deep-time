@@ -155,9 +155,10 @@ sources above (internal drainage defeating the channel network under aridity) ar
 
 ## How it is judged
 
-Unit tests (`belts.rs`): with the retro flank full at the strength height within the belt, the switch places the
-step's crust beyond `collision_belt_km` as a plateau at the strength height whose edge moves away from the front, keeps
-the volume to the metre and leaves the pro-wedge as it was; a sea between two continents of the overriding plate
-stops it; off, the no-room rule takes it as before. One cumulative 8-run arm (O1 + O2) against base34-s4 (or
+Unit test (`belts.rs`, `the_retro_plateau_grows_past_the_belt_through_its_own_crust`): with the pro side and the
+retro flank within the belt's reach at the strength height, the switch places the step's crust on the lowland beyond
+`collision_belt_km`, at most at the strength height; a sea strip between two continents of the overriding plate stops
+it; the crust kept is the same as without the switch; off, the no-room rule takes it and nothing beyond the belt
+rises. One cumulative 8-run arm (O1 + O2) against base34-s4 (or
 sedmargin, its physics), with `v1census`, `guard`, `collcoast` and `coastset`, the dock tally and the high ground
 through time. No V1 number is a gate (decisions log 2026-10-23).

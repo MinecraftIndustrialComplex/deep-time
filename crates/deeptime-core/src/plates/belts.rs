@@ -907,9 +907,7 @@ fn stack_front(
                         .filter(|&(i, d, _)| {
                             d > w_rad
                                 && samples[i as usize].kind == CONTINENTAL
-                                && belt_d
-                                    .binary_search_by_key(&(i as usize), |e| e.0)
-                                    .is_err()
+                                && belt_d.binary_search_by_key(&(i as usize), |e| e.0).is_err()
                         })
                         .map(|(i, d, _)| (i as usize, d))
                         .collect();
@@ -998,11 +996,9 @@ fn stack_front(
         // Whitney 2010); Stern & Scholl 2010's suture losses are the share's (PLT-242).
         let mut edge_rise: Vec<(usize, f64)> = Vec::new();
         if k.collision_noroom_stays {
-            let left_km2_m = (belt_rise_km2_m
-                - pro_km2_m
-                - plateau_km2_m
-                - given.iter().sum::<f64>() * area)
-                .max(0.0);
+            let left_km2_m =
+                (belt_rise_km2_m - pro_km2_m - plateau_km2_m - given.iter().sum::<f64>() * area)
+                    .max(0.0);
             let edge: Vec<usize> = f
                 .edge
                 .iter()
@@ -3317,7 +3313,8 @@ mod tests {
                 (added - kept).abs() < 1e-4 * added.max(1.0),
                 "on {on}: the record is the crust added, {added} vs {kept}"
             );
-            // The rises beyond the belt (with a spacing's margin), before the sea and past it.
+            // The rises on the lowland beyond the belt (the samples set at the strength height
+            // reach a spacing past it), before the sea and past it.
             let (mut near, mut far, mut top) = (0.0f64, 0.0f64, f64::NEG_INFINITY);
             for (i, x) in st.samples.iter().enumerate() {
                 let p = pts[i];
@@ -3326,7 +3323,7 @@ mod tests {
                 }
                 let d = behind(p);
                 let dz = f64::from(x.elevation_m - z0[i]);
-                if d > belt_km + 2.0 * spacing && d <= belt_km + spacing + 400.0 {
+                if d > belt_km + spacing && d <= belt_km + spacing + 400.0 {
                     near += dz.max(0.0) * area;
                     top = top.max(f64::from(x.elevation_m));
                 } else if d > belt_km + spacing + 800.0 {
@@ -3336,10 +3333,21 @@ mod tests {
             out.push((s, near, far, top, cap));
         }
         let (off, on) = (&out[0], &out[1]);
-        assert!(off.0.stays_km2_m > 0.0, "off: the no-room rule takes it: {:?}", off.0);
+        assert!(
+            off.0.stays_km2_m > 0.0,
+            "off: the no-room rule takes it: {:?}",
+            off.0
+        );
         assert_eq!(off.0.plateau_km2_m, 0.0);
-        assert!(off.1 < 1e-6 && off.2 < 1e-6, "off: nothing beyond the belt rose: {off:?}");
-        assert!(on.0.plateau_km2_m > 0.0, "on: the plateau took crust: {:?}", on.0);
+        assert!(
+            off.1 < 1e-6 && off.2 < 1e-6,
+            "off: nothing beyond the belt rose: {off:?}"
+        );
+        assert!(
+            on.0.plateau_km2_m > 0.0,
+            "on: the plateau took crust: {:?}",
+            on.0
+        );
         assert!(on.1 > 0.0, "on: the lowland past the belt rose: {on:?}");
         assert!(on.2 < 1e-6, "on: nothing across the sea rose: {on:?}");
         assert!(
