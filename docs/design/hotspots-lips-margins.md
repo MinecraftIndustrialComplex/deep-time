@@ -171,22 +171,28 @@ mantle is its plume heads: a head is hot 150 K above the normal mantle (the one 
 for 20 Myr after it rises (Campbell & Griffiths' "of order 20 Ma"; White & McKenzie's Table 2 has
 the first spreading within that), PLT-798.
 
-At a resampling, a gap point that goes to a continent's plate, within 90 km of that continent's
-edge (Kelemen & Holbrook's "80–100 km seaward"), formed over a head's hot mantle, is the igneous
-crust that mantle melts to at full breakup: 20.4 km at 150 K (White & McKenzie's Fig. 3 at β = 50,
-interpolated between 1400 and 1480 °C), a quarter lavas, as continental crust over its 7 km ocean
-basement (PLT-331), so 13.4 km of it counts (PLT-799). When it formed is the pair's parting: the
+At a resampling, a gap point that goes to a continent's plate, whose cell reaches into the 90 km
+seaward of that continent's outline (Kelemen & Holbrook's "80–100 km seaward", PLT-802), formed
+over a head's hot mantle, is the igneous crust that mantle melts to at full breakup over its
+cell's share of that strip (`ridges::margin_share`: the point holds the strip from d − s to d
+seaward of the outline, d its distance from the edge sample, s the spacing; the shares of a
+straight margin's rows add to the 90 km at any spacing) and the ocean column over the rest:
+20.4 km at 150 K (White & McKenzie's Fig. 3 at β = 50, interpolated between 1400 and 1480 °C), a
+quarter lavas, as continental crust over its 7 km ocean basement (PLT-331), so up to 13.4 km of it
+counts (PLT-799). When it formed is the pair's parting: the
 gap point's age (α × the time since the last resampling) but not before the pair's rift onset (the
 gap beside a continent opened after the last resampling, which filled any older one); where it
 formed is its position turned back by its plate's motion over that time. No draw decides it: a
 breakup over a head's hot mantle makes a volcanic margin, any other breakup does not.
 
 On the 16k quick planet the lattice spacing is 71 km, so the margin is the first row of gap points
-(about 950 km³ per km of margin of continental crust, beyond the basement; Kelemen & Holbrook's
-whole igneous crust is about 1,350 km³ per km, Eldholm & Grue's North Atlantic about 2,500 with the
-onshore basalts). The new column's height starts at the gap's plus the Airy rise of its extra
-crust; `settle.rs` takes it from there. It is not hyper-extended (13.4 km of its own crust) and no
-sediment margin, so the transition (PLT-661, PLT-667) leaves it continental.
+whole and the second at a quarter: 90 km × 13.4 km, about 1,200 km³ per km of margin of
+continental crust beyond the basement (Kelemen & Holbrook's whole igneous crust is about 1,350 km³
+per km, Eldholm & Grue's North Atlantic about 2,500 with the onshore basalts). The new column's
+height starts at the gap's plus the Airy rise of its extra crust; `settle.rs` takes it from there.
+The first row is not hyper-extended (13.4 km of its own crust) and no sediment margin, so the
+transition (PLT-661, PLT-667) leaves it continental; the second (3.6 km of its own) is the
+taper's ocean side, as a hyper-extended margin is.
 
 What the rule does not do: a margin that forms without a head (the US East Coast, NW Australia,
 Franke 2013) stays the ocean column; the thick ocean crust of a ridge over a head's or a tail's

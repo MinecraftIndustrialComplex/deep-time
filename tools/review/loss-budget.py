@@ -33,7 +33,12 @@ The model's rows:
   hotspots           on continental crust: the hotspots' own basalt and their LIPs there
                      (`hotspot_magma_c`) and the cones they counted inside (`hotspot_cones_c`), since
                      2026-10-31; before, all of the hotspots' own basalt (`hotspot_magma`), ocean
-                     floor's included and the cones left out (row "model only: hotspots, all")
+                     floor's included and the cones left out (row "model only: hotspots, all");
+                     since the hotspot lane (2026-10-31, PLT-795, PLT-799, PLT-800) also the
+                     sourced provinces' plateau beyond the plate model's dome on continental
+                     crust (`lip_c` - `lip_dome_c`, the volcano stage lays it) and the volcanic
+                     rifted margins' continental crust (`vrm`), with sub-rows for the tails, the
+                     provinces whole and the margins
   ocean floor        the ocean floor's own crust (7 km a sample) made continental with the crust
                      on it (`cb_moves` o2c, every part), less what stays under it as its basement
                      and is not counted as continental crust (`o2c_b_km`, PLT-331, since
