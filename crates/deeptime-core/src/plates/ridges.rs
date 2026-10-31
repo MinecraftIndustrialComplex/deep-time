@@ -463,11 +463,13 @@ pub fn hot_mantle_at(heads: &[HotMantle], at: DVec3, t_myr: f64) -> Option<HotMa
 /// normal melts to when it rises to the surface under full breakup
 /// (`super::hotspots::sourced::igneous_crust_m`), lavas over intrusions in the share
 /// `super::hotspots::sourced::MARGIN_EXTRUSIVE_SHARE`, on new sea floor whose ocean crust is
-/// the ocean column (PLT-104). `None` where it is no thicker than that.
-pub fn volcanic_margin_column(excess_k: f64) -> Option<[f32; pool::COUNT]> {
-    let h = super::hotspots::sourced::igneous_crust_m(excess_k);
-    let ocean = oceanic_column();
-    if !(h > f64::from(thickness(&ocean))) {
+/// the ocean column (PLT-104), over `share` of the point's cell (the rest the ocean column; see
+/// [`margin_share`]). `None` where it is no thicker than the ocean column.
+pub fn volcanic_margin_column(excess_k: f64, share: f64) -> Option<[f32; pool::COUNT]> {
+    let ocean = f64::from(thickness(&oceanic_column()));
+    let h = ocean
+        + share.clamp(0.0, 1.0) * (super::hotspots::sourced::igneous_crust_m(excess_k) - ocean);
+    if !(h > ocean) {
         return None;
     }
     let mut p = [0.0f32; pool::COUNT];
@@ -475,6 +477,20 @@ pub fn volcanic_margin_column(excess_k: f64) -> Option<[f32; pool::COUNT]> {
     p[pool::MAFIC_VOLCANIC] = (h * e) as f32;
     p[pool::MAFIC_PLUTONIC] = (h * (1.0 - e)) as f32;
     Some(p)
+}
+
+/// The share of a gap point's cell inside a volcanic margin's `width_rad` (PLT-802): a gap point
+/// `d1_rad` from the nearest edge sample along the lattice holds the strip from `d1 − s` to `d1`
+/// seaward of the plate's outline (the outline lies half a spacing `s` beyond the edge sample,
+/// and the point's cell spreads half a spacing either side of it), so the share of it within the
+/// margin's width is the strip's overlap with [0, width] over `s`. Summed over the rows of a
+/// straight margin the shares give the width at any lattice spacing: on the 16k quick planet
+/// (71 km) the first row takes all of its cell and the second a quarter of it for 90 km.
+pub fn margin_share(d1_rad: f64, width_rad: f64, spacing_rad: f64) -> f64 {
+    if !(spacing_rad > 0.0) {
+        return 0.0;
+    }
+    ((d1_rad.min(width_rad) - (d1_rad - spacing_rad).max(0.0)) / spacing_rad).clamp(0.0, 1.0)
 }
 
 /// A pair's frame for the ridge segments: its relative rotation's pole ê and two unit vectors
@@ -1143,14 +1159,16 @@ pub fn resample(
         s.pools = oceanic_column();
         s.thickness_m = thickness(&s.pools);
         s.heat_flow_mw_m2 = ocean_heat_flow(age) as f32;
-        // A volcanic rifted margin (PLT-799): new sea floor of a continent's plate within
-        // `MARGIN_WIDTH_KM` of its continental edge, formed over a plume head's hot mantle
-        // (White & McKenzie 1989), is the igneous crust that mantle melts to, continental crust
-        // over its ocean basement (PLT-331). It formed when the pair began to part or later (its
+        // A volcanic rifted margin (PLT-799): new sea floor of a continent's plate whose cell
+        // reaches into the `MARGIN_WIDTH_KM` strip seaward of its continental outline (PLT-802,
+        // over its cell's share of it), formed over a plume head's hot mantle (White & McKenzie
+        // 1989), is the igneous crust that mantle melts to, continental crust over its ocean
+        // basement (PLT-331). It formed when the pair began to part or later (its
         // age, α × the time since the last resampling, at most that), where its plate's motion
         // brings it back to over that time.
+        let share = margin_share(d1, margin_rad, norm.spacing_rad());
         if !heads.is_empty()
-            && d1 <= margin_rad
+            && share > 0.0
             && plate_new[l1 as usize] == p1
             && samples[l1 as usize].kind == CONTINENTAL
         {
@@ -1161,8 +1179,8 @@ pub fn resample(
                 .max(state.resample_myr);
             let t_f = (t - age).max(t_open).min(t);
             let back = super::kinematics::rotation(omega[p1 as usize], -(t - t_f) * 1.0e6);
-            if let Some(column) =
-                hot_mantle_at(&heads, back * p, t_f).and_then(|h| volcanic_margin_column(h.excess_k))
+            if let Some(column) = hot_mantle_at(&heads, back * p, t_f)
+                .and_then(|h| volcanic_margin_column(h.excess_k, share))
             {
                 let added = thickness(&column) - thickness(&s.pools);
                 s.pools = column;

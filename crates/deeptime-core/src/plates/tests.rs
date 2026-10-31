@@ -7491,8 +7491,16 @@ fn a_breakup_over_a_plume_head_makes_a_volcanic_margin() {
     );
     let (st, world, pts) = a_rift_over_a_head(&p, &env, Some(rose), head_km);
     let vrm = margin(&st);
-    let want = ridges::volcanic_margin_column(HEAD_EXCESS_K).expect("a thick igneous crust");
+    let want = ridges::volcanic_margin_column(HEAD_EXCESS_K, 1.0).expect("a thick igneous crust");
     let h = f64::from(pools::thickness(&want));
+    // The margin's strip over the lattice (PLT-802): the rows' shares of a straight margin add to
+    // its width at any spacing.
+    for s_km in [50.0, 71.4, 159.0, 300.0] {
+        let (w, s) = (env.norm.rad(90.0), env.norm.rad(s_km));
+        let rows: f64 = (1..6).map(|r| ridges::margin_share(r as f64 * s, w, s) * s).sum();
+        assert!((rows - w).abs() < 1e-12, "{s_km} km: {rows} against {w}");
+    }
+    assert_eq!(ridges::margin_share(env.norm.rad(71.4), env.norm.rad(90.0), env.norm.rad(71.4)), 1.0);
     eprintln!(
         "volcanic margin: {} gap points, {h:.0} m of igneous crust each",
         vrm.len()
@@ -7513,14 +7521,12 @@ fn a_breakup_over_a_plume_head_makes_a_volcanic_margin() {
             "far from the continent: z {}",
             pts[i].z
         );
-        assert!(
-            (f64::from(s.thickness_m) - h).abs() < 1.0,
-            "{} m",
-            s.thickness_m
-        );
+        // The igneous crust over the cell's share of the margin, the ocean column over the rest.
+        let th = f64::from(s.thickness_m);
+        assert!(th > 7000.0 && th <= h + 1.0, "{th} m");
         assert!((f64::from(s.basement_m) - 7000.0).abs() < 1.0);
         let lava = f64::from(s.pools[state::pool::MAFIC_VOLCANIC]);
-        assert!((lava - h * MARGIN_EXTRUSIVE_SHARE).abs() < 1.0);
+        assert!((lava - th * MARGIN_EXTRUSIVE_SHARE).abs() < 1.0);
         own += f64::from(s.own_thickness_m());
     }
     let booked = world.globals[ridges::VOLCANIC_MARGIN_GLOBAL];
@@ -7630,7 +7636,8 @@ fn a_sourced_tail_adds_its_buoyancy_fluxs_magma() {
         let rise = f64::from(b.elevation_m - a.elevation_m);
         assert!((rise - dry * wet).abs() < 0.01 + 1e-3 * rise.abs(), "{rise} against {}", dry * wet);
     }
-    assert!(seen > 3, "{seen} columns took magma");
+    // On this 6,000-sample planet (spacing about 290 km) the 150 km kernel holds its centre.
+    assert!(seen >= 1, "{seen} columns took magma");
     let (_, with) = run(1.0);
     assert!(with < km3, "the cones are counted inside the rate");
 }
