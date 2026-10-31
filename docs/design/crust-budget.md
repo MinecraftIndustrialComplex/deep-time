@@ -242,4 +242,10 @@ against 6.5 (p 0.35). Verdict: all three correct, on (PLT-760 with the substrate
   than 50 Myr: 0.61; Earth's zones began 55 Ma or later). A missing law by its signature: a
   subduction zone starts at any converging boundary after 100 km of slab. Next: whether the start
   condition or the kinematics that make young boundaries converge is missing (one trace: each
-  contact's boundary the step before its onset).
+  contact's boundary the step before its onset). The onset trace (oo-onset, 2026-10-31): neither
+  in the plain sense. Onsets between two floors younger than 10 Myr make 0.03 of the
+  intra-oceanic front; 0.90 of the onsets come at pairs that had not converged before (parting,
+  or not touching on the lattice, the step before), about half on the step after a resampling,
+  where the first floor down is the resampling's new floor (median 7 Myr). The contacts begin
+  where the resampling and the plates' motion first make two plates overlap. Reported before
+  building; next, a resampling trace (where the next step's new overlaps come from).
