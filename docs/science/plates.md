@@ -13285,6 +13285,23 @@ year on continental crust, nearly Stern & Scholl's whole row, because Hawaii's m
 flux applies under every lid. The lid (Courtillot et al. 2003: weak plumes "would not melt beneath
 old lithosphere"; White & McKenzie's Fig. 3) is the sourced step before `hotspots_sourced` goes on.
 
+**The review's fixes** (an Opus review of 4d9ea6f5, 2026-10-31; docs/design/hotspot-cone-budget.md
+section 6). The arcs run before the hotspots and net every felsic cone within 1,800 km of an oceanic
+slab's front, a hotspot's silicic centres and ignimbrites included, so under the budget a
+continental hotspot's near a front was netted by the arc and by its tail (on hs-budget 0.004 to
+0.007 km³ a year, about a fifth of what the tails netted by id, the reviewer's reading): the budgeted
+hotspots' cones now reach the plate model apart (`surface/volcanic_hotspot_felsic_m`,
+`surface/volcanic_hotspot_mafic_m`), into the pools as any cone's rock and counted by no arc nor
+kernel by place. The tail nets its cones between nothing and the step's rock and carries the rest of
+either sign (a negative pending had been netted uncapped, cleared on a step with no rock and dropped
+at a tail's death); a dead tail's record leaves it as unnetted (`plates/hotspot_cones_unnetted_km3`).
+A cone whose growth held no cell no longer backs rock its hotspot's other cones handed. New tests:
+`a_budgeted_hotspots_cones_join_the_pools_but_no_rate_by_place` (plates/tests.rs) and
+`two_hotspots_cones_hand_and_take_back_each_their_own_share` (volcanoes/tests.rs); the sourced tail's
+test now on a planet whose kernel holds several samples, its netting exact, and the volcanic margin's
+test checks each gap point's thickness against its share. The arms above predate the fixes; the
+default without the budget is unchanged.
+
 ### The lid (PLT-805 to PLT-808; 2026-10-31)
 
 With the cone budget the sourced tails still put 0.43 km³ a year on continental crust (hs-cum2), because
