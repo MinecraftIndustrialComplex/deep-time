@@ -1239,6 +1239,8 @@ pub(in crate::plates) mod tests {
             let mut fx = Fx::new();
             fx.k.collapse_hot_myr = 40.0;
             fx.k.collapse_sea_column = on;
+            // The ocean floor turns continental at the filled column, as before PLT-662 went on.
+            fx.k.margin_sediment_continental = false;
             let mut st = planet(&fx.geo, belt, 26_000.0);
             for s in st.samples.iter_mut().filter(|s| s.thickness_m > 40_000.0) {
                 s.orogeny = OROGENY_HIMALAYAN;
