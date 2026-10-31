@@ -109,9 +109,9 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
     // The plate model's heat flow (2026-10-02): continental cells only, every one at least the
     // floor of its law (since 2026-10-23 the lithosphere's thermal state, on by default: an old
     // craton's 41 mW/m², PLT-467; the old proxy's 55 before) and nodata on oceanic crust (where
-    // the crust-age layer has data; a continental cell has none).
+    // the crust-age layer has data; a continental cell has none), and at most its law's ceiling.
     let floor = crate::plates::thermal::conductive_mw_m2(crate::plates::thermal::L_COLD_KM);
-    check_heat_flow(&dir, floor - 0.1);
+    check_heat_flow(&dir, floor - 0.1, state_heat_flow_ceiling());
     for f in [
         "strata/classes.json",
         "spawn/candidates.json",
@@ -326,9 +326,24 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
-/// The bake's heat flow: continental cells only, every one in [`lo`, 200.1] mW/m², and nodata on
+/// The most the lithosphere's thermal state gives a continental column, mW/m² (+0.1 for the
+/// layer's rounding): its law (PLT-467, PLT-468) at the lid's floor (PLT-820) of the thinnest crust
+/// the model makes continental, the ocean's 7 km column (floor made continental starts from it; a
+/// stretch leaves a source at least its target crust, the ocean's, PLT-261), with an arc's and a
+/// hotspot's terms: 26 + 2,700 / 7 + 80 = 491.7. Before the floor (2026-10-31) the law had no
+/// ceiling but the 1 km clamp's 3,401 (+80), and the tests held the state to the proxy's 200.1,
+/// which held for their planets, not for the law (lithosphere-thermal-state.md "The lid's floor").
+fn state_heat_flow_ceiling() -> f64 {
+    use crate::plates::thermal::{
+        ARC_HEAT_MW_M2, HOTSPOT_HEAT_MW_M2, conductive_mw_m2, lid_floor_km,
+    };
+    let ocean_km = f64::from(crate::plates::pools::oceanic_column().iter().sum::<f32>()) / 1000.0;
+    conductive_mw_m2(lid_floor_km(ocean_km)) + ARC_HEAT_MW_M2 + HOTSPOT_HEAT_MW_M2 + 0.1
+}
+
+/// The bake's heat flow: continental cells only, every one in [`lo`, `hi`] mW/m², and nodata on
 /// oceanic crust (where the crust-age layer has data; a continental cell has none).
-fn check_heat_flow(dir: &Path, lo: f64) {
+fn check_heat_flow(dir: &Path, lo: f64, hi: f64) {
     let load = |n: &str| {
         deeptime_format::TilePackReader::open(&dir.join(format!("rasters/{n}.dtr")))
             .unwrap()
@@ -352,7 +367,7 @@ fn check_heat_flow(dir: &Path, lo: f64) {
             if v.is_nan() {
                 cold += 1;
             } else {
-                assert!((lo..=200.1).contains(&v), "({i}, {j}) heat flow {v}");
+                assert!((lo..=hi).contains(&v), "({i}, {j}) heat flow {v}");
                 assert!(a.is_nan(), "({i}, {j}) has an age and a continental flow");
                 assert_eq!(k, 1.0, "({i}, {j}) has a continental flow on crust {k}");
                 hot += 1;
@@ -382,13 +397,18 @@ fn the_release_pace_bakes_continental_heat_flow_with_the_final_pass() {
     v["surface"]["flexure"]["te_weakening_myr"] = json!(62.8);
     v["tectonics"]["thermal_state"] = json!(false);
     run_to_folder(&v.to_string(), &dir);
-    check_heat_flow(&dir, 54.9);
+    // The proxy's most: 55 + 35 + 40 + 40 + 30 = 200 (PLT-468's terms on its base).
+    check_heat_flow(&dir, 54.9, 200.1);
     let _ = std::fs::remove_dir_all(&dir);
 }
 
 /// The lithosphere's thermal state (PLT-460 to PLT-469, ISO-112; on by default since 2026-10-23)
 /// with thermal isostasy (ISO-110, off by default) and the release pace: the bake's continental
-/// heat flow is the state's, at least an old craton's 41 mW/m².
+/// heat flow is the state's, at least an old craton's 41 mW/m² and at most its law's ceiling over
+/// the ocean's 7 km column at its lid's floor, 491.7 (PLT-820). Since the floor the planet bakes
+/// 259.8 at (21, 279), its one sample over 200.1 in the run: crust with no state at the final
+/// frame, a 7.3 km column on 1.54 Myr floor, under its floor's 2.32 √(κt) of 14.4 km (PLT-821),
+/// where it took the frame's 225 km and 41 before (a temporary trace, 2026-10-31).
 #[test]
 fn the_thermal_state_bakes_its_own_heat_flow() {
     let dir = temp_dir("thermal");
@@ -401,7 +421,9 @@ fn the_thermal_state_bakes_its_own_heat_flow() {
     v["tectonics"]["thermal_strength"] = json!(true);
     run_to_folder(&v.to_string(), &dir);
     let floor = crate::plates::thermal::conductive_mw_m2(crate::plates::thermal::L_COLD_KM);
-    check_heat_flow(&dir, floor - 0.1);
+    let ceiling = state_heat_flow_ceiling();
+    assert!((ceiling - 491.8).abs() < 0.1, "{ceiling}");
+    check_heat_flow(&dir, floor - 0.1, ceiling);
     let _ = std::fs::remove_dir_all(&dir);
 }
 

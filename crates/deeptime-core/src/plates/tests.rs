@@ -544,8 +544,12 @@ fn sutures_and_initiations_keep_continents_whole() {
     // 5, 6, 8, 9, 11 to 13, 16 to 22 and 24, so supercontinent 2 and scattered 8 still; both
     // still weld with the island-arc class carried through the resamplings and no suture magma on
     // a terrane going down, PR #53's re-review, the same day: supercontinent 1 to 4, 10, 12, 14,
-    // 18 and 21 to 24, scattered 1, 3 to 6, 8 to 10, 12, 13, 15 to 17 and 21 to 23).
-    for (start, seed) in [("supercontinent", 2), ("scattered_continents", 8)] {
+    // 18 and 21 to 24, scattered 1, 3 to 6, 8 to 10, 12, 13, 15 to 17 and 21 to 23; with the
+    // continental lid's floor, PLT-820 and PLT-821, 2026-10-31, supercontinent 2 still welds and
+    // scattered 8 no more, the sweep's welding seeds supercontinent 1, 2, 4 to 6, 8 to 12, 14, 16,
+    // 21 and 24 and scattered 1, 2, 4, 5, 9, 12 to 19 and 21 to 24, so supercontinent 2 and
+    // scattered 1).
+    for (start, seed) in [("supercontinent", 2), ("scattered_continents", 1)] {
         let mut p = preset(8000, 300.0, start, seed);
         // The old law (PLT-585 off, PLT-540 on): under Forsyth & Uyeda's balance on this small
         // planet, whose ridge push is several times Earth's (`plates_quick_16k`, ridge -1,000 m,
@@ -899,8 +903,11 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // the supercontinent 2, 5, 7, 9, 13 to 15, 17, 20, 21 and 23; 16 of seeds 1 to 24 with the
     // island-arc class carried through the resamplings and no suture magma on a terrane going
     // down, PR #53's re-review, the same day: 1, 3 to 6, 8 to 10, 12, 13, 15 to 17 and 21 to 23,
-    // seed 3 still welds; from the supercontinent 1 to 4, 10, 12, 14, 18 and 21 to 24).
-    let mut p = preset(8000, 300.0, "scattered_continents", 3);
+    // seed 3 still welds; from the supercontinent 1 to 4, 10, 12, 14, 18 and 21 to 24; 17 of seeds
+    // 1 to 24 with the continental lid's floor, PLT-820 and PLT-821, 2026-10-31, the sweep
+    // `weld_seed_sweep`: 1, 2, 4, 5, 9, 12 to 19 and 21 to 24, seed 3 no more, so seed 1; from the
+    // supercontinent 1, 2, 4 to 6, 8 to 12, 14, 16, 21 and 24).
+    let mut p = preset(8000, 300.0, "scattered_continents", 1);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: under Forsyth & Uyeda's
     // balance on this small planet, whose ridge push is several times Earth's
     // (`plates_quick_16k`, ridge -1,000 m, floor -10,000 m), the speed guard bound on every
@@ -1113,8 +1120,11 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // 2026-10-31: it still welds (the sweep's welding seeds 1, 3, 5, 6, 8, 9, 11 to 13, 16 to 22
     // and 24, the guard binding on none), so the two tests still share this planet; and after PR
     // #53's re-review, the same day (the sweep's welding seeds 1, 3 to 6, 8 to 10, 12, 13, 15 to 17
-    // and 21 to 23, the guard binding on none)).
-    let mut p = preset(8000, 300.0, "scattered_continents", 3);
+    // and 21 to 23, the guard binding on none); seed 1 since the continental lid's floor, PLT-820
+    // and PLT-821, 2026-10-31, when seed 3 no longer welds: the sweep's welding seeds 1, 2, 4, 5,
+    // 9, 12 to 19 and 21 to 24, the guard binding on none, seed 1 the first, and the weld test
+    // above takes seed 1 too, so the two tests still share this planet).
+    let mut p = preset(8000, 300.0, "scattered_continents", 1);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: the guard asserted below
     // bound under Forsyth & Uyeda's balance on every welding seed of 1 to 24 of this small planet
     // but supercontinent 11, whose ridge push is several times Earth's (`plates_quick_16k`, ridge
@@ -6248,7 +6258,7 @@ fn young_floor_made_continental_after_the_step_takes_the_continental_law() {
     for &i in &sea {
         assert_eq!(
             st.samples[i].heat_flow_mw_m2,
-            continental_heat_flow(&st.samples[i], t, false, 0.0),
+            continental_heat_flow(&st.samples[i], t, false),
             "what finish_samples sets"
         );
     }
@@ -6282,6 +6292,154 @@ fn young_floor_made_continental_after_the_step_takes_the_continental_law() {
     let mut st = made.clone();
     thermal::refresh_heat_flow(&mut st, &off, t);
     assert_eq!(st, made);
+}
+
+/// The continental lithosphere's floor (PLT-820 to PLT-823): a continental column's thermal
+/// lithosphere reaches no shallower than where the heat-flow law's conductive geotherm puts its
+/// Moho at the crust's basal solidus, 1080 °C (Lachenbruch, Sass & Galanis 1985), z_Moho × 1350 /
+/// 1080, so the law is bounded by the crust: 26 + 2,700 / z_Moho before the magmatic terms, 141
+/// mW/m² over the Salton Trough's 23.5 km crust against the Imperial Valley's ~140. A 70 km belt
+/// under an arc's heating stays at its 87.5 km floor (the heating's target is L_hot's 60); floor
+/// made continental keeps the floor's 2.32 √(κt) or its lid's floor, whichever is deeper; a
+/// stretch thins L with the crust down to the stretched column's floor, not to 1 km; crust with no
+/// state takes its floor's lithosphere at the floor's age (at least its lid's floor), not the
+/// frame's 225 km; and the law no longer reaches the 1 km clamp's 3,401 mW/m².
+#[test]
+fn a_continental_lithosphere_reaches_down_to_at_least_its_moho() {
+    use super::thermal::{
+        ARC_HEAT_MW_M2, CRUST_BASE_C, L_COLD_KM, MANTLE_C, conductive_mw_m2, continental_l_km,
+        cooling_myr, lid_floor_km, moho_km, ocean_km, stretch,
+    };
+    let p = preset(2_000, 20.0, "supercontinent", 5);
+    assert!(p.tectonics.thermal_state, "the state is the default");
+    // The bound against the Salton Trough (PLT-823): 26 + 3,375 × 1080 / 1350 / 23.5.
+    let salton = conductive_mw_m2(lid_floor_km(23.5));
+    assert!((salton - 140.9).abs() < 0.1, "{salton}");
+    assert!((lid_floor_km(23.5) - 23.5 * MANTLE_C / CRUST_BASE_C).abs() < 1e-12);
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (mut st, _geo) = init::initial_state(&p, &env).unwrap();
+    let t = env.t_myr;
+    let visible = |st: &PlateState, kind: u8| -> Vec<usize> {
+        (0..st.samples.len())
+            .filter(|&i| st.samples[i].kind == kind && !st.samples[i].is_hidden())
+            .collect()
+    };
+    let land = visible(&st, CONTINENTAL);
+    let sea = visible(&st, OCEANIC);
+    let column_of = |km: f64| {
+        let base = pools::continental_column();
+        let total: f32 = base.iter().sum();
+        base.map(|x| x * (km * 1000.0) as f32 / total)
+    };
+    // A 70 km Andean belt under an arc, its lithosphere 100 km.
+    let belt = land[0];
+    {
+        let s = &mut st.samples[belt];
+        s.pools = column_of(70.0);
+        s.thickness_m = s.pools.iter().sum();
+        s.lithosphere_km = 100.0;
+        s.keel_km = 0.0;
+        s.flags = ARC;
+        s.orogeny = state::OROGENY_ANDEAN;
+    }
+    // Floor 2.4 Myr old (L = 18 km) made continental under 5 km of rock (a 12 km column, its
+    // floor 15 km) and under 18 km (25 km, its floor 31.25 km).
+    let age = 2.4;
+    for (&i, extra) in sea[..2].iter().zip([5000.0f32, 18_000.0]) {
+        let s = &mut st.samples[i];
+        s.pools = pools::oceanic_column();
+        s.pools[state::pool::SEDIMENT] += extra;
+        s.thickness_m = s.pools.iter().sum();
+        s.formed_myr = (t - age) as f32;
+        s.lithosphere_km = ocean_km(age) as f32;
+        s.flags = 0;
+        s.make_continental();
+    }
+    let floor_l = ocean_km(age);
+    assert!((floor_l - 18.0).abs() < 0.1, "{floor_l}");
+    assert!((f64::from(st.samples[sea[0]].lithosphere_km) - floor_l).abs() < 1e-4);
+    let deep = lid_floor_km(moho_km(&st.samples[sea[1]]));
+    assert!((deep - 31.25).abs() < 1e-3, "{deep}");
+    assert!((f64::from(st.samples[sea[1]].lithosphere_km) - deep).abs() < 1e-4);
+    // Floor the last resampling made (no state), 0.5 Myr old, made continental under 2 km of
+    // rock: its floor's 2.32 √(κ 0.5) = 8.2 km against its 9 km column's 11.25 km floor.
+    let unset = sea[2];
+    {
+        let s = &mut st.samples[unset];
+        s.pools = pools::oceanic_column();
+        s.pools[state::pool::SEDIMENT] += 2000.0;
+        s.thickness_m = s.pools.iter().sum();
+        s.formed_myr = (t - 0.5) as f32;
+        s.lithosphere_km = 0.0;
+        s.flags = 0;
+        s.make_continental();
+    }
+    assert_eq!(st.samples[unset].lithosphere_km, 0.0, "no state yet");
+    assert!(ocean_km(0.5) < 11.25);
+    let q_unset = f64::from(continental_heat_flow(&st.samples[unset], t, true));
+    assert!(
+        (q_unset - conductive_mw_m2(11.25)).abs() < 1e-2,
+        "{q_unset} against {}",
+        conductive_mw_m2(11.25)
+    );
+    let before = st.clone();
+    for _ in 0..30 {
+        thermal::step(&mut st, &env);
+    }
+    // The belt: at its floor, not at L_hot's 60 km; its heat flow 26 + 3,375 / 87.5 + the arc's 40.
+    let s = &st.samples[belt];
+    assert!(
+        (f64::from(s.lithosphere_km) - 87.5).abs() < 1e-3,
+        "{}",
+        s.lithosphere_km
+    );
+    let q = f64::from(continental_heat_flow(s, t, true));
+    assert!(
+        (q - (26.0 + 3375.0 / 87.5 + ARC_HEAT_MW_M2)).abs() < 1e-2,
+        "{q}"
+    );
+    // The crust with no state: its floor's lithosphere at its lid's floor, then cooling towards
+    // L_cold (one step from 11.25 km).
+    let mut once = before.clone();
+    thermal::step(&mut once, &env);
+    let want = L_COLD_KM + (11.25 - L_COLD_KM) * (-env.dt_myr / cooling_myr()).exp();
+    let got = f64::from(once.samples[unset].lithosphere_km);
+    assert!((got - want).abs() < 1e-3, "{got} against {want}");
+    // Every continental column's lithosphere at or below its floor after the steps.
+    for s in st.samples.iter().filter(|s| s.kind == CONTINENTAL) {
+        assert!(
+            f64::from(s.lithosphere_km) >= lid_floor_km(moho_km(s)) - 1e-3,
+            "{} km over a {} km column",
+            s.lithosphere_km,
+            moho_km(s)
+        );
+    }
+    // A stretch thins L with the crust to the stretched column's floor: by β = 2 over 35 km of
+    // crust (17.5 km after, its floor 21.875 km), a 60 km lithosphere to 30 km and a 40 km one to
+    // the floor.
+    for (l, want) in [(60.0, 30.0), (40.0, 21.875)] {
+        let mut s = state::Sample::blank(0);
+        s.kind = CONTINENTAL;
+        s.pools = column_of(35.0).map(|x| x * 0.5);
+        s.thickness_m = s.pools.iter().sum();
+        s.lithosphere_km = l;
+        stretch(&mut s, 0.5);
+        assert!(
+            (f64::from(s.lithosphere_km) - want).abs() < 1e-3,
+            "{} against {want}",
+            s.lithosphere_km
+        );
+    }
+    // The 1 km clamp is out of reach: a lithosphere set at 0.5 km over a 7 km column reads its
+    // floor's 8.75 km.
+    let mut thin = before.samples[unset];
+    thin.pools = pools::oceanic_column();
+    thin.lithosphere_km = 0.5;
+    assert!((continental_l_km(0.5, moho_km(&thin)) - 8.75).abs() < 1e-9);
+    let q = f64::from(continental_heat_flow(&thin, t, true));
+    assert!((q - conductive_mw_m2(8.75)).abs() < 1e-2, "{q}");
+    assert!(q < 420.0 && conductive_mw_m2(1.0) > 3400.0);
 }
 
 /// The front lane's cut trace (2026-10-24, plates.md "The front's length: why the plates are
