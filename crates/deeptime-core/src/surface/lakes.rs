@@ -131,7 +131,38 @@ pub fn water_levels<G: SurfaceGrid>(
     let (id, mut lakes) = label_lakes_parallel(d, &is_lake, filled)
         .unwrap_or_else(|| label_lakes(d, &is_lake, filled));
     let rcv = |c: usize| r.rcv.get(c).map_or(c, |&x| x as usize);
-    let exits = |c: usize| id[c] != NONE && (rcv(c) == c || id[rcv(c)] != id[c]);
+    // ledger: ERO-218
+    // An exit: a lake cell whose water leaves the lake for good. Its receiver lies outside the
+    // lake, and the path from there does not come back into it across the lake's own flat (cells
+    // at the lake's fill within LAKE_TOL_M of their ground, shoals of the flooded depression that
+    // are not lake cells): a lake cell draining onto a shoal that drains back in is no way out
+    // (the closed-basins review, 2026-10-31: the share was applied there and at the real exit).
+    let level: Vec<f64> = lakes.iter().map(|l| l.level - LAKE_TOL_M).collect();
+    let leaves = |c: usize| -> bool {
+        let k = id[c];
+        if k == NONE {
+            return false;
+        }
+        let mut x = rcv(c);
+        if x == c {
+            return true;
+        }
+        loop {
+            if id[x] == k {
+                return false;
+            }
+            if id[x] != NONE || kind[x] != LAND || filled[x] < level[k as usize] {
+                return true;
+            }
+            let next = rcv(x);
+            if next == x {
+                return true;
+            }
+            x = next;
+        }
+    };
+    let is_exit: Vec<bool> = (0..n).into_par_iter().map(leaves).collect();
+    let exits = |c: usize| is_exit[c];
     // (counts: in parallel, the same integers)
     let exit_lakes: Vec<u32> = (0..n)
         .into_par_iter()

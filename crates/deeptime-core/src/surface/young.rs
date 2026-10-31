@@ -6,8 +6,10 @@
 //! to L2 (`resolution.l2_r`; clamped Catmull–Rom, `amplify/resample.rs`), fills the depressions
 //! the interpolation made (those shallower than `min_lake_depth_m`; deeper ones are L1's lakes)
 //! and runs `steps` steps of the same physics as the deep-time surface (`surface/mod.rs`):
-//! priority-flood, D8 routing with runoff-weighted areas, implicit stream power with deposition
-//! and a critical slope (`spl.rs`), then hillslope and marine diffusion. The drainage network
+//! priority-flood, D8 routing with runoff-weighted areas passed on through the lakes as their water
+//! balance leaves them (`closed.rs`, with `surface.closed_basins`: a closed basin passes none),
+//! implicit stream power with deposition and a critical slope (`spl.rs`), then hillslope and marine
+//! diffusion. The drainage network
 //! that comes out — exact on L2, with the lakes the flood found — is what the amplifier refines.
 //!
 //! **Time.** The stage adds `myr` million years of erosion at the end of the history without
@@ -36,8 +38,12 @@ use serde_json::{Value, json};
 use super::amplify::{doublings, resample};
 use super::grid::Dims;
 use super::pflood::{BASE, LAKE_TOL_M, LAND, SINK};
-use super::{SurfaceParams, climate, diffusion, glacial, lithology, marine, pflood, routing, spl};
+use super::{
+    SurfaceParams, climate, closed, diffusion, glacial, lakes, lithology, marine, pflood, routing,
+    spl,
+};
 use crate::error::CoreError;
+use crate::hydro::HydroParams;
 use crate::params::PlanetPreset;
 use crate::stage::{Stage, StageContext, StageEstimate, from_state, to_state};
 use crate::world::{Field, WorldState};
@@ -304,6 +310,51 @@ pub fn fail_sea_floor(d: &Dims, open: &[bool], sea: f64, slope_deg: f64, z: &mut
         *v = x as f32;
     }
     moved * d.cell_area() / 1.0e9
+}
+
+/// The lakes' water on L2 for the closed basins (`closed.rs`, ERO-217): what each cell runs off
+/// and what open water over it loses, m/yr, from L1's climate fields as the deep-time surface takes
+/// them (`climate::cell_water` on the climate stage's mean temperature, precipitation and seasons),
+/// upsampled `k` times (bilinear). None without the stage's temperature and precipitation on L1
+/// (`w1` × `h1` cells).
+fn lake_water(
+    world: &WorldState,
+    hydro: &HydroParams,
+    w1: usize,
+    h1: usize,
+    k: u32,
+) -> Option<(Vec<f32>, Vec<f32>)> {
+    let n1 = w1 * h1;
+    let get = |name: &str| {
+        world
+            .fields
+            .get(name)
+            .filter(|f| f.data.len() == n1)
+            .map(|f| &f.data[..])
+    };
+    let (t, p) = (get(climate::T_FIELD)?, get(climate::P_FIELD)?);
+    let (warm, cold) = (
+        get(crate::climate::field::T_WARM),
+        get(crate::climate::field::T_COLD),
+    );
+    let (mut runoff, mut loss): (Vec<f32>, Vec<f32>) = (0..n1)
+        .map(|c| {
+            let half = match (warm, cold) {
+                (Some(a), Some(b)) => 0.5 * f64::from(a[c] - b[c]),
+                _ => f64::NAN,
+            };
+            let cw = climate::cell_water(hydro, f64::from(p[c]), f64::from(t[c]), half);
+            (cw.runoff_m_yr as f32, cw.loss_m_yr as f32)
+        })
+        .unzip();
+    let (mut w, mut h) = (w1, h1);
+    for _ in 0..k {
+        runoff = resample::upsample2_linear(&runoff, w, h);
+        loss = resample::upsample2_linear(&loss, w, h);
+        w *= 2;
+        h *= 2;
+    }
+    Some((runoff, loss))
 }
 
 /// Land elevations above sea: (median, 90th percentile, maximum), m.
@@ -677,24 +728,49 @@ impl YoungStage {
                     }
                 })
                 .collect();
+            // ledger: ERO-217, ERO-218
+            // The closed basins (`closed.rs`), as on the deep-time surface: each lake's exit
+            // passes on the share of its inflow its water balance leaves, a closed basin's none.
+            // Without them the last step's spill of a basin the history kept closed was cut with
+            // the whole basin's area, and that area fed the amplifier's drainage (the
+            // closed-basins review, 2026-10-31).
+            let hydro_p = self.preset.hydro.unwrap_or_default();
+            let water = if sp.closed_basins {
+                lake_water(world, &hydro_p, w >> k1, hgt >> k1, k1)
+            } else {
+                None
+            };
             let route = |h: &[f64],
                          base_z: &[f64],
                          kind: &mut Vec<u8>,
                          filled: &mut Vec<f64>,
                          rt: &mut routing::Routing,
-                         area: &mut Vec<f64>| {
+                         area: &mut Vec<f64>|
+             -> Option<Vec<lakes::LakeOutflow>> {
                 pflood::open_sea_with(fm, &d, h, sea, (n / 500).max(1), kind);
                 pflood::flood_with(fm, &d, h, base_z, kind, filled);
                 routing::receivers(&d, filled, kind, rt);
                 routing::stack(&d, kind, rt);
                 routing::accumulate(&d, rt, weight, area);
+                let (runoff, loss) = water.as_ref()?;
+                let lv =
+                    lakes::water_levels(&d, h, filled, kind, rt, sea, hydro_p.lake_balance, &|c| {
+                        lakes::CellWater {
+                            runoff_m_yr: f64::from(runoff[c]),
+                            loss_m_yr: f64::from(loss[c]),
+                        }
+                    });
+                if let Some(pass) = closed::pass_shares(n, &lv.outflow) {
+                    routing::accumulate_passing(&d, rt, weight, &pass, area);
+                }
+                Some(lv.outflow)
             };
             let mut kind = vec![LAND; n];
             let mut filled = vec![0.0; n];
             let base_z = vec![sea; n];
             let mut rt = routing::Routing::default();
             let mut area = Vec::new();
-            route(&h, &base_z, &mut kind, &mut filled, &mut rt, &mut area);
+            let mut outflow = route(&h, &base_z, &mut kind, &mut filled, &mut rt, &mut area);
             self.time("route", started);
 
             let started = Instant::now();
@@ -741,15 +817,32 @@ impl YoungStage {
                     max_iter: sp.spl_max_iter as usize,
                     tol_m: 0.01,
                 };
-                let input = spl::SplInput {
-                    kind: &kind,
-                    h0: &h,
-                    filled: &filled,
-                    base_z: &base_z,
-                    area: &area,
-                    kf: &kf,
+                let solve = |area: &[f64], h_new: &mut [f64], qin: &mut [f64]| {
+                    let input = spl::SplInput {
+                        kind: &kind,
+                        h0: &h,
+                        filled: &filled,
+                        base_z: &base_z,
+                        area,
+                        kf: &kf,
+                    };
+                    spl::solve(&d, &rt, &input, &spl_p, h_new, qin);
                 };
-                spl::solve(&d, &rt, &input, &spl_p, &mut h_new, &mut qin);
+                solve(&area, &mut h_new, &mut qin);
+                // ledger: ERO-217
+                // A lake the step's sediment filled to its spill passes all its water: solved
+                // again with its area passed on (`closed::open_filled`).
+                if let Some(outflow) = outflow.as_mut()
+                    && closed::open_filled(outflow, &h_new, &filled) > 0
+                {
+                    match closed::pass_shares(n, outflow) {
+                        Some(pass) => {
+                            routing::accumulate_passing(&d, &rt, weight, &pass, &mut area)
+                        }
+                        None => routing::accumulate(&d, &rt, weight, &mut area),
+                    }
+                    solve(&area, &mut h_new, &mut qin);
+                }
                 h = h_new;
             }
             drop(kf);
@@ -890,7 +983,7 @@ impl YoungStage {
                 let mut rt = routing::Routing::default();
                 let mut area = Vec::new();
                 let base_z = vec![sea; n];
-                route(&h, &base_z, &mut kind, &mut filled, &mut rt, &mut area);
+                let _ = route(&h, &base_z, &mut kind, &mut filled, &mut rt, &mut area);
                 drop(base_z);
                 drop(rt);
                 drained = Some(drainage(&kind, &area));
