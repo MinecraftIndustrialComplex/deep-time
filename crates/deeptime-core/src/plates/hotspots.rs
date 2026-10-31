@@ -13,6 +13,20 @@
 //!   by a third of that) and boosts rifting of the plate above (`rifting.rs`), which it then causes.
 //! - Events: large_igneous_province at the eruption; hotspot_track when the hotspot dies or the run
 //!   ends, spanning its life, with the plates it crossed and its track length.
+//!
+//! From sources (the hotspot lane, 2026-10-31; [`sourced`], docs/design/hotspots-lips-margins.md;
+//! each off by default):
+//! - `hotspots_sourced`: Sleep's (1990) 37 tails, each with one of his buoyancy fluxes, living 100
+//!   to 150 Myr (Courtillot et al. 2003), born at the steady state's rate, each making Hawaii's
+//!   magma per unit of flux (Sleep: 4 m³/s at 8.7 Mg/s), a seventh of it lavas (White et al.
+//!   2006), the heights by the model's isostasy instead of the uplift rule and its ceilings.
+//! - `plume_heads_sourced`: a head with the share of births that gives one every 15 Myr (Ernst et
+//!   al. 2021), spreading 1,000 km (Sleep 1990, White & McKenzie 1989, Campbell & Griffiths 1990),
+//!   its province one of the record's for the crust it rises under (Clift et al. 2009), a quarter
+//!   lavas.
+//! - `volcanic_margins` (`ridges::resample`): a head's mantle is 150 K hot for 20 Myr after it
+//!   rises ([`hot_mantle`]), and a continent's new sea floor that forms over it is a volcanic
+//!   margin.
 
 use glam::DVec3;
 
@@ -246,7 +260,7 @@ pub fn step(
 
 /// A plume head's large igneous province at `at`; returns its event and the radius its head
 /// spread to, km on the model sphere.
-fn erupt(
+pub(super) fn erupt(
     state: &mut PlateState,
     world: &mut WorldState,
     pos: &[DVec3],
@@ -263,9 +277,12 @@ fn erupt(
     // the record's volume. Off, the preset's radius and central pile.
     let sourced = k.plume_heads_sourced;
     let (radius_km, record_km3) = if sourced {
+        let continental = tree
+            .nearest(at)
+            .is_some_and(|(j, _)| state.samples[j as usize].kind == CONTINENTAL);
         (
             sourced::HEAD_RADIUS_KM,
-            sourced::lip_volume_km3(&mut state.rng),
+            sourced::lip_volume_km3(&mut state.rng, continental),
         )
     } else {
         (k.lip_radius_km, 0.0)
@@ -435,10 +452,26 @@ pub mod sourced {
     use crate::params::TectonicParams;
     use crate::sphere::SplitMix64;
 
-    /// PLACEHOLDER (filled from the sources).
-    pub const FLUX_MG_S: [f64; 1] = [f64::NAN];
+    /// Sleep (1990, Table 1, p. 6732; full text): the buoyancy fluxes of 37 hotspots, Mg/s, in
+    /// his order (Afar to Yellowstone), "The total buoyancy flux is 54.9 Mg s-1" (p. 6730). A
+    /// tail's flux is one of them, drawn evenly. ledger: PLT-791
+    pub const FLUX_MG_S: [f64; 37] = [
+        1.2, 0.9, 1.1, 0.3, 1.1, 0.4, 0.3, 1.0, 1.6, 1.6, 0.5, 0.5, 3.3, 0.5, 1.0, 0.5, 8.7, 0.9,
+        1.4, 0.3, 1.6, 0.5, 0.9, 3.3, 3.3, 0.5, 0.5, 3.3, 1.9, 0.5, 1.6, 1.6, 3.3, 0.9, 0.9, 1.7,
+        1.5,
+    ];
+    /// The tails a planet holds: Sleep's 37, the count of his catalogue (King & Adam 2014 list
+    /// 26 to 69 in the catalogues, Courtillot et al. 2003 consider 49). ledger: PLT-790
     pub const COUNT: usize = FLUX_MG_S.len();
-    pub const LIFETIME_MYR: [f64; 2] = [f64::NAN, f64::NAN];
+    /// A tail's life, Myr, drawn evenly: Courtillot et al. (2003, p. 303; full text), "The tails
+    /// (stems) of primary plumes tend to last on the order of 130 Ma. Indeed, all plumes born as
+    /// traps in the last 100 Ma ... are still quite active, whereas those born between 100 and
+    /// 140 Ma may be failing ... and those older than 150 Ma do not in general have an active
+    /// trace" (the range is the agent's reading; the only lifetime read, applied to every tail).
+    /// ledger: PLT-792
+    pub const LIFETIME_MYR: [f64; 2] = [100.0, 150.0];
+    /// Births per Myr: the steady state of [`COUNT`] tails living [`LIFETIME_MYR`]'s mean
+    /// (Little's law, the agent's arithmetic: 37 / 125). ledger: PLT-790
     pub fn births_per_myr() -> f64 {
         COUNT as f64 / (0.5 * (LIFETIME_MYR[0] + LIFETIME_MYR[1]))
     }
@@ -448,18 +481,34 @@ pub mod sourced {
     pub fn flux_mg_s(rng: &mut SplitMix64) -> f64 {
         FLUX_MG_S[(rng.next_u64() % COUNT as u64) as usize]
     }
-    pub const MAGMA_KM3_YR_PER_MG_S: f64 = f64::NAN;
-    pub const TAIL_EXTRUSIVE_SHARE: f64 = f64::NAN;
+    /// A tail's magma per unit of buoyancy flux, km³ a year per Mg/s: Hawaii's, Sleep (1990,
+    /// p. 6719): "the flux Qv of magmas implaced in the crust or erupted is about 4 m3 s-1", at
+    /// its 8.7 Mg/s (Table 1); 4 / 8.7 m³/s per Mg/s, × 3.156 × 10⁷ s a year (the agent's
+    /// arithmetic). Hawaii's melt share of its plume applied to every tail (Sleep: Iceland's,
+    /// on a ridge, is ten times it; the thick lid's lower melting is not modelled).
+    /// ledger: PLT-793
+    pub const MAGMA_KM3_YR_PER_MG_S: f64 = 4.0 / 8.7 * 3.155_76e7 / 1.0e9;
+    /// Of a tail's magma, the share erupted: White, Crisp & Spera (2006, Table 3; full text) give
+    /// the Hawaiian-Emperor chain an intrusive to extrusive ratio of 6:1 (5.9 × 10⁶ against
+    /// 1.1 × 10⁶ km³ over 74 Myr, underplating included). ledger: PLT-794
+    pub const TAIL_EXTRUSIVE_SHARE: f64 = 1.0 / 7.0;
+    /// The volcano stage's strength for a tail (its shields' height, VOL-008): the preset's
+    /// reference uplift times 0.6 to 1.4 by the flux's rank in Sleep's table, so the volcanoes
+    /// keep the spread they had and the strongest plume builds the tallest shields (game-choice:
+    /// the hotspot lane, 2026-10-31, a mapping for the volcano stage, not a rate). ledger: PLT-801
     pub fn volcano_uplift_mm_yr(k: &TectonicParams, flux: f64) -> f64 {
         let below = FLUX_MG_S.iter().filter(|&&f| f < flux).count() as f64;
-        let q = if COUNT > 1 {
-            below / (COUNT - 1) as f64
-        } else {
-            0.5
-        };
+        let q = below / (COUNT - 1) as f64;
         k.hotspot_uplift_mm_yr * (0.6 + 0.8 * q)
     }
-    pub const LIPS_PER_MYR: f64 = f64::NAN;
+    /// Plume heads (large igneous provinces) per Myr: Ernst et al. (2021, AGU Monograph 255
+    /// ch. 1; full text), "Continental LIPs have occurred on average (but irregularly) every 30
+    /// myr throughout the Phanerozoic and Proterozoic. The oceanic LIP record is similar to that
+    /// of continental LIPs for the past 200 myr": one continental and one oceanic every 30 Myr
+    /// (the agent's reading of "similar"), one every 15 Myr. ledger: PLT-795
+    pub const LIPS_PER_MYR: f64 = 2.0 / 30.0;
+    /// The share of new tails that rise with a head: the heads' rate over the births'
+    /// (0.0667 / 0.296 = 0.225 with the sourced births; at most 1). ledger: PLT-795
     pub fn head_share(births_per_myr: f64) -> f64 {
         if births_per_myr > 0.0 {
             (LIPS_PER_MYR / births_per_myr).min(1.0)
@@ -467,22 +516,96 @@ pub mod sourced {
             0.0
         }
     }
-    pub const LIP_VOLUMES_KM3: [f64; 1] = [f64::NAN];
-    pub fn lip_volume_km3(rng: &mut SplitMix64) -> f64 {
-        LIP_VOLUMES_KM3[(rng.next_u64() % LIP_VOLUMES_KM3.len() as u64) as usize]
+    /// Continental large igneous provinces, km³ of magma with their intrusive roots: Clift,
+    /// Vannucchi & Phipps Morgan (2009, Table 7, "Estimated total volume with intrusives", four
+    /// times the original volcanic volume; the authors' revised manuscript, partly recovered by
+    /// the research sub-agent): Deccan, Siberian, Ethiopia, Paraná, Emeishan, Etendeka, Columbia
+    /// River, Karoo, North Atlantic (sum 30,463,152, "0.12 km3/a" over 250 Myr). ledger: PLT-796
+    pub const CONTINENTAL_LIPS_KM3: [f64; 9] = [
+        2_956_972.0,
+        12_200_000.0,
+        2_363_892.0,
+        2_720_000.0,
+        1_200_000.0,
+        144_000.0,
+        748_712.0,
+        4_121_877.0,
+        4_007_699.0,
+    ];
+    /// Oceanic plateaus, km³ of crust: Ontong Java "44.4x10⁶ km³ (Coffin and Eldholm, 1994)"
+    /// and the Wallaby Plateau "4.2x10⁶ km³ (Schubert and Sandwell, 1989)" as Clift et al. 2009
+    /// (§7.1, the manuscript) give them, the Caribbean "4.5 million km³" (Kasbohm, Schoene &
+    /// Burgess 2021, full text). ledger: PLT-796
+    pub const OCEANIC_LIPS_KM3: [f64; 3] = [44_400_000.0, 4_500_000.0, 4_200_000.0];
+    /// A head's province: one of the record's for the crust it rises under, drawn evenly (the
+    /// lid's control on how much a head melts, White & McKenzie 1989, read from the record
+    /// rather than modelled). ledger: PLT-796
+    pub fn lip_volume_km3(rng: &mut SplitMix64, continental: bool) -> f64 {
+        let set: &[f64] = if continental {
+            &CONTINENTAL_LIPS_KM3
+        } else {
+            &OCEANIC_LIPS_KM3
+        };
+        set[(rng.next_u64() % set.len() as u64) as usize]
     }
-    pub const LIP_EXTRUSIVE_SHARE: f64 = f64::NAN;
-    pub const HEAD_RADIUS_KM: f64 = f64::NAN;
-    /// The volcano stage's flood-basalt plateau at `x` of the radius (VOL-035).
+    /// Of a province's magma, the share erupted: Clift et al. (2009, §7.2, the manuscript) after
+    /// White et al. 2006, "many of the extrusive:intrusive ratios lie in the range 1:2 to 1:5. In
+    /// this study we therefore take a value of 1:3". ledger: PLT-796
+    pub const LIP_EXTRUSIVE_SHARE: f64 = 0.25;
+    /// How far a head spreads under the lithosphere, km: Sleep (1990, p. 6732), "The area
+    /// strongly affected by modern plume heads is typically 1000 km in radius (data from White
+    /// and McKenzie [1989])"; White & McKenzie (1989), "A 1000-km-radius circle, which is the
+    /// typical extent of the thermal anomaly created by a plume"; Campbell & Griffiths (1990,
+    /// p. 87), a head "forms a disk ~2000 km in diameter". ledger: PLT-797
+    pub const HEAD_RADIUS_KM: f64 = 1000.0;
+    /// The volcano stage's flood-basalt plateau at `x` of the radius, 1 − smoothstep(0.6, 1, x)
+    /// (VOL-035), whose rock beyond the plate model's dome the volcano stage lays.
     pub fn plateau(x: f64) -> f64 {
         let t = ((x - 0.6) / 0.4).clamp(0.0, 1.0);
         1.0 - t * t * (3.0 - 2.0 * t)
     }
-    pub const HEAD_EXCESS_K: f64 = f64::NAN;
-    pub const HEAD_HOT_MYR: f64 = f64::NAN;
+    /// A head's hot mantle above the normal mantle, K: White & McKenzie (1989; full text),
+    /// "temperatures raised 100-200 °C above normal" (abstract), "of the order of 100-150 °C
+    /// above normal" (conclusion); Franke (2013) quotes White: "an anomalously hot mantle
+    /// (150-200° above normal) must be present under the rift shortly before continental
+    /// breakup". 150 K is the value in all three ranges (the agent's reading). ledger: PLT-798
+    pub const HEAD_EXCESS_K: f64 = 150.0;
+    /// How long after its rise a head's hot mantle lies under the lithosphere, Myr: Campbell &
+    /// Griffiths (1990; full text, abstract): the bulk of the magma within 2 to 3 Myr, smaller
+    /// volumes over a further 5 to 10, and the activity decays "over a total time of order 20
+    /// Ma". White & McKenzie's Table 2 puts the oceans' first spreading within that of their
+    /// flood basalts (North Atlantic 58 to 56 Ma after 63 to 52, Deccan 64 within 67 to 60,
+    /// Paraná 130 to 120 against 130 to 117). ledger: PLT-798
+    pub const HEAD_HOT_MYR: f64 = 20.0;
+    /// White & McKenzie (1989, Fig. 3, the research sub-agent's reading of the figure, ±1 km):
+    /// the igneous crust mantle melts to at full breakup (β = 50, their stand-in for infinite
+    /// stretching), m, at a potential temperature above the normal 1280 °C, K: 7 km at 1280 °C,
+    /// 17 km at 1400 °C, 26 km at 1480 °C ("an increase of 200 °C above its normal value ... can
+    /// more than triple the amount of melt"). ledger: PLT-799
+    pub const IGNEOUS_CRUST_M: [(f64, f64); 3] = [(0.0, 7000.0), (120.0, 17_000.0), (200.0, 26_000.0)];
+    /// [`IGNEOUS_CRUST_M`] interpolated linearly (the agent's), held at its ends.
     pub fn igneous_crust_m(excess_k: f64) -> f64 {
-        7000.0 + excess_k * f64::NAN
+        let t = &IGNEOUS_CRUST_M;
+        if !(excess_k > t[0].0) {
+            return t[0].1;
+        }
+        for w in t.windows(2) {
+            if excess_k <= w[1].0 {
+                let f = (excess_k - w[0].0) / (w[1].0 - w[0].0);
+                return w[0].1 + f * (w[1].1 - w[0].1);
+            }
+        }
+        t[t.len() - 1].1
     }
-    pub const MARGIN_EXTRUSIVE_SHARE: f64 = f64::NAN;
-    pub const MARGIN_WIDTH_KM: f64 = f64::NAN;
+    /// Of a volcanic margin's igneous crust, the share erupted (its seaward-dipping lavas over
+    /// the high-velocity lower crust): the large igneous provinces' 1:3 (Clift et al. 2009);
+    /// White & McKenzie (1989): "accompanying the extruded basalts ... there is an even greater
+    /// volume of new underplated or intruded igneous rock in the lower crust"; the North
+    /// Atlantic's "~1.8 million km³" extrusive of "between 5 and 10 million km³" (Kasbohm et al.
+    /// 2021), 0.18 to 0.36. ledger: PLT-799
+    pub const MARGIN_EXTRUSIVE_SHARE: f64 = 0.25;
+    /// How far seaward of the continent the thick igneous crust reaches, km: Kelemen & Holbrook
+    /// (1995, abstract), the US East Coast's "only for about 80–100 km seaward" (the middle of
+    /// the range).
+    pub const MARGIN_WIDTH_KM: f64 = 90.0; // ledger: PLT-802
 }

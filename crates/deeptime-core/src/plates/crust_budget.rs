@@ -250,7 +250,7 @@ const GLOBALS: [(&str, &str); 82] = [
     ("hotspot_magma_c", super::hotspots::MAGMA_CONTINENTAL_GLOBAL),
     ("hotspot_cones", super::hotspots::CONES_GLOBAL),
     ("hotspot_cones_c", super::hotspots::CONES_CONTINENTAL_GLOBAL),
-    // The hotspot lane (ledger: PLT-795, PLT-799): the plume heads' large igneous provinces, all
+    // The hotspot lane (ledger: PLT-795, PLT-799, PLT-800): the plume heads' large igneous provinces, all
     // and on continental crust, their count, and the volcanic rifted margins' continental crust
     // and gap points.
     ("lip", super::hotspots::LIP_GLOBAL),
