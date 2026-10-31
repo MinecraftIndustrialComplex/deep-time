@@ -357,6 +357,7 @@ mod tests {
             cause: None,
             segment: 0,
             gone: None,
+            rock_m: 0.0,
         }
     }
 
