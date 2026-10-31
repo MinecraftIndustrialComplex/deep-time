@@ -12,6 +12,7 @@ MODE=trench (default): the incoming plate's sediment at its trenches (oceanic sa
   Kominz et al. 2011's average ocean-floor sediment (phi0 0.66, lambda 1,333 m; ERO-215, surface::pelagic): 1 km in
   place holds 536 m of rock. Shares of the trench samples by pile: under 536 m solid (thinner than 1 km in place),
   536 to 1,000 m (1 to 1.78 km in place: accretionary by C&V's in-place line, erosive by the solid one), over 1 km.
+MODE=trenchrun: per run, the trench sediment averaged over every snapshot, with Mann-Whitney p against the first arm.
 MODE=arcs: where the arcs' magma went, as stocks on the visible samples (arc_oceanic_m, arc_continental_m: the magma
   each sample received from island and from continental arcs, PLT-045/PLT-285): on ocean floor, on continental crust
   an island arc made (dynamics::is_island_arc, PLT-220: island-arc magma more than continental), and on the rest of
@@ -112,8 +113,64 @@ def med(xs):
     return statistics.median(xs) if xs else float("nan")
 
 
+def trench_runs(argv):
+    """MODE=trenchrun: per run, the trench sediment averaged over every snapshot from -950 to -50 Myr (t0000 is the
+    final resampling's lattice, no TRENCH flags): the trench samples' share of the visible samples, their pile's mean
+    (m of rock), the sediment on them and on all the visible ocean floor (planet-mean m), and the share of the trench
+    samples over 1 km; the medians of the runs, and the two-sided Mann-Whitney p of each arm against the first. A
+    heavy-tailed pile read at three snapshots swings from run to run; this reads all of them."""
+    from scipy.stats import mannwhitneyu
+
+    ts = list(range(-950, 0, 50))
+    keys = ("tr_share", "pile_mean", "sed_tr_m", "sed_ov_m", "thick_n")
+    arms = []
+    for arg in argv:
+        per = []
+        for r in runs_of(arg):
+            acc = {k: [] for k in keys}
+            for t in ts:
+                try:
+                    a, pp = read(r, t)
+                except (FileNotFoundError, ValueError):
+                    continue
+                n = len(a)
+                oc = a[:, 4] < 0.5
+                tr = oc & ((a[:, 10].astype(np.int64) & TRENCH_FLAG) > 0)
+                pile = pp[:, 0] + pp[:, 1]
+                if not tr.any():
+                    continue
+                acc["tr_share"].append(tr.mean())
+                acc["pile_mean"].append(pile[tr].mean())
+                acc["sed_tr_m"].append(pile[tr].sum() / n)
+                acc["sed_ov_m"].append(pile[oc].sum() / n)
+                acc["thick_n"].append((pile[tr] >= 1000.0).mean())
+            per.append((r.name, {k: float(np.mean(v)) if v else float("nan") for k, v in acc.items()}))
+        arms.append((arg, per))
+    for arg, per in arms:
+        print(f"== trenchrun {arg} ({len(per)} runs; means over the snapshots -950 to -50)")
+        print(f"{'run':26s} " + " ".join(f"{k:>10}" for k in keys))
+        for name, v in per:
+            print(f"{name:26s} " + " ".join(f"{v[k]:10.4f}" for k in keys))
+    print("medians (Mann-Whitney p against the first arm)")
+    print(f"{'arm':60s} " + " ".join(f"{k:>16}" for k in keys))
+    base = arms[0][1]
+    for j, (arg, per) in enumerate(arms):
+        cells = []
+        for k in keys:
+            x = [v[k] for _, v in per]
+            if j == 0:
+                cells.append(f"{med(x):10.4f}      ")
+            else:
+                p = mannwhitneyu(x, [v[k] for _, v in base], alternative="two-sided").pvalue
+                cells.append(f"{med(x):10.4f} ({p:.2f})")
+        print(f"{arg[-60:]:60s} " + " ".join(f"{c:>16}" for c in cells))
+
+
 def main(argv):
     mode = os.environ.get("MODE", "trench")
+    if mode == "trenchrun":
+        trench_runs(argv)
+        return
     fn = {"trench": trench, "arcs": arcs}[mode]
     ts = [int(x) for x in os.environ.get("CTIMES", "-800,-500,-200,0").split(",")]
     if mode == "trench":
