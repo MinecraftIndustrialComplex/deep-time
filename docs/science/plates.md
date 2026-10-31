@@ -11720,10 +11720,20 @@ merge) the small bodies are fewer and thinner (60 a snapshot against 127, a medi
 against 19, 0.75 of their samples under Cloos's 15 km), so the reach is longer (308 km under 17 km of
 crust, 391 km under 10.5 km, on a full slab) and 0.18 to 0.38 of the hand-offs under 50 samples are
 within it, while their share of the coast with high ground fell to 0.002 to 0.004: the expected move is
-less than that, and about 0.02 to 0.07 km³ a year of crust (the project's estimates). Its 8-run arm is
-measured on the collision orogen's physics (PLT-730, PLT-731, PLT-740 set on) against the cached arm
-orog-cum, the same physics without the docking law; a finer lattice resolves smaller bodies, and there
-it reaches more of them.
+less than that, and about 0.02 to 0.07 km³ a year of crust (the project's estimates). A finer lattice
+resolves smaller bodies, and there it reaches more of them.
+
+On the pool (2026-10-31; arm small-terrane, key dcf0d7480ef3, 8 runs, on the collision orogen's
+physics, PLT-730, PLT-731 and PLT-740 set on, against orog-cum, the same physics without the law;
+medians, Mann-Whitney p in brackets): the guard clean (the worst 10,154 m from the sea against 9,945,
+p 0.51; no step beyond 2 Earth reliefs). Hand-offs under 50 samples 12.3 per 100 Myr against 17.6
+(p 0.014), the larger classes unchanged; partings 29.2 against 23.3, 5.8 per 100 Myr of them terranes
+that went down whole; crust stripped 0.035 km³ a year (p25 to p75 0.029 to 0.043), about 1 % of Stern &
+Scholl's 3.2 km³ a year of additions. No V1 number beyond the seeds' spread: land 0.222 against 0.205
+(p 0.19), the largest landmass 0.083 against 0.074 (p 0.33), continental crust under the sea 0.567
+against 0.605 (p 0.16), the coast with high ground 0.091 against 0.067 (p 0.38); collision high coasts on
+landmasses under 0.02 of the land 0.359 against 0.668 (p 0.44). The design's "What the arm showed" has
+the rest.
 
 ## Sediment by margin type and the margin's sediment (PLT-660 to PLT-662, 2026-10-25)
 
