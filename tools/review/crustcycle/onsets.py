@@ -22,6 +22,11 @@ fill, PLT-502; a one-way slab gap, PLT-542; an orphan pocket; contested by two f
 old sample nearest it), and the onsets by time since the last resampling: how many, how their first front samples were
 made (both sides), how many passed incipient and when, their slab's longest, and the front they made over the run
 (ocean-ocean and ocean-continent km x Myr, as a mean length over the run).
+
+With the overlap trace's records (the onsets' `overlap`, plates/dynamics.rs `OnsetOverlap`) it prints, by band and by
+setting and route, the two plates' motion across the overlap at the onset: the overlapping samples converging, moving
+along the boundary (PLT-311's transform, or at rest), parting or with no normal; the pair's own reading at the
+overlap's centroid; and what the onsets whose pair does not converge make.
 """
 import json
 import statistics
@@ -55,7 +60,7 @@ def share_table(title, rows, key, order):
 
 
 def main(argv):
-    onsets, length_myr, fronts, resamples = [], 0.0, {}, []
+    onsets, length_myr, fronts, resamples, step_ts = [], 0.0, {}, [], []
     runs = 0
     for folder in argv:
         for r in runs_of(folder):
@@ -67,6 +72,7 @@ def main(argv):
             length_myr += float(steps[-1]["t"]) - float(rec.get("t0_myr", steps[0]["t"]))
             lives = {int(x["id"]): x for x in rec.get("plates") or []}
             resamples.append(rec.get("resamples") or [])
+            step_ts.append([float(s["t"]) for s in steps])
             for o in rec.get("onsets") or []:
                 lu, lo = lives.get(o["under"], {}), lives.get(o["over"], {})
                 o["lives"] = (lu, lo)
@@ -143,7 +149,9 @@ def main(argv):
                          "other"])
             share_table("    the plates' relation", sub, lambda o: o.get("relation", "?"), ["parent", "siblings", "other"])
     if any(resamples):
-        resampling_report(onsets, resamples, length_myr)
+        resampling_report(onsets, resamples, length_myr, step_ts)
+    if any((o.get("overlap") or {}).get("n", 0) > 0 for o in onsets):
+        overlap_report(onsets, length_myr)
     print("# the subducting fronts by their contact's onset, mean km at any time, median of the runs")
     for key, names in (("onset_kind", KINDS), ("onset_route", ROUTES), ("onset_buoyant", BUOYANT)):
         for setting in ("oo", "oc"):
@@ -156,7 +164,48 @@ def main(argv):
 PROV = ["gap", "slab gap", "orphan", "contested", "moved"]
 
 
-def resampling_report(onsets, resamples, length_myr):
+OVERLAP = ["converging", "transform", "parting", "no normal"]
+
+
+def overlap_lines(sub, length_myr):
+    # The overlap trace (OnsetRec.overlap): the plates' motion across the overlap at the onset, by sample and by
+    # the pair's own reading, and what the onsets whose pair does not converge make.
+    ov = [o for o in sub if (o.get("overlap") or {}).get("n", 0) > 0]
+    if not ov:
+        return
+    n = sum(o["overlap"]["n"] for o in ov)
+    by = [sum(o["overlap"][k.replace(" ", "_")] for o in ov) / n for k in OVERLAP]
+    pair = [sum(1 for o in ov if o["overlap"]["pair_class"] == i) / len(ov) for i in range(len(OVERLAP))]
+    rest = [o for o in ov if o["overlap"]["pair_class"] != 0]
+    km = [sum(o["front_km_myr"][k] for o in rest) / max(length_myr, 1e-9) for k in (0, 1)]
+    passed = sum(1 for o in rest if o["subducting_after_myr"] >= 0) / max(len(rest), 1)
+    print(f"    the overlap at the onset ({len(ov)} of {len(sub)} read): samples " + "  ".join(
+        f"{k} {v:.3f}" for k, v in zip(OVERLAP, by)) + "; the pair " + "  ".join(
+        f"{k} {v:.3f}" for k, v in zip(OVERLAP, pair)) + f"; convergence median"
+          f" {statistics.median([o['overlap']['conv_mm_yr'] for o in ov]):.1f} mm/yr (samples), "
+          f"{statistics.median([o['overlap']['pair_conv_mm_yr'] for o in ov]):.1f} (the pair)")
+    print(f"    of them with the pair not converging: passed incipient {passed:.3f}; front made, mean km over the run:"
+          f" oo {km[0]:.0f}, oc {km[1]:.0f}")
+
+
+def overlap_report(onsets, length_myr):
+    print("# the overlap trace: onsets by setting at the onset and route, all times")
+    for setting in (0, 1):
+        for route, name in enumerate(ROUTES[:3]):
+            sub = [o for o in onsets if o["setting"] == setting and o["route"] == route]
+            if not sub:
+                continue
+            print(f"  {SETTINGS[setting]} {name} ({len(sub)})")
+            overlap_lines(sub, length_myr)
+
+
+def since_of(t, res_ts):
+    # The time since the last resampling at or before t (-1 before any), as the onset trace records it.
+    last = [r for r in res_ts if r <= t + 1e-9]
+    return t - last[-1] if last else -1.0
+
+
+def resampling_report(onsets, resamples, length_myr, step_ts):
     n_res = sum(len(r) for r in resamples)
     gaps = [b["t"] - a["t"] for r in resamples for a, b in zip(r, r[1:])]
     tot = [0] * len(PROV)
@@ -172,8 +221,22 @@ def resampling_report(onsets, resamples, length_myr):
     traced = [o for o in onsets if "since_resample_myr" in o and o.get("prov")]
     if not traced:
         return
-    bands = [("first step after", lambda x: 0 <= x <= 2.001), ("2-10 Myr after", lambda x: 2.001 < x <= 10),
-             ("over 10 Myr after", lambda x: x > 10), ("before any", lambda x: x < 0)]
+    bands = [("its own step", lambda x: 0 <= x < 1e-6), ("the step after", lambda x: 1e-6 <= x <= 2.001),
+             ("2-10 Myr after", lambda x: 2.001 < x <= 10), ("over 10 Myr after", lambda x: x > 10),
+             ("before any", lambda x: x < 0)]
+    # The chance rate: the share of the runs' steps in each band (an onset on a step drawn at random).
+    sinces = [since_of(t, [x["t"] for x in r]) for ts, r in zip(step_ts, resamples) for t in ts]
+    dts = [b - a for ts in step_ts for a, b in zip(ts, ts[1:])]
+    print(f"# steps: {len(sinces)} over the runs, step median {statistics.median(dts) if dts else 0:g} Myr; share of"
+          f" steps by time since the last resampling: " + "  ".join(
+              f"{name} {sum(1 for x in sinces if test(x)) / max(len(sinces), 1):.3f}" for name, test in bands))
+    near = sorted({round(x, 6) for x in sinces if 0 <= x <= 6.001})
+    for setting in (0, 1):
+        sub = [o for o in traced if o["setting"] == setting]
+        print(f"# onsets {SETTINGS[setting]} at the onset by the exact time since the last resampling (up to 6 Myr):"
+              f" share of the onsets / share of the steps: " + "  ".join(
+                  f"{v:g} {sum(1 for o in sub if abs(o['since_resample_myr'] - v) < 1e-6) / max(len(sub), 1):.3f}"
+                  f"/{sum(1 for x in sinces if abs(x - v) < 1e-6) / max(len(sinces), 1):.3f}" for v in near))
     for setting in (0, 1):
         print(f"# onsets {SETTINGS[setting]} at the onset, by time since the last resampling (all routes)")
         for name, test in bands:
@@ -194,6 +257,20 @@ def resampling_report(onsets, resamples, length_myr):
             print("    front samples' provenance, overriding side: " + "  ".join(
                 f"{p} {v:.3f}" for p, v in zip(PROV, over)) + f"; subducting side: " + "  ".join(
                 f"{p} {v:.3f}" for p, v in zip(PROV, under)) + f" (gone under {hidden:.3f})")
+            # A front sample needs a converging, non-transform neighbour of the subducting plate
+            # (dynamics.rs `front_index`), so an onset with none had no converging front that step.
+            none = sum(1 for o in sub if o["prov"]["n"] == 0)
+            idle = [o for o in sub if o["prov"]["n"] == 0]
+            km_idle = [sum(o["front_km_myr"][k] for o in idle) / max(length_myr, 1e-9) for k in (0, 1)]
+            passed_idle = sum(1 for o in idle if o["subducting_after_myr"] >= 0) / max(len(idle), 1)
+            print(f"    at the onset: no converging front sample {none / len(sub):.3f}, front samples median"
+                  f" {statistics.median([o['prov']['n'] for o in sub]):.0f}; relative speed median"
+                  f" {statistics.median([o['convergence_mm_yr'] for o in sub]):.0f} mm/yr; the boundary the step"
+                  f" before: " + "  ".join(
+                      f"{k} {sum(1 for o in sub if KINDS[o['kind']] == k) / len(sub):.3f}" for k in KINDS[:6]))
+            print(f"    of them with no converging front sample at the onset: passed incipient {passed_idle:.3f};"
+                  f" front made, mean km over the run: oo {km_idle[0]:.0f}, oc {km_idle[1]:.0f}")
+            overlap_lines(sub, length_myr)
 
 
 def young_age(o):
