@@ -57,7 +57,9 @@
 //! dammed it (the closed-basins review, 2026-10-31). [`open_filled`]: a lake the step's sediment
 //! fills to its spill has no room for water either, so it passes all of it, and the step is solved
 //! again with its area passed on; the spill is then cut by the basin's water and the sediment
-//! past the room is carried on with it.
+//! past the room is carried on with it. Opening a lake sends its water and its sediment on to the
+//! lakes below it, which may fill in turn, so the step is opened and solved again until no lake
+//! opens ([`open_until_stable`]): a chain of lakes ends within its depth.
 //!
 //! # Simplifications (the agent's, 2026-10-31)
 //! - The depression is the solve's lake up to its spill whatever the level of the water in it, as
@@ -84,8 +86,9 @@
 
 use rayon::prelude::*;
 
+use super::grid::SurfaceGrid;
 use super::lakes::LakeOutflow;
-use super::routing::Routing;
+use super::routing::{self, Routing};
 
 /// The share of its drainage area each cell passes on to its receiver (`routing::
 /// accumulate_passing`): 1 everywhere but at the exits of lakes that lose water, which pass their
@@ -101,6 +104,22 @@ pub fn pass_shares(n: usize, outflow: &[LakeOutflow]) -> Option<Vec<f32>> {
     pass
 }
 
+/// The drainage area with the lakes' shares passed on: the plain accumulation when every lake
+/// passes all of its inflow, else [`routing::accumulate_passing`] with [`pass_shares`].
+/// ledger: ERO-218
+pub fn accumulate<G: SurfaceGrid>(
+    d: &G,
+    r: &Routing,
+    weight: &[f32],
+    outflow: &[LakeOutflow],
+    area: &mut Vec<f64>,
+) {
+    match pass_shares(d.cells(), outflow) {
+        Some(pass) => routing::accumulate_passing(d, r, weight, &pass, area),
+        None => routing::accumulate(d, r, weight, area),
+    }
+}
+
 /// How close to the flood's level a lake's exit must stand after the solve to count as filled, m
 /// (rounding: the solve raises a filled lake's cells to h0 + 1.0 × (fill − h0)).
 const FILLED_TOL_M: f64 = 1.0e-6; // ledger: ERO-217 (numerical)
@@ -110,12 +129,12 @@ const FILLED_TOL_M: f64 = 1.0e-6; // ledger: ERO-217 (numerical)
 /// (`spl.rs`, HYD-110: the lake's cells rise by one share of their depth, all of it once the
 /// sediment reaching the lake fills its room). A lake with no room holds no water, so it passes
 /// all of it ("the sediment overfill of the lake (both inducing lake level rise) ... can trigger
-/// drainage opening", Garcia-Castellanos 2006, pp. 284-285; "the material shed from the range
-/// into the basin may eventually overtop the range and reintegrate the drainage system", Sobel et
-/// al. 2003, [26]). Without it the sediment past the room left at the spill with only the spill's
-/// own water, settled there and dammed the spill higher: the next step's flood found a new closed
-/// lake behind it (the closed-basins review, 2026-10-31). `h` is the solve's result; returns how
-/// many lakes it opened (their share set to 1). ledger: ERO-217
+/// drainage opening", Garcia-Castellanos 2006, pp. 284-285; that source alone). Without it the
+/// sediment past the room left at the spill with only the spill's own water, settled there and
+/// dammed the spill higher: the next step's flood found a new closed lake behind it (the
+/// closed-basins review, 2026-10-31). `h` is the solve's result; returns how many lakes it
+/// opened (their share set to 1). One call sees only the lakes this solve filled: see
+/// [`open_until_stable`]. ledger: ERO-217
 pub fn open_filled(outflow: &mut [LakeOutflow], h: &[f64], filled: &[f64]) -> usize {
     let mut opened = 0;
     for lake in outflow.iter_mut().filter(|l| l.share < 1.0) {
@@ -130,6 +149,33 @@ pub fn open_filled(outflow: &mut [LakeOutflow], h: &[f64], filled: &[f64]) -> us
         }
     }
     opened
+}
+
+/// Opens the filled lakes and solves again until no lake opens; returns how many it opened in
+/// all. `open` is [`open_filled`] on the state's solve (`state` holds the solve's result), and
+/// `resolve` accumulates the area again with the new shares ([`accumulate`]) and solves the step
+/// again into the state. Opening a lake adds its water and its sediment to the lakes below it,
+/// so a lower lake whose room lay between its supplies before and after the upper one opened
+/// fills only in the second solve; one call of [`open_filled`] left it closed, its overflow
+/// settling on its spill (the chain review, 2026-10-31). Each round opens a lake or ends the
+/// loop, and an opened lake is never a candidate again, so it ends within the number of lakes;
+/// that bounds the rounds. ledger: ERO-217
+pub fn open_until_stable<S>(
+    outflow: &mut [LakeOutflow],
+    state: &mut S,
+    mut open: impl FnMut(&S, &mut [LakeOutflow]) -> usize,
+    mut resolve: impl FnMut(&mut S, &[LakeOutflow]),
+) -> usize {
+    let mut total = 0;
+    for _ in 0..outflow.len() {
+        let opened = open(state, outflow);
+        if opened == 0 {
+            break;
+        }
+        total += opened;
+        resolve(state, outflow);
+    }
+    total
 }
 
 /// Per cell: whether its water ends in a closed basin, the cell itself an exit of a lake that
@@ -589,6 +635,224 @@ mod tests {
         assert!(
             opened < 0.25 * dammed,
             "opened, it goes on: {opened} against {dammed}"
+        );
+    }
+
+    /// Two lakes of one depression the shoals at its fill split, a route from one into the other
+    /// and back into the first: no exit where it enters the second, whose water comes back. A
+    /// ridge of ground at 800 m, the spill's height, across [`basin`]'s bowl makes two lakes at
+    /// that level (columns 15 to 17 and 19 to 21); an east cell is sent into a west cell, and that
+    /// into another east cell. Walking on only through lakes at the same level (within
+    /// `LAKE_TOL_M`), as the solve's lakes are taken (`spl::lake_links`). ledger: ERO-218
+    #[test]
+    fn a_route_through_a_lake_at_its_own_level_and_back_is_no_exit() {
+        let (d, mut z, bowl) = basin();
+        let w = 24;
+        for j in 0..9 {
+            z[j * w + 18] = 800.0;
+        }
+        let plain = route(&d, &z, &bowl, WET, WET);
+        assert_eq!(plain.outflow.len(), 2, "{:?}", plain.outflow);
+        assert!(
+            (plain.outflow[0].spill_m - plain.outflow[1].spill_m).abs() <= pflood::LAKE_TOL_M,
+            "one level: {:?}",
+            plain.outflow
+        );
+        let at = |i: usize, j: usize| j * w + i;
+        let (w1, e1) = (at(16, 4), at(20, 4));
+        // An east cell whose way down passes neither of the two (no loop of receivers).
+        let passes = |from: usize| {
+            let mut x = from;
+            loop {
+                if x == e1 || x == w1 {
+                    return true;
+                }
+                let next = plain.r.rcv[x] as usize;
+                if next == x {
+                    return false;
+                }
+                x = next;
+            }
+        };
+        let e2 = (19..=21)
+            .flat_map(|i| (1..8).map(move |j| (i, j)))
+            .map(|(i, j)| at(i, j))
+            .find(|&c| c != e1 && !passes(c))
+            .expect("an east cell off the two's way");
+        let got = route_with(&d, &z, &bowl, WET, WET, &|r| {
+            r.rcv[e1] = w1 as u32;
+            r.rcv[w1] = e2 as u32;
+        });
+        assert_eq!(got.outflow.len(), 2, "{:?}", got.outflow);
+        assert!(
+            got.outflow
+                .iter()
+                .all(|l| !l.exits.contains(&(e1 as u32)) && !l.exits.contains(&(w1 as u32))),
+            "the loop through the other lake is no exit: {:?}",
+            got.outflow
+        );
+        // The lakes still have their ways out: the real ones, over the spill.
+        assert!(got.outflow.iter().all(|l| !l.exits.is_empty()));
+    }
+
+    /// The stream power's solve over [`route`]'s routing with `area`, 2 Myr, K 1.5e-9 (the
+    /// arrays of [`a_closed_basin_its_sediment_fills_opens`]).
+    fn solve_step(d: &Dims, got: &Routed, z: &[f64], area: &[f64]) -> Vec<f64> {
+        let n = z.len();
+        let p = super::super::spl::SplParams {
+            m: 1.0,
+            n: 2.0,
+            g: 1.0,
+            dt: 2.0e6,
+            sc: 0.15,
+            max_iter: 6,
+            tol_m: 0.01,
+        };
+        let (kf, base_z) = (vec![1.5e-9; n], vec![0.0; n]);
+        let input = super::super::spl::SplInput {
+            kind: &got.kind,
+            h0: z,
+            filled: &got.filled,
+            base_z: &base_z,
+            area,
+            kf: &kf,
+        };
+        let (mut out, mut qin) = (vec![0.0; n], vec![0.0; n]);
+        super::super::spl::solve(d, &got.r, &input, &p, &mut out, &mut qin);
+        out
+    }
+
+    /// Two arid basins in a chain, the upper's pass spilling into the lower, and a range behind
+    /// the upper that sheds far more than its room. Closed, the upper basin takes the sediment
+    /// it can hold and its pass dams up to the critical slope, so the lower basin gets the rest;
+    /// the upper opens ([`open_filled`]) and the lower gets the pass's share too. The lower
+    /// basin's floor is set so that its room lies between the two supplies (measured on a basin
+    /// too deep to fill): it is not full after the first solve and is full after the second. One
+    /// round of opening leaves it closed, its overflow settling on its spill and damming it;
+    /// [`open_until_stable`] opens it in the second round and the spill is cut by the basin's
+    /// water. ledger: ERO-217
+    #[test]
+    fn a_lower_basin_the_opened_upper_one_fills_is_opened_in_turn() {
+        let (w, h) = (24usize, 9usize);
+        let d = Dims::new(w, h, 1000.0, false);
+        let n = w * h;
+        // The heights, the lower basin's floor given.
+        let heights = |floor: f64| -> Vec<f64> {
+            (0..n)
+                .map(|c| {
+                    let (i, j) = ((c % w) as i64, c / w);
+                    match i {
+                        0..=1 => -1000.0,
+                        2..=9 => 400.0 + 10.0 * i as f64,
+                        10 if j == 4 => 500.0,
+                        10 => 520.0,
+                        // The lower basin, its spill at 500 m.
+                        11..=13 => floor,
+                        // The pass between the basins, over the lower one's floor.
+                        14 if j == 4 => 510.0,
+                        14 => 515.0,
+                        // The upper basin, half a metre under its pass, and the range behind it.
+                        15..=17 => 509.5,
+                        _ => 610.0 + 100.0 * (i - 18) as f64,
+                    }
+                })
+                .collect()
+        };
+        let (spill, pass) = (4 * w + 10, 4 * w + 14);
+        let bowl: Vec<bool> = (0..n).map(|c| c % w >= 11).collect();
+        let weight = vec![1.0f32; n];
+        // What the lower basin holds of the sediment after a solve, m³.
+        let held = |h: &[f64], z: &[f64]| -> f64 {
+            (0..n)
+                .filter(|c| (11..=13).contains(&(c % w)))
+                .map(|c| (h[c] - z[c]) * d.cell_area())
+                .sum()
+        };
+        // The supply of a lower basin too deep to fill: before the upper opens (it is closed, its
+        // pass dammed) and after (its sediment and water go on).
+        let deep = heights(200.0);
+        let got = route(&d, &deep, &bowl, WET, ARID);
+        let first = solve_step(&d, &got, &deep, &got.passing);
+        let mut once = got.outflow.clone();
+        assert_eq!(open_filled(&mut once, &first, &got.filled), 1);
+        let mut area = Vec::new();
+        accumulate(&d, &got.r, &weight, &once, &mut area);
+        let (before, after) = (
+            held(&first, &deep),
+            held(&solve_step(&d, &got, &deep, &area), &deep),
+        );
+        assert!(
+            after > before + 5.0e7,
+            "the opened upper basin adds to the lower's supply: {before:.3e} and {after:.3e}"
+        );
+        // The lower basin's room between the two.
+        let room = before + 0.5 * (after - before);
+        let depth = room / (27.0 * d.cell_area());
+        eprintln!(
+            "the lower basin's supply {before:.3e} then {after:.3e} m3, its room {room:.3e} ({depth:.1} m)"
+        );
+
+        let z = heights(500.0 - depth);
+        let got = route(&d, &z, &bowl, WET, ARID);
+        assert_eq!(got.outflow.len(), 2, "{:?}", got.outflow);
+        assert!(got.outflow.iter().all(|l| l.share == 0.0), "both closed");
+        let column = |k: usize| got.outflow[k].exits[0] as usize % w;
+        let lower = (0..2).find(|&k| column(k) == 11).expect("the lower");
+        let upper = (0..2).find(|&k| column(k) == 15).expect("the upper");
+        let full = |h: &[f64], l: &LakeOutflow| {
+            l.exits
+                .iter()
+                .all(|&e| got.filled[e as usize] - h[e as usize] <= FILLED_TOL_M)
+        };
+
+        // The first solve fills the upper basin only.
+        let first = solve_step(&d, &got, &z, &got.passing);
+        assert!(
+            full(&first, &got.outflow[upper]),
+            "the range fills the upper"
+        );
+        assert!(!full(&first, &got.outflow[lower]), "and not the lower");
+
+        // One round, as before: the upper opens, the lower fills in the next solve, stays
+        // closed, and dams its spill.
+        let mut once = got.outflow.clone();
+        assert_eq!(open_filled(&mut once, &first, &got.filled), 1);
+        assert_eq!(once[upper].share, 1.0);
+        accumulate(&d, &got.r, &weight, &once, &mut area);
+        let second = solve_step(&d, &got, &z, &area);
+        assert!(
+            full(&second, &once[lower]),
+            "the opened upper fills the lower"
+        );
+        assert_eq!(once[lower].share, 0.0, "one round leaves it closed");
+        let dammed = second[spill] - z[spill];
+
+        // To the end: the lower opens in the second round and the spill is cut.
+        let mut outflow = got.outflow.clone();
+        let mut state = first.clone();
+        let opened = open_until_stable(
+            &mut outflow,
+            &mut state,
+            |h, outflow| open_filled(outflow, h, &got.filled),
+            |h, outflow| {
+                accumulate(&d, &got.r, &weight, outflow, &mut area);
+                *h = solve_step(&d, &got, &z, &area);
+            },
+        );
+        assert_eq!(opened, 2, "both lakes opened");
+        assert!(pass_shares(n, &outflow).is_none(), "every lake passes all");
+        let cut = state[spill] - z[spill];
+        eprintln!(
+            "the lower spill's rise: one round {dammed:.1} m, to the end {cut:.1} m (the pass {:.1} m)",
+            state[pass] - z[pass]
+        );
+        assert!(
+            dammed > 20.0,
+            "one round, the overflow dams the spill: {dammed}"
+        );
+        assert!(
+            cut < 0.25 * dammed,
+            "opened, it goes on: {cut} against {dammed}"
         );
     }
 }

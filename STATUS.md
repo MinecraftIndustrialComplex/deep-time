@@ -234,8 +234,10 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
   - No V1 number beyond the spread (coast with high ground 0.102, p 0.13).
   - The ground draining to a closed basin wears at 30.6 m/Myr against plat-cb0's 52.8 (the runs' ranges apart; stream
     power 3.8 against 24.6).
-  - 0.101 of the land drains to closed basins (0.127). R3 opens 4.8e4 filled lake-substeps a run; lakes passing part
-    of their inflow fell from 6.3e4 to 1.7e4 a run (the false exits).
+  - 0.101 of the land drains to closed basins (0.127). R3 opens 4.8e4 filled lake-substeps a run (the closed and the
+    part-passing lakes together); the counts are taken after R3, and the part-passing lakes fell from 6.3e4 to 1.7e4 a
+    run, about the number opened, while the closed ones fell only from 3.6e4 to 2.7e4: the drop is R3's (the overfill
+    fix), not the false exits' (corrected in the second review fixes below).
   - K is intact (all land 38.3 against 38.1 m/Myr). The flat high ground still wears at 124 m/Myr, frozen 0.62 of it.
   - plat-cb0's larger guard worst and rounder belts are the plates' changes, not the law's (small-terrane gives the
     same).

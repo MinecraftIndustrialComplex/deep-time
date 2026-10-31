@@ -200,14 +200,16 @@ Nothing else changes, and what the sources describe follows from the model's own
 
 **R3. A basin its sediment fills opens** (ERO-217; the review of 2026-10-31). "In closed drainage basins, either a
 climate change to wetter climatic conditions, or the sediment overfill of the lake (both inducing lake level rise) or a
-basin capture undertaken by an adjacent river can trigger drainage opening" (Garcia-Castellanos 2006, pp. 284-285); "the
-material shed from the range into the basin may eventually overtop the range and reintegrate the drainage system"
-(Sobel et al. 2003, [26]). R2 alone did not do it: HYD-110 raises every lake cell by one share of its depth, so the lake
+basin capture undertaken by an adjacent river can trigger drainage opening" (Garcia-Castellanos 2006, pp. 284-285). That
+point rests on this source alone: an earlier draft also quoted Sobel et al. 2003, [26], on the shed material overtopping
+the range, and that sentence is in no printed record of the reading (the bibliography's [26] is a different sentence), so it
+is removed. R2 alone did not do it: HYD-110 raises every lake cell by one share of its depth, so the lake
 keeps its cells, and the balance its losses, until the room is nearly gone, and the sediment past the room left at the
 spill with only the spill's own water (a closed lake passes none), settled there and dammed it; the next step's flood
 found a new closed lake behind it. Now a lake whose exits the solve leaves at the flood's level (its room taken) has no
-room for water either and passes all of it, and the step is solved again with its area passed on
-(`closed::open_filled`): the spill is cut by the basin's water and the sediment goes on down the valley. A shallow pit
+room for water either and passes all of it, and the step is solved again with its area passed on, until no lake
+opens (`closed::open_filled`, `closed::open_until_stable`: opening one sends its water and sediment to the lake below
+it): the spill is cut by the basin's water and the sediment goes on down the valley. A shallow pit
 has little room, so a one-cell lake the sediment reaches fills and opens within its step; the surface's lakes are any
 depression the flood fills by more than 1 cm, as the solve's are, where the bake draws only lakes of 1 km² and a block
 deep (what the world shows, not the water).
@@ -259,7 +261,9 @@ Unit tests: `surface::closed` (an arid basin is closed and passes no water; a hu
 evaporation, the share against an independent count; passing everything is the plain accumulation to the bit; and,
 since the review of 2026-10-31, the passing accumulation against its definition with random shares, a lake draining
 over its own shoal with one way out, a chain of two lakes applying each share once, and a 0.5 m deep arid basin a range
-overfills in one step, whose spill rises 660 m closed and is cut 186 m once it opens) and
+overfills in one step, whose spill rises 660 m closed and is cut 186 m once it opens; since the second review of
+2026-10-31 also a chain whose lower basin the opened upper one's sediment fills, a route through a lake at its own level
+and back, and, in `surface::young`, the young step's routing and solve on a closed basin) and
 `surface::plateau_check::an_arid_plateau_behind_its_rim_keeps_its_rock` (the table above; since the review it also
 checks the first step's lakes: the arid interior's 871-cell lake passes nothing, the humid one 0.69). Gate on the branch (VM,
 `tools/review/plateau/gate.sh full`, on c4fd3e38): fmt and clippy (workspace, all targets) clean, deeptime-core 1,150
@@ -451,6 +455,47 @@ changed (199c51b1 and after):
    closed pit the sediment reaches fills and opens within its step (closed.rs, "Simplifications"). The 0 °C line of the
    frozen flat high ground carries `// ledger: ERO-220`; the "spills (today)" labels are "spills (no balance)".
 
+## The second review (2026-10-31) and its fixes (branch `plateau-drainage-on`)
+
+A re-review of the first fixes (d19ada78) found one thing that was wrong in the code, two in the docs and one in a
+source line. What changed:
+
+1. **A downstream lake in a chain could still dam its own spill.** `closed::open_filled` ran once per substep. Opening
+   an upper lake sends its water and its sediment on to the lake below it, so a lower closed lake whose room lay
+   between its supplies before and after the upper opened was filled by the second solve without being opened, and its
+   overflow settled on its spill (the re-reviewer measured 60.6 to 70.9 m of rise). Now `closed::open_until_stable`
+   opens, accumulates the area again and solves again until no lake opens. An opened lake is never a candidate again, so
+   the loop ends within the number of lakes, and that number bounds its rounds. It is the one loop the surface
+   (`surface/mod.rs`), the young stage (`young.rs`, `solve_lakes`) and the plateau test (`plateau_check.rs`) run.
+   - The chain test `a_lower_basin_the_opened_upper_one_fills_is_opened_in_turn` sets the lower basin's floor so its
+     room lies between the two supplies (measured on a basin too deep to fill: 2.561e9 m³ before the upper opens,
+     2.700e9 after, the room 2.631e9). Checked: the lower is not full after the first solve and is full after the second;
+     one round leaves it closed and its spill rises 69.3 m; the loop opens both lakes and the spill falls 236 m.
+2. **Two statements of the arm's table were wrong** (see "What changed" below, corrected): the drop in lakes passing
+   part of their inflow (6.3e4 to 1.7e4 substeps a run) is about the 4.8e4 opened by R3, not the false exits'; and the
+   closed lake-substeps fell only 0.8e4, so R3's lakes were mostly part-passing ones. `filled_lake_steps` counts the
+   closed and the part-passing lakes together, and the three counts are taken after R3 (`Totals` doc comments).
+3. **A Sobel et al. 2003 [26] quote was removed.** "The material shed from the range into the basin may eventually
+   overtop the range and reintegrate the drainage system" stood in `closed.rs`, in R3 above and in ERO-217. It is in no
+   printed record of the reading: the bibliography's Sobel2003 entry gives a different [26] sentence, and `git log -S`
+   finds it only in the commit that added it. R3's source is Garcia-Castellanos 2006, pp. 284-285, alone.
+4. **The young step is tested with a closed basin.** `young.rs` routes and solves through two functions now
+   (`route_lakes`, `solve_lakes`; the same code, moved out of `lem`), and
+   `the_young_step_routes_a_closed_basin_and_opens_one_its_sediment_fills` runs them on the geometry of
+   `closed.rs`'s overfill test: the routing cuts the spill's area by the closed basin's; solved without opening, the
+   spill rises 660 m; the step's solve opens the basin and gives the plain accumulation's result to 1e-6 m (−185.7 m).
+   Without the lakes' water in the routing, or without the opening in the solve, it fails.
+5. **A lake's exit through another lake at its own level.** A depression the shoals at its fill split into two lakes at
+   one level (within 1 cm) could make a false exit: a route from a cell of one into the other and back into the first
+   counted as leaving. The walk now goes on through a lake at the same level (as `spl::lake_links` takes the solve's
+   lakes) and stops at one at another level. `a_route_through_a_lake_at_its_own_level_and_back_is_no_exit`.
+6. **Smaller.**
+   - The `Totals` lake counts' doc comments say what they count.
+   - The young stage's estimate lists the 8 B a cell it holds through the glaciers' step (the lakes' runoff and loss on
+     L2, two `f32`s): `OWN_BYTES_PER_L2_CELL` 340 to 348, the test's holds 951 to 961 MiB (quick) and 3,474 to 3,515
+     (full) by that arithmetic, not measured again.
+   - The gate record below is the branch's at this review.
+
 ## The arm after the fixes: plat-cb1 (2026-10-31)
 
 `pool.sh run plat-cb1 --seeds 1,2,3,4 +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps` ran on
@@ -466,7 +511,7 @@ small-terrane (key dcf0d7480ef3, argkey 35ce6e09: the docking cover on the oroge
 - small-terrane has the docking cover but not the other two, so no cached arm is plat-cb1 without the law. Plate-side
   rows are read against small-terrane, surface rows against plat-cb0.
 - The pool's runs stop before the young landscape (`young=0.0s/0steps` in the timings), so fix 1 is not in these
-  numbers. The young step's tests pass with it, but none of them holds a closed basin: a test that does is a follow-up.
+  numbers. The young step has a test with a closed basin since the second review (above).
 
 **The pool's tables (8 runs each; p against orog-cum unless said).**
 - **V1:** land 0.218 (p 0.51), largest landmass 0.083 (p 0.65), crust under the sea 0.577 (p 0.65), land above 2 km
@@ -510,12 +555,16 @@ What changed:
   mm/ka") and 2 to 3 times Hetzel et al. 2011's catchment rates (11 to 16 m/Myr), against 3 to 5 times before. This arm
   cannot split the fixes from the plates' changes. Those changes are not expected to cut a surface class's stream power
   six-fold, but that is not shown here.
-- **Less land drains to a closed basin** (0.101 against 0.127, ranges overlapping). R3 opens the basins their sediment
-  fills, about 4.8e4 lake-substeps a run, more than the 2.7e4 that stay closed. So most lakes the balance would close
-  are reached by sediment that fills them first. Earth: "Endorheic basins occupy 20% of the Earth's land surface"
-  (Garcia-Castellanos et al. 2003, p. 8-1).
-- **The lakes passing part of their inflow fell from 6.3e4 to 1.7e4 substeps a run.** The false exits had counted a
-  lake's shoals as exits.
+- **Less land drains to a closed basin** (0.101 against 0.127, ranges overlapping). Earth: "Endorheic basins occupy
+  20% of the Earth's land surface" (Garcia-Castellanos et al. 2003, p. 8-1).
+- **R3 opened 4.8e4 lake-substeps a run, mostly lakes that passed part of their inflow.**
+  - The counts in the table are taken after R3 (`closed::open_until_stable`), and `filled_lake_steps` counts the closed
+    and the part-passing lakes it opened together.
+  - The lakes passing part of their inflow fell by 4.7e4 substeps a run (6.3e4 to 1.7e4), about the 4.8e4 opened: the
+    drop is R3's, the overfill fix, not the false exits'.
+  - The closed lake-substeps fell by only 0.8e4 (3.6e4 to 2.7e4). So most of the 4.8e4 were lakes that spilled part of
+    their inflow and that the step's sediment filled, not lakes the balance would close.
+  - The false exits' own share of the drop is not separated by this arm.
 
 What did not change:
 - **The plateaus.** The flat high ground as a whole wears at 124 against 141 and 134 m/Myr, within the runs' spread.

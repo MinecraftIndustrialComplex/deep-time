@@ -1305,8 +1305,9 @@ HYD-050 and HYD-051) now also sets what each lake passes on: the stream power's 
 the share of its inflow its balance lets out, and none from a lake that cannot fill to its spill. The depression stays
 the solve's lake (HYD-110), so what a closed basin's ranges shed stays on its crust up to the lake's room; a basin
 its sediment fills to the spill opens and passes its water ("the sediment overfill of the lake ... can trigger drainage
-opening", Garcia-Castellanos 2006, pp. 284-285), and a lake cell is an exit only where its water leaves the lake for
-good. The young landscape (L2) takes the same law. The flat high ground is also split
+opening", Garcia-Castellanos 2006, pp. 284-285; that source alone), the step solved again until no lake opens (opening
+one sends its water and sediment to the lake below it), and a lake cell is an exit only where its water leaves the lake
+for good. The young landscape (L2) takes the same law. The flat high ground is also split
 by its water in the erosion bands (`flatc`, `flatd`, `flatf`; ERO-220).
 
 **The controlled plateau (ERO-219).** ERO-176's rimmed plateau on the presets' law, a wet outer flank: the arid interior
