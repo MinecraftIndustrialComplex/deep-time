@@ -209,6 +209,8 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
   `surface.runoff_budget` true in `SurfaceParams::default`, ERO-010, ERO-221 and ERO-222 noted, the design's status and
   the science page; origin/master 0a3ada8c merged first. The builder's earlier flip (runoff-budget-on, 95a928a7) is
   superseded: its only change past master was the flip itself, made here again on the reviewed law.
+- **Gate with the flip** (VM, `tools/review/plateau/gate.sh full` on 5dd7ae88, job rb-on-full): fmt and workspace
+  clippy clean, `cargo test --workspace` 1,483 passed, 0 failed, 13 ignored; no test changed with the default.
 
 ### 2026-10-31: The continents' export is set by the plates' uplift, not by the erosion law (a diagnosis from cached runs; the runoff lane, worktree agent-a4e92fd13092b08b0, branch `surface-runoff-budget`; nothing built)
 
