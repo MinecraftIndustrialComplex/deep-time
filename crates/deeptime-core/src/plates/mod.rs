@@ -651,6 +651,11 @@ impl PlatesStage {
                 subduction::ARC_FRONT_INTRA_OCEANIC_GLOBAL,
                 pull.front_intra_oceanic_km_myr,
             ),
+            (subduction::SUTURE_FRONT_GLOBAL, pull.suture_front_km_myr[0]),
+            (
+                subduction::SUTURE_FRONT_ACTIVE_GLOBAL,
+                pull.suture_front_km_myr[1],
+            ),
         ] {
             *world.globals.entry(name.to_owned()).or_insert(0.0) += x;
         }
@@ -1723,7 +1728,7 @@ fn finish_samples(st: &mut PlateState, geo: &Geo, z0: &[f32], env: &Env<'_>) {
     // column's thickness: the plate model keeps crust stacked at resamplings under the oceanic
     // label (`transition.rs`), and that is no arc. Until 2026-10-02 a mature arc also had to
     // stand above sea level that step; most intra-oceanic arcs are submarine (Stern 2010).
-    let mature_m = (env.k.arc_mature_crust_km * 1000.0 - transition::oceanic_m()).max(0.0) as f32;
+    let mature_m = subduction::mature_arc_m(env.k);
     let thermal_heat = env.k.thermal_state;
     let thermal_reference = env.k.thermal_reference_km as f32;
     st.samples.par_iter_mut().enumerate().for_each(|(i, s)| {

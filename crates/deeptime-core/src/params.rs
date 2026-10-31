@@ -935,15 +935,21 @@ pub struct TectonicParams {
     /// An intra-oceanic arc keeps the island arcs' law on the crust it made (the crust-budget
     /// lane, 2026-10-31; on by default since 2026-10-31, the coordinator's call under Ben's rule
     /// of 2026-10-23: physics goes on by default once built and correct; decisions log
-    /// 2026-10-31): the arc's type is its setting at its onset (no visible continental crust
-    /// within `arc_distance_km` of its front, PLT-370's test, when the arc begins), not its
-    /// column's label, so an island arc whose own crust turned its column continental (PLT-047,
-    /// 8 km of arc crust: under one step of the early pulse at the axis) goes on at the island
-    /// law (`arc_front_loaded`'s pulse, then its mature rate) on that crust. Off (the model
-    /// before), the column's label picks the law, and a young island arc's pulse ends when its
-    /// axis turns continental. Stern & Scholl (2010, p. 11) give the front-loaded law for the
-    /// intra-oceanic arcs they list, the Izu-Bonin-Mariana among them, whose crust is far
-    /// thicker than 8 km. ledger: PLT-760
+    /// 2026-10-31): the arc's type is its setting at its onset (none of a continent's own crust
+    /// within `arc_distance_km` of its front when the arc begins: ocean floor and an earlier
+    /// intra-oceanic arc's crust, `subduction::island_arc_crust`, do not count), and on the crust
+    /// an intra-oceanic arc made the island law goes on, whatever the column's label: an island
+    /// arc whose own crust turned its column continental (PLT-047, 8 km of arc crust: under one
+    /// step of the early pulse at the axis) goes on at the island law (`arc_front_loaded`'s
+    /// pulse, then its mature rate) on that crust, and a continent's own crust takes the
+    /// continental law. The substrate is Stern 2010's ("IOASs are built on oceanic crust, whereas
+    /// Andean-type arcs are built on pre-existing continental crust"; their basements include
+    /// earlier intra-oceanic arcs): ocean floor, or continental crust over an ocean basement
+    /// with PLT-047's island-arc crust in it. Off (the model before), the column's label picks
+    /// the law and any continental column within the arc's distance makes the onset continental,
+    /// and a young island arc's pulse ends when its axis turns continental. Stern & Scholl (2010,
+    /// p. 11) give the front-loaded law for the intra-oceanic arcs they list, the
+    /// Izu-Bonin-Mariana among them, whose crust is far thicker than 8 km. ledger: PLT-760
     pub island_arc_own_crust: bool,
     /// Arc magma at collision fronts (the crust-budget lane, 2026-10-31; on by default since
     /// 2026-10-31, the coordinator's call under Ben's rule of 2026-10-23, decisions log): where
@@ -951,9 +957,15 @@ pub struct TectonicParams {
     /// zone), the overriding plate's arc band goes on taking magma at Scholl & von Huene's
     /// global arc addition during suturing over their long-term suture length, 0.2 AU over
     /// 6,000 km (33.3 km³/km/Myr, `subduction::SUTURE_ARC_KM3_PER_KM_MYR`), with no convergence
-    /// factor; off (the model before), a collision front makes no arc. Stern & Scholl 2010's
-    /// Table 1 books it as "Additions at crust-suturing subduction zones 0.2" (abstract only:
-    /// the source is not read in full). ledger: PLT-763
+    /// factor (game-choice: the source gives a global figure, not a law in the convergence);
+    /// off (the model before), a collision front makes no arc. It acts only past incipient, its
+    /// contact's slab at PLT-611's 100 km or more, and `forces::grow_slab` breaks the slab off
+    /// (length 0) once continental crust has held half the front for `slab_breakoff_myr`
+    /// (FRC-019; PLT-184, 10 Myr), so a collision's suture magma lasts at most about that long.
+    /// Its band sets the ARC flag as an arc's does (the heat flow's arc term, PLT-468; the
+    /// volcano stage, the plutons and the traps read it). Stern & Scholl 2010's Table 1 books it
+    /// as "Additions at crust-suturing subduction zones 0.2" (abstract only: the source is not
+    /// read in full). ledger: PLT-763
     pub collision_arc_magma: bool,
     /// Clift & Vannucchi's (2004) trench sediment line read in place (the crust-budget lane,
     /// 2026-10-31; on by default since 2026-10-31, the coordinator's call under Ben's rule of
