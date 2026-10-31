@@ -13841,26 +13841,31 @@ plates converge there or the zigzag converges locally. That is `subduction::reso
 overlap of 3 samples makes a contact, with no convergence test. A correctness fix for the
 default, whatever V1 says.
 
-**The fix, built (PLT-810, PLT-811; on by default since 2026-10-31, below).** `tectonics.contact_needs_convergence`: a new contact
-only where the pair's reading converges and is no transform by PLT-311; reversals and existing
-contacts are not gated. An overlap left without a contact stays an overlap, as one under 3
-samples does now, and the next resampling's ranking settles it. Tests first:
+**The fix, built (PLT-810, PLT-811; on by default since 2026-10-31, below; its onset test changed
+by PR #55's review, "The review's fixes (PR #55)").** `tectonics.contact_needs_convergence`: as
+built, a new contact only where the pair's reading converges and is no transform by PLT-311;
+reversals and existing contacts are not gated. An overlap left without a contact stays an
+overlap, as one under 3 samples does now, and the next resampling's ranking settles it (which, the
+review found, drops a growing overlap's crust). Tests first:
 `a_contact_begins_only_where_its_plates_converge` (one overlap, three motions: converging makes a
 contact either way; along the boundary or parting makes one off and none on) and
 `the_overlap_trace_reads_the_motion_across_the_boundary` (the normal, the classes and the pair's
 reading). It removes up to 0.30 of the intra-oceanic front at the onset; some of those contacts
-would begin later, when their plates converge. Not run: per the coordinator's rule, reported
-before an arm.
+would begin later, when their plates converge. Run as the arm below.
 
 **The arm and the default (2026-10-31).** One 8-run arm, oo-gate (`--set
 tectonics.contact_needs_convergence=true`, the crust-budget envs), against base35-s4 (master
 9d9e4c94, seeds 1 to 4 of both starts). Guard clean (no step beyond two Earth reliefs). No V1
 check beyond the seeds' spread: land 0.216 to 0.189 (p 0.16), continental crust under the sea
-0.594 to 0.653 (p 0.13), criteria met 5 against 5 (p 0.95). The gate does what it says: every
-ocean-ocean onset of a pair that came to converge now converges across its overlap (1.000). The
-intra-oceanic front does not shrink: past incipient 20,265 to 21,296 km (medians), its share on
-floor younger than 55 Myr 0.488 to 0.520 (about 9,100 to 10,150 km against Earth's 2,240 to
-3,860 km of intra-oceanic trench); the subducting fronts 47,103 to 49,017 km. The pairs it holds
+0.594 to 0.653 (p 0.13), criteria met 5 against 5 (p 0.95). Every ocean-ocean onset of a pair
+that came to converge now reads converging across its overlap (1.000), which is no test of the
+gate: the trace reads the gate's own function on the same inputs (the run-long check is
+`onsets_carry_their_plates_motion_across_the_overlap`). The intra-oceanic front does not shrink:
+past incipient 20,265 to 21,296 km (the record's front, `fronts.py`, medians of the runs). On the
+crust-budget maps (`oofronts.py`, -950 to -50 Myr, pooled) the intra-oceanic front is 18,650 and
+19,521 km at a snapshot, of it on floor younger than 55 Myr 0.488 and 0.520, about 9,100 and
+10,150 km, against Earth's 2,240 to 3,860 km of intra-oceanic trench; the subducting fronts
+47,103 to 49,017 km (the record's, `fronts.py`). The pairs it holds
 back begin a few steps later, once they converge. So the intra-oceanic excess is not this rule:
 it is plates that really converge meeting where the resampling fills the gap between them (the
 resampling trace above), which is the next thing to read. On by default since 2026-10-31 (the
@@ -13868,7 +13873,81 @@ coordinator's call, decisions log: a correctness fix, Bird 2003 paragraph [126])
 `weld_seed_sweep` welds scattered 3, 5, 7, 9, 11, 13 to 16, 18 and 22 and supercontinent 1, 2,
 8, 9, 12, 13, 16, 17 and 19; the sutures test moved from scattered 8 to 3. Test fixtures whose
 plates were turned but left at rest resolve their overlaps moving about their turn at 50 mm/yr
-(`resolve_turned` in the tests), so their contacts begin as PLT-810 asks.
+(`resolve_turned` in the tests, 16 call sites), so their contacts begin as PLT-810 asks.
+
+### The review's fixes (PR #55, 2026-10-31)
+
+An Opus review of the branch at 5eb0cf81. What it found, and what changed.
+
+**A refused overlap had no consumer.** Only a contact hides the samples of the plate that goes
+under. With the 20 degrees at the onset, two plates converging within 20 degrees of their
+boundary (transpression) read as a transform every step, so their overlap deepened by v sin θ per
+step until the next resampling (20 to 120 Myr apart, or 1,500 km of drift). There the ranking puts
+one plate on top, and the visible crust of the other that no contact puts under it is dropped:
+continental crust to `plates/resample_dropped_km3`, ocean floor and its sediment with no tally.
+Measured from the cached runs (`tools/review/crustcycle/dropped.py`, medians of 8 runs, km³ a
+year over the run, Mann-Whitney p): the continental crust dropped at resamplings 0.0049 on
+base35-s4, 0.0228 on oo-gate (p < 0.01; every arm run above every base run); the sediment books'
+resampling residual (the sediment's change under the resampling's blend plus what the slab took
+down) -0.661 against -0.676 (p 0.88), its ocean-floor side -0.146 against -0.161 (p 0.38). The
+0.018 km³ a year more crust dropped is under a hundredth of the arcs' magma (2.1 km³ a year on the
+arm's supercontinent-1, its `cb_globals` arc_o and arc_c), and it was crust the model threw away.
+
+**The consumer: a contact wherever the overlap grows.** Three were on the table: a contact where
+the plates converge at all, the 20 degrees left to the arcs' fronts (PLT-330); a contact once a
+refused overlap is deeper than about a spacing; or the resampling accreting the losing sample.
+The first is the sources' rule. Bird 2003 calls a step a subduction zone where it has "a
+convergent (component of) velocity" and a Benioff zone ([126]); his 20 degrees are a tolerance for
+the azimuth errors of steps that are not subduction zones ([127], PLT-311). At an onset there is
+no Benioff zone yet; the incipient stage (PLT-610, PLT-611: 100 km of slab, Gurnis et al.
+2004's "Cumulative convergence, not the rate of convergence, is the dominant control") stands for
+it. And Earth starts subduction under transpression: at Puysegur "motion was fully strike-slip
+with a component of convergence" after 10 Ma (Gurnis et al. 2004 [25]), and the subduction zone
+began 11 to 5 Ma (their Table 1); "relatively minor adjustments in relative plate motion convert
+a transform fault into a convergent plate boundary" (Stern 2004, p. 280). (Both read in the
+library's texts by a Sonnet research sub-agent, 2026-10-31.) The depth rule would stand on the
+lattice's resolution, not on a source, and the accretion would thicken the top plate with ocean
+floor that on Earth subducts. So PLT-810 now begins a contact where the two plates' mean
+convergence across the overlap's samples is positive, at any angle. That mean is the rate at
+which the overlap grows, so an overlap that grows always gets its consumer, and one that does not
+(plates sliding past, or parting) begins none and does not deepen. PLT-311's 20 degrees stay
+where they were before the gate: the boundary classes and the arcs' fronts (PLT-330), so a
+transpressive contact builds no arc on its strike-slip stretches. In the overlap trace's records
+(rule as built), the pairs read as transforms were 0.275 of the ocean-ocean onsets, and 0.66 of
+them had a convergent component: those now begin.
+
+**The pair's reading from its samples (PLT-811).** The reading summed the samples' unit normals at
+the overlap's centroid: two overlaps on opposite flanks of a rotating plate cancel, and the
+relative pole beside the centroid reads noise. Deep in an overlap both plates' samples surround a
+sample, and the difference of their mean positions is lattice noise that `normalize_or_zero`
+turned into an arbitrary unit vector. Now a sample whose two means lie less than a quarter of a
+spacing apart has no normal, and the pair's reading is the mean convergence over its samples with
+a normal, at least `MIN_CONTACT` of them (else no normal: no contact). The gate reads only pairs
+with no contact and an overlap of a contact's size.
+
+**What the gate does not touch.** A contact that exists goes on whatever its plates do: an
+active contact seen again, one carried through a resampling (PLT-550), and a dormant one, unseen
+for less than `contact_timeout_myr` (24 Myr, PLT-059), which resumes when its plates overlap again,
+converging or not. So do a polarity reversal's new onset and an initiation's planted slab.
+
+**Tests.** `a_contact_begins_only_where_its_plates_converge`: head-on and 10 degrees off the
+boundary towards it (transpression), a contact with the switch on; 10 degrees off away from it
+and head-on away, none, and the overlap's samples stay visible. `a_contact_goes_on_and_reverses_whatever_its_plates_do`:
+a contact begun converging is seen again the next step while its plates part, and reverses the
+step after, with continental crust on its subducting side, though they still part.
+`onsets_carry_their_plates_motion_across_the_overlap`: with the gate on (the default), every new
+contact of a full run but a reversal reads converging. `the_overlap_trace_reads_the_motion_across_the_boundary`:
+the quarter-spacing no-normal case and the pair's reading under transpression, transtension and
+parting.
+
+**Small fixes.** The onset trace keyed a contact to its record by its onset step and slab age,
+which a split's copies keep; every continental onset has slab age 0, so two of one step shared a
+record. The key adds the onset's convergence. `onsets.py` says the records' signs
+(`PairBound.normal_mm_yr` negative converging, `OverlapMotion` positive).
+
+WELD_SWEEP_PLACEHOLDER
+
+Not run yet: the arm oo-gate2 (the fixed gate, 8 runs against base35-s4) needs a simulation slot.
 
 ## Hotspots, plume heads and volcanic margins from sources (2026-10-31)
 

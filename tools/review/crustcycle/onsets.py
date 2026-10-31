@@ -25,8 +25,14 @@ made (both sides), how many passed incipient and when, their slab's longest, and
 
 With the overlap trace's records (the onsets' `overlap`, plates/dynamics.rs `OnsetOverlap`) it prints, by band and by
 setting and route, the two plates' motion across the overlap at the onset: the overlapping samples converging, moving
-along the boundary (PLT-311's transform, or at rest), parting or with no normal; the pair's own reading at the
-overlap's centroid; and what the onsets whose pair does not converge make.
+along the boundary (PLT-311's transform, or at rest), parting or with no normal; the pair's own reading; and what the
+onsets whose pair does not converge make. The pair's reading was the samples' normals summed at the overlap's
+centroid in the records made before PR #55's review fixes (2026-10-31), and is the samples' mean convergence since
+(PLT-810, PLT-811), so `pair_conv_mm_yr` equals `conv_mm_yr` in the newer records.
+
+Signs: the boundary the step before (`before.normal_mm_yr`, dynamics.rs `PairBound`) is negative converging, positive
+parting; the overlap's convergence (`overlap.conv_mm_yr`, `pair_conv_mm_yr`, subduction.rs `OverlapMotion`) is
+positive converging.
 """
 import json
 import statistics
