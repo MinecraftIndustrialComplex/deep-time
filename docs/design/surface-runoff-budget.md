@@ -230,3 +230,78 @@ Reading:
 It replaces the snapshot's rule that a land below freezing evaporates nothing (MOI-067's PET for the runoff), which the
 bake dropped on 2026-10-01, so the rivers and the lakes then share one budget. It does not reach Tibet's 6 to 16 m/Myr.
 The plateaus' flat tops now wear by the edge's cut and by diffusion, not by runoff.
+
+## The continents' export: the erosion law or the plates' uplift (2026-10-31, a diagnosis)
+
+The crust-budget lane (branch `trench-input`, docs/design/crust-budget.md, plates.md "The trenches' input split by
+source and by delivery term") found the continents exporting 3.82 km³ of rock a year to the ocean floor on base34-s4.
+That is 2.16 times Clift et al. 2009's long-run 1.77, and the floor's sediment stock agrees. It asked which law sets
+the rate. From cached runs only: plat-rb0, plat-cb0 and orog-cum, 8 runs each, and base34, 24 runs.
+`tools/review/plateau/export_corr.sh` gives each arm's export and its correlations within the arms;
+`/data/ban/deeptime-runs/plateau/export-corr.txt` holds them.
+
+**Earth's numbers, per km² of land.** Earth's land is 0.289 of 5.10 x 10^8 km², about 1.47 x 10^8 km² (this page's
+arithmetic, the project's hypsometry figure). Rock lowering per land area, all computed:
+- **Clift et al. 2009's long-run rivers,** 1.77 km³ a year of rock (a Cenozoic mean): 12 m/Myr.
+- **Modern loads:**
+  - Milliman 1997's 6.5 km³ a year, as Clift et al. quote it: 44 m/Myr;
+  - Milliman & Syvitski 1992's 20 Gt a year, about 7.5 km³ of rock (the crust-budget lane's arithmetic): 51 m/Myr.
+- **Cosmogenic rates** (ERO-171, Portenga & Bierman 2011): basins a median of 54 m/Myr (mean 218), outcrops 5.4
+  (mean 12).
+- **Montgomery & Brandon 2002** (ERO-172): quiet land at 0.2 mm/yr per km of relief, over a background of 0.01 mm/yr.
+
+**The model.** Its export is 3.03 to 3.86 km³ a year by arm. Over its land, 0.30 of the visible samples (the
+crust-budget lane), that is 20 to 25 m/Myr. Its land's mean net lowering, over the surface's own smaller land, is 37 to
+39 m/Myr. So the model sheds about twice Clift's long run per km² and about half the modern loads.
+
+**K's calibration.** The regions' erosion at each relief lies between Montgomery & Brandon's lines in every arm
+(`recal.sh`). Montgomery & Brandon's rates are of the present-day kind, like the modern loads. The model's land is
+flatter than Earth's:
+- relief above 1 km: 0.012 to 0.016 of the land, against Earth's at most 0.05;
+- land above 2 km: 0.013 to 0.019, against Earth's 0.102.
+
+Against Clift's long run, then, the model's erosion per relief is several times Earth's: it sheds twice the rock off
+lower ground.
+
+**Which one sets the export.** On a 1,000-Myr run the land is near a steady state, where the erosion equals the rock
+the plates bring above the sea. A change in the erosion law moves the relief that carries that supply, not the supply.
+The cached runs test this in both directions:
+
+| change | what it changed | export, km³ a year (8 runs, median) |
+|---|---|---|
+| the closed basins (plat-cb0 against orog-cum) | the water below closed lakes, 0.13 of the land draining to them | 3.36 against 3.03 (the runs' pairs off in both directions) |
+| the runoff budget (plat-rb0 against plat-cb0) | the runoff weight: -12 % on land, -51 % above 2 km | 3.34 against 3.36; land above 4 km doubled, relief above 1 km +25 % |
+| the two orogen switches (orog-cum against base34-s4, same erosion law) | the collisions' wedges and plateau, a plate law | 3.03 against 3.74 (5 of the 8 seed pairs lower, 1 equal) |
+
+- **The erosion law's two changes left the export where it was.** The land answered with relief, and the export over
+  gross erosion stayed at 0.31.
+- **The plate law's change moved the export by a fifth.**
+- **Within the arms,** after each arm's median is taken off (48 runs), the export follows the land's median height
+  (Spearman +0.50), the sea's level at the end (-0.40) and the collisions that parted (+0.50). It runs against the
+  continental crust left at the end (-0.48): the supply of land above the sea, and an export that drains the
+  continents.
+
+**The split.**
+- The export's 2.2 times Clift's is the plates' supply: rock lifted above the sea at about twice Earth's long-run rate.
+- The erosion law's efficiency, calibrated on present-day rates, shows as the land's low relief, not as the export.
+- Retuning K would not move the export. A lower K would raise the relief at the same export; a higher one would flatten
+  the land further.
+- The runoff law does the first of these, for the cold high ground.
+
+**The lead, on the plates' side.** Measure the rock the plates lift above the sea, by process, on one traced seed. That
+needs measurement-only globals, bit for bit with the base, as the crust-budget lane's ti-src: the gap budget
+(`DEEPTIME_GAP_BUDGET`, PLT-283's 27 parts) with the crust budget's steps. Set each process against Earth's long-run
+references:
+- collision thickening and the flow and collapse that spread it (the plateau lane: the plates take 0.57 to 0.69 of a
+  plateau's crust after its collision);
+- the arcs' additions;
+- the flows back to the continents: accretion at resamplings 1.15 and the transition 0.59 km³ a year, on base34-s4;
+- the continents' own drain: a net -0.98 km³ a year, so about a quarter of the export is not resupplied.
+
+The flows back come first. They return 0.45 of the export to the continents, where it can be lifted and eroded again,
+so a recycling loop would count the same rock twice. The land's lowlands carry the most of the lowering (land below 1
+km: 0.53 of it at 21 to 23 m/Myr), which fits rock being returned and re-lifted near the coasts.
+
+The relief shortfall is a separate question: present-day rates against a long-run supply. It is the erosion law's
+calibration target (K 1.5e-9 against Montgomery & Brandon, set 2026-10-18), and so not this lane's to retune. If the
+plates' supply comes down to Earth's, the relief at today's K would fall further.

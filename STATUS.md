@@ -152,6 +152,37 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 
 ## Build log
 
+### 2026-10-31: The continents' export is set by the plates' uplift, not by the erosion law (a diagnosis from cached runs; the runoff lane, worktree agent-a4e92fd13092b08b0, branch `surface-runoff-budget`; nothing built)
+
+- **The question** (the crust-budget lane, branch `trench-input`): the continents export 3.82 km³ of rock a year on
+  base34-s4, 2.16 times Clift et al. 2009's long-run 1.77. Is that the surface's erosion efficiency, or the plates'
+  uplift that the erosion keeps pace with? Write-up: docs/design/surface-runoff-budget.md, "The continents' export".
+- **Measured** (`tools/review/plateau/export_corr.sh`, VM; plat-rb0, plat-cb0, orog-cum, base34). Two changes of the
+  erosion law left the export where it was:
+  - closed basins: 3.36 against 3.03 km³ a year;
+  - the runoff budget: 3.34 against 3.36, at -12 % runoff weight on land and -51 % above 2 km, the land answering with
+    relief (land above 4 km doubled).
+
+  One plate law moved it: the two orogen switches, 3.03 against base34-s4's 3.74. The export over gross erosion stayed
+  0.31 to 0.34. Within the arms (48 runs, Spearman on the deviations from each arm's median), the export follows the
+  land's median height (+0.50), the sea at the end (-0.40), the collisions that parted (+0.50) and less continental
+  crust at the end (-0.48).
+- **Against the sources, per km² of land** (computed over Earth's land, 0.289 of 5.10e8 km²):
+  - Clift's 1.77 km³ a year is 12 m/Myr; the modern loads (6.5, Milliman 1997 as Clift et al. quote it; 7.5, Milliman
+    & Syvitski 1992) are 44 to 51; Portenga & Bierman's basins have a median of 54 (ERO-171).
+  - The model sheds 20 to 25 m/Myr over its land (0.30 of the samples), about twice the long run and half the modern.
+  - Its regions' erosion per relief lies between Montgomery & Brandon's lines (ERO-172, present-day rates) on land
+    flatter than Earth's (relief above 1 km 0.012 to 0.016 against at most 0.05).
+- **The split.** The export's excess is the plates' supply, rock lifted above the sea at about twice Earth's long-run
+  rate. The erosion law's present-day efficiency shows as low relief, not as export. Retuning K would not move the
+  export.
+- **The lead** (not built). On one traced seed, with measurement-only globals (`DEEPTIME_GAP_BUDGET` with the crust
+  budget's steps, as ti-src was), measure the rock the plates lift above the sea by process, against Earth's long-run
+  references. Look first at the flows back to the continents: accretion at resamplings 1.15 and the transition 0.59 km³
+  a year on base34-s4, 0.45 of the export, a possible recycling loop that would count the same rock twice. Then the
+  collisions' thickening and its spreading, and the continents' net drain (-0.98). The relief shortfall is a separate
+  question, the erosion law's calibration target (present-day against long-run rates).
+
 ### 2026-10-31: The surface's runoff from the bake's water budget, built and off (`surface.runoff_budget`, ERO-221, ERO-222) (the runoff lane, worktree agent-a4e92fd13092b08b0, branch `surface-runoff-budget` on origin/plateau-drainage 7df49df8; not merged)
 
 - **Why.** The plateau lane's arm found where the flat high ground wears: 0.67 of it, over the run, is below 0 °C on the
