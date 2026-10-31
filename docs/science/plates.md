@@ -13657,3 +13657,58 @@ lithosphere outweighs the asthenosphere: about 10 Myr (Cloos 1993, abstract), 10
 1977). So the model's onsets at boundaries that spread the step before (0.28 of the ocean-ocean
 onsets, the last spreading within 2 Myr for 0.42) have no Earth example with the lag Gurnis et al.
 describe; the step that makes them is the question the resampling trace would answer.
+
+**The resampling trace (2026-10-31, the onset trace's next step).** oo-resample (branch
+oceanic-fronts at f9c03086, key 7691e6985ab4, base34's argkey, `pool.sh run oo-resample --seeds 1
++DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`), bit for bit base34's seed 1
+(`same_run.py`: no state file differs and the records match with the trace's fields taken out, on
+both runs). The record keeps each resampling (`dynamics::ResampleRec`: its time, its step and its
+new samples by how they were made: a gap of the gap fill, PLT-502; a one-way slab gap, PLT-542;
+an orphan pocket; contested by two footprints; given another plate than the old sample nearest
+it), each sample's provenance until the next (`Dynamics::prov`) and, for each onset, its first
+front samples' provenance on both sides and its outcome (passed incipient and when, its slab's
+longest, the front it made over the run). Read with `onsets.py`, which also gives each band's
+chance rate (the share of the runs' steps in it).
+
+- 110 resamplings over the two runs, median spacing 20 Myr (the step is 2 Myr). Of their new
+  samples 0.093 are gap fill, 0.010 slab gaps, none orphans, 0.088 contested and 0.064 given
+  another plate than the old sample nearest them.
+- The ocean-ocean onsets (788 over the two runs) by the time since the last resampling, against
+  the share of steps: on the resampling's own step 0.061 (0.110 of the steps), on the step after
+  0.527 (0.106), 4 Myr after 0.072 (0.103), 6 Myr after 0.038 (0.103). The ocean-continent onsets
+  do not cluster (0.154, 0.103, 0.108 against the same shares).
+- The 415 ocean-ocean onsets of the step after: their first front samples are gap fill for 0.64
+  on both sides (0.093 of all new samples) and given another plate than the old sample nearest
+  them for 0.27 (0.064); 0.65 of the subducting side had gone under. On the lattice the
+  resampling has just built, 0.77 of them have a converging, non-transform front at their onset
+  (median 6 front samples; `dynamics::front_index`), relative speed median 47 mm/yr. The step
+  before, on the old lattice, the pair had no boundary for 0.55 and a spreading one for 0.34. They
+  pass the incipient stage at 0.74 (median 4 Myr after the onset, against 0.52 for the onsets 2
+  Myr or more after a resampling), their slab's longest is 553 km at the median (200 to 213), and
+  they make 9,922 km of the intra-oceanic front, mean over the run: 0.48 of the 20,464 km all
+  onsets make.
+- 0.23 of them (96) have no converging front sample at their onset on that fresh lattice: they
+  pass incipient at 0.41 and make 2,670 km of the intra-oceanic front (0.13). That is an upper
+  bound on the contacts begun without convergence across them: a front sample also needs the
+  subducting plate's crust beside it (PLT-582), which an overlap that went under can take away.
+  Away from resamplings the share without a front sample (0.55 to 0.70) says nothing about
+  convergence: a pair that met since the last resampling has no lattice edge between them, so no
+  front sample, converging or not.
+
+**What the resampling trace says.** The resampling is what starts half the intra-oceanic contacts:
+they fall on the step after one at five times the chance rate, on the gap's new floor, and make
+half the intra-oceanic front. But they are contacts between plates that converge: three in four
+converge across the boundary the resampling builds through the gap, and three in four go on to
+subduct, with longer slabs than the other onsets'. So the trace does not show the resampling
+making subduction zones out of plates that do not converge. It shows the scheme making crust only
+at resamplings (Cortial et al. 2019 §4.3: between two, a gap stays open): two plates converging
+across a gap meet when the gap is filled, on its new floor (a gap point's age is α times the time
+since the last resampling, PLT-502), so their first floor down is young. Why a pair whose
+boundary spread the step before converges on the next is not in the record (the boundary's class
+is its majority, and the stretch the gap fill builds need not be the stretch that spread). The
+part that may be a numerical artefact is smaller: the contacts `subduction::resolve` makes from an
+overlap of 3 samples or more with no convergence across it, at most 0.13 of the intra-oceanic
+front on the step after a resampling, unread elsewhere. The measure that would read it at every
+onset is the overlap's own convergence (in `resolve`: the two plates' relative velocity at the
+overlapping samples against the boundary's normal, with PLT-311's transform test). Nothing is
+built.
