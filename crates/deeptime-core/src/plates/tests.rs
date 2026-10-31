@@ -1747,13 +1747,25 @@ fn a_contact_begins_only_where_its_plates_converge() {
     };
     let converging = subduction::OVERLAP_CONVERGING as u8;
     assert_eq!(run(false, DVec3::X), (1, converging));
-    assert_eq!(run(true, DVec3::X), (1, converging), "no contact under convergence");
+    assert_eq!(
+        run(true, DVec3::X),
+        (1, converging),
+        "no contact under convergence"
+    );
     let transform = subduction::OVERLAP_TRANSFORM as u8;
     assert_eq!(run(false, DVec3::Z), (1, transform));
-    assert_eq!(run(true, DVec3::Z), (0, transform), "a contact on a transform");
+    assert_eq!(
+        run(true, DVec3::Z),
+        (0, transform),
+        "a contact on a transform"
+    );
     let parting = subduction::OVERLAP_PARTING as u8;
     assert_eq!(run(false, -DVec3::X), (1, parting));
-    assert_eq!(run(true, -DVec3::X), (0, parting), "a contact between parting plates");
+    assert_eq!(
+        run(true, -DVec3::X),
+        (0, parting),
+        "a contact between parting plates"
+    );
 }
 
 /// A subduction initiation's contact takes the polarity of the slab planted under its fracture
@@ -2164,7 +2176,8 @@ fn how_resamplings_roughen_a_boundary() {
                 st.recount(&pos);
                 let tree = Tree::over(&pos, |_| true);
                 let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env);
-                subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &tree, &env).unwrap();
+                subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &tree, &env)
+                    .unwrap();
             }
         }
     }
