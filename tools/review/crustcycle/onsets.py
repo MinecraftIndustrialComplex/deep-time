@@ -179,8 +179,9 @@ def resampling_report(onsets, resamples, length_myr, step_ts):
     traced = [o for o in onsets if "since_resample_myr" in o and o.get("prov")]
     if not traced:
         return
-    bands = [("first step after", lambda x: 0 <= x <= 2.001), ("2-10 Myr after", lambda x: 2.001 < x <= 10),
-             ("over 10 Myr after", lambda x: x > 10), ("before any", lambda x: x < 0)]
+    bands = [("its own step", lambda x: 0 <= x < 1e-6), ("the step after", lambda x: 1e-6 <= x <= 2.001),
+             ("2-10 Myr after", lambda x: 2.001 < x <= 10), ("over 10 Myr after", lambda x: x > 10),
+             ("before any", lambda x: x < 0)]
     # The chance rate: the share of the runs' steps in each band (an onset on a step drawn at random).
     sinces = [since_of(t, [x["t"] for x in r]) for ts, r in zip(step_ts, resamples) for t in ts]
     dts = [b - a for ts in step_ts for a, b in zip(ts, ts[1:])]
@@ -214,6 +215,14 @@ def resampling_report(onsets, resamples, length_myr, step_ts):
             print("    front samples' provenance, overriding side: " + "  ".join(
                 f"{p} {v:.3f}" for p, v in zip(PROV, over)) + f"; subducting side: " + "  ".join(
                 f"{p} {v:.3f}" for p, v in zip(PROV, under)) + f" (gone under {hidden:.3f})")
+            # A front sample needs a converging, non-transform neighbour of the subducting plate
+            # (dynamics.rs `front_index`), so an onset with none had no converging front that step.
+            none = sum(1 for o in sub if o["prov"]["n"] == 0)
+            print(f"    at the onset: no converging front sample {none / len(sub):.3f}, front samples median"
+                  f" {statistics.median([o['prov']['n'] for o in sub]):.0f}; relative speed median"
+                  f" {statistics.median([o['convergence_mm_yr'] for o in sub]):.0f} mm/yr; the boundary the step"
+                  f" before: " + "  ".join(
+                      f"{k} {sum(1 for o in sub if KINDS[o['kind']] == k) / len(sub):.3f}" for k in KINDS[:6]))
 
 
 def young_age(o):
