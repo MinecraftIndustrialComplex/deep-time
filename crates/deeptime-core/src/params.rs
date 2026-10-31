@@ -933,26 +933,31 @@ pub struct TectonicParams {
     /// ledger: PLT-668
     pub arc_front_loaded: bool,
     /// An intra-oceanic arc keeps the island arcs' law on the crust it made (the crust-budget
-    /// lane, 2026-10-31; off by default): the arc's type is its setting at its onset (no visible
-    /// continental crust within `arc_distance_km` of its front, PLT-370's test, when the arc
-    /// begins), not its column's label, so an island arc whose own crust turned its column
-    /// continental (PLT-047, 8 km of arc crust: under one step of the early pulse at the axis)
-    /// goes on at the island law (`arc_front_loaded`'s pulse, then its mature rate) on that
-    /// crust. Off, the column's label picks the law, and a young island arc's pulse ends when its
+    /// lane, 2026-10-31; on by default since 2026-10-31, the coordinator's call under Ben's rule
+    /// of 2026-10-23: physics goes on by default once built and correct; decisions log
+    /// 2026-10-31): the arc's type is its setting at its onset (no visible continental crust
+    /// within `arc_distance_km` of its front, PLT-370's test, when the arc begins), not its
+    /// column's label, so an island arc whose own crust turned its column continental (PLT-047,
+    /// 8 km of arc crust: under one step of the early pulse at the axis) goes on at the island
+    /// law (`arc_front_loaded`'s pulse, then its mature rate) on that crust. Off (the model
+    /// before), the column's label picks the law, and a young island arc's pulse ends when its
     /// axis turns continental. Stern & Scholl (2010, p. 11) give the front-loaded law for the
-    /// intra-oceanic arcs they list, the Izu-Bonin-Mariana among them, whose crust is far thicker
-    /// than 8 km. ledger: PLT-760
+    /// intra-oceanic arcs they list, the Izu-Bonin-Mariana among them, whose crust is far
+    /// thicker than 8 km. ledger: PLT-760
     pub island_arc_own_crust: bool,
-    /// Arc magma at collision fronts (the crust-budget lane, 2026-10-31; off by default): where
+    /// Arc magma at collision fronts (the crust-budget lane, 2026-10-31; on by default since
+    /// 2026-10-31, the coordinator's call under Ben's rule of 2026-10-23, decisions log): where
     /// the subducting plate's continental crust stands at the front (a crust-suturing subduction
     /// zone), the overriding plate's arc band goes on taking magma at Scholl & von Huene's
     /// global arc addition during suturing over their long-term suture length, 0.2 AU over
     /// 6,000 km (33.3 km³/km/Myr, `subduction::SUTURE_ARC_KM3_PER_KM_MYR`), with no convergence
-    /// factor; off, a collision front makes no arc. Stern & Scholl 2010's Table 1 books it as
-    /// "Additions at crust-suturing subduction zones 0.2". ledger: PLT-763
+    /// factor; off (the model before), a collision front makes no arc. Stern & Scholl 2010's
+    /// Table 1 books it as "Additions at crust-suturing subduction zones 0.2" (abstract only:
+    /// the source is not read in full). ledger: PLT-763
     pub collision_arc_magma: bool,
     /// Clift & Vannucchi's (2004) trench sediment line read in place (the crust-budget lane,
-    /// 2026-10-31; off by default): their 1 km (PLT-660's accretionary pile, PLT-442's erosive
+    /// 2026-10-31; on by default since 2026-10-31, the coordinator's call under Ben's rule of
+    /// 2026-10-23, decisions log): their 1 km (PLT-660's accretionary pile, PLT-442's erosive
     /// margin's cover) is the sediment's thickness at the trench "uncorrected for porosity", and
     /// the model's pools are solid rock, so the line in rock is the solid a 1 km porous column
     /// holds under ERO-215's porosity law (536 m). Off, the solid pile is read against 1 km.
@@ -1507,9 +1512,9 @@ impl Default for TectonicParams {
             island_arc_convergence_ref_mm_yr: 86.6, // ledger: PLT-666
             continental_arc_convergence_ref_mm_yr: 58.6, // ledger: PLT-666
             arc_front_loaded: true, // ledger: PLT-668 (built 2026-10-25, on since 2026-10-26)
-            island_arc_own_crust: false, // ledger: PLT-760 (built 2026-10-31, off)
-            collision_arc_magma: false, // ledger: PLT-763 (built 2026-10-31, off)
-            trench_pile_in_place: false, // ledger: PLT-762 (built 2026-10-31, off)
+            island_arc_own_crust: true, // ledger: PLT-760 (built 2026-10-31, on since 2026-10-31)
+            collision_arc_magma: true, // ledger: PLT-763 (built 2026-10-31, on since 2026-10-31)
+            trench_pile_in_place: true, // ledger: PLT-762 (built 2026-10-31, on since 2026-10-31)
             arc_mature_crust_km: 15.0, // ledger: PLT-047
             cordillera_shortening_mm_yr: 0.0, // ledger: PLT-048
             cordillera_width_km: 120.0,

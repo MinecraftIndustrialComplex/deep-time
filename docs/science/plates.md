@@ -22,7 +22,7 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | the continents census's Earth references and measuring choices (`tools/review/continents_census.py`, section "White patches, drowned continents and coastal high ground", 2026-10-21) | PLT-360 to PLT-363 (4) |
 | [PLT](ledger/PLT.md) | the crust flux into collision fronts: the crust budget's measures and Earth's references (section "The crust flux into collision fronts", 2026-10-21) | PLT-401 (1) |
 | [PLT](ledger/PLT.md) | the trench budget: sediment subduction, subduction erosion and where it acts, the trench's release, the measures and Earth's references (section "The trench budget", 2026-10-22; switches, off by default) | PLT-440 to PLT-444 (5) |
-| [PLT](ledger/PLT.md) | the crust budget against Stern & Scholl 2010, row by row: the island law on an intra-oceanic arc's own crust, the additions measured whole, the trench sediment line in place, arc magma at sutures (section "The crust budget against Stern & Scholl 2010, row by row", 2026-10-31; switches, off by default) | PLT-760 to PLT-763 (4) |
+| [PLT](ledger/PLT.md) | the crust budget against Stern & Scholl 2010, row by row: the island law on an intra-oceanic arc's own crust, the additions measured whole, the trench sediment line in place, arc magma at sutures (section "The crust budget against Stern & Scholl 2010, row by row", 2026-10-31; switches, on by default since 2026-10-31) | PLT-760 to PLT-763 (4) |
 
 Rows by status (after the ocean–continent transition, 2026-10-04): `verified` 17, `cited-unverified` 46, `from-memory` 4, `abstract-only` 19, `calibrated` 14, `game-choice` 79, `uncited` 42; `pending-rewrite` 151; `not-yet-coded` 8; `merged` (not counted) 33.
 
@@ -12675,6 +12675,13 @@ The coordinator's task after the freeboard landed (PR #49, PLT-660 and PLT-661 o
 over base34's first 8 runs, 18 % of it in 1 Gyr against 6 % on base33). Read what the model makes
 and loses row by row against the sources, find in the code why each row is where it is, and build
 the fixes a source's law asks for (docs/design/crust-budget.md, the design; build log 2026-10-31).
+**Status: the three switches this section builds (`tectonics.island_arc_own_crust`, PLT-760;
+`tectonics.trench_pile_in_place`, PLT-762; `tectonics.collision_arc_magma`, PLT-763) are on by default
+since 2026-10-31**, the coordinator's call under Ben's rule of 2026-10-23 (physics goes on by default
+once built and correct; decisions log 2026-10-31). The base34-s4 rows, the arms cb-760 to cb-cum2 and
+the traces below are read against the model with them off, as they ran; the verdicts at the end say
+what each switch does.
+
 Tools: `tools/review/loss-budget.py` (new rows: the arcs' cones, the hotspots on continental crust,
 the trench input and the one-way slab's share, per-km rates against Clift et al. 2009's Table 1,
 the arc band, the erosion asked and not there; `--from T` for a window, from the cumulative lines
@@ -12687,7 +12694,7 @@ the arcs' magma by the crust it built). No knob, cap or forcing term moves a row
 |---|---|---|---|
 | intra-oceanic arcs | 1.05 (0.96) | 1.5 | front 25,744 km against 14,500 at 40.9 km³/km/Myr; 0.28 of the oceanic fronts make no arc (incipient, PLT-610 and PLT-681; past the slab's ends, PLT-561: the band is 0.72 of the fronts); v_n at the island fronts 43.6 mm/yr against PLT-666's 86.6, so the mature rate runs at half; the early pulse (PLT-668) stops at the axis within a step (below); the felsic cones the arcs count inside their rate (PLT-286) in neither row before PLT-761 |
 | continental arcs | 0.60 (0.52) | 1.0 | front 29,436 km against 27,500 at 20.4 against the law's 33.1 at v_n 55.5 mm/yr; the same band share and cones |
-| crust-suturing zones | 0 | 0.2 | no rule (PLT-763 builds one) |
+| crust-suturing zones | 0 | 0.2 | no rule in base34 (PLT-763 builds one; on by default since 2026-10-31) |
 | rifts, hotspots, volcanic rifted margins | 0.05 (0.05) | 0.5 | the hotspots' own basalt (PLT-108 to PLT-120 uncited, `pending-rewrite`); no magmatic addition at breakup (PLT-294 trades the continental side's crust for ocean crust on the ocean side) |
 | sediment subduction | 2.60 (2.93) | 1.1 (+0.1 at sutures); Clift 2009 1.65 | 2.90 km³ a year reaches the trenches (0.33 of it the one-way slab's, all subducted); 0.25 of the trench samples hold over 1 km of rock and carry 0.9 of the sediment; PLT-660 sends down 0.90 of it |
 | subduction erosion | 0.49 (0.41) | 1.4 (+0.3); Clift 2009 1.33 | erosive fronts 13,395 km against Clift & Vannucchi's 22,925 at PLT-441's 90 ask 1.21; the forearc band holds 0.49 beyond 7 km of crust (`forearc_short` 0.72) |
@@ -12967,6 +12974,8 @@ the substrate alone: ocean floor, or continental crust over an ocean basement (P
   Scholl's 0.2, on 18,700 km of collision front at any time); the plate cells' largest excess over
   Airy rises (2,530 against 2,194 m, p 0.021), inside the guard. On; its source is an abstract.
 - PLT-760 (`island_arc_own_crust`): correct with the substrate rule (Stern 2010's class). On.
+- All three are on by default since 2026-10-31 (decisions log; the coordinator's call under Ben's rule
+  of 2026-10-23). PLT-763's source is an abstract (Scholl & von Huene 2009), as its ledger row says.
 - Together, on the final code (cb-cum2): the net change of the continental volume −0.98 to −0.37
   km³ a year (late half −1.14 to −0.63), the felsic rock's late-half loss 1.70 to 1.15 km
   planet-mean, the sea 169 to 348 m, the criteria 6.5 to 6 (p 0.35), the guard clean. What still

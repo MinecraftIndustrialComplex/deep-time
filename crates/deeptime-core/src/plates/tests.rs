@@ -873,6 +873,10 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // seeds 1 to 24 with sediment subduction by margin type and the margin's sediment continental
     // on by default, PLT-660 to PLT-662, 2026-10-31: 1 to 4, 6, 11, 12, 15, 16, 18, 20 to 22 and
     // 24, seed 8 no more, so seed 1; from the supercontinent 1, 4, 6, 8, 10, 12, 14, 18, 20, 22
+    // and 24; 15 of seeds 1 to 24 with the island arcs' law on the crust an intra-oceanic arc
+    // made, the trench sediment line in place and the arc magma at collision fronts on by
+    // default, PLT-760, PLT-762 and PLT-763, 2026-10-31: 1, 3, 7 to 9, 13 to 16, 18 and 20 to 24,
+    // seed 1 still welds; from the supercontinent 1 to 3, 6, 7, 9, 11 to 13, 17 to 19, 21, 23
     // and 24).
     let mut p = preset(8000, 300.0, "scattered_continents", 1);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: under Forsyth & Uyeda's
@@ -1071,8 +1075,12 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // seed 8; seed 2 since sediment subduction by margin type and the margin's sediment
     // continental went on by default, PLT-660 to PLT-662, 2026-10-31, when seed 19 no longer
     // welds: the sweep's welding seeds 1 to 4, 6, 11, 12, 15, 16, 18, 20 to 22 and 24, the guard
-    // binding on none, seed 2 the first after seed 1).
-    let mut p = preset(8000, 300.0, "scattered_continents", 2);
+    // binding on none, seed 2 the first after seed 1; seed 3 since the island arcs' law on the
+    // crust an intra-oceanic arc made, the trench sediment line in place and the arc magma at
+    // collision fronts went on by default, PLT-760, PLT-762 and PLT-763, 2026-10-31, when seed
+    // 2 no longer welds: the sweep's welding seeds 1, 3, 7 to 9, 13 to 16, 18 and 20 to 24, the
+    // guard binding on none, seed 3 the first after seed 1).
+    let mut p = preset(8000, 300.0, "scattered_continents", 3);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: the guard asserted below
     // bound under Forsyth & Uyeda's balance on every welding seed of 1 to 24 of this small planet
     // but supercontinent 11, whose ridge push is several times Earth's (`plates_quick_16k`, ridge
