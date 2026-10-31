@@ -11,7 +11,7 @@ MODE=trench (default): the incoming plate's sediment at its trenches (oceanic sa
   (PLT-442, PLT-660) is read against it as solid; the pile in place is the porous column holding that solid under
   Kominz et al. 2011's average ocean-floor sediment (phi0 0.66, lambda 1,333 m; ERO-215, surface::pelagic): 1 km in
   place holds 536 m of rock. Shares of the trench samples by pile: under 536 m solid (thinner than 1 km in place),
-  536 to 1,000 m (1 to 1.78 km in place: accretionary by C&V's in-place line, erosive by the solid one), over 1 km.
+  536 to 1,000 m (1 to 1.62 km in place: accretionary by C&V's in-place line, erosive by the solid one), over 1 km.
 MODE=floor: the sea floor's sediment by class (deep ocean, margins, young ocean, trenches near and far from continents)
   in place under ERO-215's law, against GlobSed's means.
 MODE=trenchrun: per run, the trench sediment averaged over every snapshot, with Mann-Whitney p against the first arm.

@@ -877,8 +877,11 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // made, the trench sediment line in place and the arc magma at collision fronts on by
     // default, PLT-760, PLT-762 and PLT-763, 2026-10-31: 1, 3, 7 to 9, 13 to 16, 18 and 20 to 24,
     // seed 1 still welds; from the supercontinent 1 to 3, 6, 7, 9, 11 to 13, 17 to 19, 21, 23
-    // and 24).
-    let mut p = preset(8000, 300.0, "scattered_continents", 1);
+    // and 24; 13 of seeds 1 to 24 once PLT-760's onset reads a continent's own crust and its
+    // substrate an earlier island arc's (the branch's review, 2026-10-31): 2, 3, 5 to 8, 10, 11,
+    // 13, 14, 20, 23 and 24, seed 1 no more, so seed 2; from the supercontinent 3, 5, 14, 16, 17,
+    // 20, 23 and 24).
+    let mut p = preset(8000, 300.0, "scattered_continents", 2);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: under Forsyth & Uyeda's
     // balance on this small planet, whose ridge push is several times Earth's
     // (`plates_quick_16k`, ridge -1,000 m, floor -10,000 m), the speed guard bound on every
@@ -5013,9 +5016,10 @@ fn island_arcs_front_loaded_pulse_then_mature_rate() {
 /// began intra-oceanic adds Stern & Scholl's pulse, 500 × the band, with the switch on, and the
 /// continental arcs' law with it off (the column's label), as it does on the switch with an arc
 /// that began at a continent, or on a continent's own crust whatever the setting. The crust's
-/// substrate decides (an ocean basement or not), not its share of arc magma. The arc's setting
-/// comes from its onset: an arc begun over ocean floor is intra-oceanic, one begun at a continent
-/// is not, and the intra-oceanic front is measured.
+/// substrate decides (ocean floor or an earlier island arc, or a continent's crust), not its share
+/// of arc magma. The arc's setting comes from its onset: an arc begun over ocean floor or behind
+/// an earlier intra-oceanic arc is intra-oceanic with the switch on, one begun at a continent's
+/// own crust is not, and the intra-oceanic front is measured.
 #[test]
 fn an_intra_oceanic_arc_keeps_the_island_law_on_the_crust_it_made() {
     // A young arc (4 Myr) on a matured island arc's crust, its contact's setting `io`.
@@ -5027,7 +5031,7 @@ fn an_intra_oceanic_arc_keeps_the_island_law_on_the_crust_it_made() {
             s.pools[pool::FELSIC_PLUTONIC] += 9000.0;
             s.arc_oceanic_m = 9000.0;
             s.thickness_m = pools::thickness(&s.pools);
-            assert!(subduction::island_arc_crust(s));
+            assert!(subduction::island_arc_crust(s, &p.tectonics));
         }
         for c in &mut st.contacts {
             c.arc_intra_oceanic = io;
@@ -5071,33 +5075,70 @@ fn an_intra_oceanic_arc_keeps_the_island_law_on_the_crust_it_made() {
         st.samples
             .iter()
             .filter(|s| s.group == 0)
-            .all(|s| !subduction::island_arc_crust(s))
+            .all(|s| !subduction::island_arc_crust(s, &p.tectonics))
     );
     let cont = arc_step(&p, &mut st, &geo, &pos, 1).0;
     assert!(cont.arc_continental_km3 > 0.0);
     assert_eq!(cont.arc_oceanic_km3, 0.0);
 
-    // The substrate decides (Stern 2010: IOASs "are built on oceanic crust"): continental crust
-    // over an ocean basement is crust an intra-oceanic arc builds on, whatever share of it is
-    // island-arc magma; a continent's own crust is not, whatever island-arc magma it took.
+    // The substrate decides (Stern 2010: IOASs "are built on oceanic crust", their basements
+    // "earlier intra-oceanic arcs"): an island arc matured over its ocean floor (an ocean basement
+    // and PLT-047's 8 km of island-arc crust) is crust an intra-oceanic arc builds on, whatever
+    // else it took; a continent's crust on ocean floor (a sediment margin, PLT-661; crust stacked
+    // or spread onto the floor, PLT-289 and PLT-662: an ocean basement, no arc) is not, nor is a
+    // continent's own crust, whatever island-arc magma it took, nor a continent that took a
+    // share of a basement from an accreted arc beside it at a resampling.
+    let k = &crate::params::TectonicParams::default();
+    let mature = subduction::mature_arc_m(k);
+    assert_eq!(mature, 8000.0);
+    let mut arc = state::Sample::blank(0);
+    arc.pools = pools::oceanic_column();
+    arc.arc_oceanic_m = mature;
+    arc.make_continental();
+    arc.pools[pool::FELSIC_PLUTONIC] += mature;
+    arc.thickness_m = pools::thickness(&arc.pools);
+    assert!(arc.basement() > 0.0);
+    assert!(subduction::island_arc_crust(&arc, k));
     let mut margin = state::Sample::blank(0);
     margin.pools = pools::oceanic_column();
     margin.make_continental();
     margin.pools[pool::FELSIC_PLUTONIC] += 20_000.0;
     margin.thickness_m = pools::thickness(&margin.pools);
     assert!(margin.basement() > 0.0 && margin.arc_oceanic_m == 0.0);
-    assert!(subduction::island_arc_crust(&margin));
+    assert!(!subduction::island_arc_crust(&margin, k));
     let mut own = state::Sample::blank(0);
     own.kind = CONTINENTAL;
     own.pools = pools::continental_column();
     own.arc_oceanic_m = 30_000.0;
     own.thickness_m = pools::thickness(&own.pools);
     assert!(own.basement() <= 0.0);
-    assert!(!subduction::island_arc_crust(&own));
+    assert!(!subduction::island_arc_crust(&own, k));
+    let mut traced = own;
+    traced.basement_m = 500.0;
+    traced.arc_oceanic_m = 0.3 * mature;
+    assert!(traced.basement() > 0.0);
+    assert!(!subduction::island_arc_crust(&traced, k));
 
-    // The setting at the onset: over ocean floor intra-oceanic, at a continent not.
-    for (ocean, io) in [(true, true), (false, false)] {
-        let (p, mut st, geo, pos) = arc_fixture(true, ocean, 150.0, None, 50.0);
+    // The setting at the onset: over ocean floor intra-oceanic, at a continent's own crust not;
+    // behind an earlier intra-oceanic arc (the overriding plate's samples a matured island arc)
+    // intra-oceanic with the switch on, at a continent with it off (any continental column).
+    for (ocean, matured_over, switch, io) in [
+        (true, false, true, true),
+        (false, false, true, false),
+        (true, true, true, true),
+        (true, true, false, false),
+    ] {
+        let (mut p, mut st, geo, pos) = arc_fixture(true, ocean, 150.0, None, 50.0);
+        p.tectonics.island_arc_own_crust = switch;
+        if matured_over {
+            for s in st.samples.iter_mut().filter(|s| s.group == 0) {
+                s.arc_oceanic_m = 9000.0;
+                s.make_continental();
+                s.pools[pool::FELSIC_PLUTONIC] += 9000.0;
+                s.thickness_m = pools::thickness(&s.pools);
+                assert!(subduction::island_arc_crust(s, &p.tectonics));
+            }
+        }
         arc_step(&p, &mut st, &geo, &pos, 1);
         let begun: Vec<bool> = st
             .contacts
@@ -5106,7 +5147,10 @@ fn an_intra_oceanic_arc_keeps_the_island_law_on_the_crust_it_made() {
             .map(|c| c.arc_intra_oceanic)
             .collect();
         assert!(!begun.is_empty());
-        assert!(begun.iter().all(|&x| x == io), "ocean {ocean}: {begun:?}");
+        assert!(
+            begun.iter().all(|&x| x == io),
+            "ocean {ocean}, matured {matured_over}, switch {switch}: {begun:?}"
+        );
     }
 }
 

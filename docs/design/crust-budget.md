@@ -54,11 +54,14 @@ Izu-Bonin-Mariana and the Aleutians among them, arcs whose crust is far thicker 
 the arc's, by its setting, not the label the model gives its crust.
 
 The rule: a contact's arc takes its setting at its onset (PLT-669): intra-oceanic where none of its
-oceanic fronts that step has visible continental crust of the overriding plate within
-`arc_distance_km` (PLT-370's test), stored as `Contact::arc_intra_oceanic`, cleared with the onset at
-a polarity reversal and kept by a split's copies. With the switch on, magma that lands on crust an
-intra-oceanic arc is built on (`subduction::island_arc_crust`: ocean floor, or continental crust over
-an ocean basement, PLT-331) under an arc that began intra-oceanic follows the island law (its pulse
+oceanic fronts that step has a continent's own crust (visible continental crust of the overriding
+plate that is not crust an intra-oceanic arc is built on) within `arc_distance_km`, stored as
+`Contact::arc_intra_oceanic`, cleared with the onset at a polarity reversal and kept by a split's
+copies (until the review, PLT-370's test, any continental column; the switch off still reads that).
+With the switch on, magma that lands on crust an intra-oceanic arc is built on
+(`subduction::island_arc_crust`: ocean floor, or an earlier intra-oceanic arc, continental crust over
+an ocean basement, PLT-331, with PLT-047's island-arc crust in it; until the review any basement)
+under an arc that began intra-oceanic follows the island law (its pulse
 while young, then 30 × v_n / 86.6), its pools, and the island accumulator. A continent's own crust
 under any arc, and every column under an arc that began at a continent, keep the label's law. The
 column's height still follows its kind (Airy on continental crust, the ocean's line on oceanic). The
@@ -201,6 +204,33 @@ the three adding (+76, +60 and +87 m alone, +223 together); the supercontinents'
 follows from the sea, the coast with high ground does not; on the final code the criteria are 6
 against 6.5 (p 0.35). Verdict: all three correct, on (PLT-760 with the substrate rule); on by
 default since 2026-10-31 (decisions log: the coordinator's call, Ben's rule of 2026-10-23).
+
+## The branch's review (2026-10-31)
+
+The Opus review of crust-budget-on (980a4395), fixed on the same branch (plates.md, "The review's
+fixes"):
+
+1. PLT-760's onset read any continental column while its law read the substrate: an arc begun
+   behind a matured intra-oceanic arc took the continental law. With the switch on the onset now
+   reads a continent's own crust.
+2. The substrate test passed any basement, which the resampling blends onto continents beside
+   accreted arcs, and PLT-289's and PLT-662's columns. The substrate is now ocean floor or an
+   earlier intra-oceanic arc (an ocean basement with PLT-047's island-arc crust in it); PLT-661,
+   PLT-289 and PLT-662 columns are a continent's crust on ocean floor.
+3. PLT-763's 0.18 against 0.2 is no match: the magma needs a slab past incipient and the slab
+   breaks off after 10 Myr of a collision, so it runs about a third of a collision on a front
+   three times Scholl & von Huene's. The collision fronts are measured now; whether suture magma
+   needs a slab is a lead.
+4. Small fixes: PLT-762's 1.62 km in place (not 1.78), the switch's doc, PLT-763's convergence
+   as a game-choice, its ARC flags documented, the "moves no rock" wording, `loss-budget.py
+   --from` checking its time.
+
+Left for later (the review's, not done):
+
+- PLT-761 splits the cones by row approximately: the suture's cones land in the arc rows, and
+  cones the volcano stage zeroed are still recorded as arc cones.
+- PLT-762's test would pass without the switch (it checks the line, not the switch's effect).
+- PLT-761's recording has no test.
 
 ## What is left
 
