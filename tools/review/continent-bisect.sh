@@ -39,7 +39,7 @@ verb=${1:-}; shift || true
 
 case "$verb" in
 ship)
-  HOST=${DEEPTIME_MAC:-ban@deeptime-test-ban.westus2.cloudapp.azure.com}
+  HOST=${DEEPTIME_MAC:-ban@deeptime-test-ban.eastus.cloudapp.azure.com}
   for c in "$@"; do
     echo "ship $c"
     git archive "$c" | ssh -o BatchMode=yes "$HOST" \

@@ -130,6 +130,27 @@ const EROSION_ORDER: [usize; 6] = [
     pool::FELSIC_PLUTONIC,
 ];
 
+/// The pools of a column's supracrustal cover: the layered rock laid down on its basement
+/// (sediment, sedimentary rock, and lavas and tuffs), above its plutonic and metamorphic crust.
+/// Docking at a trench strips a terrane to it (`tectonics.terrane_docking_cover`): accreted
+/// terranes are "thin crustal units sheared off" (Tetreault & Buiter 2014, p. 1243), "only the
+/// upper 2–5 km of arc crust" where the arc rides the subducting plate (p. 1251); the Yakutat
+/// terrane's "sedimentary cover ... has been scraped off basement rocks and accreted to the
+/// growing fold-and-thrust belt" (Enkelmann et al. 2008, p. 916). Taking the cover's base as the
+/// detachment is the project's reading ("rheologically weak crustal layers ... can be activated
+/// as detachments", Tetreault & Buiter 2014, p. 1243). ledger: PLT-771
+pub const COVER: [usize; 4] = [
+    pool::SEDIMENT,
+    pool::SEDIMENTARY,
+    pool::FELSIC_VOLCANIC,
+    pool::MAFIC_VOLCANIC,
+];
+
+/// The thickness of a column's cover ([`COVER`]), m.
+pub fn cover_m(pools: &[f32; pool::COUNT]) -> f64 {
+    COVER.iter().map(|&p| f64::from(pools[p].max(0.0))).sum()
+}
+
 /// A continental column, metres (design choice: 35 km, granite-dominated upper crust over a
 /// mafic lower crust).
 pub fn continental_column() -> [f32; pool::COUNT] {
@@ -363,6 +384,30 @@ pub fn ocean_heat_flow(age_myr: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A column's cover (ledger PLT-771) is its layered rock on the basement: the continental
+    /// column's 0.1 km of sediment, 2 km of sedimentary and 1.5 km of volcanic rock; an island
+    /// arc of 15 km on 7 km of ocean crust (its basement, PLT-331) keeps its own lavas and tuffs,
+    /// a sixth of its magma (PLT-046), not the ocean floor's: 2.5 km, inside Tetreault & Buiter
+    /// 2014's "upper 2–5 km of arc crust" (p. 1251) that accretes.
+    #[test]
+    fn the_cover_is_the_layered_rock_on_the_basement() {
+        assert!((cover_m(&continental_column()) - 3600.0).abs() < 1e-3);
+        let mut s = crate::plates::state::Sample::blank(0);
+        // The arc turned continental (PLT-047), its ocean crust kept under it as its basement.
+        s.kind = crate::plates::state::CONTINENTAL;
+        s.pools = oceanic_column();
+        s.basement_m = 7000.0;
+        let arc = 15_000.0_f32;
+        let volcanic = arc / 6.0;
+        s.pools[pool::MAFIC_VOLCANIC] += volcanic * 2.0 / 3.0;
+        s.pools[pool::FELSIC_VOLCANIC] += volcanic / 3.0;
+        s.pools[pool::FELSIC_PLUTONIC] += arc - volcanic;
+        s.thickness_m = s.pools.iter().sum();
+        let own = cover_m(&s.own_pools());
+        assert!((own - 2500.0).abs() < 1.0, "{own}");
+        assert!((2000.0..=5000.0).contains(&own));
+    }
 
     /// The trench's pull is a half-life (P1-19 #27): half the way per 2-Myr step, exactly as the
     /// old per-step share, and one 4-Myr step goes as far as two 2-Myr steps.
