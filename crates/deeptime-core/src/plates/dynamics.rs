@@ -171,6 +171,19 @@ pub struct Dynamics {
     /// [`FrontBands::gain`] (measurement only, PLT-683).
     #[serde(default)]
     pub prev_pair_front: Vec<(u32, u32, u8, u8, u64)>,
+    /// Measurement only (the onset trace, 2026-10-31): every subduction contact's onset with its
+    /// boundary the step before ([`OnsetRec`]) …
+    #[serde(default)]
+    pub onsets: Vec<OnsetRec>,
+    /// … each pair of plates' boundary after the last step ([`Mix::pair_bounds`]) …
+    #[serde(default)]
+    pub prev_pair_bound: Vec<PairBound>,
+    /// … each pair of plates' boundary history ([`PairHist`]) …
+    #[serde(default)]
+    pub pair_hist: Vec<PairHist>,
+    /// … and the active contacts after the last step (under, over), to tell a reversal.
+    #[serde(default)]
+    pub prev_contacts: Vec<(u32, u32)>,
 }
 
 /// One step's state of the planet and its plates.
@@ -1051,6 +1064,154 @@ pub struct FrontBands {
     /// floor younger than its contact was made after the subduction zone began.
     #[serde(default)]
     pub oo_over_floor: [[f64; BANDS]; BANDS],
+    /// … and the subducting fronts by setting and by their contact's onset ([`OnsetRec`], the
+    /// onset trace): by the boundary the step before (`onset_kind`, [`ONSET_KINDS`] then
+    /// unknown: a contact begun before the record or not found), by the route (`onset_route`:
+    /// plates that came to converge, a reversal, an initiation's pair, unknown) and by the two
+    /// floors at that boundary against [`super::forces::SLAB_BUOYANT_MYR`] (`onset_buoyant`:
+    /// both younger, the subducting side's only, the overriding side's only, neither, unknown).
+    #[serde(default)]
+    pub onset_kind: [[f64; ONSET_KINDS.len() + 1]; 2],
+    #[serde(default)]
+    pub onset_route: [[f64; 4]; 2],
+    #[serde(default)]
+    pub onset_buoyant: [[f64; 5]; 2],
+}
+
+/// [`OnsetRec::kind`]: the pair's boundary the step before a contact's onset, by its longest
+/// class: spreading ([`mix::RIDGE`] or [`mix::RIFT`]), [`mix::OTHER`] converging across it on
+/// the whole, [`mix::OTHER`] not converging (a transform), a front ([`mix::OCEAN_OCEAN`] or
+/// [`mix::OCEAN_CONTINENT`]), a [`mix::COLLISION`], or no common boundary.
+pub const ONSET_KINDS: [&str; 6] = [
+    "spreading",
+    "converging",
+    "transform",
+    "front",
+    "collision",
+    "none",
+];
+
+/// Measurement only (the onset trace, 2026-10-31): one pair of plates' common boundary in one
+/// step, from [`boundary_mix`]'s boundary samples on both plates: its length by [`mix`] class
+/// (half sample spacings; a sample counts towards every other plate it borders), the mean velocity
+/// across it over the samples' neighbours on the other plate (mm/yr, negative converging), and for
+/// each plate (`lo` first) its oceanic boundary samples, their mean floor age (Myr, -1 with none)
+/// and its continental boundary samples. The subducting side of a front is no boundary sample
+/// ([`classify_boundary`]), so a front's pair holds its overriding side only.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct PairBound {
+    pub lo: u32,
+    pub hi: u32,
+    pub class: [u64; MIX_CLASSES],
+    pub normal_mm_yr: f64,
+    pub ocean: [u32; 2],
+    pub age_myr: [f64; 2],
+    pub cont: [u32; 2],
+}
+
+impl PairBound {
+    /// [`ONSET_KINDS`]' index of this boundary.
+    pub fn kind(&self) -> u8 {
+        let spread = self.class[mix::RIDGE] + self.class[mix::RIFT];
+        let front = self.class[mix::OCEAN_OCEAN] + self.class[mix::OCEAN_CONTINENT];
+        let parts = [
+            (spread, 0u8),
+            (self.class[mix::OTHER], 1),
+            (front, 3),
+            (self.class[mix::COLLISION], 4),
+        ];
+        let (n, k) = parts
+            .iter()
+            .copied()
+            .fold((0u64, 5u8), |best, p| if p.0 > best.0 { p } else { best });
+        if n == 0 {
+            5
+        } else if k == 1 && self.normal_mm_yr >= 0.0 {
+            2
+        } else {
+            k
+        }
+    }
+}
+
+/// Measurement only (the onset trace): a pair of plates' boundary history ([`record_step`]):
+/// when it was first seen, Myr; since when its mean velocity across has been converging at every
+/// step (`None` while not); and the last step any of it spread (ridge or rift).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct PairHist {
+    pub lo: u32,
+    pub hi: u32,
+    pub first_myr: f64,
+    pub converging_since_myr: Option<f64>,
+    pub spread_last_myr: Option<f64>,
+}
+
+/// Measurement only (the onset trace, 2026-10-31): a subduction contact's onset (a new contact,
+/// or a polarity reversal's new onset) with its pair's boundary the step before (`before`, the
+/// default with none), its history then (the boundary's age since the pair first met, how long
+/// it had converged, since it last spread; -1 for never), and the contact's own onset slab age
+/// and convergence. `route`: 0 plates that came to converge, 1 a reversal (the pair's contact
+/// the step before had the other polarity), 2 a plate and the plate an initiation split off it
+/// (PLT-690). `kind`: [`ONSET_KINDS`].
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct OnsetRec {
+    pub t: f64,
+    pub step: u64,
+    pub under: u32,
+    pub over: u32,
+    pub setting: u8,
+    pub route: u8,
+    pub kind: u8,
+    pub before: PairBound,
+    pub boundary_age_myr: f64,
+    pub converging_myr: f64,
+    pub since_spread_myr: f64,
+    pub slab_age_myr: f64,
+    pub convergence_mm_yr: f64,
+}
+
+impl OnsetRec {
+    /// The floors at the boundary the step before against the age below which oceanic
+    /// lithosphere is not denser than the mantle ([`super::forces::SLAB_BUOYANT_MYR`]): 0 both
+    /// younger, 1 the subducting side's only, 2 the overriding side's only, 3 neither (or the
+    /// overriding side continental), 4 unknown (no oceanic floor of the subducting plate there).
+    pub fn buoyant(&self) -> u8 {
+        let side = |p: u32| usize::from(p != self.before.lo);
+        let (u, o) = (side(self.under), side(self.over));
+        if self.before.ocean[u] == 0 {
+            return 4;
+        }
+        let young = |i: usize| {
+            self.before.ocean[i] > 0 && self.before.age_myr[i] < super::forces::SLAB_BUOYANT_MYR
+        };
+        match (young(u), young(o)) {
+            (true, true) => 0,
+            (true, false) => 1,
+            (false, true) => 2,
+            (false, false) => 3,
+        }
+    }
+}
+
+/// The relation of two plates in the record's plate lives: [`PAIR_INITIATION`] (one split off
+/// the other by a subduction initiation), [`PAIR_RIFT`] (one rifted off the other, or both off
+/// the same parent) or [`PAIR_OTHER`].
+fn pair_relation(lives: &BTreeMap<u32, (Option<u32>, &str)>, a: u32, b: u32) -> usize {
+    let la = lives.get(&a).copied().unwrap_or((None, ""));
+    let lb = lives.get(&b).copied().unwrap_or((None, ""));
+    let child = |(parent, origin): (Option<u32>, &str), of: u32, how: &str| {
+        parent == Some(of) && origin == how
+    };
+    if child(la, b, "subduction_initiation") || child(lb, a, "subduction_initiation") {
+        PAIR_INITIATION
+    } else if child(la, b, "rift")
+        || child(lb, a, "rift")
+        || (la.1 == "rift" && lb.1 == "rift" && la.0.is_some() && la.0 == lb.0)
+    {
+        PAIR_RIFT
+    } else {
+        PAIR_OTHER
+    }
 }
 
 /// One pair of plates' front in one setting and state this step ([`Mix::pairs`]; measurement
@@ -1094,6 +1255,8 @@ pub struct Mix {
     /// Each pair of plates' front by setting and state, ordered by (under, over, setting,
     /// subducting): what the front's turnover ([`FrontBands::gain`]) is measured from.
     pub pairs: Vec<PairFront>,
+    /// Each pair of plates' common boundary, ordered by (lo, hi) (the onset trace).
+    pub pair_bounds: Vec<PairBound>,
 }
 
 /// One front sample of [`boundary_mix`], kept for the cross-tabs that need the whole step
@@ -1118,6 +1281,8 @@ struct FrontRec {
     arc_age: f64,
     onset_slab_age: f64,
     over_floor_age: f64,
+    /// The contact's onset (kind, route, buoyancy; FrontBands::onset_*).
+    onset: [u8; 3],
 }
 
 /// An active contact's measures for [`boundary_mix`]'s bands (measurement only): its slab, km,
@@ -1128,6 +1293,20 @@ struct ContactMeas {
     age: f64,
     arc_age: f64,
     onset_slab_age: f64,
+    onset: [u8; 3],
+}
+
+/// One pair of plates' boundary samples in a step, as integers so the sums do not depend on the
+/// order the samples are taken in ([`PairBound`]): the velocity across in µm/yr, the floor age in
+/// hundredths of a Myr.
+#[derive(Clone, Default)]
+struct PairAcc {
+    class: [u64; MIX_CLASSES],
+    normal_um_yr: i64,
+    normal_n: u64,
+    ocean: [u64; 2],
+    age_centi: [u64; 2],
+    cont: [u64; 2],
 }
 
 /// [`Mix`] in half sample spacings, summed over samples.
@@ -1144,6 +1323,8 @@ struct MixUnits {
     benioff: [u64; 2],
     /// The front samples, for the cross-tabs that need the whole step (PLT-683).
     recs: Vec<FrontRec>,
+    /// Each pair of plates' boundary samples (the onset trace).
+    pair_bound: BTreeMap<(u32, u32), PairAcc>,
 }
 
 impl MixUnits {
@@ -1180,6 +1361,19 @@ impl MixUnits {
         }
         self.other_converging += b.other_converging;
         self.recs.extend(b.recs);
+        for (key, y) in b.pair_bound {
+            let x = self.pair_bound.entry(key).or_default();
+            for (a, b) in x.class.iter_mut().zip(y.class) {
+                *a += b;
+            }
+            x.normal_um_yr += y.normal_um_yr;
+            x.normal_n += y.normal_n;
+            for i in 0..2 {
+                x.ocean[i] += y.ocean[i];
+                x.age_centi[i] += y.age_centi[i];
+                x.cont[i] += y.cont[i];
+            }
+        }
         self
     }
 }
@@ -1223,6 +1417,23 @@ pub fn boundary_mix(
     // Each active contact's slab length, km, and age, Myr (the bands, measurement only).
     let slab_km: BTreeMap<(u32, u32), f64> =
         st.slabs.iter().map(|s| ((s.under, s.over), s.km)).collect();
+    // The onset trace: each recorded onset's categories, by its step and slab age (a split's copies
+    // and a reversal keep the slab age; a reversal's onset has its own record).
+    let onset_of: BTreeMap<(u64, u64), [u8; 3]> = st
+        .dynamics
+        .as_ref()
+        .map(|d| {
+            d.onsets
+                .iter()
+                .map(|o| {
+                    (
+                        (o.step, o.slab_age_myr.to_bits()),
+                        [o.kind, o.route, o.buoyant()],
+                    )
+                })
+                .collect()
+        })
+        .unwrap_or_default();
     let contact_of: BTreeMap<(u32, u32), ContactMeas> = st
         .contacts
         .iter()
@@ -1234,6 +1445,10 @@ pub fn boundary_mix(
                 age: env.t_myr - c.onset_myr,
                 arc_age: c.arc_onset_myr.map_or(f64::NAN, |a| env.t_myr - a),
                 onset_slab_age: c.onset_slab_age_myr,
+                onset: onset_of
+                    .get(&(c.onset_step, c.onset_slab_age_myr.to_bits()))
+                    .copied()
+                    .unwrap_or([ONSET_KINDS.len() as u8, 3, 4]),
             };
             (key, meas)
         })
@@ -1252,23 +1467,7 @@ pub fn boundary_mix(
                 .collect()
         })
         .unwrap_or_default();
-    let pair_of = |a: u32, b: u32| -> usize {
-        let la = lives.get(&a).copied().unwrap_or((None, ""));
-        let lb = lives.get(&b).copied().unwrap_or((None, ""));
-        let child = |(parent, origin): (Option<u32>, &str), of: u32, how: &str| {
-            parent == Some(of) && origin == how
-        };
-        if child(la, b, "subduction_initiation") || child(lb, a, "subduction_initiation") {
-            PAIR_INITIATION
-        } else if child(la, b, "rift")
-            || child(lb, a, "rift")
-            || (la.1 == "rift" && lb.1 == "rift" && la.0.is_some() && la.0 == lb.0)
-        {
-            PAIR_RIFT
-        } else {
-            PAIR_OTHER
-        }
-    };
+    let pair_of = |a: u32, b: u32| pair_relation(&lives, a, b);
     let pairs: BTreeMap<(u32, u32), usize> = active
         .iter()
         .map(|&(u, o)| ((u, o), pair_of(u, o)))
@@ -1410,6 +1609,28 @@ pub fn boundary_mix(
                     c[v].store(class as u8 + 1, std::sync::atomic::Ordering::Relaxed);
                 }
                 acc.km[class] += u64::from(half);
+                // Measurement only (the onset trace): this sample towards each other plate it
+                // borders.
+                for j in 0..n {
+                    let pu = plate_buf[j];
+                    if plate_buf[..j].contains(&pu) {
+                        continue;
+                    }
+                    let key = (pv.min(pu), pv.max(pu));
+                    let e = acc.pair_bound.entry(key).or_default();
+                    e.class[class] += u64::from(half);
+                    for (b, _) in buf[..n].iter().zip(&plate_buf[..n]).filter(|x| *x.1 == pu) {
+                        e.normal_um_yr += (b.normal * 1000.0).round() as i64;
+                        e.normal_n += 1;
+                    }
+                    let side = usize::from(pv != key.0);
+                    if sv.kind == CONTINENTAL {
+                        e.cont[side] += 1;
+                    } else {
+                        e.ocean[side] += 1;
+                        e.age_centi[side] += (sv.age_myr(env.t_myr) * 100.0).round() as u64;
+                    }
+                }
                 if let Some((k, f, km, age)) = front {
                     // Measurement only (PLT-683): the front sample for the step's cross-tabs.
                     let under = plate_buf[f];
@@ -1429,6 +1650,7 @@ pub fn boundary_mix(
                         arc_age: meas.map_or(f64::NAN, |m| m.arc_age),
                         onset_slab_age: meas.map_or(f64::NAN, |m| m.onset_slab_age),
                         over_floor_age: sv.age_myr(env.t_myr),
+                        onset: meas.map_or([ONSET_KINDS.len() as u8, 3, 4], |m| m.onset),
                     });
                     if young {
                         acc.incipient[k] += u64::from(half);
@@ -1482,6 +1704,9 @@ pub fn boundary_mix(
     let mut arc_age = [[0u64; BANDS]; 2];
     let mut onset_slab = [[0u64; BANDS]; 2];
     let mut oo_over_floor = [[0u64; BANDS]; BANDS];
+    let mut onset_kind = [[0u64; ONSET_KINDS.len() + 1]; 2];
+    let mut onset_route = [[0u64; 4]; 2];
+    let mut onset_buoyant = [[0u64; 5]; 2];
     let mut by_pair: BTreeMap<(u32, u32, u8, bool), (u64, f64)> = BTreeMap::new();
     for r in &recs {
         let h = u64::from(r.half);
@@ -1515,6 +1740,9 @@ pub fn boundary_mix(
         if !r.onset_slab_age.is_nan() {
             onset_slab[r.setting][band_of(r.onset_slab_age, &AGE_BANDS_MYR)] += h;
         }
+        onset_kind[r.setting][usize::from(r.onset[0])] += h;
+        onset_route[r.setting][usize::from(r.onset[1])] += h;
+        onset_buoyant[r.setting][usize::from(r.onset[2])] += h;
     }
     let pairs = by_pair
         .into_iter()
@@ -1529,9 +1757,39 @@ pub fn boundary_mix(
             },
         )
         .collect();
+    let pair_bounds = units
+        .pair_bound
+        .into_iter()
+        .map(|((lo, hi), a)| {
+            let mean = |sum: u64, n: u64| {
+                if n == 0 {
+                    -1.0
+                } else {
+                    sum as f64 / 100.0 / n as f64
+                }
+            };
+            PairBound {
+                lo,
+                hi,
+                class: a.class,
+                normal_mm_yr: if a.normal_n == 0 {
+                    0.0
+                } else {
+                    a.normal_um_yr as f64 / 1000.0 / a.normal_n as f64
+                },
+                ocean: a.ocean.map(|x| x as u32),
+                age_myr: [
+                    mean(a.age_centi[0], a.ocean[0]),
+                    mean(a.age_centi[1], a.ocean[1]),
+                ],
+                cont: a.cont.map(|x| x as u32),
+            }
+        })
+        .collect();
     Mix {
         km: units.km.map(km),
         pairs,
+        pair_bounds,
         bands: FrontBands {
             slab: bands(units.slab),
             normal: bands(units.normal),
@@ -1550,6 +1808,9 @@ pub fn boundary_mix(
             arc_age: bands(arc_age),
             onset_slab: bands(onset_slab),
             oo_over_floor: oo_over_floor.map(|row| row.map(km)),
+            onset_kind: onset_kind.map(|row| row.map(km)),
+            onset_route: onset_route.map(|row| row.map(km)),
+            onset_buoyant: onset_buoyant.map(|row| row.map(km)),
             ..FrontBands::default()
         },
     }
@@ -1675,6 +1936,94 @@ struct Tally {
     land: u32,
     land_held: u32,
     continental: u32,
+}
+
+/// Measurement only (the onset trace, 2026-10-31): records each contact whose onset is this step
+/// ([`OnsetRec`]) with its pair's boundary the step before, then updates the pairs' history and
+/// keeps this step's boundaries and contacts for the next.
+fn record_onsets(d: &mut Dynamics, st: &PlateState, env: &Env<'_>, bounds: &[PairBound]) {
+    let t = env.t_myr;
+    let lives: BTreeMap<u32, (Option<u32>, &str)> = d
+        .plates
+        .iter()
+        .map(|p| (p.id, (p.parent, p.origin.as_str())))
+        .collect();
+    let prev: BTreeMap<(u32, u32), &PairBound> = d
+        .prev_pair_bound
+        .iter()
+        .map(|b| ((b.lo, b.hi), b))
+        .collect();
+    let hist: BTreeMap<(u32, u32), &PairHist> =
+        d.pair_hist.iter().map(|h| ((h.lo, h.hi), h)).collect();
+    let was: BTreeSet<(u32, u32)> = d.prev_contacts.iter().copied().collect();
+    let mut new = Vec::new();
+    for c in st.contacts.iter().filter(|c| c.onset_step == env.step) {
+        let key = (c.under.min(c.over), c.under.max(c.over));
+        let before = prev.get(&key).map(|b| (*b).clone()).unwrap_or(PairBound {
+            lo: key.0,
+            hi: key.1,
+            age_myr: [-1.0, -1.0],
+            ..PairBound::default()
+        });
+        let h = hist.get(&key);
+        let route = if was.contains(&(c.over, c.under)) {
+            1
+        } else if pair_relation(&lives, c.under, c.over) == PAIR_INITIATION {
+            2
+        } else {
+            0
+        };
+        new.push(OnsetRec {
+            t,
+            step: env.step,
+            under: c.under,
+            over: c.over,
+            setting: c.setting,
+            route,
+            kind: before.kind(),
+            boundary_age_myr: h.map_or(-1.0, |h| t - h.first_myr),
+            converging_myr: h
+                .and_then(|h| h.converging_since_myr)
+                .map_or(0.0, |s| t - s),
+            since_spread_myr: h.and_then(|h| h.spread_last_myr).map_or(-1.0, |s| t - s),
+            slab_age_myr: c.onset_slab_age_myr,
+            convergence_mm_yr: c.onset_convergence_mm_yr,
+            before,
+        });
+    }
+    d.onsets.extend(new);
+    let mut next: BTreeMap<(u32, u32), PairHist> =
+        d.pair_hist.drain(..).map(|h| ((h.lo, h.hi), h)).collect();
+    let now: BTreeSet<(u32, u32)> = bounds.iter().map(|b| (b.lo, b.hi)).collect();
+    for (key, h) in &mut next {
+        if !now.contains(key) {
+            h.converging_since_myr = None;
+        }
+    }
+    for b in bounds {
+        let h = next.entry((b.lo, b.hi)).or_insert(PairHist {
+            lo: b.lo,
+            hi: b.hi,
+            first_myr: t,
+            ..PairHist::default()
+        });
+        if b.normal_mm_yr < 0.0 {
+            h.converging_since_myr.get_or_insert(t);
+        } else {
+            h.converging_since_myr = None;
+        }
+        if b.class[mix::RIDGE] + b.class[mix::RIFT] > 0 {
+            h.spread_last_myr = Some(t);
+        }
+    }
+    d.pair_hist = next.into_values().collect();
+    d.prev_pair_bound = bounds.to_vec();
+    d.prev_contacts = st
+        .contacts
+        .iter()
+        .filter(|c| c.active(env.step))
+        .map(|c| (c.under, c.over))
+        .collect();
 }
 
 /// Appends this step's record. `seen` is what the step measured (the fronts' lengths per plate,
@@ -1958,6 +2307,7 @@ pub fn record_step(
         front_bands.gain_slab = gain_slab.map(|r| r.map(units_km));
     }
     d.prev_pair_front = now;
+    record_onsets(&mut d, st, env, &seen.mix.pair_bounds);
     d.steps.push(StepRec {
         t,
         visible,
@@ -2016,6 +2366,45 @@ pub fn age_record_of(ages: &[f64], t: f64) -> AgeRec {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The onset trace's classes (measurement only): a pair's boundary by its longest class, the
+    /// "other" boundary split by the velocity across it, and the floors against 10 Myr.
+    #[test]
+    fn onset_trace_classes_a_boundary_and_its_floors() {
+        let mut b = PairBound {
+            lo: 1,
+            hi: 2,
+            ..PairBound::default()
+        };
+        assert_eq!(b.kind(), 5);
+        b.class[mix::RIDGE] = 4;
+        b.class[mix::OTHER] = 3;
+        assert_eq!(b.kind(), 0);
+        b.class[mix::OTHER] = 9;
+        b.normal_mm_yr = -12.0;
+        assert_eq!(b.kind(), 1);
+        b.normal_mm_yr = 0.0;
+        assert_eq!(b.kind(), 2);
+        b.class[mix::OCEAN_OCEAN] = 20;
+        assert_eq!(b.kind(), 3);
+        b.ocean = [5, 7];
+        b.age_myr = [4.0, 30.0];
+        let o = |b: &PairBound, under, over| OnsetRec {
+            under,
+            over,
+            before: b.clone(),
+            ..OnsetRec::default()
+        };
+        // Plate 1 (lo) has 4 Myr floor at the boundary, plate 2 30 Myr.
+        assert_eq!(o(&b, 1, 2).buoyant(), 1);
+        assert_eq!(o(&b, 2, 1).buoyant(), 2);
+        b.age_myr = [4.0, 8.0];
+        assert_eq!(o(&b, 2, 1).buoyant(), 0);
+        b.age_myr = [40.0, 80.0];
+        assert_eq!(o(&b, 2, 1).buoyant(), 3);
+        b.ocean = [5, 0];
+        assert_eq!(o(&b, 2, 1).buoyant(), 4);
+    }
 
     fn on_sphere(lon_deg: f64, lat_deg: f64) -> DVec3 {
         let (lo, la) = (lon_deg.to_radians(), lat_deg.to_radians());
