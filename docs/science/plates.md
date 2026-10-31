@@ -13164,4 +13164,173 @@ three times, but both modern numbers are inflated for a long run (above). Which 
 is the next question: the erosion laws (the surface stage's efficiency at the model's relief) or
 the uplift they keep pace with (the plates' arcs, collisions and crust made continental). The
 second term is a plate-geometry one: the intra-oceanic fronts are 1.9 times Earth's length
-(25,744 km against Clift's 13,550; Stern & Scholl's 14,500). Nothing is built on this diagnosis.
+(25,744 km against Clift's 13,550; Stern & Scholl's 14,500; diagnosed in the next section).
+Nothing is built on this diagnosis.
+
+### The intra-oceanic fronts' length (2026-10-31, a diagnosis)
+
+The question (the trench-input diagnosis's second term): why the arcs' count of intra-oceanic
+front is 25,744 km on base34-s4 against Clift et al. 2009's 13,550 (Stern & Scholl 2010's
+14,500), 1.9 times. Nothing is built on this diagnosis.
+
+**The answer.** Part of the 1.9 is the measure: the counter takes the incipient fronts (1.25
+times) and Clift's inventory is 0.78 of Bird's (1.28 times). On a total trench of Earth's length,
+the planet's own excess is in the share, 1.3 to 2.1 times Earth's when each class is matched. It
+lies in where young floor goes down. On floor 55 Myr or older the model's intra-oceanic front has
+Earth's length (8,560 km against 8,400 to 11,100); on younger floor it is 10,840 km against
+Earth's 2,240 to 3,860. Earth puts that floor down at continental margins: the model's young floor
+goes down along about Earth's total length (23,630 km against 25,080), but 0.46 of it at
+intra-oceanic fronts against Earth's 0.09 to 0.15. By its signature it is a missing law. In the
+model a subduction zone starts wherever two plates come to converge (any overlap is a contact,
+`subduction::resolve`, and the incipient stage ends at 100 km of slab whatever the floor's age,
+PLT-610 and PLT-611), so young boundaries between oceanic plates become intra-oceanic trenches:
+0.57 of the model's intra-oceanic front belongs to contacts whose first floor down was younger
+than 12 Myr. Young slabs then converge slowly, open no back-arcs (PLT-712's 55 Myr gate) and last.
+Which law is missing, a start condition at a converging boundary or the kinematics that make young
+boundaries converge, is the next question (at the end).
+
+**Runs and tools.** From cached runs: base34 (key 122e4803cded, argkey cd665cef, 24 runs) through
+`tools/review/crustcycle/fronts.py` (the step records' front bands), `oofronts.py` and
+`transect.py` (the crust-budget maps at -950 to -50 Myr, every 50 Myr). One trace, oo-trace
+(branch oceanic-fronts at a5bd6c0b, key 28820e933ba1, `pool.sh run oo-trace --seeds 1
++DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`, base34's argkey), adds
+measurement-only front bands to the record (`dynamics::FrontBands`: `arc_age`, the subducting
+fronts by their arc's PLT-669 onset, which a reversal resets; `onset_slab`, by their contact's
+slab age at its onset; `oo_over_floor`, the ocean-ocean front by its contact's age against the
+overriding floor's age at the front). Both runs are bit for bit base34's seed 1
+(`tools/review/crustcycle/same_run.py`: every state file but globals.json, and the records with the
+new fields taken out). The trace also wrote two fields dropped since: `no_arc` (always 0: a front
+past incipient always has an arc onset) and the ocean left on the subducting side (read from the
+subducting side's lattice neighbour, mostly a sample gone under, so 0.92 of it read "none";
+`oofronts.py` measures the ocean left on the maps). Earth: `tools/review/crustcycle/earth_fronts.py`
+on Bird 2003's subduction steps (PB2002_steps.dat, class SUB, 1,127 steps, 51,309 km; the
+relative velocity's component across each step, whose length-weighted mean over them is Table
+3's 53.2 mm/yr, the agent's reading of the steps file), CRUST1.0 (Laske et al. 2013; crystalline
+crust, the upper crust's top to the Moho) and Seton et al. 2020's floor ages (EarthByte's
+age.2020.1.GTS2012.6m.grd). Each step is classed as PLT-370 classes the model's fronts:
+ocean-ocean where no crust of at least the threshold lies within 200 km behind it on the
+overriding side. The threshold is 15 km, the model's own line (PLT-047: 7 km of ocean crust and
+8 km of arc crust turn a sample continental), and 20 km for the reading's sensitivity.
+
+**The measure.**
+
+- The arcs' counter (`plates/arc_front_oceanic_km_myr`) takes every oceanic-slab front, the
+  incipient ones too (PLT-610, PLT-681). Past incipient the ocean-ocean front is 22,931 km on
+  base34 against the counter's 28,641 (1.25 times).
+- Clift's 13,550 km is 0.337 of a 40,225 km inventory; Bird's subduction zones are 51,310 km.
+  The model's subducting front past incipient is 51,773 km on base34 (1.01 times Bird's). The
+  total is Earth's; the comparison is the share.
+- The class. Earth's lists class an arc by the crust it stands on: "Intra-oceanic arcs ... occur
+  where overridding plates of subduction zones consist of oceanic rocks" (Leat & Larter 2003,
+  abstract), as Stern 2010 does, and they count arcs built on earlier intra-oceanic arcs among
+  them (Gerya 2011, its account of Leat & Larter). PLT-370 classes a front by continental crust
+  within 200 km, so a matured island arc behind it makes it ocean-continent. Matched in each class
+  (the share of the subducting front):
+
+| class | model | Earth | model over Earth |
+|---|---|---|---|
+| PLT-370's: continental crust within 200 km (mature island arcs count) | 0.385 (maps, great circle) to 0.438 (the record, lattice steps) | 0.212 (CRUST1.0 at 15 km) to 0.305 (20 km) | 1.26 to 2.07 |
+| by the substrate: no continental crust within 200 km but island arcs' | 0.582 (maps) | 0.337 (Clift's rows) to about 0.40 (Leat & Larter, abstract: "some 40% of the subduction margins") | 1.46 to 1.73 |
+
+**Where the excess lies: the floor going under** (the model's maps: the subducting plate's
+sample nearest each front sample; Earth's: the first dated floor 20 to 200 km out on the
+subducting side; km of front, each class's shares times its length):
+
+| fronts | floor under 55 Myr | 55 Myr or older | undated |
+|---|---|---|---|
+| model, intra-oceanic (20,969 km) | 10,840 | 8,560 | 1,570 |
+| Earth at 15 km, intra-oceanic (10,891) | 2,240 | 8,400 | 250 |
+| Earth at 20 km, intra-oceanic (15,630) | 3,860 | 11,100 | 670 |
+| model, continental margins (33,566) | 12,790 | 16,450 | 4,330 |
+| Earth at 15 km, continental margins (40,418) | 22,840 | 12,930 | 4,610 |
+| Earth at 20 km, continental margins (35,679) | 21,270 | 10,240 | 4,170 |
+
+On Earth the intra-oceanic fronts take the oldest floor: 0.60 of them over 100 Myr at 15 km, 0.04
+to 0.07 under 30 Myr. In the model 0.19 are over 100 Myr and 0.32 under 30. The continental
+margins are the other way round. Young floor goes down along about Earth's length in all (23,630
+km against 25,080 to 25,130), old floor 1.17 times (25,000 against 21,330).
+
+**What follows from young slabs** (each matched with Earth):
+
+- *Convergence across the front* (the record's `normal` bands, base34 past incipient; Bird's
+  component across the step; shares of each class):
+
+| mm/yr | under 10 | 10 to 20 | 20 to 40 | 40 to 80 | over 80 |
+|---|---|---|---|---|---|
+| model, intra-oceanic | 0 (incipient) | 0.169 | 0.288 | 0.347 | 0.195 |
+| Earth at 15 km, intra-oceanic | 0.033 | 0.123 | 0.093 | 0.432 | 0.318 |
+| Earth at 20 km, intra-oceanic | 0.061 | 0.162 | 0.115 | 0.409 | 0.253 |
+| model, continental margins | 0 (incipient) | 0.104 | 0.230 | 0.368 | 0.299 |
+| Earth at 15 km, continental margins | 0.106 | 0.124 | 0.180 | 0.460 | 0.130 |
+
+  Earth's intra-oceanic fronts are its fast ones (69.6 mm/yr at 15 km, 60.7 at 20, against 48.8
+  and 49.9 at its continental margins). The model's are slower than its continental margins.
+- *Back-arcs.* The floor 200 to 600 km behind the front (the first oceanic sample along the
+  normal on any plate but the one going under; Earth, the first dated floor; no plate outlines on
+  either side): younger than 10 Myr behind 0.04 of the model's intra-oceanic front against 0.43
+  (15 km) and 0.31 (20 km) of Earth's, younger than 30 Myr 0.28 against 0.68 and 0.54. The
+  back-arc slivers (PLT-710) hold 0.058 of the model's subducting front over the run (base34's
+  globals, `plates/backarc_front_km_myr` over `plates/trench_front_km_myr`; qualifying and not
+  held 0.106), against Heuret & Lallemand 2005's 0.184 of segments in back-arc spreading (PLT-716's
+  tabulation). PLT-712's gate (the floor coming in older than 55 Myr, Sdrolias & Müller 2006)
+  excludes the young-floor fronts.
+- *Age.* The arcs (`arc_age`, the trace): 0.61 of the model's intra-oceanic front belongs to arcs
+  older than 50 Myr, 0.32 to arcs older than 100 (the contacts, base34: 0.69 and 0.38). Earth's
+  intra-oceanic zones began 55 Ma or later (Crameri et al. 2020, Table 1: Izu-Bonin-Mariana 52,
+  Aleutian 53, Tonga-Kermadec 50 by reversal, Lesser Antilles 49, South Sandwich 34, New
+  Hebrides-New Britain 10, Philippine 9, Ryukyu 6; Gurnis et al. 2004, Table 1, the same order).
+  Weighted by Bird's ocean-ocean steps at 15 km, matched to those zones by the agent, Earth's
+  median is about 50 Myr, the model's arcs' about 69. Earth's ages are one snapshot after the
+  Eocene cluster of initiations (Crameri: "between ~55-40 Ma"); the model's are pooled over 1,000
+  Myr.
+
+**How they begin.** Of the model's intra-oceanic front, 0.57 belongs to contacts whose first floor
+down was younger than 12 Myr and 0.23 younger than 6 (`onset_slab`, the trace: the mean age of
+the overlapping floor at the contact's first step, kept by a split's copies); of the continental
+margins' front, 0.48 and 0.20. The trace's runs count 489 to 496 confirmed subduction onsets in
+1,000 Myr, of them 27 to 30 PLT-690 initiations and 96 to 114 reversals; the rest are plates that
+came to converge. Earth's initiation events took plates of mean age 31.7 to 117.4 Myr (Crameri
+et al. 2020, Supplementary Data 1; a plate's mean, not the floor at the new trench, so a loose
+comparison). Gurnis et al. 2004 name the settings "old fracture zones, transform faults, and
+extinct spreading centers and through polarity reversal behind active subduction zones"; one of
+the Cenozoic zones in their Table 1 began along a spreading centre (Puysegur-Fiordland). Cloos
+1993 (abstract): "Oceanic lithosphere that is ~10 m.y. old is the youngest that is more dense than
+the asthenosphere". The intra-oceanic arcs are born intra-oceanic, not continental margins moved
+off: the front past incipient of arcs that began intra-oceanic (`plates/arc_front_intra_oceanic_km_myr`,
+PLT-760's measure, fronts of either class now) is 20,700 km on the trace, against 22,057 km of
+ocean-ocean front.
+
+The overriding side agrees. Walking from each intra-oceanic front sample into its own plate
+(`transect.py`, every 50 km to 1,500 km), 0.39 of the walks meet continental crust. Of those, 0.82
+find the floor youngest at the front: 33 to 38 Myr there on average, 60 to 62 midway, 80 to 89
+just before the continent, a ridge's flank with the trench where the ridge was. Along Earth's
+walks (Seton's dated floor; the arcs and forearcs carry no age) the strips are about even (0.52)
+or young at the front (0.40), 32 to 48 Myr at the front and 45 to 53 at the continent. Of the
+model's intra-oceanic front at contacts older than 100 Myr, 0.75 has floor younger than 50 Myr at
+the front (`oo_over_floor`). A contact's age is its pair of plates', so a front segment can be
+younger than its contact; on Earth "the substrate for intra-oceanic arcs is produced when
+subduction begins" (Stern & Scholl 2010, p. 7 of the proof, citing Stern & Bloomer 1992 and Hall
+et al. 2003).
+
+**What is not the term.**
+
+- The continents behind the fronts. Along the overriding-side normal on both (any plate but the
+  one going under), the first continental crust lies within 1,200 km of 0.44 of the model's
+  intra-oceanic front and of 0.33 (15 km) to 0.46 (20 km) of Earth's; none lies within 2,400 km
+  behind 0.34 against 0.39 to 0.40. An earlier reading that the model's fronts sit in narrow
+  oceans by their continents came from another measure (the overriding plate's nearest
+  continental crust in any direction), which Earth's data here cannot give.
+- The plates' origins: the intra-oceanic and continental fronts' overriding plates come alike from
+  rifts (0.51 and 0.49), first plates (0.16 and 0.16), initiations (0.14 and 0.14) and back-arcs
+  (0.09 and 0.11).
+- The total trench (Bird's) and the convergence over all fronts (50 against 53.2 mm/yr, the
+  trench-input diagnosis).
+
+**The next step.** Which law is missing is not settled by these runs. (a) A start condition: on
+Earth young floor goes down where a continent overrides it, and intra-oceanic zones start near
+existing ones on older floor (Crameri, Gurnis); the model has no condition at a converging
+boundary but the 100 km of slab. (b) The kinematics: in the model a boundary of young floor
+between oceanic plates comes to converge often enough to start 0.57 of the intra-oceanic front;
+on Earth ridges are where plates part. One trace would split them: at each contact's onset, what
+its boundary was the step before (spreading, transform, incipient convergence) and for how long
+its plates had been parting there.
