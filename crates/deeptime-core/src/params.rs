@@ -1341,6 +1341,29 @@ pub struct TectonicParams {
     /// On by default since 2026-10-30 (arm backarc against base32-s4: the guard clean, about 1.9
     /// reversals per 100 Myr). ledger: PLT-737
     pub collision_backarc_reversal: bool,
+    /// `true`: a terrane its slab can drag down whole subducts, stripped of its cover. A collision
+    /// front's terranes go down with the contact's slab when each body at the front has its
+    /// extent across the front (all its area, hidden and visible, over its share of the front's
+    /// length) within the slab's reach against its buoyancy (`shortening::dragged_length_km`: the
+    /// slab's length over 1 + 2.25 T / 30 km, FRC-028 to FRC-030's law), judged as the body
+    /// arrives and kept while it goes down, a body that crust joins judged again by all its
+    /// samples over the share of the front it was judged with (`shortening::docking`); then only the
+    /// supracrustal cover of its crossing crust (sediment, sedimentary and volcanic rock,
+    /// `pools::COVER`) and the crust this collision stacked on it (PLT-400) stay, pool by pool,
+    /// by `collision_stacking_share`, all of it on the overriding plate (no pro-wedge on a
+    /// terrane going down), the plutonic and metamorphic crust under it going down with the slab;
+    /// it does not transfer at `collision_threshold_km`, and its front feeds the slab instead of
+    /// blocking it (FRC-019). A body beyond its reach jams the slab and the front collides as
+    /// before. Tetreault & Buiter 2014: "the force of the subducting slab
+    /// ... can most likely overcome the buoyancy of small crustal units"; accretion adds "slivers
+    /// of thrusted crustal units ... rather than collision and addition of the entire crustal
+    /// thickness"; "only the upper 2–5 km of arc crust" where the arc is on the subducting plate.
+    /// `shortening::advance` classes the front, `belts::stack` strips it; the design
+    /// docs/design/small-terrane-docking.md. On by default since 2026-10-31 (the coordinator's
+    /// call, under Ben's rule of 2026-10-23: physics goes on by default once built and correct;
+    /// decisions log 2026-10-31; its pool arms against orog-cum in PLT-770's row and the design).
+    /// `false`: every terrane collides and transfers as before (PLT-068). ledger: PLT-770, PLT-771
+    pub terrane_docking_cover: bool,
     /// Contacts unseen for longer than this are closed, Myr (12 steps at the 2-Myr step).
     /// Ledger PLT-059.
     pub contact_timeout_myr: f64,
@@ -1615,6 +1638,7 @@ impl Default for TectonicParams {
             initiation_stress_mpa: 20.0, // ledger: PLT-505 (game-choice; on since 2026-10-23)
             transference: true,          // ledger: PLT-516
             collision_backarc_reversal: true, // ledger: PLT-737 (on since 2026-10-30)
+            terrane_docking_cover: true, // ledger: PLT-770, PLT-771 (on since 2026-10-31)
             contact_timeout_myr: 24.0,   // ledger: PLT-059
             collision_orogeny_myr: 30.0, // ledger: PLT-079
             collision_melt_after_myr: 20.0, // ledger: PLT-735
