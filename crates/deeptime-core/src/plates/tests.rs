@@ -1711,24 +1711,21 @@ fn plates_unresolved(
 
 /// A contact begins only where its plates converge across their overlap (PLT-810,
 /// `tectonics.contact_needs_convergence`; Bird 2003's transform test, PLT-311): two oceanic
-/// plates split at the equator. The southern turned half a spacing about the pole and moving
-/// that way slides past the northern, and the lattice's zigzag outline still makes overlaps: with
-/// the switch off they make a contact, on they make none. Turned and moving about the x axis it
-/// runs under the northern where y > 0 at 50 mm/yr: a contact either way.
+/// plates split at the equator, the southern turned 0.1 rad about the x axis, so it overlaps the
+/// northern where y > 0. Moving that way at 50 mm/yr it runs under the northern: a contact either
+/// way. Moving about the pole (along the boundary) or away from the northern, the same overlap
+/// makes a contact with the switch off and none with it on. Its overlap's reading
+/// (`subduction::overlap_motion`) says which.
 #[test]
 fn a_contact_begins_only_where_its_plates_converge() {
     let p0 = preset(20_000, 20.0, "supercontinent", 5);
-    let run = |on: bool, axis: DVec3, turn: f64| -> (usize, u32) {
+    let run = |on: bool, motion: DVec3| -> (usize, u8) {
         let mut p = p0.clone();
         p.tectonics.contact_needs_convergence = on;
         let stage = PlatesStage::new(p.clone());
         let env = stage.env(&p.tectonics, 1);
-        let (mut st, geo) = plates_unresolved(
-            &p,
-            &env,
-            glam::DQuat::from_axis_angle(axis, turn),
-            |q| q.z > 0.0,
-        );
+        let turn = glam::DQuat::from_rotation_x(0.1);
+        let (mut st, geo) = plates_unresolved(&p, &env, turn, |q| q.z > 0.0);
         for s in st.samples.iter_mut() {
             s.kind = OCEANIC;
             s.pools = pools::oceanic_column();
@@ -1736,25 +1733,27 @@ fn a_contact_begins_only_where_its_plates_converge() {
             s.elevation_m = -4500.0;
             s.formed_myr = (env.t_myr - 80.0) as f32;
         }
-        let w = env.norm.omega_of_speed(50.0) * axis;
-        st.plates[1].omega = w.to_array();
+        st.plates[1].omega = (env.norm.omega_of_speed(50.0) * motion).to_array();
         let pos = geometry::positions(&st, &geo);
         st.recount(&pos);
         let tree = Tree::over(&pos, |_| true);
         let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env);
-        let n = overlaps.len();
+        assert!(overlaps.len() >= subduction::MIN_CONTACT as usize);
+        let read = subduction::overlap_motion(&st, &overlaps, &pos, &tree, &env, |_| true);
+        let class = read.get(&(0, 1)).map_or(u8::MAX, |r| r.pair_class);
         let mut world = WorldState::new(1, 16_384, p.t_start_years());
         subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &tree, &env).unwrap();
-        (st.contacts.len(), u32::try_from(n).unwrap())
+        (st.contacts.len(), class)
     };
-    let spacing = (4.0 * std::f64::consts::PI / 20_000.0).sqrt();
-    let (off, n) = run(false, DVec3::Z, 0.5 * spacing);
-    assert!(n >= subduction::MIN_CONTACT, "{n} overlaps sliding past");
-    assert_eq!(off, 1, "the slide's overlaps make a contact with the switch off");
-    let (on, _) = run(true, DVec3::Z, 0.5 * spacing);
-    assert_eq!(on, 0, "a contact between plates sliding past");
-    assert_eq!(run(true, DVec3::X, 0.1).0, 1, "no contact under convergence");
-    assert_eq!(run(false, DVec3::X, 0.1).0, 1);
+    let converging = subduction::OVERLAP_CONVERGING as u8;
+    assert_eq!(run(false, DVec3::X), (1, converging));
+    assert_eq!(run(true, DVec3::X), (1, converging), "no contact under convergence");
+    let transform = subduction::OVERLAP_TRANSFORM as u8;
+    assert_eq!(run(false, DVec3::Z), (1, transform));
+    assert_eq!(run(true, DVec3::Z), (0, transform), "a contact on a transform");
+    let parting = subduction::OVERLAP_PARTING as u8;
+    assert_eq!(run(false, -DVec3::X), (1, parting));
+    assert_eq!(run(true, -DVec3::X), (0, parting), "a contact between parting plates");
 }
 
 /// A subduction initiation's contact takes the polarity of the slab planted under its fracture

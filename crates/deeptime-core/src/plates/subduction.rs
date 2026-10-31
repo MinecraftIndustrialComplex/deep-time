@@ -621,7 +621,9 @@ pub fn resolve(
     // pairs with no contact, read once.
     let motion = env.k.contact_needs_convergence.then(|| {
         let st: &PlateState = state;
-        overlap_motion(st, overlaps, pos, tree, env, |key| !index.contains_key(&key))
+        overlap_motion(st, overlaps, pos, tree, env, |key| {
+            !index.contains_key(&key)
+        })
     });
     for (&(lo, hi), agg) in &aggs {
         let centroid = agg.sum.normalize_or(DVec3::Z);
