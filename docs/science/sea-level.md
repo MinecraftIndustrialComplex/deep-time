@@ -981,8 +981,10 @@ The terms of a column's height, against Earth:
   model's fill stands 371 m over Earth's on base35 (198 m on base34): the area of the thick crust +516 m (+303), its
   lower heights -156 m (-117), the water +57 m (+58: the planet's 2,664 m less its ice against Earth's present ocean),
   the ocean floor and margins under 20 km -28 m (-76). The ocean basins are not shallow any more (with the margins
-  continental since PLT-661 the floor beyond them is Earth's to within 30 to 80 m on the fill); the sea stands high
-  because the continents cover 0.48 of the planet. From base34 to base35 the filled sea rose 179 m, of it +204 m the
+  continental since PLT-661 the floor beyond them is Earth's to within 30 to 80 m on the fill), and the floor is older
+  than Earth's (mean 106 Myr on base35, 88.5 on base34, m5sea.py; Seton et al. 2020's 64.2), which deepens it; the
+  ridges and the floor's sediment are not the term. The sea stands high because the continents cover 0.48 of the
+  planet. From base34 to base35 the filled sea rose 179 m, of it +204 m the
   continental area (m5sea.py's Shapley), from the crust budget's kept crust: the own-crust volume at the end 6.56 to
   7.14 × 10⁹ km³ (cb_t lines), at the same mean thickness (26.0 and 26.1 km own; 31.7 and 31.8 km for the crust at
   least 20 km thick).
