@@ -1748,28 +1748,9 @@ fn finish_samples(st: &mut PlateState, geo: &Geo, z0: &[f32], env: &Env<'_>) {
         let f = s.flags;
         s.heat_flow_mw_m2 = if s.kind == OCEANIC {
             ocean_heat_flow(s.age_myr(t)) as f32
-        } else if thermal_heat {
-            // From the lithosphere's state (ledger: PLT-467, PLT-468); an arc matured this step
-            // carries its floor's.
-            let l = if s.lithosphere_km > 0.0 {
-                s.lithosphere_km
-            } else {
-                thermal_reference
-            };
-            thermal::sample_heat_flow(l, f)
         } else {
-            let since = (t - f64::from(s.orogeny_myr)).max(0.0);
-            let mut q = 55.0 + 35.0 * (-since / 60.0).exp();
-            if f & ARC != 0 {
-                q += 40.0;
-            }
-            if f & HOTSPOT != 0 {
-                q += 40.0;
-            }
-            if f & DIVERGENT != 0 {
-                q += 30.0;
-            }
-            q as f32
+            // An arc matured this step carries its floor's lithosphere.
+            continental_heat_flow(s, t, thermal_heat, thermal_reference)
         };
         s.regime = if s.is_hidden() {
             regime::TRENCH
@@ -1807,6 +1788,41 @@ fn finish_samples(st: &mut PlateState, geo: &Geo, z0: &[f32], env: &Env<'_>) {
         s.basement_m = s.basement();
     });
     st.counters.emerged += st.samples.iter().filter(|s| s.flags & EMERGED != 0).count() as u32;
+}
+
+/// A continental sample's heat flow, mW/m², by its law at `t_myr`: with `thermal` (the
+/// lithosphere's state) from its lithosphere's depth, the frame's `reference_km` where it has none,
+/// and its arc and hotspot terms (ledger: PLT-467, PLT-468); else the old proxy, which decays after
+/// the last orogeny and adds an arc's, a hotspot's and a divergent margin's terms (ledger:
+/// PLT-137). `finish_samples` sets it on every continental sample; the heat flow's final pass
+/// ([`thermal::refresh_heat_flow`], PLT-469) on crust made continental after that.
+pub(crate) fn continental_heat_flow(
+    s: &state::Sample,
+    t_myr: f64,
+    thermal: bool,
+    reference_km: f32,
+) -> f32 {
+    let f = s.flags;
+    if thermal {
+        let l = if s.lithosphere_km > 0.0 {
+            s.lithosphere_km
+        } else {
+            reference_km
+        };
+        return thermal::sample_heat_flow(l, f);
+    }
+    let since = (t_myr - f64::from(s.orogeny_myr)).max(0.0);
+    let mut q = 55.0 + 35.0 * (-since / 60.0).exp(); // ledger: PLT-137
+    if f & ARC != 0 {
+        q += 40.0;
+    }
+    if f & HOTSPOT != 0 {
+        q += 40.0;
+    }
+    if f & DIVERGENT != 0 {
+        q += 30.0;
+    }
+    q as f32
 }
 
 /// Table 2 of Cortial et al. 2019 (C++, i7-6700K): seconds per regular step, per oceanic crust

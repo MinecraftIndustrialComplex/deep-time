@@ -162,6 +162,36 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 - **On the orogen's physics** (the coordinator, 2026-10-31): origin/collision-orogen (0e8a5ac9) merged in; the arm sets PLT-730/731 and PLT-740 on and is read against the cached arm orog-cum (key f2d6412d801f, argkey d3261b0a, 8 runs). The two-wedges fill takes the stripped rise (`belt_rise_km2_m` from the kept thickness), so the law holds in both branches.
 - **The arm** (on the slot the orogen lane freed): `pool.sh run small-terrane --seeds 1,2,3,4 --set tectonics.terrane_docking_cover=true --set tectonics.collision_two_wedges=true --set tectonics.collision_retro_plateau=true +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps --registry tools/review/pool/measures_boundary.json --registry tools/review/pool/measures_gap4.json --measures v1census,guard,collcoast,coastset` (key dcf0d7480ef3, argkey 35ce6e09, 8 runs, about 1,200 s each), `pool.sh table --base orog-cum --arm small-terrane` per measure, `dock_records.py` and `dock_maps.py` over both. The guard clean (worst 10,154 m from the sea against 9,945, p 0.51; no step beyond 2 reliefs). Hand-offs under 50 samples 12.3 per 100 Myr against 17.6 (p 0.014), the larger classes unchanged; partings 29.2 against 23.3, 5.8 per 100 Myr of them terranes gone down whole; crust stripped 0.035 km³ a year (0.029 to 0.043), about 1 % of the crust's additions. No V1 number beyond the seeds' spread: land 0.222 against 0.205 (p 0.19), largest landmass 0.083 against 0.074 (p 0.33), crust under the sea 0.567 against 0.605 (p 0.16), coast with high ground 0.091 against 0.067 (p 0.38); collision high coasts on landmasses under 0.02 of the land 0.359 against 0.668 (p 0.44); belt not elongated 0.170 against 0.075 (p 0.038, one column of twelve). The design's "What the arm showed" has the rest.
 - **Next.** Turn `tectonics.terrane_docking_cover` on by default (Ben's rule: built and correct, the guard clean): params.rs's default and PLT-770's value column, with the orogen's flip (collision-orogen-on) so base35 carries all three; nothing it replaces goes off (PLT-068's threshold still docks the bodies beyond the reach).
+### 2026-10-31: young floor made continental kept its 300 mW/m² (PLT-469); the bake test on collision-orogen-on fixed (the orogen lane, worktree agent-a52784a4e4ef20e33, branch heatflow-fix pushed to `collision-orogen-on`)
+
+- **The failure.** On collision-orogen-on (e23c2317, both orogen switches on) `bake::tests::the_release_pace_bakes_continental_heat_flow_with_the_final_pass`
+  baked 300 mW/m² at (45, 140), over its 200.1.
+- **Cause** (a per-stage print on the last step, since removed). The rate guard after the resampling (`rate::limit` →
+  `collapse::spread`) spread 9.3 km of rock from continental sources onto 2.4 Myr floor (and some onto 6.6 Myr floor),
+  which turned continental at once under PLT-662. The step had already set every heat flow, so the samples kept the
+  floor's 300 (and 198.8), and PLT-469's final pass, an "at least", leaves a value above the law alone. The plateau
+  (PLT-740) was not involved: it grows only through continental samples. PLT-662's label is kept (continental rock on
+  the floor's own crust, PLT-331); the heat flow was wrong.
+- **Fix.** Heat flow belongs to the crust's kind, as the resampling already treats it. `Sample::make_continental` sets it
+  to 0. The final pass gives a continental sample with none its law's full value through `plates::continental_heat_flow`,
+  the law `finish_samples` now shares (the proxy with its terms; the state over the sample's own lithosphere). With both
+  `heat_flow_refresh` and `thermal_state` off, such a sample keeps 0, which is the fault the pass exists to fix. Test
+  `young_floor_made_continental_after_the_step_takes_the_continental_law`. Docs:
+  lithosphere-thermal-state.md "Young floor (2026-10-31)"; ledger PLT-469, PLT-467 and PLT-137 rows.
+- **Master has it too.** A temporary scan ran the plate stage alone on the test's preset: 60 Myr, release pace on,
+  scattered_continents and supercontinent, seeds 1-12, orogen off and on, state off and on, 96 runs. Before the fix,
+  with master's switches and the proxy, 22 of 24 planets had crust keeping a floor's value above its law, and 6 of 24
+  had continental heat flow over 200.1 at the final frame. With the state (the shipped default), 1 of 24 at the final
+  frame and 7 at some step, up to 300. With the orogen on: 11 of 24 (proxy) and 3 of 24 (state) at the final frame.
+  After the fix, none of the 96 runs keeps a floor's value, and none passes 200.1 with the proxy. With the state and
+  the orogen, 3 runs reach 203.4 to 204.5 at one step and none at the final frame; that comes from the state's own law,
+  which has no ceiling at 200. So `the_thermal_state_bakes_its_own_heat_flow`'s 200.1 bound holds only for its planet.
+  The pool's base34 runs do not dump heat flow, so they could not be checked.
+- **Found, not changed.** Floor that the resampling makes is born with no lithosphere state (`Sample::blank`). If it turns
+  continental in that same step, it takes the frame's 225 km under the state, and so does `thermal::step` afterwards.
+- **Gate (VM).** `cargo test --workspace --no-fail-fast`: 1,437 passed, 0 failed, 13 ignored (deeptime-core lib 1,153).
+  clippy `-D warnings` clean; fmt clean after its layout of the new test.
+- **Next.** The coordinator lands collision-orogen-on.
 
 ### 2026-10-31: the collision orogen as a doubly vergent wedge, measured on the freeboard; the plateau's retro-ward growth behind a switch (PLT-740) (the orogen lane, worktree agent-a52784a4e4ef20e33, branch `collision-orogen`)
 
