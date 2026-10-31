@@ -23,6 +23,7 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | the crust flux into collision fronts: the crust budget's measures and Earth's references (section "The crust flux into collision fronts", 2026-10-21) | PLT-401 (1) |
 | [PLT](ledger/PLT.md) | the trench budget: sediment subduction, subduction erosion and where it acts, the trench's release, the measures and Earth's references (section "The trench budget", 2026-10-22; switches, off by default) | PLT-440 to PLT-444 (5) |
 | [PLT](ledger/PLT.md) | the crust budget against Stern & Scholl 2010, row by row: the island law on an intra-oceanic arc's own crust, the additions measured whole, the trench sediment line in place, arc magma at sutures (section "The crust budget against Stern & Scholl 2010, row by row", 2026-10-31; switches, off by default) | PLT-760 to PLT-763 (4) |
+| [PLT](ledger/PLT.md) | hotspots, plume heads and volcanic rifted margins from sources: Sleep's 37 tails, a head every 15 Myr with the record's provinces, the igneous crust at breakup over a head's hot mantle (section "Hotspots, plume heads and volcanic margins from sources", 2026-10-31; switches, off by default) | PLT-790 to PLT-802 (13) |
 
 Rows by status (after the ocean–continent transition, 2026-10-04): `verified` 17, `cited-unverified` 46, `from-memory` 4, `abstract-only` 19, `calibrated` 14, `game-choice` 79, `uncited` 42; `pending-rewrite` 151; `not-yet-coded` 8; `merged` (not counted) 33.
 
@@ -12972,3 +12973,130 @@ the substrate alone: ocean floor, or continental crust over an ocean basement (P
   planet-mean, the sea 169 to 348 m, the criteria 6.5 to 6 (p 0.35), the guard clean. What still
   drains the continents is sediment subduction (2.95 km³ a year in the late half), fed by the
   continents' export (4.07 off them against Clift et al.'s rivers' 1.8): the surface lane's lead.
+
+## Hotspots, plume heads and volcanic margins from sources (2026-10-31)
+
+The coordinator's task after the crust budget's row by row reading: the row "rifts, hotspots,
+volcanic rifted margins" made 0.05 km³ a year against Stern & Scholl's 0.5, from hotspot rules
+that rested on nothing (PLT-108 to PLT-120 `uncited`) and no magma at breakup. Give the plumes,
+their heads and the margins a law from sources, build it behind switches, run one cumulative arm.
+The design, what each rule rested on and the sources' numbers: docs/design/hotspots-lips-margins.md;
+the sources and what was read of them: bibliography.md "The sources of the hotspot lane
+(2026-10-31)"; the rows: PLT-790 to PLT-802. No knob, cap or forcing term moves a row towards Earth.
+
+### The rules (all off by default)
+
+- `tectonics.hotspots_sourced` (PLT-790 to PLT-794, PLT-801): Sleep 1990's 37 tails, each with one
+  of his buoyancy fluxes, alive 100 to 150 Myr (Courtillot et al. 2003), born at 37 over the mean
+  life; each makes Hawaii's magma per unit of flux (4 m³/s at 8.7 Mg/s), a seventh lavas (White et
+  al. 2006's 6:1 for the Hawaiian chain), over the 150 km kernel, raised by the model's Airy
+  isostasy; the volcano stage's strength by the flux's rank.
+- `tectonics.plume_heads_sourced` (PLT-795 to PLT-797): a head every 15 Myr (Ernst et al. 2021's
+  continental LIPs every 30 Myr and an oceanic record "similar"), 1,000 km in radius, its province
+  one of the record's (Clift et al. 2009's nine continental LIPs with their roots, three oceanic
+  plateaus), a quarter lavas; the plate model's dome holds 0.514 of it and the volcano stage's
+  plateau the rest, so the world holds the record's volume.
+- `tectonics.volcanic_margins` (PLT-798, PLT-799, PLT-802): a breakup over a head's hot mantle
+  (150 K for 20 Myr, White & McKenzie 1989, Campbell & Griffiths 1990) makes White & McKenzie's
+  igneous crust at full breakup (20.4 km at 150 K) over the 90 km seaward of the outline (Kelemen
+  & Holbrook 1995), continental over its 7 km ocean basement; any other breakup makes none.
+
+Unit tests against the sources' numbers (plates/tests.rs: `the_hotspot_constants_are_their_sources`,
+`a_sourced_tail_adds_its_buoyancy_fluxs_magma`, `a_sourced_plume_head_erupts_a_recorded_province`,
+`a_breakup_over_a_plume_head_makes_a_volcanic_margin`). Switches off, the branch is base34 bit for
+bit: arm hs-off (`pool.sh run hs-off --seeds 1 --starts supercontinent` with the crust-budget
+environment, key f1352cd8eca1) against base34's supercontinent-1: rec.json identical, every dumped
+field identical but globals.json, which differs only by the crust-budget lane's measurement globals.
+
+### The arm hs-cum (the crust-budget switches and the three on; 8 runs)
+
+`tools/review/pool/pool.sh run hs-cum --seeds 1,2,3,4 --set tectonics.island_arc_own_crust=true --set
+tectonics.collision_arc_magma=true --set tectonics.trench_pile_in_place=true --set
+tectonics.hotspots_sourced=true --set tectonics.plume_heads_sourced=true --set
+tectonics.volcanic_margins=true +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`
+(branch hotspot-lip at be0b83f7, key f1352cd8eca1, argkey e501232a), read against base34-s4 (key
+122e4803cded) and cb-cum2 (the crust-budget switches alone on their final code, key ab482e63fcf0).
+The budget (`tools/review/loss-budget.py`, means of 8 runs, km³ a year; the late half, `--from
+-500`, in brackets):
+
+| row | base34-s4 | cb-cum2 | hs-cum | Stern & Scholl 2010 |
+|---|---|---|---|---|
+| intra-oceanic arcs (with their cones) | 1.05 (0.95) | 1.91 (1.67) | 1.65 (1.23) | 1.5 |
+| continental arcs (with their cones) | 0.60 (0.54) | 0.43 (0.39) | 0.40 (0.32) | 1.0 |
+| crust-suturing zones | 0 | 0.18 (0.19) | 0.20 (0.23) | 0.2 |
+| rifts, hotspots, volcanic rifted margins | 0.05 (0.05) | 0.03 (0.04) | 0.91 (1.00) | 0.5 |
+| of it the tails (their basalt and the cones inside their kernel) | | 0.03 | 0.61 (0.70) | |
+| of it the LIPs on continental crust, whole | | | 0.26 (0.25) | |
+| of it volcanic rifted margins | | | 0.04 (0.04) | |
+| sediment subduction | 2.60 (2.82) | 2.72 (2.95) | 2.63 (2.46) | 1.1 |
+| subduction erosion | 0.49 (0.43) | 0.35 (0.29) | 0.26 (0.16) | 1.4 |
+| suturing losses | 0.50 (0.55) | 0.54 (0.59) | 0.56 (0.57) | 0.7 |
+| resampling drops | 0.22 (0.24) | 0.24 (0.27) | 0.40 (0.48) | 0 |
+| net change of the continental volume | −0.98 (−1.14) | −0.37 (−0.63) | +3.11 (+2.82) | about 0 |
+| continental crust at the end, share of the planet | 0.492 | 0.521 | 0.687 | |
+
+The heads: 6.74 per 100 Myr (the design's 6.67), the mean province 9.9 × 10⁶ km³, all LIPs 0.67
+km³ a year whole; 670 volcanic-margin gap points a run. The V1 census (`pool.sh table`, medians,
+Mann-Whitney p against base34-s4): land 0.238 to 0.170 (0.028), largest landmass 0.097 to 0.043
+(0.005), continental crust under the sea 0.527 to 0.755 (< 0.001), land above 2 km 0.013 to 0.007,
+coast with high ground 0.064 to 0.064, land under ice 0.061 to 0.100, collisions per 100 Myr 5.00 to
+7.20 (0.004), the crust's net change +0.065 to +0.259 (< 0.001), criteria met median 6.5 to 4
+(0.002), the sea 174 / 169 m to 948 / 1321 m (after 100 Myr / at the end); against cb-cum2 (6
+criteria, the sea 348 m) the same directions. The guard (`pool.sh measure --arm hs-cum --measures
+guard`): no step beyond 2 Earth reliefs, no continental cell 5 km over Airy; the worst 11,886 m from
+the sea against 9,964 (p < 0.001, the sea 1.1 km higher over the same trenches), the largest fall
+of a cell in a step 11,370 against 6,765 m, the plate cells' largest excess over Airy 2,708 against
+2,194 m (0.10). `collcoast` (measures_boundary.json): collision regime 0.023 of the land, 0.739 of
+it within 150 km of the sea (0.591), collisions the plate check counts 7.72 per 100 Myr (5.50).
+`coastset` (measures_gap4.json): coast_hi 0.064 (0.067), the hotspot coasts 0.045 of the high coasts
+(0), the high coasts facing a flooded continent 0.798 (0.684).
+
+### Why the continents grow: the volcano stage's cones over 37 tails
+
+The named rows add +0.87 km³ a year over cb-cum2; the net moves +3.48. The rest is rock the budget's
+rows do not name:
+
+- **The volcano stage's cones.** The cones the volcano stage hands the pools (PLT-286,
+  `plates/cone_felsic_km3` and `plates/cone_mafic_km3`) are 0.79 km³ a year on cb-cum2 and 5.00 on
+  hs-cum (the mafic 0.31 to 0.47 against 4.08 to 4.66 on two runs read; the stage's own count: 82
+  shields and 112 caldera complexes born in 1,000 Myr against 807 and 1,458 on scattered seed 1).
+  Of them the hotspots' kernels count 0.57 to 0.64 inside their rate, the arcs 0.24 to 0.26, and the
+  LIPs' plateau beyond the dome is about 0.4: the rest, 3.5 to 4.0 km³ a year against 0.3 to 0.5 on cb-cum2
+  (the agent's subtraction on those runs), lies outside every kernel, so nothing nets it against a
+  tail's magma. A shield's radius is set in the game's metres (VOL-022:
+  40 km at the top of its range, over `flank_steepness` 0.5, so 49 to 80 km on the 16k planet, whose
+  radius is 782 km), 400 to 650 km on Earth's sphere (the agent's arithmetic), and its height (3.5 to
+  6.5 km, VOL-021) does not depend on the plume's flux; a tail grows a new one every
+  `hotspot_spacing_km` of track (VOL-007). So with Sleep's 37 tails (about 3 to 8 alive before) the cones'
+  rock, Earth-normalized, is about four times the tails' own sourced magma (0.80 km³ a year).
+- **Where it goes.** The shields stand on ocean floor (silicic centres on continental crust), so the
+  ocean floor thickens, and the rules that turn thick or sediment-laden ocean floor continental take
+  more of it: the crust made continental less its basement (`tools/review/crustcycle/o2c.py`, new)
+  1.25 to 2.14 km³ a year, the transition's −0.25 to +0.32 and PLT-289's buoyant crust at the
+  trenches 0.03 to 0.19. The cones handed to continental crust are booked in the surface stage's part
+  of the budget, with erosion (`apply_surface_feedback`), so loss-budget.py's row "off the continents
+  by the surface stage" falls 4.07 to 2.19 km³ a year with the cones netted inside it.
+- **The sea follows.** The continental crust covers 0.69 of the planet at the end against 0.52, so
+  the ocean basins are smaller and the sea stands 1.3 km over the datum; more of the continents lie
+  under it (0.755), where their rock stays.
+
+The diagnostic arm hs-tails (the crust-budget switches and `hotspots_sourced` alone; seeds 1 and 2,
+4 runs, argkey 2973f3da): the cones 4.92 km³ a year, the tails' row 0.74, the net +2.75 against
+hs-cum's +3.10 on the same four runs, the continental share 0.675, the sea 958 / 1248 m, criteria 4.
+So the tails' cones carry most of it; the heads and the margins add +0.35 on top, about their rows
+(the LIPs 0.28 whole on continental crust, the margins 0.04).
+
+**Verdicts.**
+- `plume_heads_sourced` and `volcanic_margins`: correct as built (their unit tests; 6.74 heads per
+  100 Myr against the design's 6.67; 0.30 to 0.32 km³ a year onto the continents, inside White &
+  McKenzie's 0.3 to 0.4 for melt above rifted regions); measured only beside the sourced tails, since
+  without `hotspots_sourced` the heads' share caps at every one of the preset's 3 births per 100 Myr.
+- `hotspots_sourced`: not on yet. The tails' own magma is Sleep's, but the volcano stage's cones over
+  them are not tied to it: their size is the game's, their number follows the track, and only the
+  part inside the plate model's 150 km kernel counts against the tail. The next step makes a
+  hotspot's cones one budget with its tail: the volcano stage knows each cone's hotspot
+  (`Volcano::hotspot`) and can hand the pools at most the tail's lavas (PLT-794's seventh of PLT-793's
+  magma, Earth-normalized), counted by hotspot, not by the kernel, the rest of the cone standing as
+  relief over rock the plate model already holds. That is a VOL design (VOL-021, VOL-022, PLT-286),
+  then an arm. The lid (design section 5: little melt from a tail under thick lithosphere; Courtillot
+  et al. 2003, White & McKenzie's Fig. 3) is the step after.

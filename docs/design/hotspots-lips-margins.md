@@ -3,7 +3,7 @@
 Status: **built behind switches, off** (2026-10-31, the hotspot lane, branch `hotspot-lip` on
 `origin/crust-budget`): `tectonics.hotspots_sourced` (PLT-790 to PLT-794, PLT-801),
 `tectonics.plume_heads_sourced` (PLT-795 to PLT-797) and `tectonics.volcanic_margins` (PLT-798,
-PLT-799), with the measurement PLT-800. The arm is in "The arm" below; the readings in plates.md
+PLT-799), with the measurement PLT-800. The arm is section 6 below; the readings in plates.md
 "Hotspots, plume heads and volcanic margins from sources (2026-10-31)"; the sources and what was
 read of them in bibliography.md "The sources of the hotspot lane (2026-10-31)".
 
@@ -224,3 +224,29 @@ mantle).
   read).
 - **Thick ocean crust over hot mantle** (Iceland), the plateau's own accretion, and rift magmatism
   short of breakup.
+
+## 6. The arm hs-cum (2026-10-31)
+
+One cumulative 8-run arm on top of the crust-budget lane's three switches (`pool.sh run hs-cum
+--seeds 1,2,3,4` with the six switches and the crust-budget environment; key f1352cd8eca1, argkey
+e501232a), read against base34-s4 and cb-cum2; the tables are in plates.md "Hotspots, plume heads
+and volcanic margins from sources (2026-10-31)". Switches off, the branch is base34 bit for bit
+(arm hs-off, one run).
+
+- The rows did what section 4 estimated for the heads (6.74 per 100 Myr, the LIPs 0.26 km³ a year
+  whole on continental crust) and the margins (0.04, 670 gap points a run: the estimate's order).
+  The tails' row is 0.61 on continental crust, not 0.24: the model's continental crust covers 0.52
+  to 0.69 of the planet, not 0.3, and the volcano stage's cones inside the kernels add to it.
+- The net change of the continental volume is +3.11 km³ a year (cb-cum2 −0.37), the continental
+  crust 0.69 of the planet at the end, the sea 1,321 m over the datum, the criteria 4 of 7 (6 on
+  cb-cum2); the guard is clean.
+- The cause is outside this design: the volcano stage builds a shield or a silicic centre per
+  `hotspot_spacing_km` of each tail's track at the game's size (VOL-007, VOL-021, VOL-022), hands
+  its rock to the pools (PLT-286) and only the part inside the 150 km kernel counts against the
+  tail. With Sleep's 37 tails the cones are 5.0 km³ a year against 0.8 on cb-cum2, about four times
+  the tails' own magma. A tails-only arm (hs-tails, 4 runs) carries 0.9 of the net's rise.
+- The next step: a hotspot's cones and its tail as one budget, counted by the cone's hotspot
+  (`Volcano::hotspot`) and capped at the tail's lavas (PLT-793, PLT-794), the rest of the cone relief
+  over rock the plate model already holds; then this arm again. `plume_heads_sourced` and
+  `volcanic_margins` are correct as built, but were run only beside the sourced tails (alone, the
+  heads' share caps at the preset's 3 births per 100 Myr).
