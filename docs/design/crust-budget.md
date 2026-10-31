@@ -110,8 +110,15 @@ how much reaches them, per km of trench:
 The model's trench is longer (55,180 km of oceanic front, Bird 2003's subduction zones 51,310)
 and each km takes 1.2 times Clift's. The sources disagree by 1.6 times between themselves, and
 von Huene & Scholl's long-term 1.0 km³/yr corrects for "high rates of terrigenous seafloor
-sedimentation during the past 30 m.y." So the sediment row is within Clift's per-km physics;
-nothing is changed in the share, and no rule is added to lower it.
+sedimentation during the past 30 m.y." Nothing is changed in the share, and no rule is added to
+lower it.
+
+Corrected 2026-10-31 (plates.md, "Clift et al. 2009's sediment numbers, in rock"): the table above
+sets the model's rock beside Clift's volumes in place. Table 1's delivery is each margin's trench
+sediment thickness times its convergence, and the thickness is Clift & Vannucchi's "uncorrected for
+porosity"; under ERO-215's law the solid share of it is 0.60 (the agent's derivation), so Earth's
+trenches take 26 to 29 km³ of rock per km a Myr against the model's 52.7, about twice, on a trench
+1.37 times as long. The share subducted (0.90 against 0.93) stands; the delivery is the excess.
 
 One units error is fixed: Clift & Vannucchi's 1 km (PLT-660's accretionary pile and PLT-442's
 erosive margin's cover) is "the thickness of sediment (uncorrected for porosity) on the subducting
@@ -205,5 +212,9 @@ default since 2026-10-31 (decisions log: the coordinator's call, Ben's rule of 2
   beyond its 7 km of ocean crust to give. Earth's erosive forearcs retreat into the arc (Scholl &
   von Huene 2010, ~2.5 km/Myr), `tectonics.erosion_retreat` (PLT-523, off); a loss, so it would
   deepen the drain.
-- The land's export: the trench takes what the continents shed (3.8 to 4.2 km³ a year off them
-  against Clift et al. 2009's Cenozoic rivers' 1.8), the surface lane's.
+- The trenches' input: in rock about twice Clift et al. 2009's per km, on a longer trench
+  (plates.md, "Clift et al. 2009's sediment numbers, in rock"). Clift's rivers' 1.77 km³ a year is
+  the whole export to the ocean in rock, a Cenozoic mean, against the model's 3.8 to 4.3 (modern
+  loads are several times Clift's mean, so the export's own excess is open); the trench-bound share
+  of the export is 0.75 to 0.79 against Earth's 0.60 to 0.65 (the agent's derivation). The next
+  diagnosis splits the trench input by source and by delivery term.
