@@ -1,6 +1,7 @@
 # A hotspot's cones and its tail as one budget: design
 
-Status: **built behind a switch, off** (2026-10-31, the hotspot lane, branch `hotspot-lip`):
+Status: **on by default since 2026-10-31** (the coordinator's call, decisions log 2026-10-31: a
+books fix for the default; built 2026-10-31, the hotspot lane, branch `hotspot-lip`):
 `tectonics.hotspot_cone_budget` (PLT-803), with the measurement PLT-804. A correctness fix of the
 default as much as of the sourced tails (section 1): it holds whatever `hotspots_sourced` says. The
 arms are in section 5.
@@ -115,3 +116,5 @@ subsection "The cone budget". Key b58b6e4506f5 (a92a07f0), 8 runs each:
   clean. The tails still put 0.43 km³ a year on continental crust: the lid is next.
 
 Verdict: on by default, whatever the hotspot switches say (a correctness fix of master's default).
+The coordinator turned it on on 2026-10-31 (decisions log); the hotspot lane's three switches stay
+off until the lid is built.

@@ -152,6 +152,13 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 
 ## Build log
 
+### 2026-10-31: Hotspot lane: the cone budget on by default (the coordinator's call); a crash on small grids fixed (lane agent, worktree .claude/worktrees/agent-abc417f512034b877, branch hotspot-lip; sub-agent of session 88bb1af2-7722-4f74-9e04-4e8b8af667a9; not merged)
+
+- **Flip**: `tectonics.hotspot_cone_budget` (PLT-803) true by default ("the coordinator's call, 2026-10-31: a books fix for the default, the volcano stage handed the crust 0.50 km³ a year of cone rock no rate counted (arm hs-base, 8 runs, base34-s4's physics bit for bit)"; decisions log 2026-10-31); `hotspots_sourced`, `plume_heads_sourced` and `volcanic_margins` stay off until the lid. PLT-803's row, PLT-286's note, the design's status and plates.md updated.
+- **Tests**: two old-law fixtures pinned off with a comment (`hotspot_cones_are_counted_inside_the_hotspot_rate`, `a_sourced_tail_adds_its_buoyancy_fluxs_magma`: the kernel's netting, PLT-286); no seed moved, no conservation or guard assertion touched. The first `--no-fail-fast` gate with the budget on crashed seven pipeline tests (climate, surface, live_map, overlap) on the small test grids: a hotspot volcano's growth whose footprint held no cell had no share in the frame's map (`volcanoes/mod.rs`, the rock-backed height); it now hands none. The 16k planets' arms never met it (their cells are 4.8 km, the cones 49 to 80 km).
+- **Gate** on this commit (the VM, `cargo test --workspace --no-fail-fast`, clippy `-D warnings`, `fmt --check`, deny): clean, all tests pass.
+- **Next**: merge master again when the coordinator says (after crust-budget-on lands); the lid on branch `hotspot-lid`.
+
 ### 2026-10-31: Hotspot lane, step 2: the cone budget, a correctness fix of the default (master carries 0.5 km³ a year of cone rock no rate made); arms hs-base, hs-budget, hs-cum2; origin/master merged (lane agent, worktree .claude/worktrees/agent-abc417f512034b877, branch hotspot-lip; sub-agent of session 88bb1af2-7722-4f74-9e04-4e8b8af667a9; not merged)
 
 - **Task** (the coordinator): make a hotspot's cones and its tail one budget (count cones by the hotspot that built them, hand the crust at most the tail's lavas), with design, unit tests first, docs and ledger; first quantify the gap on master's default and whether loss-budget.py's surface row is inflated by cones on continental crust; then hs-cum again; merge origin/master.

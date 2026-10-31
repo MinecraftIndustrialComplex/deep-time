@@ -24,7 +24,7 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | the trench budget: sediment subduction, subduction erosion and where it acts, the trench's release, the measures and Earth's references (section "The trench budget", 2026-10-22; switches, off by default) | PLT-440 to PLT-444 (5) |
 | [PLT](ledger/PLT.md) | the crust budget against Stern & Scholl 2010, row by row: the island law on an intra-oceanic arc's own crust, the additions measured whole, the trench sediment line in place, arc magma at sutures (section "The crust budget against Stern & Scholl 2010, row by row", 2026-10-31; switches, off by default) | PLT-760 to PLT-763 (4) |
 | [PLT](ledger/PLT.md) | hotspots, plume heads and volcanic rifted margins from sources: Sleep's 37 tails, a head every 15 Myr with the record's provinces, the igneous crust at breakup over a head's hot mantle (section "Hotspots, plume heads and volcanic margins from sources", 2026-10-31; switches, off by default) | PLT-790 to PLT-802 (13) |
-| [PLT](ledger/PLT.md) | the cone budget: a hotspot's cones hand the pools at most its tail's lavas, counted by the cone's own hotspot, and the cones' measures (section "Hotspots, plume heads and volcanic margins from sources", subsection "The cone budget", 2026-10-31; a switch, off by default) | PLT-803 to PLT-804 (2) |
+| [PLT](ledger/PLT.md) | the cone budget: a hotspot's cones hand the pools at most its tail's lavas, counted by the cone's own hotspot, and the cones' measures (section "Hotspots, plume heads and volcanic margins from sources", subsection "The cone budget", 2026-10-31; on by default since 2026-10-31) | PLT-803 to PLT-804 (2) |
 
 Rows by status (after the ocean–continent transition, 2026-10-04): `verified` 17, `cited-unverified` 46, `from-memory` 4, `abstract-only` 19, `calibrated` 14, `game-choice` 79, `uncited` 42; `pending-rewrite` 151; `not-yet-coded` 8; `merged` (not counted) 33.
 
@@ -13225,7 +13225,8 @@ of its rock with `hotspots_sourced`, all of the preset's all-lava rock); the vol
 pools a hotspot's cones' growth at min(1, budget / growth), counted by the cone's own hotspot
 wherever it stands, the cone's relief whole; a caldera of such a cone moves only the rock it holds;
 the tail nets what its cones handed against its own rock and no longer nets its kernel's cones by
-place. `tectonics.hotspot_cone_budget`, off by default. Unit tests:
+place. `tectonics.hotspot_cone_budget`, on by default since 2026-10-31 (the coordinator's call, decisions
+log 2026-10-31: a books fix for the default). Unit tests:
 `a_budgeted_tail_nets_its_cones_by_their_hotspot` (plates/tests.rs),
 `the_l1_cells_cover_the_model_sphere_and_cones_hand_at_most_their_budget` and, on a 60 Myr pipeline
 with Sleep's tails, `a_hotspots_cones_hand_the_pools_at_most_its_tails_lavas` (volcanoes/tests.rs:
@@ -13276,7 +13277,8 @@ is a correctness fix of the default, whatever the hotspot switches say.
 
 **Verdicts.** `hotspot_cone_budget`: correct (its tests; on master's next default it removes the
 0.45 km³ a year of rock no rate made and moves no V1 number, p ≥ 0.19). On, whatever the hotspot
-switches say. With it, the sourced tails and heads no longer flood the planets, but the
+switches say: on by default since 2026-10-31 (the coordinator's call; the three hotspot switches stay
+off until the lid). With it, the sourced tails and heads no longer flood the planets, but the
 continents still gain (+0.53 km³ a year, the sea 679 m, the criteria 4.5): the tails put 0.43 km³ a
 year on continental crust, nearly Stern & Scholl's whole row, because Hawaii's melt per unit of
 flux applies under every lid. The lid (Courtillot et al. 2003: weak plumes "would not melt beneath
