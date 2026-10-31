@@ -119,7 +119,7 @@ pub const RIFT_STEPS_GLOBAL: &str = "plates/rift_steps";
 const REACH_HALF_WIDTHS: f64 = 4.0;
 
 /// What one step did.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Extension {
     /// Pairs of plates with a rift.
     pub rifts: u32,
@@ -127,15 +127,90 @@ pub struct Extension {
     pub columns: u32,
     /// Crust moved into the rifts' fills, m summed over samples.
     pub stretched_m: f64,
+    /// One record per pair with a rift, for the rift trace (`rift_trace.rs`; no rule reads it).
+    pub records: Vec<RiftRecord>,
 }
 
 /// What [`lay`] did at a resampling, m summed over samples.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Laid {
     pub floor_m: f64,
     pub fallback_m: f64,
     /// Gap samples made the rift's continental floor.
     pub samples: u32,
+    /// One record per fill, for the rift trace (`rift_trace.rs`; no rule reads it).
+    pub records: Vec<LayRecord>,
+}
+
+/// One rift in one step (the rift trace's row; measurement only).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct RiftRecord {
+    pub a: u32,
+    pub b: u32,
+    /// The boundary's length W, km, and its mean opening speed u, mm/yr.
+    pub length_km: f64,
+    pub speed_mm_yr: f64,
+    /// The opening's area over the step, u W δt, km² …
+    pub asked_km2: f64,
+    /// … and what the columns took of it, Σ A (−ln keep), km² (less than asked when the
+    /// columns that take part reach the hyper-extended limit).
+    pub taken_km2: f64,
+    /// Crust moved into the fill, m summed over samples.
+    pub stretched_m: f64,
+    /// Plate `a`'s side, then plate `b`'s.
+    pub sides: [SideRecord; 2],
+}
+
+/// One side of a rift in one step (see [`RiftRecord`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct SideRecord {
+    /// 0 no edge on this side, 1 narrow, 2 wide.
+    pub mode: u8,
+    /// Its edge columns, and their mean crust (km), lithosphere (km) and Moho (°C), the means
+    /// the mode test reads.
+    pub edges: u32,
+    pub crust_km: f64,
+    pub lith_km: f64,
+    pub moho_c: f64,
+    /// How far the search reached, km.
+    pub reach_km: f64,
+    /// Columns within the reach, those of them with a positive weight, those that thinned, and
+    /// those already at the hyper-extended limit.
+    pub found: u32,
+    pub weighted: u32,
+    pub thinned: u32,
+    pub at_limit: u32,
+    /// The farthest column that thinned, km, and the columns' distance weighted by the crust
+    /// they gave, km.
+    pub far_km: f64,
+    pub mean_km: f64,
+    /// Crust this side gave, m summed over samples.
+    pub given_m: f64,
+}
+
+/// One fill at one resampling (the rift trace's row; measurement only).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct LayRecord {
+    pub a: u32,
+    pub b: u32,
+    /// What the fill held, m summed over samples, and the mean thickness of the columns it came
+    /// from, m.
+    pub total_m: f64,
+    pub source_m: f64,
+    /// Gap samples between the pair, and how many took a column of the fill (fewer: break-up).
+    pub gap: u32,
+    pub columns: u32,
+    /// The column each took, m, and the even spread over the columns, m.
+    pub column_m: f64,
+    pub even_m: f64,
+    /// The crystalline crust of a column, m.
+    pub crystalline_m: f64,
+    /// Laid as the floor, left waiting, and sent to the fallback, m summed over samples.
+    pub floor_m: f64,
+    pub waits_m: f64,
+    pub fallback_m: f64,
+    /// Resamplings it had waited before this one.
+    pub waited: u32,
 }
 
 /// A wide rift's decay length L, km: the thin sheet's for a boundary of length `length_km`,
@@ -306,10 +381,19 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Exte
             continue;
         }
         let l_wide = wide_length_km(length_km);
+        let mut record = RiftRecord {
+            a,
+            b,
+            length_km,
+            speed_mm_yr: speed,
+            asked_km2: speed * length_km * env.dt_myr,
+            ..RiftRecord::default()
+        };
         // The columns that take part on each side, along their own plate's continental crust,
-        // with their weights by the side's mode (ledger: PLT-782).
-        let mut cols: Vec<(u32, f64)> = Vec::new();
-        for p in [a, b] {
+        // with their weights by the side's mode (ledger: PLT-782); each with its side and its
+        // distance from the rift, km, for the record.
+        let mut cols: Vec<(u32, f64, usize, f64)> = Vec::new();
+        for (k_side, p) in [a, b].into_iter().enumerate() {
             let side: Vec<u32> = es.iter().filter(|e| e.plate == p).map(|e| e.v).collect();
             if side.is_empty() {
                 continue;
@@ -318,7 +402,8 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Exte
             let mean = |f: &dyn Fn(&Sample) -> f64| -> f64 {
                 side.iter().map(|&v| f(&samples[v as usize])).sum::<f64>() / side.len() as f64
             };
-            let wide = thermal_on && mean(&|s| sample_moho_c(s, reference)) >= WIDE_MOHO_C;
+            let edge_moho = mean(&|s| sample_moho_c(s, reference));
+            let wide = thermal_on && edge_moho >= WIDE_MOHO_C;
             let lith = mean(&|s| {
                 if thermal_on && s.lithosphere_km > 0.0 {
                     f64::from(s.lithosphere_km)
@@ -332,6 +417,13 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Exte
             } else {
                 half
             };
+            let rec = &mut record.sides[k_side];
+            rec.mode = if wide { 2 } else { 1 };
+            rec.edges = side.len() as u32;
+            rec.crust_km = mean(&|s| f64::from(s.thickness_m) / 1000.0);
+            rec.lith_km = lith;
+            rec.moho_c = edge_moho;
+            rec.reach_km = reach_km;
             let src: Vec<(u32, f64, u32)> = side.iter().map(|&v| (v, 0.0, v)).collect();
             let on = |u: u32| {
                 let s = &samples[u as usize];
@@ -343,7 +435,8 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Exte
             for (u, d, _) in dijkstra_sparse(geo, &src, |_, u| on(u), env.norm.rad(reach_km)) {
                 let s = &samples[u as usize];
                 let x = env.norm.km(d);
-                let w = if least_keep(&s.pools) >= 1.0 {
+                let at_limit = least_keep(&s.pools) >= 1.0;
+                let w = if at_limit {
                     0.0
                 } else if !wide {
                     1.0
@@ -352,7 +445,10 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Exte
                 } else {
                     0.0
                 };
-                cols.push((u, w));
+                rec.found += 1;
+                rec.weighted += u32::from(w > 0.0);
+                rec.at_limit += u32::from(at_limit);
+                cols.push((u, w, k_side, x));
             }
         }
         // A column on both sides' reach (none: each side is its own plate) counts once.
@@ -365,7 +461,7 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Exte
             b,
             ..RiftFill::default()
         };
-        for (&(u, _), &rate) in cols.iter().zip(&rates) {
+        for (&(u, _, k_side, x_km), &rate) in cols.iter().zip(&rates) {
             let s = &mut state.samples[u as usize];
             let keep = keep_share(rate, env.dt_myr, &s.pools);
             if keep >= 1.0 {
@@ -379,6 +475,13 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Exte
                 fill.pools[p] += r;
                 given += r;
             }
+            let rec = &mut record.sides[k_side];
+            rec.thinned += 1;
+            rec.far_km = rec.far_km.max(x_km);
+            rec.mean_km += given * x_km;
+            rec.given_m += given;
+            record.taken_km2 += -keep.ln() * area;
+            record.stretched_m += given;
             fill.source_m += given * f64::from(thickness(&before));
             s.thickness_m = thickness(&s.pools);
             fill.basement_m += f64::from(s.basement_m) * (1.0 - keep);
@@ -403,6 +506,12 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Exte
             out.rifts += 1;
             merge(&mut state.rift_fill, fill);
         }
+        for rec in &mut record.sides {
+            if rec.given_m > 0.0 {
+                rec.mean_km /= rec.given_m;
+            }
+        }
+        out.records.push(record);
     }
     out
 }
@@ -465,14 +574,27 @@ pub fn lay(
         }
         let lith = fill.lithosphere_km_m / total;
         let members = by_pair.get(&(fill.a, fill.b)).cloned().unwrap_or_default();
+        let mut record = LayRecord {
+            a: fill.a,
+            b: fill.b,
+            total_m: total,
+            source_m: fill.source_m / total,
+            gap: members.len() as u32,
+            waited: fill.waited,
+            ..LayRecord::default()
+        };
         if members.is_empty() {
             if alive(fill.a) && alive(fill.b) {
+                record.waits_m = total;
                 let mut f = fill;
                 f.waited += 1;
                 kept.push(f);
             } else {
-                laid.fallback_m += fallback(&fill, samples, points, k, gravity, z_0, sea_m);
+                let to = fallback(&fill, samples, points, k, gravity, z_0, sea_m);
+                laid.fallback_m += to;
+                record.fallback_m = to;
             }
+            laid.records.push(record);
             continue;
         }
         let mut members = members;
@@ -510,6 +632,11 @@ pub fn lay(
             laid.samples += 1;
         }
         laid.floor_m += placed;
+        record.columns = m as u32;
+        record.column_m = column;
+        record.even_m = even;
+        record.crystalline_m = crystalline_share * column;
+        record.floor_m = placed;
         let rest = 1.0 - placed / total;
         if rest > 1.0e-9 {
             let mut f = fill;
@@ -519,12 +646,16 @@ pub fn lay(
             f.source_m *= rest;
             f.centroid.iter_mut().for_each(|x| *x *= rest);
             if alive(f.a) && alive(f.b) {
+                record.waits_m = f.total_m();
                 f.waited += 1;
                 kept.push(f);
             } else {
-                laid.fallback_m += fallback(&f, samples, points, k, gravity, z_0, sea_m);
+                let to = fallback(&f, samples, points, k, gravity, z_0, sea_m);
+                laid.fallback_m += to;
+                record.fallback_m = to;
             }
         }
+        laid.records.push(record);
     }
     *fills = kept;
     laid
@@ -780,6 +911,18 @@ mod tests {
         assert!((fill.total_m() - out.stretched_m).abs() < 1e-6 * out.stretched_m);
         let after = crust(&st) + fill.total_m();
         assert!((after - before).abs() < 1e-6 * before, "{before} {after}");
+        // The rift trace's record: the pair, its columns and its crust, and the opening's area
+        // all taken (no column is near its limit).
+        assert_eq!(out.records.len(), 1);
+        let r = &out.records[0];
+        assert_eq!((r.a, r.b), (0, 1));
+        assert_eq!(r.sides.iter().map(|s| s.thinned).sum::<u32>(), out.columns);
+        assert!((r.stretched_m - out.stretched_m).abs() < 1e-9 * out.stretched_m);
+        assert!((r.taken_km2 / r.asked_km2 - 1.0).abs() < 1e-6, "{r:?}");
+        for s in &r.sides {
+            assert!(s.mode > 0 && s.edges > 0 && s.thinned > 0, "{s:?}");
+            assert!(s.far_km <= s.reach_km + 1e-9 && s.mean_km <= s.far_km + 1e-9, "{s:?}");
+        }
         // The crust it gives is about the opening's area over the step times a column: the sides
         // move apart at 20 mm/yr (10 each way, along x at +y) over a rift of W km, u W δt T.
         let rift_km = out.stretched_m * e.norm.sample_area_km2() / (35_100.0 * 20.0 * 2.0);
@@ -944,7 +1087,7 @@ mod tests {
         // it nearest the edges (gap sample 3), sea floor beyond.
         let mut fills = vec![fill_of(0.5)];
         let mut samples: Vec<Sample> = (0..6).map(|_| ocean()).collect();
-        lay(
+        let laid = lay(
             &mut fills,
             &mut samples,
             &gaps,
@@ -956,6 +1099,11 @@ mod tests {
         );
         assert_eq!(n_cont(&samples), vec![3]);
         assert!((f64::from(samples[3].thickness_m) - total_col / 2.0).abs() < 1.0);
+        // The trace's record: four gap samples, one column (break-up), none waits.
+        let r = laid.records[0];
+        assert_eq!((r.gap, r.columns), (4, 1), "{r:?}");
+        assert!((r.floor_m - total_col / 2.0).abs() < 1.0 && r.waits_m == 0.0, "{r:?}");
+        assert!(r.crystalline_m >= HYPER_EXTENDED_M, "{r:?}");
 
         // No gap between the pair: it waits while both live …
         let mut fills = vec![fill_of(1.0)];
@@ -972,7 +1120,10 @@ mod tests {
         );
         assert_eq!(fills.len(), 1);
         assert_eq!(fills[0].waited, 1);
-        assert_eq!(laid, Laid::default());
+        assert_eq!((laid.floor_m, laid.fallback_m, laid.samples), (0.0, 0.0, 0));
+        let r = laid.records[0];
+        assert_eq!((r.gap, r.columns, r.waited), (0, 0, 0));
+        assert!((r.waits_m - total_col).abs() < 1.0, "{r:?}");
         // … and with plate 1 dead goes to the continental crust nearest where it came from.
         let mut land = Sample::blank(0);
         land.kind = CONTINENTAL;
@@ -1022,6 +1173,10 @@ mod tests {
         assert_eq!(fills[0].waited, 1);
         assert!((fills[0].total_m() - 6.0 * total_col).abs() < 1.0);
         assert!((fills[0].source_m / fills[0].total_m() - total_col).abs() < 1.0);
+        let r = laid.records[0];
+        assert_eq!((r.gap, r.columns), (4, 4), "{r:?}");
+        assert!((r.column_m - total_col).abs() < 1.0 && r.even_m > 2.0 * total_col, "{r:?}");
+        assert!((r.waits_m - 6.0 * total_col).abs() < 1.0, "{r:?}");
         // … and goes to the fallback when one of them has died.
         let mut fills = vec![fill_of(10.0)];
         let mut samples: Vec<Sample> = (0..6).map(|_| ocean()).collect();

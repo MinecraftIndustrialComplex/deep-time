@@ -1287,6 +1287,10 @@ pub fn resample(
             env.gravity,
             sea,
         );
+        // The rift trace (measurement only; `rift_trace.rs`).
+        if let Some(dir) = super::rift_trace::env_dir() {
+            super::rift_trace::write_lays(&dir, t, &laid.records);
+        }
         let area = norm.sample_area_km2();
         for (key, v) in [
             (super::extension::FLOOR_GLOBAL, laid.floor_m * area / 1000.0),

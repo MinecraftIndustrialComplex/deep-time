@@ -72,6 +72,7 @@ pub mod pools;
 pub mod propagation;
 pub mod rate;
 pub mod ridges;
+pub mod rift_trace;
 pub mod rifting;
 pub mod settle;
 pub mod shortening;
@@ -827,6 +828,10 @@ impl PlatesStage {
         if k.rift_stretching {
             let stretched = extension::step(st, &cache.geo, &pos, &env);
             book(st, gap_budget::Part::Extension);
+            // The rift trace (measurement only; `rift_trace.rs`).
+            if let Some(dir) = rift_trace::env_dir() {
+                rift_trace::write_steps(&dir, env.t_myr, env.step, &stretched.records);
+            }
             let area = env.norm.sample_area_km2();
             for (key, v) in [
                 (
