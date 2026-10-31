@@ -1267,6 +1267,22 @@ pub struct TectonicParams {
     /// On by default since 2026-10-30 (arm backarc against base32-s4: the guard clean, about 1.9
     /// reversals per 100 Myr). ledger: PLT-737
     pub collision_backarc_reversal: bool,
+    /// `true`: a terrane its slab can drag down whole subducts, stripped of its cover. A collision
+    /// front's terrane goes down with the contact's slab when its extent across the front (the
+    /// shortening so far and the rest's area over the front's length) is within the slab's reach
+    /// against the terrane's buoyancy (`shortening::dragged_length_km`: the slab's length over
+    /// 1 + 2.25 T / 30 km, FRC-028 to FRC-030's law); then only the supracrustal cover of its
+    /// crossing crust (sediment, sedimentary and volcanic rock, `pools::COVER`) stays, by
+    /// `collision_stacking_share`, the plutonic and metamorphic crust under it going down with
+    /// the slab, and it does not transfer at `collision_threshold_km`. A larger terrane jams the
+    /// slab and collides as before. Tetreault & Buiter 2014: "the force of the subducting slab
+    /// ... can most likely overcome the buoyancy of small crustal units"; accretion adds "slivers
+    /// of thrusted crustal units ... rather than collision and addition of the entire crustal
+    /// thickness"; "only the upper 2–5 km of arc crust" where the arc is on the subducting plate.
+    /// `shortening::advance` classes the front, `belts::stack` strips it; the design
+    /// docs/design/small-terrane-docking.md. Off by default until its pool arm. ledger: PLT-760,
+    /// PLT-761
+    pub terrane_docking_cover: bool,
     /// Contacts unseen for longer than this are closed, Myr (12 steps at the 2-Myr step).
     /// Ledger PLT-059.
     pub contact_timeout_myr: f64,
@@ -1533,6 +1549,7 @@ impl Default for TectonicParams {
             initiation_stress_mpa: 20.0, // ledger: PLT-505 (game-choice; on since 2026-10-23)
             transference: true,          // ledger: PLT-516
             collision_backarc_reversal: true, // ledger: PLT-737 (on since 2026-10-30)
+            terrane_docking_cover: false,     // ledger: PLT-760 (off until its pool arm)
             contact_timeout_myr: 24.0,   // ledger: PLT-059
             collision_orogeny_myr: 30.0, // ledger: PLT-079
             collision_melt_after_myr: 20.0, // ledger: PLT-735

@@ -2295,6 +2295,7 @@ fn a_collision() -> state::Collision {
         continental_over: 1.0,
         stalled_since_myr: None,
         jam_km: None,
+        subducting: false,
         belt: Default::default(),
     }
 }
