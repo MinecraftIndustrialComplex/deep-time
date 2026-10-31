@@ -186,11 +186,35 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 - **Ledger**: ERO-217 and ERO-218 `verified`, ERO-219 and ERO-220 `game-choice`; claims.md recounted (ERO 198 rows; PLT
   375, the orogen lane's PLT-740 counted). Bibliography: Sobel2003, Strecker2009 and BookhagenStrecker2012 completed;
   ten new entries.
-- **Next.** The coordinator's: one cumulative 8-run arm when a slot frees. On base35-s4 (after collision-orogen-on
-  lands): merge origin/master into this branch, then `tools/review/pool/pool.sh run plat-cb --seeds 1,2,3,4 --set
-  surface.closed_basins=true +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`, `pool.sh table --base
-  base35-s4 --arm plat-cb`, and wear.sh and hiseries.py over both. Before base35: key e751b2344693 (d8cdbea2) with the
-  two orogen `--set`s against orog-cum, after `pool.sh alias HEAD f2d6412d801f --check-seed 1`.
+- **The arm** (queued by the coordinator: plat-cb0 on e751b2344693/5e8a748c, the two orogen `--set`s and
+  `surface.closed_basins=true`, 8 runs, against orog-cum; the alias check was identical). Reads on the VM:
+  `tools/review/plateau/wear.sh platcb0=<folder> orogcum=<folder>` (now with series.py and hiseries.py), `recal.sh`,
+  `closedshare.py`; design "The arm".
+  - **Not the plateau fix.** The flat high ground wears at 141.4 against 134.3 m/Myr. Its stream-power share is 0.372
+    against 0.366. Its parts:
+    - draining to a closed basin (0.30): 52.8 m/Myr, 0.47 of it diffusion;
+    - dry (0.22): 37.6 m/Myr;
+    - frozen (0.67 over the run): 140.8 m/Myr.
+
+    Against Hetzel 2011's 11 to 16 m/Myr catchments and Lal 2003's under 30, the closed part wears 3 to 5 times too
+    fast. Land above 3 and 4 km over time, and the cohorts' top, are within spread.
+  - **What it does do:**
+    - drains 0.13 of the land into closed basins (Earth 20 %);
+    - leaves K's calibration intact (regions of 100 to 1,500 m relief within 2 %; the flattest 8.3 against 8.9
+      m/Myr);
+    - costs 3.7 s of 445.
+  - **The guard's worst,** 10.5 against 9.9 km, is a one-step transient past every snapshot. The standing deep side is
+    unchanged; the high side and the largest one-step rise are 0.2 to 0.5 km higher. It is under the Challenger Deep,
+    0.044 of the bound. The guard does not record its side.
+  - **The belt shape** (collcoast `geom_round`, 0.256 against 0.075) is a final-frame read on a changed population: the
+    end frame's collision land is 0.025 against 0.013.
+  - **Contradicts this entry's measurement above.** "Below 0 °C without ice: 0.004 and 0.029" was the runs' final
+    frame. Over the run, 0.67 of the flat high ground is below 0 °C.
+- **Next.** Verdict: `surface.closed_basins` default-on (built, tested, sound on the pool, replaces ERO-080's
+  spill-everything). Flip it in the batch after collision-orogen-on, with the 24-run base. The next plateau law is the
+  surface's runoff from the bake's budget (`HydroParams::budget`: rain share HYD-036, degree-day melt HYD-037,
+  biotemperature PET HYD-029, HYD-030, HYD-035) in place of `surface/climate.rs`'s PET 0 below 0 °C (ERO-010). Its arm
+  reads K's regions' table again rather than retuning K.
 
 ### 2026-10-31: the collision orogen as a doubly vergent wedge, measured on the freeboard; the plateau's retro-ward growth behind a switch (PLT-740) (the orogen lane, worktree agent-a52784a4e4ef20e33, branch `collision-orogen`)
 
