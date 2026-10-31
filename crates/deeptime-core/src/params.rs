@@ -793,6 +793,24 @@ pub struct TectonicParams {
     /// height, under its sea water when below the sea, plus the surface's flexure) with this
     /// e-folding time, Myr (`plates/settle.rs`). 0 = off.
     pub isostasy_relax_myr: f64,
+    /// `true`: the settling leaves standing the rebound of rock the surface stage takes off the
+    /// top of a column or lays on it. A column's Airy height is its whole-column height
+    /// (`collapse::iso_height`, the crust's mean 2,830 kg/m³, PLT-281) less a deficit carried with
+    /// the sample, which grows by (ρ̄_c − ρ_u) / ρ_m per metre of rock the surface takes off its
+    /// top (ρ_u the upper crust's 2,700 kg/m³, ISO-008, which PLT-281 keeps for "erosion from the
+    /// top of a column") and falls by as much per metre it lays down. `false` (the default): every
+    /// continental column settles at its whole-column height, so eroded ground rises back by 6/7
+    /// of the rock taken instead of the upper crust's 0.82. ledger: PLT-780
+    pub settle_top_density: bool,
+    /// `true`: a rift stretches the continental lithosphere on both its sides before it breaks up
+    /// (`plates/extension.rs`): where two plates' continental crust meets at a boundary that
+    /// opens, the opening's area is taken in pure shear by the columns within reach (strain by the
+    /// thin sheet's decay from the rift and the columns' weakness), each keeping no less than
+    /// 10 km of crystalline crust, and the crust they give is laid at the next resampling in the
+    /// gap between the two plates as the rift's floor, or past break-up as hyper-extended margins.
+    /// `false` (the default): the gap is new sea floor and the rift's sides keep their crust.
+    /// ledger: PLT-781 to PLT-785
+    pub rift_stretching: bool,
     /// The fastest a column's crust thickens, mm/yr (km/Myr): no process of a plate step, the
     /// resampling's accretion included, leaves a visible column thicker than it was when the
     /// step began plus this rate times the step; the excess goes to the nearest room on its
@@ -1444,6 +1462,8 @@ impl Default for TectonicParams {
             crust_max_km: 70.0,               // ledger: PLT-258
             crust_channel_km2_myr: 1500.0,    // ledger: PLT-300
             isostasy_relax_myr: 0.004,        // ledger: ISO-078
+            settle_top_density: false,        // ledger: PLT-780
+            rift_stretching: false,           // ledger: PLT-781
             thickening_max_mm_yr: 5.0,        // ledger: PLT-287
             uplift_max_mm_yr: 3.5,            // ledger: PLT-288
             transition_width_km: 200.0,       // ledger: PLT-262 (km on the model sphere)

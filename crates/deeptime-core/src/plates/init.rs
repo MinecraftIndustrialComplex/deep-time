@@ -461,6 +461,8 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
         dynamics: None,
         gap_budget: None,
         limits: None,
+        top_deficit_m: Vec::new(),
+        rift_fill: Vec::new(),
         shown: None,
         one_way: None,
         propagations: Vec::new(),

@@ -746,6 +746,33 @@ pub struct BackArc {
     pub born_myr: f64,
 }
 
+/// Continental crust a rift's stretching moved into the opening between plates `a` < `b`
+/// (`extension.rs`, `tectonics.rift_stretching`, ledger PLT-781): the opening is no sample yet,
+/// so the crust waits here until a resampling lays it in the gap between the two as the rift's
+/// floor (`ridges::resample`).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct RiftFill {
+    pub a: u32,
+    pub b: u32,
+    /// The crust, by rock pool, metres summed over samples (each a sample's area).
+    pub pools: [f64; pool::COUNT],
+    /// The thinned lithosphere it came from, km summed with the same weights as its crust (its
+    /// mean is the floor's lithosphere).
+    pub lithosphere_km_m: f64,
+    /// Σ of the unit positions of the samples that gave it, weighted by their crust (where it
+    /// goes if the pair cannot take it).
+    pub centroid: [f64; 3],
+    /// Resamplings it waited through with no gap between the two.
+    pub waited: u32,
+}
+
+impl RiftFill {
+    /// Its crust, metres summed over samples.
+    pub fn total_m(&self) -> f64 {
+        self.pools.iter().sum()
+    }
+}
+
 /// A subduction zone propagating along a passive margin (law 2, `tectonics.margin_propagation`,
 /// `propagation.rs`, ledger PLT-656): plate `under` (U) subducts at a trench that reached its own
 /// continental margin, and the margin's floor was cut off the continent, which with the floor
@@ -847,6 +874,16 @@ pub struct PlateState {
     /// so never in a checkpoint.
     #[serde(skip)]
     pub limits: Option<super::rate::Limits>,
+    /// Per sample, with `tectonics.settle_top_density`: how far below its whole-column Airy height
+    /// the column stands for the light rock the surface took off its top (or above it, for what
+    /// it laid down), m (`settle.rs`, ledger PLT-780); empty while the switch is off, and read as
+    /// 0 for a sample it does not reach.
+    #[serde(default)]
+    pub top_deficit_m: Vec<f32>,
+    /// Crust stretched into rifts that no resampling has laid in their gap yet (`extension.rs`,
+    /// ledger PLT-781); empty while `tectonics.rift_stretching` is off.
+    #[serde(default)]
+    pub rift_fill: Vec<RiftFill>,
 }
 
 impl PlateState {

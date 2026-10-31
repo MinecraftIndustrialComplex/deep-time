@@ -16,6 +16,9 @@ over the window from then to the end:
   t_shelf  ... on visible continental crust at or under the sea
   t_ocean  ... on visible ocean floor at or under the sea
   t_hidden ... on hidden samples
+  cap_land the rate cap's release (`rate::limit`) on columns above the sea, by the parts that
+           thickened them earlier in the step (what no part thickened stays under `rate`)
+  cap_sea  ... on columns at or under the sea (both 0 in summaries written before 2026-10-31)
 
 and the land's volume above the sea at the window's ends, the sea's own term and the closure.
 Parts with every number under 0.005 km^3 a year are left out unless --all. The last block is the
@@ -25,7 +28,7 @@ import re
 import sys
 
 NUM = r"(-?[0-9.]+(?:e[+-]?[0-9]+)?|NaN|nan|inf|-inf)"
-ROWS = ("lift", "up", "lift_c", "t_land", "t_shelf", "t_ocean", "t_hidden")
+ROWS = ("lift", "up", "lift_c", "t_land", "t_shelf", "t_ocean", "t_hidden", "cap_land", "cap_sea")
 
 
 def read(path):
@@ -41,6 +44,9 @@ def read(path):
                         d[k] = [float(x) for x in v.split("/")]
                     else:
                         d[k] = float(v)
+                n = len(d["lift"])
+                for r in ROWS:
+                    d.setdefault(r, [0.0] * n)
                 snaps.append(d)
     if head is None or not snaps:
         raise SystemExit(f"{path}: no land_ledger lines (DEEPTIME_GAP_BUDGET=1?)")

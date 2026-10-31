@@ -53,6 +53,7 @@ pub mod cut_trace;
 pub mod dock_tally;
 pub mod dynamics;
 pub mod events;
+pub mod extension;
 pub mod flow;
 pub mod forces;
 pub mod front_trace;
@@ -783,6 +784,23 @@ impl PlatesStage {
         }
         lap(&mut clock, "flow");
         cut_trace::mark(st, &cache.geo, "flow");
+        // A rift stretches the continents on its two sides before it breaks up (`extension.rs`;
+        // nothing while `rift_stretching` is off).
+        if k.rift_stretching {
+            let stretched = extension::step(st, &cache.geo, &pos, &env);
+            book(st, gap_budget::Part::Extension);
+            let area = env.norm.sample_area_km2();
+            for (key, v) in [
+                (
+                    extension::STRETCHED_GLOBAL,
+                    stretched.stretched_m * area / 1000.0,
+                ),
+                (extension::RIFT_STEPS_GLOBAL, f64::from(stretched.rifts)),
+            ] {
+                *world.globals.entry(key.to_owned()).or_insert(0.0) += v;
+            }
+            lap(&mut clock, "extension");
+        }
         // Rifted margins taper from continent to ocean over Earth's width (`transition.rs`).
         let taper = transition::step(st, &cache.geo, &pos, &env);
         book(st, gap_budget::Part::Transition);
@@ -1372,6 +1390,18 @@ impl PlatesStage {
                 (got, cone_iso)
             })
             .collect();
+        // The light rock taken off the top or laid on it, for the settling (ledger: PLT-780).
+        if k.settle_top_density {
+            let n = st.samples.len();
+            st.top_deficit_m.resize(n, 0.0);
+            for (v, d) in st.top_deficit_m.iter_mut().enumerate() {
+                if wsum(v) > 0.0 {
+                    settle::take_from_top(d, -sums[v].m / wsum(v));
+                }
+            }
+        } else {
+            st.top_deficit_m.clear();
+        }
         let area = env.norm.sample_area_km2();
         for (k, name) in [CONE_FELSIC_GLOBAL, CONE_MAFIC_GLOBAL]
             .into_iter()

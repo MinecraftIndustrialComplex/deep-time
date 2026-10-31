@@ -52,12 +52,29 @@
 //! held up; the settling then moved the column to its Airy height plus that larger F, and the
 //! two raised each other to the 30 km ceiling (`docs/science/flexure.md`, "The settling's
 //! feedback").
-// ledger: ISO-078 (the rule and τ), ISO-064 (the 3-5 kyr), ISO-044 (ρ_w), ISO-043 (ρ_m).
+//!
+//! # Light rock off the top (`tectonics.settle_top_density`, off by default)
+//! z_A is a whole column's height: crust of the column's mean density, 2,830 kg/m³, 7.0 m of
+//! crust per m of height (PLT-281), right for crust stacked onto a column, spread from it or
+//! foundering from its base. Rock the surface stage erodes is the top's, which PLT-281 keeps at
+//! the upper crust's 2,700 kg/m³ (ISO-008: 5.5 m of rock per m of surface), and the surface's own
+//! rebound gives back 0.8 of what it takes (ISO-001). Settling the eroded column to its
+//! whole-column z_A lifts it further: by the uplift trace (docs/design/uplift-trace.md) the
+//! response to erosion comes to 6/7 of the rock taken, against the upper crust's 1 − 2,700 /
+//! 3,300 = 0.82. With the switch the column keeps a deficit D ([`TOP_DEFICIT_PER_M`] per metre
+//! the surface took off its top, less as much per metre it laid down; `PlateState::top_deficit_m`,
+//! carried through a resampling with the sample's weights) and settles at z_A − D: a column that
+//! lost its light top is denser on average and stands lower. The column's other processes do not
+//! move D (a simplification: the collapse's pure shear would thin it with the column, the belts'
+//! stacking keeps it), except the rift's stretching (`extension.rs`), which thins it with the
+//! crust. Deposition at 2,700 too (the surface's own rebound is one share for both, ISO-001).
+// ledger: ISO-078 (the rule and τ), ISO-064 (the 3-5 kyr), ISO-044 (ρ_w), ISO-043 (ρ_m), PLT-780 (D).
 
 use rayon::prelude::*;
 
 use super::Env;
 use super::collapse::iso_height;
+use super::pools::{COLUMN_ISOSTATIC_FACTOR, ISOSTATIC_FACTOR};
 use super::state::{CONTINENTAL, PlateState, TRENCH};
 use super::thermal;
 use crate::surface::flexure::{RHO_MANTLE, RHO_WATER};
@@ -65,6 +82,19 @@ use crate::surface::flexure::{RHO_MANTLE, RHO_WATER};
 /// `WorldState::globals`: the settling's rise and fall over the run, km³ of height × area.
 pub const RISE_GLOBAL: &str = "plates/settle_rise_km3";
 pub const FALL_GLOBAL: &str = "plates/settle_fall_km3";
+
+/// How far below its whole-column Airy height a metre of rock taken off a column's top leaves it,
+/// m: 1 / 5.5 − 1 / 7.0 = (ρ̄_c − ρ_u) / ρ_m = (2,830 − 2,700) / 3,300 = 0.039.
+// ledger: PLT-780 (ISO-008's 2,700, PLT-281's 2,830, ISO-043's 3,300)
+pub const TOP_DEFICIT_PER_M: f64 = 1.0 / ISOSTATIC_FACTOR - 1.0 / COLUMN_ISOSTATIC_FACTOR;
+
+/// Books rock the surface took off a column's top (`taken_m` > 0) or laid on it (< 0) to its
+/// deficit (see the module docs, ledger PLT-780).
+pub fn take_from_top(deficit: &mut f32, taken_m: f64) {
+    if taken_m.is_finite() {
+        *deficit = (f64::from(*deficit) + taken_m * TOP_DEFICIT_PER_M) as f32;
+    }
+}
 
 /// How much a metre of a submerged column's dry Airy height below the sea sinks it: its water.
 pub const WATER_LOADED: f64 = RHO_MANTLE / (RHO_MANTLE - RHO_WATER);
@@ -126,6 +156,12 @@ pub fn step(state: &mut PlateState, env: &Env, flexure: Option<&[f64]>, sea: f64
     let share = 1.0 - (-env.dt_myr / tau).exp();
     let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
     let g = env.gravity;
+    // The light rock the surface took off the top (ledger: PLT-780; none while off).
+    let deficit: &[f32] = if k.settle_top_density {
+        &state.top_deficit_m
+    } else {
+        &[]
+    };
     // The changes are collected and summed in sample order: a parallel sum's order, so its last
     // bits, would change from run to run.
     let changes: Vec<f64> = state
@@ -140,8 +176,13 @@ pub fn step(state: &mut PlateState, env: &Env, flexure: Option<&[f64]>, sea: f64
                 .and_then(|f| f.get(i).copied())
                 .filter(|f| f.is_finite())
                 .unwrap_or(0.0);
+            let d = deficit
+                .get(i)
+                .map(|&d| f64::from(d))
+                .filter(|d| d.is_finite())
+                .unwrap_or(0.0);
             // The lithosphere's thermal height joins the crust's (ledger: ISO-110; 0 when off).
-            let z_a = iso_height(&s.pools, z_0, g) + thermal::uplift_m(k, s.lithosphere_km);
+            let z_a = iso_height(&s.pools, z_0, g) + thermal::uplift_m(k, s.lithosphere_km) - d;
             let target = equilibrium_m(z_a, sea) + f;
             let z = f64::from(s.elevation_m);
             let dz = (target - z) * share;
@@ -162,6 +203,24 @@ pub fn step(state: &mut PlateState, env: &Env, flexure: Option<&[f64]>, sea: f64
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// With the deficit a metre of rock off the top lowers the column's height by the upper
+    /// crust's Airy share, 1 − 2,700 / 3,300 of it coming back, and a metre laid down undoes it.
+    #[test]
+    fn rock_off_the_top_lowers_the_column_by_the_upper_crusts_airy_share() {
+        let mut d = 0.0f32;
+        take_from_top(&mut d, 1000.0);
+        let lowered = 1000.0 / COLUMN_ISOSTATIC_FACTOR + f64::from(d);
+        assert!(
+            (lowered - 1000.0 * (1.0 - 2700.0 / 3300.0)).abs() < 1e-3,
+            "{lowered}"
+        );
+        assert!((f64::from(d) - 1000.0 * 130.0 / 3300.0).abs() < 1e-3, "{d}");
+        take_from_top(&mut d, -1000.0);
+        assert!(d.abs() < 1e-4);
+        take_from_top(&mut d, f64::NAN);
+        assert!(d.abs() < 1e-4);
+    }
 
     #[test]
     fn a_dry_column_settles_at_its_airy_height_and_a_drowned_one_under_its_water() {

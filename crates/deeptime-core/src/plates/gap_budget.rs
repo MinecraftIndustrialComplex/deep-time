@@ -160,6 +160,9 @@ pub enum Part {
     ResampleAccrete,
     /// Anything else (the motion).
     Other,
+    /// `extension::step`: a rift's stretching, its crust into the rift's fill (PLT-781; last, so
+    /// that the parts before it keep their numbers in older tools).
+    Extension,
 }
 
 /// The surface stage's parts of the feedback and their fields, in the order
@@ -176,7 +179,7 @@ pub const SURFACE_PARTS: [(Part, &str); 8] = [
 ];
 
 /// The number of parts.
-pub const PARTS: usize = 31;
+pub const PARTS: usize = 32;
 
 /// The parts' names, in order.
 pub const NAMES: [&str; PARTS] = [
@@ -211,6 +214,7 @@ pub const NAMES: [&str; PARTS] = [
     "resample_blend",
     "resample_accrete",
     "other",
+    "extension",
 ];
 
 /// The thickness bands, km (the crust bins of `deeptime run`, the two thickest merged).
@@ -308,6 +312,13 @@ pub struct LandSums {
     pub t_ocean: [f64; PARTS],
     /// … and on hidden samples.
     pub t_hidden: [f64; PARTS],
+    /// The rate cap's release (`rate::limit`, PLT-287) by the parts that thickened the column
+    /// earlier in the step, in proportion to their thickening (crust the cap moved or sank, m
+    /// summed over samples; what no part of the step thickened stays under `Rate`): on columns
+    /// above the sea before the release …
+    pub cap_land: [f64; PARTS],
+    /// … and at or under it.
+    pub cap_sea: [f64; PARTS],
 }
 
 impl LandSums {
@@ -320,6 +331,8 @@ impl LandSums {
             (&mut self.t_shelf, &o.t_shelf),
             (&mut self.t_ocean, &o.t_ocean),
             (&mut self.t_hidden, &o.t_hidden),
+            (&mut self.cap_land, &o.cap_land),
+            (&mut self.cap_sea, &o.cap_sea),
         ] {
             for (x, y) in a.iter_mut().zip(b) {
                 *x += y;
@@ -346,6 +359,32 @@ impl LandSums {
             (true, false, false) => &mut self.t_ocean,
         };
         row[part] += dt;
+    }
+
+    /// Books a release of `released` m by the rate cap to the parts of `step_dt` (the column's
+    /// thickening by part so far this step) that thickened it, in proportion.
+    fn capped(&mut self, released: f64, step_dt: &[f32; PARTS], above: bool) {
+        let row = if above {
+            &mut self.cap_land
+        } else {
+            &mut self.cap_sea
+        };
+        let rate = Part::Rate as usize;
+        let gained: f64 = step_dt
+            .iter()
+            .enumerate()
+            .filter(|&(p, &x)| p != rate && x > 0.0)
+            .map(|(_, &x)| f64::from(x))
+            .sum();
+        if gained <= 0.0 {
+            row[rate] += released;
+            return;
+        }
+        for (p, &x) in step_dt.iter().enumerate() {
+            if p != rate && x > 0.0 {
+                row[p] += released * f64::from(x) / gained;
+            }
+        }
     }
 }
 
@@ -660,6 +699,13 @@ impl GapBudget {
                         f64::from(t.z) > sea,
                         t.continental,
                     );
+                    if thick_part == Part::Rate && thick < t.thick {
+                        land.capped(
+                            f64::from(t.thick - thick),
+                            &t.step_dt,
+                            f64::from(t.z) > sea && t.visible,
+                        );
+                    }
                     for (p, x) in t.parts.iter_mut().zip(&d) {
                         *p += *x as f32;
                     }
@@ -1053,7 +1099,8 @@ impl GapBudget {
             let l = &s.sums;
             out += &format!(
                 "\nland_ledger t={:.0} sea_m={:.1} v_km3={:.4e} v_c_km3={:.4e} sea_shift_km3={:.4e} \
-                 lift={} up={} lift_c={} t_land={} t_shelf={} t_ocean={} t_hidden={}",
+                 lift={} up={} lift_c={} t_land={} t_shelf={} t_ocean={} t_hidden={} \
+                 cap_land={} cap_sea={}",
                 s.t_myr,
                 s.sea_m,
                 s.v * km3,
@@ -1066,6 +1113,8 @@ impl GapBudget {
                 fmt(&l.t_shelf),
                 fmt(&l.t_ocean),
                 fmt(&l.t_hidden),
+                fmt(&l.cap_land),
+                fmt(&l.cap_sea),
             );
         }
         out
@@ -1341,5 +1390,40 @@ mod tests {
         let lines = b.land_lines();
         assert!(lines.contains("land_ledger t=2 sea_m=100.0"), "{lines}");
         assert!(lines.contains("area_km2=10.0000"), "{lines}");
+    }
+
+    /// The rate cap's release goes to the parts that thickened the column earlier in the step,
+    /// in proportion, on land or under the sea by where the column stood.
+    #[test]
+    fn the_rate_caps_release_goes_to_the_parts_that_thickened_the_column() {
+        let mut samples = vec![column(800.0, 0.0), column(-200.0, 0.0)];
+        let mut b = GapBudget::start(&samples, 525.0, 9.81);
+        b.set_sea(0.0, 1.0);
+        b.begin_step(&samples);
+        // The belts add 9 km and the arcs 3 km to the land column, the arcs 4 km to the shelf's.
+        samples[0].pools[pool::METAMORPHIC] += 9000.0;
+        b.book(&samples, Part::Belts);
+        samples[0].pools[pool::METAMORPHIC] += 3000.0;
+        samples[1].pools[pool::METAMORPHIC] += 4000.0;
+        b.book(&samples, Part::Arcs);
+        // The cap takes 2 km off the first and 1 km off the second.
+        samples[0].pools[pool::METAMORPHIC] -= 2000.0;
+        samples[1].pools[pool::METAMORPHIC] -= 1000.0;
+        b.book(&samples, Part::Rate);
+        let (belts, arcs) = (Part::Belts as usize, Part::Arcs as usize);
+        let l = &b.land;
+        assert!(
+            (l.cap_land[belts] - 1500.0).abs() < 1e-3,
+            "{:?}",
+            l.cap_land
+        );
+        assert!((l.cap_land[arcs] - 500.0).abs() < 1e-3, "{:?}", l.cap_land);
+        assert!((l.cap_sea[arcs] - 1000.0).abs() < 1e-3, "{:?}", l.cap_sea);
+        assert_eq!(l.cap_sea[belts], 0.0);
+        // A release with no thickening earlier in the step stays under the cap's own part.
+        b.begin_step(&samples);
+        samples[0].pools[pool::METAMORPHIC] -= 500.0;
+        b.book(&samples, Part::Rate);
+        assert!((b.land.cap_land[Part::Rate as usize] - 500.0).abs() < 1e-3);
     }
 }

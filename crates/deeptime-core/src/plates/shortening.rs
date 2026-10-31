@@ -749,6 +749,8 @@ mod tests {
             dynamics: None,
             gap_budget: None,
             limits: None,
+            top_deficit_m: Vec::new(),
+            rift_fill: Vec::new(),
             shown: None,
             one_way: None,
             propagations: Vec::new(),

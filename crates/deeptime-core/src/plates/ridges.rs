@@ -996,6 +996,8 @@ pub fn resample(
     });
     let mut pairs: BTreeMap<(u32, u32), (usize, DVec3)> = BTreeMap::new();
     let mut orphans = Vec::new();
+    // The gap's samples between two plates, for the rifts' floors (`extension.rs`, PLT-784).
+    let mut gap_points: Vec<super::extension::GapPoint> = Vec::new();
     for i in 0..n {
         if !gap[i] {
             continue;
@@ -1046,6 +1048,13 @@ pub fn resample(
         s.thickness_m = thickness(&s.pools);
         s.heat_flow_mw_m2 = ocean_heat_flow(age) as f32;
         if let Some(p2) = p2 {
+            if !state.rift_fill.is_empty() {
+                gap_points.push(super::extension::GapPoint {
+                    i: i as u32,
+                    pair: (p1.min(p2), p1.max(p2)),
+                    edge_rad: d1,
+                });
+            }
             let spread = norm.velocity_mm_yr(omega[p1 as usize] - omega[p2 as usize], p);
             let r = p.cross(spread).normalize_or_zero();
             s.ridge = [r.x as f32, r.y as f32, r.z as f32];
@@ -1069,6 +1078,37 @@ pub fn resample(
         samples[i] = s;
         plate_new[i] = group_plate[state.samples[j as usize].group as usize];
         phi_new[i] = (level_set::STALE_SPACINGS * spacing) as f32;
+    }
+
+    // The rifts' floors: the crust their stretching moved into the opening (ledger: PLT-784).
+    if !state.rift_fill.is_empty() {
+        let sea = world
+            .globals
+            .get(crate::climate::SEA_LEVEL_GLOBAL)
+            .copied()
+            .filter(|z| z.is_finite())
+            .unwrap_or(0.0);
+        let plates = &state.plates;
+        let laid = super::extension::lay(
+            &mut state.rift_fill,
+            &mut samples,
+            &gap_points,
+            new_pts,
+            |p| plates.get(p as usize).is_some_and(|q| q.alive),
+            k,
+            env.gravity,
+            sea,
+        );
+        let area = norm.sample_area_km2();
+        for (key, v) in [
+            (super::extension::FLOOR_GLOBAL, laid.floor_m * area / 1000.0),
+            (
+                super::extension::FALLBACK_GLOBAL,
+                laid.fallback_m * area / 1000.0,
+            ),
+        ] {
+            *world.globals.entry(key.to_owned()).or_insert(0.0) += v;
+        }
     }
 
     // One unrotated group per plate.
@@ -1118,7 +1158,26 @@ pub fn resample(
         }
         l
     });
+    // The settling's top deficit (ledger: PLT-780): a covered sample's corners' blended with its
+    // own weights (the accreted covers' are left out, as their light tops are under it), new sea
+    // floor none.
+    let new_deficit: Vec<f32> = if k.settle_top_density && state.top_deficit_m.len() == src.len() {
+        let old_d = &state.top_deficit_m;
+        found
+            .par_iter()
+            .zip(gap.par_iter())
+            .map(|((top, _), &g)| match top {
+                Some((_, c)) if !g => (0..3)
+                    .map(|j| c.w[j] * f64::from(old_d[c.tri[j] as usize]))
+                    .sum::<f64>() as f32,
+                _ => 0.0,
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
     state.samples = samples;
+    state.top_deficit_m = new_deficit;
     // The held crust is consumed or under new crust, and the old lattice's forearc is the next
     // step's to find: the new lattice starts with neither.
     if let Some(ow) = state.one_way.as_mut() {
