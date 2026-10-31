@@ -285,6 +285,8 @@ pub struct Resolved {
     /// not freshly sutured, sorted, each once. They seed the terrane when the contact's collision
     /// fires (`shortening::advance`).
     pub seeds: BTreeMap<usize, Vec<u32>>,
+    /// The pairs (lower id first) whose contact reversed this step (the onset trace's route).
+    pub reversed: Vec<(u32, u32)>,
 }
 
 /// Two plates' motion across their overlap ([`overlap_motion`]; ledger: PLT-810, PLT-811): their
@@ -350,6 +352,10 @@ const OVERLAP_NEAR: usize = 12;
 /// the sample, and the difference of their means is lattice noise; PR #55's review). ledger:
 /// PLT-811
 const OVERLAP_NORMAL_MIN_SPACINGS: f64 = 0.25;
+/// The cumulative convergence across an overlap that begins a contact, in lattice spacings
+/// (ledger PLT-810, PLT-811): a resolution threshold, the least convergence the lattice tells
+/// from a transform's zigzag (the coordinator's call on PR #55's re-review, 2026-10-31).
+pub const CONTACT_CONVERGENCE_SPACINGS: f64 = 0.5;
 
 /// The boundary's unit normal at the overlapping sample `p`, from plate lo's side towards plate
 /// hi's: the tangent part at `p` of the mean position of the hi samples among `near` (each
@@ -637,16 +643,39 @@ pub fn resolve(
     for (k, c) in state.contacts.iter().enumerate() {
         index.insert((c.under.min(c.over), c.under.max(c.over)), k);
     }
-    // A new contact only where its plates converge across the overlap (ledger: PLT-810): the
-    // pairs with no contact and an overlap of a contact's size, read once. A contact that exists
-    // (active, carried through a resampling or dormant until `contact_timeout_myr`, PLT-059) goes
-    // on whatever its plates do, as a reversal does: the gate is on a new contact only.
+    // A new contact only where its plates have converged across their overlap by half a lattice
+    // spacing (ledger: PLT-810, PLT-811): the pairs with no contact and an overlap of a contact's
+    // size, read once, each adding its overlap's mean convergence times the step to its sum; a
+    // pair that stops overlapping starts again from nothing. A contact that exists (active,
+    // carried through a resampling or dormant until `contact_timeout_myr`, PLT-059) goes on
+    // whatever its plates do, as a reversal does: the gate is on a new contact only.
     let motion = env.k.contact_needs_convergence.then(|| {
         let st: &PlateState = state;
         overlap_motion(st, overlaps, pos, tree, env, |key| {
             !index.contains_key(&key) && aggs.get(&key).is_some_and(|a| a.count >= MIN_CONTACT)
         })
     });
+    let converged: BTreeMap<(u32, u32), f64> = match &motion {
+        Some(m) => {
+            let before: BTreeMap<(u32, u32), f64> = state
+                .converging
+                .iter()
+                .map(|c| ((c.lo, c.hi), c.km))
+                .collect();
+            m.iter()
+                .map(|(&key, r)| {
+                    let add = if usize::from(r.pair_class) == OVERLAP_NO_NORMAL {
+                        0.0
+                    } else {
+                        r.conv_mm_yr * env.dt_myr
+                    };
+                    (key, before.get(&key).copied().unwrap_or(0.0) + add)
+                })
+                .collect()
+        }
+        None => BTreeMap::new(),
+    };
+    let need_km = CONTACT_CONVERGENCE_SPACINGS * env.norm.km(env.norm.spacing_rad());
     for (&(lo, hi), agg) in &aggs {
         let centroid = agg.sum.normalize_or(DVec3::Z);
         let frac = |s: usize| f64::from(agg.cont[s]) / f64::from(agg.seen[s].max(1));
@@ -668,7 +697,20 @@ pub fn resolve(
             if agg.count >= MIN_CONTACT
                 && reverses([frac(u), frac(o)], near(o), [lock(u), lock(o)], by_arc)
             {
-                reverse(state, world, env, k)?;
+                // The new polarity's onset: the floor of the plate that goes under now (the old
+                // overriding side's) and the plates' convergence, as a new contact's.
+                let oceanic = agg.seen[o] - agg.cont[o];
+                let slab_age = if oceanic == 0 {
+                    0.0
+                } else {
+                    agg.age[o] / f64::from(oceanic)
+                };
+                let conv = env.norm.speed_mm_yr(
+                    DVec3::from_array(state.plates[c.over as usize].omega)
+                        - DVec3::from_array(state.plates[c.under as usize].omega),
+                    centroid,
+                );
+                reverse(state, world, env, k, slab_age, conv)?;
                 reversed_now.push((lo, hi));
             }
         }
@@ -678,12 +720,9 @@ pub fn resolve(
                 if agg.count < MIN_CONTACT {
                     continue;
                 }
-                // Plates whose overlap does not grow (sliding past or parting) make no subduction
-                // zone (ledger: PLT-810).
-                if motion.as_ref().is_some_and(|m| {
-                    m.get(&(lo, hi))
-                        .is_none_or(|r| usize::from(r.pair_class) != OVERLAP_CONVERGING)
-                }) {
+                // Plates that have not converged across the overlap by half a spacing (sliding
+                // past, parting, or not yet) make no subduction zone (ledger: PLT-810).
+                if motion.is_some() && converged.get(&(lo, hi)).is_none_or(|&km| km < need_km) {
                     continue;
                 }
                 let mean_age = |s: usize| {
@@ -858,7 +897,16 @@ pub fn resolve(
         list.sort_unstable();
         list.dedup();
     }
-    Ok(Resolved { seeds })
+    // The pairs still without a contact keep their sums; the rest start again.
+    state.converging = converged
+        .into_iter()
+        .filter(|(key, _)| !index.contains_key(key))
+        .map(|((lo, hi), km)| super::state::PairConvergence { lo, hi, km })
+        .collect();
+    Ok(Resolved {
+        seeds,
+        reversed: reversed_now,
+    })
 }
 
 /// The isostatic ceiling on uplift (design choice): crust at height z above the sea (the callers
@@ -1004,6 +1052,8 @@ fn reverse(
     world: &mut WorldState,
     env: &Env,
     k: usize,
+    slab_age_myr: f64,
+    convergence_mm_yr: f64,
 ) -> Result<(), CoreError> {
     let old = state.contacts[k].clone();
     if let Some(onset) = old.onset_event
@@ -1032,6 +1082,10 @@ fn reverse(
     c.onset_myr = env.t_myr;
     c.onset_step = env.step;
     c.onset_event = None;
+    // The new polarity's own onset floor and convergence (until PR #55's re-review the old
+    // polarity's stayed).
+    c.onset_slab_age_myr = slab_age_myr;
+    c.onset_convergence_mm_yr = convergence_mm_yr;
     c.setting = 1;
     c.cont_in = 0;
     c.max_uplift_mm_yr = 0.0;
@@ -3002,12 +3056,7 @@ mod tests {
         assert_eq!(lone, DVec3::ZERO);
         let (k, conv) = overlap_class(30.0 * east, lone);
         assert!(k == OVERLAP_NO_NORMAL && close(conv, 0.0), "{k} {conv}");
-        // Deep in an overlap, both plates' samples all about it: no normal either.
-        let mixed: Vec<(DVec3, bool)> = near
-            .iter()
-            .flat_map(|&(q, _)| [(q, false), (q, true)])
-            .collect();
-        assert_eq!(overlap_normal(p, mixed, min_rad), DVec3::ZERO);
+        // (Deep in an overlap: `a_mixed_neighbourhood_gives_no_normal`.)
         // A contact's record: its samples by class, the mean convergence over those with a
         // normal, and the pair's reading, the same mean.
         let mut acc = OverlapAcc::new(1, 2);
@@ -3055,6 +3104,55 @@ mod tests {
     }
 
     use crate::sphere::{SplitMix64, fibonacci_sphere};
+
+    /// The quarter-spacing threshold on two offset lattices (PLT-811; PR #55's re-review): two
+    /// Fibonacci lattices of 20,000 samples, the second turned by a random rotation. Deep in an
+    /// overlap, both plates' samples about every point (the sample itself among its 12 nearest,
+    /// as `overlap_motion` reads them), most points give no normal; at a clean boundary (plate
+    /// lo's samples where x < 0, hi's where x > 0) every point within half a spacing of it gives
+    /// the normal along +x.
+    #[test]
+    fn a_mixed_neighbourhood_gives_no_normal() {
+        let n = 20_000;
+        let spacing = (4.0 * std::f64::consts::PI / n as f64).sqrt();
+        let min_rad = OVERLAP_NORMAL_MIN_SPACINGS * spacing;
+        let mut rng = SplitMix64::new(29);
+        let turn = super::super::init::random_rotation(&mut rng);
+        let lo = fibonacci_sphere(n);
+        let hi: Vec<DVec3> = lo.iter().map(|&q| turn * q).collect();
+        let mut all: Vec<(DVec3, bool)> = lo.iter().map(|&q| (q, false)).collect();
+        all.extend(hi.iter().map(|&q| (q, true)));
+        let near = |p: DVec3, pts: &[(DVec3, bool)]| -> Vec<(DVec3, bool)> {
+            let mut d: Vec<(f64, (DVec3, bool))> =
+                pts.iter().map(|&x| ((x.0 - p).length(), x)).collect();
+            d.sort_by(|a, b| a.0.total_cmp(&b.0));
+            d.into_iter().take(OVERLAP_NEAR).map(|x| x.1).collect()
+        };
+        // Deep in the overlap: points of either lattice, both plates all about.
+        let probes: Vec<DVec3> = (0..200).map(|k| all[k * 199 % all.len()].0).collect();
+        let none = probes
+            .iter()
+            .filter(|&&p| overlap_normal(p, near(p, &all), min_rad) == DVec3::ZERO)
+            .count();
+        assert!(none * 2 > probes.len(), "{none} of {}", probes.len());
+        // A clean boundary: each plate on its own side of x = 0.
+        let split: Vec<(DVec3, bool)> = all
+            .iter()
+            .copied()
+            .filter(|&(q, h)| (q.x > 0.0) == h)
+            .collect();
+        let edge: Vec<DVec3> = split
+            .iter()
+            .map(|x| x.0)
+            .filter(|q| q.x.abs() < 0.5 * spacing)
+            .take(100)
+            .collect();
+        assert!(edge.len() >= 50);
+        for &p in &edge {
+            let nrm = overlap_normal(p, near(p, &split), min_rad);
+            assert!(nrm.dot(DVec3::X) > 0.8, "{p} {nrm}");
+        }
+    }
 
     /// The trench's retreat against its sources (PLT-522, PLT-523): Scholl & von Huene 2010's
     /// ~2.5 km/Myr, inside Clift & Vannucchi 2004's Table 2 range (0.9 to 4.7); on the normal

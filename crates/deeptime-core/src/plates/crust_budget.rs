@@ -180,6 +180,8 @@ const GLOBALS: [(&str, &str); 101] = [
         super::ridges::ACCRETED_HIDDEN_CONTINENT_GLOBAL,
     ),
     ("dropped", super::ridges::DROPPED_GLOBAL),
+    ("last_resort_c", super::ridges::LAST_RESORT_CONTINENT_GLOBAL),
+    ("last_resort_o", super::ridges::LAST_RESORT_OCEAN_GLOBAL),
     ("mafic_dropped", super::ridges::MAFIC_DROPPED_GLOBAL),
     ("collapse_moved", super::collapse::MOVED_GLOBAL),
     ("collapse_gained_km2", super::collapse::GAINED_GLOBAL),
