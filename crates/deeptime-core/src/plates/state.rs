@@ -545,6 +545,17 @@ impl Contact {
     }
 }
 
+/// A pair of plates' cumulative convergence across an overlap with no contact (ledger PLT-810):
+/// plates `lo` < `hi`, km (Earth-normalized; the overlap's mean convergence, mm/yr, times each
+/// step's Myr, never below 0), and the steps that added to it (the onset trace's crossing).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct PairConvergence {
+    pub lo: u32,
+    pub hi: u32,
+    pub km: f64,
+    pub steps: u32,
+}
+
 /// A body of continental crust at a collision front judged going down with its slab (ledger
 /// PLT-770, `shortening::docking`): its samples, hidden and visible, sorted, as of the last step,
 /// and its share of the front's length when it was judged, km.
@@ -955,6 +966,13 @@ pub struct PlateState {
     /// PLT-710, PLT-715); empty while `tectonics.backarc_rifting` is off.
     #[serde(default)]
     pub backarcs: Vec<BackArc>,
+    /// Each pair of plates that overlaps with no contact yet: its cumulative convergence across
+    /// the overlap (`subduction::resolve`, ledger PLT-810), dropped when the pair has no overlap
+    /// at all for a step or a contact begins, and copied to the pieces of a split plate that
+    /// border the other plate (`inherit::inherit`, PLT-534). A resampling takes every overlap, so
+    /// a pair keeps its sum through one only if it overlaps again by the next step's resolve.
+    #[serde(default)]
+    pub converging: Vec<PairConvergence>,
     /// The land's gap budget (`gap_budget.rs`): measurement only, absent unless switched on; not
     /// kept in checkpoints.
     #[serde(skip)]
