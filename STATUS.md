@@ -153,6 +153,33 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 
 ## Build log
 
+### 2026-10-31: Continental extension after ext-cum2: the rift trace (measurement only), Buck's mode map in place of the 700 C Moho test (PLT-786, PLT-787), the rifts read against Earth's (the runoff lane, worktree agent-a4e92fd13092b08b0, branch `continental-extension`; not merged)
+
+- **The rift trace** (`plates/rift_trace.rs`, `DEEPTIME_RIFT_TRACE`; no rule reads it): per pair and step the opening,
+  the mode and the area thinned; per resampling the fill laid. Arm ext-trace (key e5329a3bdd42, argkey 7050a4c4: ext-cum2's
+  sets, seeds 1 and 2 on both starts; `tools/review/extension/trace_identity.py`: the runs are ext-cum2's own).
+  `rift_trace.py`: 11.7 to 16.4 pairs a step; a pair opens a median of 112 to 188 km before it breaks up; narrow sides
+  stretch 0.47 to 0.75 of the crust (reach about 30 km), wide sides 0.25 to 0.53 (reach a median of 812 to 1,250 km,
+  p90 2,479 to 4,149); the 700 C test made sides of 25 to 35 km of crust wide (0.25 to 0.63 of them).
+- **Buck's band** (`extension::BAND_EDGE`, `in_wide_band`, PLT-786): his wide-rift band's narrow edge in crust against
+  heat flow (Buck 1991 as Buck 2007's Fig. 30 reprints it, read off: 41.5 km at 74 mW/m2 to 20 km at 136, none under
+  about 70), the heat flow the model's own; at a Moho of 810 to 910 C on the model's geotherm. A wide side spreads its
+  strain evenly over its region in the band, reached through the band (PLT-787), in place of e^(-x/L) over 4L. Tests
+  `bucks_band_puts_his_rifts_in_their_modes`, `a_wide_side_leaves_the_band_as_it_thins_and_cools`.
+- **The count and the rule against Earth's** (`rift_starts.py` on ext-trace): per step 12,500 to 19,200 km of rift
+  boundary opening 0.19 to 0.22 km2 a year, against Bird 2003's 27,472 km and 0.363 (not above Earth's); 15 to 22 % of
+  the pairs start with a cold side (under 60 mW/m2) of normal crust (30 km or more), 35 to 47 % of the crust stretched.
+  The sources read (Hopper & Buck 1993, Kusznir & Park, Buck 2007, Bialas, Buck & Qin 2010, Brune et al. 2023) need
+  heat, thinning, magma or an inherited weakness. The coordinator's call: the rifting rule should need what Earth
+  needs. The trace now records what each side starts on (a collision's stamp at the edge, the plate's igneous province,
+  its parent and birth), and ext-cum3 runs with it on; the rule follows as its own stage.
+- **Fixes:** clippy (`band_edge_km`'s NaN test), fmt; the whole-run guard against floor stacking restated (ext-cum's
+  surfaces of 300 km and more; a diverged run's thickest column moves by some km, 62.0 against 51.2 since the band).
+- **Gate** (VM): `tools/review/extension/gate.sh quick` on be014fac: fmt and clippy clean, the extension, settle, gap
+  budget, stretching and trace tests passed.
+- **Next:** ext-cum3 (`--seeds 1,2,3,4`, ext-cum2's sets and the trace) when a slot frees after rb3; then the cold
+  starts' kinds and the rifting rule.
+
 ### 2026-10-31: Continental extension's arms on base35-s4: identical with the switches off; ext-cum diverged (3 of 8), two fixes; ext-cum2 clean but the continents drown (land 0.216 to 0.130): not default-on (the runoff lane, worktree agent-a4e92fd13092b08b0, branch `continental-extension` with origin/master 9d9e4c94 merged in; not merged)
 
 - **The merge:** origin/master 9d9e4c94 (PR #54, base35's master) into the branch (81c3104b); PLT-780 to PLT-785 kept
