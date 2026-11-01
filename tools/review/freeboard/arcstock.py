@@ -192,6 +192,15 @@ def run_stats(run):
         small = size_of[lab[ci]] < 1.0e5
         r["coast_small_km"] = float(small.sum() * spacing / np.sqrt(3.0))
         r["parts_all"] = int(len(np.unique(lab[cont])))
+        # The boundary's length by the class on its continental side (shares): the start class, island-arc crust,
+        # collision belts, hyper-extended crust (the taper's test), the other converted crust.
+        own_a = pp[:, 0:7].sum(1) - np.clip(np.minimum(pp[:, 7], pp[:, 5] + pp[:, 6]), 0.0, None)
+        hyp_a = cont & (own_a - pp[:, 0:2].sum(1) < 10_000.0)
+        belt_a = cont & ~start & ~island & (a[:, 5] > 1.5)
+        side = {"start": start & ~hyp_a, "island": island & ~hyp_a, "belt": belt_a & ~hyp_a, "hyper": hyp_a}
+        side["otherconv"] = cont & ~side["start"] & ~side["island"] & ~side["belt"] & ~hyp_a
+        for k, m in side.items():
+            r[f"coast_by_{k}"] = float(m[ci].mean()) if ci.size else float("nan")
         # Ocean floor enclosed by continental crust (an ocean component that is not the largest, the world
         # ocean): the boundary's length against it, its area and its count.
         olab = components(p, ~cont, LINK * spacing)
