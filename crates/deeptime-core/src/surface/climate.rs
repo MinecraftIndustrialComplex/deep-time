@@ -623,10 +623,18 @@ mod tests {
         // A half that vanishes as its month reaches the mean (its weight goes to 0), and the
         // degenerate year (no range): each meets its neighbours.
         for (mean, cold) in [(4.0, -6.0), (-3.0, -20.0), (0.5, -1.0)] {
-            close(f(mean, mean + eps, cold), f(mean, mean, cold), "warmest month at the mean");
+            close(
+                f(mean, mean + eps, cold),
+                f(mean, mean, cold),
+                "warmest month at the mean",
+            );
         }
         for (mean, warm) in [(-3.0, 5.0), (4.0, 20.0), (-0.5, 1.0)] {
-            close(f(mean, warm, mean - eps), f(mean, warm, mean), "coldest month at the mean");
+            close(
+                f(mean, warm, mean - eps),
+                f(mean, warm, mean),
+                "coldest month at the mean",
+            );
         }
         close(f(5.0, 5.0 + eps, 5.0 - eps), f(5.0, 5.0, 5.0), "no range");
     }
