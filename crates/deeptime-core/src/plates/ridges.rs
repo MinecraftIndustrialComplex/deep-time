@@ -174,6 +174,74 @@ fn nearest_corner(geo: &Geo, c: &Cover, rot: DQuat, q: DVec3) -> u32 {
     best
 }
 
+/// The old sample whose labels a new sample at `q` takes from the cover `c` of a group turned by
+/// `rot`, and `q`'s distance from its class's outline (sine, ≥ 0). With the class level set
+/// (`phi`, each old sample's distance from its class's outline, `level_set::old_class_distances`;
+/// ledger PLT-852) the class (`level_set::class_of`) whose corners in the cover weigh the largest
+/// A = Σ w ψ holds `q`, as a group holds it (`level_set::margin`), and the sample takes the
+/// labels of that class's corner nearest `q`; the distance is (A − the largest other A) / |Σ w v|,
+/// the interpolated signed distance, or A / |Σ w v| with one class in the cover. Without it, the
+/// nearest corner's labels (PLT-664) and no distance.
+fn class_corner(
+    geo: &Geo,
+    src: &[Sample],
+    c: &Cover,
+    rot: DQuat,
+    q: DVec3,
+    phi: Option<&[f64]>,
+) -> (u32, f64) {
+    let nearest = nearest_corner(geo, c, rot, q);
+    let Some(phi) = phi else {
+        return (nearest, 0.0);
+    };
+    let local = rot.inverse() * q;
+    let pts = geo.points();
+    let labels = c.tri.map(|v| level_set::class_of(&src[v as usize]));
+    // Each class's weight over the cover's corners (the group's own; the others weigh 0), in the
+    // corners' order.
+    let mut weigh: [(u32, f64); 3] = [(u32::MAX, f64::NEG_INFINITY); 3];
+    for k in 0..3 {
+        if c.w[k] <= 0.0 && c.tri[k] != nearest {
+            continue;
+        }
+        let a = c.w[k] * phi[c.tri[k] as usize];
+        if let Some(e) = weigh.iter_mut().find(|e| e.0 == labels[k]) {
+            e.1 += a;
+        } else if let Some(e) = weigh.iter_mut().find(|e| e.0 == u32::MAX) {
+            *e = (labels[k], a);
+        }
+    }
+    // The heaviest class; on a tie, the nearest corner's.
+    let own = level_set::class_of(&src[nearest as usize]);
+    let mut win = (own, f64::NEG_INFINITY);
+    for e in weigh.iter().filter(|e| e.0 != u32::MAX) {
+        if e.1 > win.1 || (e.1 == win.1 && e.0 == own) {
+            win = *e;
+        }
+    }
+    let rival = weigh
+        .iter()
+        .filter(|e| e.0 != u32::MAX && e.0 != win.0)
+        .map(|e| e.1)
+        .reduce(f64::max);
+    let len = (0..3)
+        .map(|k| pts[c.tri[k] as usize] * c.w[k])
+        .sum::<DVec3>()
+        .length()
+        .max(1e-12);
+    let d = (win.1 - rival.unwrap_or(0.0)).max(0.0) / len;
+    // That class's corner nearest `q`.
+    let m = (0..3)
+        .filter(|&k| labels[k] == win.0 && (c.w[k] > 0.0 || c.tri[k] == nearest))
+        .max_by(|&a, &b| {
+            pts[c.tri[a] as usize]
+                .dot(local)
+                .total_cmp(&pts[c.tri[b] as usize].dot(local))
+        })
+        .map_or(nearest, |k| c.tri[k]);
+    (m, d)
+}
+
 /// What a resampling measures a column's height from: the height its own rock and age hold it at,
 /// m (ledger: PLT-850). Continental crust: its pools' Airy height (`collapse::iso_height`, about
 /// the continents' reference height) and its lithosphere's thermal height (`thermal::uplift_m`,
@@ -833,6 +901,11 @@ pub fn resample(
         let groups: Vec<u32> = src.iter().map(|s| s.group).collect();
         level_set::old_distances(state.level_set.as_ref(), &groups, old, spacing)
     });
+    // … and from its crust's class's outline inside its group (ledger: PLT-852).
+    let old_class_phi: Option<Vec<f64>> = k.level_set_membership.then(|| {
+        let classes: Vec<u32> = src.iter().map(level_set::class_of).collect();
+        level_set::old_class_distances(state.level_set.as_ref(), &classes, old, spacing)
+    });
     // Held crust (one-way subduction, `subduction::resolve`; none with the switch off): the slab,
     // never on top of the new lattice (ledger: PLT-542).
     let one_way = state.one_way.as_ref();
@@ -971,7 +1044,8 @@ pub fn resample(
     // accretion (new sea floor's are set with the gaps below).
     let mut limits: Vec<[f32; 3]> = vec![[f32::INFINITY, 0.0, f32::INFINITY]; n];
     // A cover of group `g` interpolated at the new point `q`, its labels from the old sample
-    // nearest `q` (ledger: PLT-664).
+    // nearest `q` (ledger: PLT-664) of the class that holds `q` (with the class level set,
+    // PLT-852).
     let heights = Heights {
         k,
         gravity: env.gravity,
@@ -979,7 +1053,8 @@ pub fn resample(
     };
     let interp = |g: u32, c: &Cover, q: DVec3| {
         let rot = rots[g as usize];
-        interpolate(src, c, rot, nearest_corner(old, c, rot, q), heights)
+        let (m, _) = class_corner(old, src, c, rot, q, old_class_phi.as_deref());
+        interpolate(src, c, rot, m, heights)
     };
     let mut samples: Vec<Sample> = found
         .par_iter()
@@ -1149,6 +1224,21 @@ pub fn resample(
             }
         })
         .collect();
+    // The new samples' distances from their classes' outlines, until `level_set::reinit` sets
+    // them (ledger: PLT-852): a covered point's from the cover that holds it, new sea floor's the
+    // stale half spacing.
+    let class_phi_new: Option<Vec<f32>> = old_class_phi.as_deref().map(|cp| {
+        found
+            .par_iter()
+            .zip(new_pts.par_iter())
+            .map(|((top, _), &q)| match top {
+                Some((g, c)) => class_corner(old, src, c, rots[*g as usize], q, Some(cp))
+                    .1
+                    .min(cap) as f32,
+                None => (level_set::STALE_SPACINGS * spacing) as f32,
+            })
+            .collect()
+    });
     let area_km2 = norm.sample_area_km2();
     let sum = |k: usize| tally.iter().map(|t| t[k]).sum::<f64>() * area_km2 / 1000.0;
     for (name, k) in [
@@ -1516,6 +1606,8 @@ pub fn resample(
         state.level_set = Some(level_set::LevelSet {
             phi: phi_new,
             member: state.samples.iter().map(|s| s.group).collect(),
+            class_phi: class_phi_new.unwrap_or_default(),
+            class_member: state.samples.iter().map(level_set::class_of).collect(),
         });
     }
     state.lattice = lattice;
