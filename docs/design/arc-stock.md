@@ -127,13 +127,72 @@ switch on, and msc-off, off; final frames, medians of 8):
 - So the margins' area is one Earth-wide ring along every edge of continental crust, the converted crust's included,
   wherever the floor beside it holds continental rock. Earth's thinned domains are the product of rifting (Brune et al.
   2014 on rifted margins); PLT-661 stands in for rifting by the sediment on the floor, which comes down from any land
-  beside any margin (sheared, transform, old active ones), and a converted ring never turns back.
+  beside any margin (sheared, transform, old active ones); a converted ring turns back only outside the zone's ocean
+  side (PLT-667).
 
-Next, sources to read (a Sonnet lookup): the total length of Earth's rifted (passive) margins and of all continental
-margins (Bradley 2008, Earth-Sci. Rev. 91, is the likely source; not yet read), and the area of Earth's necking and
-hyper-extended domains; then the model's ring per km of rifted margin. The physical fix this points to ties the
-thinned crust to the rift that made it (continental crust thinned below 10 km in rifting stays continental) rather
-than to sediment, which is the continental-extension lane's band (Buck's, branch `continental-extension`).
+**Earth's margins** (sources read by a Sonnet lookup, 2026-11-01, texts extracted from the PDFs):
+- Bradley 2008 (Earth-Sci. Rev. 91, 1-26): "The present-day passive margins have an aggregate length of 105,000 km";
+  lengths "taken as the great-circle distance between endpoints"; sheared margins and back-arc basins' continental
+  sides included.
+- Mercier de Lepinay et al. 2016 (Tectonophysics 693, 96-115): "With an aggregated length of 25500 km, transform
+  margins represents 16% of the length of continental margins, and 31% of that of non-convergent continental
+  margins." Our back-calculation: about 159,000 km of continental margins in all.
+- Chenin et al. 2017 as Manatschal & Chenin 2023 (Geol. Field Trips and Maps 15) quote it: necking domains "between
+  ca. 10 and 100 km with an average of 55 km; hyperextended domains between ca. 20 and 70 km with an average of 50
+  km", the hyper-extended domain being where "the crust is thinned from ca. 10 km to 0 km".
+- Harris et al. 2014 (Mar. Geol. 352, 4-24): "the Earth's margins are approximately 35% active and 65% passive".
+- Marcilly et al. 2022 (Gondwana Res. 110): continental crust 210.5 x 10⁶ km², flooded 61.5 x 10⁶ km², which
+  "includes areas of for example stretched continental crust (pre-breakup extension) along passive margins".
+- No global area of hyper-extended crust was found. Our arithmetic: 105,000 km x 50 km is about 5.3 x 10⁶ km², 0.010
+  of the planet.
+
+**Where the margins' area is** (2026-11-01; `arcstock.py` and `ratchet.py` on arc-lith, the switch on, and msc-off,
+off; medians of 8; the lattice is 100,000 samples, a spacing of 71 km; lengths are neighbour pairs across the line
+times a cell's edge, km):
+
+| final frame | on | off |
+|---|---|---|
+| hyper-extended crust (all) | 0.102 of the planet, 83 % sediment margins | 0.005 |
+| of it on the coast row / the second / three rows and more inland | 0.062 / 0.020 / 0.020 | 0.0046 / 0.0005 / 0 |
+| continental boundary, raw / smoothed over two spacings | 602,000 / 416,000 km | 592,000 / 341,000 km |
+| its share with hyper-extended crust on the land side | 0.75 | 0.08 |
+| ocean floor enclosed by continental crust | 0.095 (0.013 by crust of 10 km and more of its own) | 0.0095 |
+
+- The ring per km of coast is Earth's within the lattice: one row (71 km, the hyper-extended crust a median 70 km
+  from crust of 10 km and more of its own) against Chenin's 50 km average and Brune's 70 to 200 km wide sides.
+- No ratchet: the converted crust that is neither island arc nor belt has 0.074 of the planet under 10 km of its own
+  crystalline crust, 0.075 at 18 km and more, and 0.0019 between 10 and 14 km, so rings do not grow across the line
+  and step outward. It lies within one to three rows of island-arc crust, belts or the start class in both arms
+  (p90 3 rows).
+- The coast row's ring covers 0.73 of the continental coast row. Earth's share of rifted and sheared margins is about
+  0.65 (Harris et al. 2014), so the share is near Earth's.
+- The length is not Earth's. The model's continental boundary is 602,000 km (416,000 smoothed), against Earth's
+  105,000 km of passive margins (Bradley 2008) and about 159,000 km of all margins. That is 2.6 to 3.8 times
+  Earth's, though Bradley's endpoint lengths undercount curved margins. It is near the same with the switch off. So
+  the coast row's ring of 0.062, against Earth's 0.010 by our arithmetic, is the length about four times over and
+  the lattice's one row against 50 km.
+- The length grows early in both arms: 84,000 km at the start, about 205,000 at -950 and about 310,000 at -900. At
+  -900 Myr the island-arc crust's share of it is 0.20 (on) and 0.31 (off). One run's record (msc-off, seed 1) has 14
+  plates at the start and about 40 by -934 Myr; the continents split across new plates (plate 13's 10,149
+  continental samples lie on four plates by -966 Myr). At the end, lattice-scale raggedness (raw over smoothed) is
+  31 % of the length on and 42 % off.
+- The part three rows and more inland (0.020 of the planet; 88 % sediment margins) is no margin ring. It is columns of
+  22.5 km: about 7 km of ocean basement, 5.5 km of crystalline crust of its own and the rest cover. They stand 2.4 km
+  under the sea. Half were raised by an orogeny. They are on the plate of the crust beside them (99.8 %). They are
+  margins a collision carried in and welded, and they keep their sediment as cover. The taper still counts them as its
+  ocean side (any hyper-extended crust is), so it holds them at the margin's profile inland.
+- The rings close straits: the ocean floor enclosed by continental crust (an ocean component that is not the world
+  ocean, linked within 1.6 spacings) is 0.095 of the planet in 194 pieces. It is old (a median 134 Myr against the
+  world ocean's 63) and 88 % of it is on the plate of the continental crust nearest it. Counting hyper-extended crust
+  as the ocean side leaves 0.013, as the switch off does. The enclosed floor's rim is 0.75 hyper-extended crust.
+  This is a reading of the label (water crosses the drowned rings); it adds to the boundary's length.
+
+So the rule's reach per km is Earth's. Its area is the boundary's length (about four times Earth's, near the same with
+the switch off), a second row on part of it, and the welded margins inland. The fixes, in order of size: (1) what
+lengthens the continental boundary in the first 100 Myr (the continents split across new plates, the island-arc pieces,
+the lattice raggedness); (2) margins a collision welds inland, which Earth's orogens take in (Chenin et al. 2017's title
+reads the orogens closed narrow and wide oceans made from hyper-extended margins; not read beyond that) where the model
+keeps them as margins at 2.4 km under the sea; (3) the share of edges the rule rings (0.73 against about 0.65).
 
 ## Earth's side (sources read by Sonnet lookups, 2026-11-01; bibliography entries to add when used)
 
