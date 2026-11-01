@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
-//! A continental column's height from its whole buoyancy (`tectonics.column_buoyancy`, off by
-//! default; `docs/design/continental-buoyancy.md`, `docs/science/continental-buoyancy.md`; ledger
-//! PLT-830 to PLT-836).
+//! A continental column's height from its whole buoyancy (`tectonics.column_buoyancy`, on by
+//! default since 2026-11-01; `docs/design/continental-buoyancy.md`,
+//! `docs/science/continental-buoyancy.md`; ledger PLT-830 to PLT-836).
 //!
 //! # Why
 //! Every continental column stood on PLT-281's one Airy line, a crust of one density from the

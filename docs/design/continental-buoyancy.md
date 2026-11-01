@@ -1,6 +1,7 @@
 # A continental column's height from its whole buoyancy: design
 
-Status: **built behind `tectonics.column_buoyancy` (off); gated; waiting for its pool arm** (the low-continents lane's
+Status: **on by default since 2026-11-01** (`tectonics.column_buoyancy`; the coordinator's call, decisions log
+2026-11-01, after the arm cb-on: "The arm cb-on and the default") (the low-continents lane's
 lead, the coordinator's task of 2026-10-31; branch `continental-buoyancy`). Ledger PLT-830 to PLT-836 (PLT-837 to 849
 kept for what the arm asks). Science page: `docs/science/continental-buoyancy.md`.
 
@@ -77,7 +78,8 @@ Hasterok & Chapman 2007's mantle density stays out until their text is read.
   measurement budgets (gap budget, crust budget) keep reading PLT-281's line. The settling moves every column to the
   law's height after them; a cap that stops a process at PLT-281's height only shapes the step's path. Moving the caps
   to the law is a follow-up if the arm shows them binding.
-- **The switch:** `tectonics.column_buoyancy`, off; needs `thermal_state`; excludes `thermal_isostasy_m` (params.rs).
+- **The switch:** `tectonics.column_buoyancy`, on by default since 2026-11-01; needs `thermal_state`; excludes
+  `thermal_isostasy_m` (params.rs).
 
 ## The start
 
@@ -108,6 +110,51 @@ its column at the sea under the law, the converted crust's dry share and height 
 `model` (the split's line term, the sea against Earth's fill), and the guards. What would say the law works: the
 start class keeps more of its thickness, the converted crust stands higher on its hot lithosphere, the line term
 moves toward Earth's at 36 to 44 km, and the drowned share falls, with no guard failure.
+
+## The arm cb-on and the default (2026-11-01)
+
+cb-on ran the branch at 1b85d0d0 with `column_buoyancy` on (8 runs, base35-s4's starts and seeds, key ecc2f3958a5b,
+argkey 46913569). Its control is hc-on, the same code with the switch off, and base35-s4. It was read with
+`pool.sh table` (census and `--measure guard`) and `tools/review/freeboard/lowcont.sh`
+(`/data/ban/deeptime-runs/lowcont-cbon/`: area, model, m5sea).
+
+**The census** (medians of 8, Mann-Whitney p against base35-s4):
+
+| | land | largest landmass | continental crust under the sea | land above 2 km | coast with high ground | land under ice | collisions per 100 Myr | crust's net change | criteria median, mean | sea after 100 Myr / end, m |
+|---|---|---|---|---|---|---|---|---|---|---|
+| base35-s4 | 0.216 | 0.048 | 0.594 | 0.009 | 0.071 | 0.062 | 4.85 | +0.113 | 5, 5.38 | 280 / 339 |
+| cb-on | 0.186 (0.021) | 0.063 (0.80) | 0.650 (0.083) | 0.034 (0.021) | 0.152 (0.010) | 0.067 (0.65) | 5.55 (0.21) | +0.102 (0.57) | 5, 4.75 (0.079) | 329 / 122 |
+
+**The guard** (`measure guard`): worst 10,289 m against 10,304 (p 0.88); no step beyond two Earth reliefs; the largest
+one-step rise and fall 7,274 and 7,369 m against 7,144 and 7,176; the highest plate 4,517 against 4,413 m; the plate
+cells' largest excess over Airy 3,453 against 2,990 m (p 0.021).
+
+**Against "What the arm measures"** (lowcont.py, cb-on against hc-on, final frame, medians):
+- **The start class keeps more of its thickness:** 37.4 km at the end against 33.9, dry share 0.75 against 0.70, its
+  median 65 m over the sea against 52. Met.
+- **The line term moves toward Earth's at 36 to 44 km:** the p50 height over the sea by 1-km band is 17, 67, 40 and
+  136 m at 36, 38, 40 and 42 km, against Earth's 430, 340, 380 and 420 and hc-on's 370, 637, 877 and 1,154 (PLT-281's
+  line). That is the flatness of Earth's cold line, as the M5 lane's note asked (above), about 300 m under Earth's
+  level. At 44 km the law gives 1,280 m against Earth's 437, the keel's step. Met in its slope; low in its level.
+- **The converted crust stands higher on its hot lithosphere:** not met. Crust on ocean floor that is island-arc crust
+  by cb_origin's rule (0.149 of the planet, 31.6 km) stands 493 m under the sea at its median against 226 with the
+  line, dry share 0.28 against 0.35. Collision belts on ocean floor are 197 m under against 16 m over. Their mafic
+  pools now weigh as basalt and gabbro (PLT-832); under PLT-281's line every crust weighed the mean crust's density.
+- **The drowned share falls:** not met. Continental crust under the sea is 0.650 against 0.602, and the sea ends at 126
+  m against 347.
+
+**Reading (the coordinator's).** The law does what its sources say. A thick, cold, felsic column stands on its rock and
+keel, and a column of mafic arc crust stands as low as its rock. Under the old line the model's large stock of
+converted crust (sea-level.md "Why base35's continents stand low": most of the drowned crust) stood as high as
+granite. The law shows that stock for what it is. The lever for the drowned share is that excess of converted crust,
+not the height law. The coast with high ground (0.152 against its 0.11) and the land above 2 km rise because the thick
+columns stand higher. These are V1 realism checks, not a gate.
+
+**The default.** On, the coordinator's call (decisions log 2026-11-01) under Ben's rule of 2026-10-23: physics goes
+on by default once it is built and correct (unit tests against its sources, no divergence or guard failure on the
+pool), and the rule it replaces goes off with it. Here PLT-281's line is replaced where a column settles and in the
+collapse's sheet; ISO-110 was already off. The branch was merged with master and PR #58 before the flip. A fresh arm,
+cb-on2 (the branch's default against the next base), reads it on the merged head.
 
 ## Why thermal isostasy (ISO-110) is built and off, and whether that still holds
 
