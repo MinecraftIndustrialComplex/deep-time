@@ -253,6 +253,13 @@ quotes it: about 3.37 x 10⁸ km³ over about 3.63 x 10⁸ km², on the margins 
    (intra-oceanic) and 55.7 (continental arcs) normal to the front (`cbread.py`), against Bird's 53.2. Our arithmetic:
    if about two thirds of Earth's fast trench also carries under 1 km of sediment, about 0.29 of 51,309 km erodes,
    about 15,000 km, and at PLT-441's 90 km³/km/Myr that is about 1.35 km³/yr, Stern & Scholl's 1.4. The model's
-   9,100 km is about 0.6 of that, and its forearcs give a third of what that length asks. The next read is the model's
-   own distribution of normal convergence at its fronts (the record's `front_bands`, `islrec.py`), against these
-   shares.
+   9,100 km is about 0.6 of that, and its forearcs give a third of what that length asks.
+   The model's own speeds (`islrec.py` on base38-s4, the record's front bands, the subducting front's share by its
+   normal convergence) are Earth's: at 40 mm/yr or more 0.539 of the intra-oceanic front and 0.661 of the continental
+   arcs' against Bird's 0.624; at 80 or more 0.196 and 0.298 against 0.170. So the speed gate is not the term (Ben,
+   2026-11-01: "Arc crust and fronts (Recommended)"). What is short is the forearcs' crust: 0.55 of the 0.82 km³/yr the
+   erosive length asks finds no crust beyond an ocean floor's 7 km within the arc distance of the front, and 85 % of
+   the erosive length is intra-oceanic. Next: what crust stands within 200 km of the model's intra-oceanic fronts
+   against Earth's (the forearc and arc crust of Izu-Bonin-Mariana and Tonga in the sources read: Stern & Scholl
+   2010's juvenile arcs up to 30 km thick; Bai et al. 2023's Kyushu-Palau remnant arc 8 to 23 km), and the young-floor
+   excess the oceanic-fronts lane left (plates.md, "The intra-oceanic fronts' length").
