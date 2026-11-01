@@ -12443,6 +12443,74 @@ nearest rule's unbiased mass. The margins switch is off in the shipped presets, 
 not run on the pool; PLT-667 acts with it off as well, where a collapse's spread or a resampling's accretion
 leaves a sediment margin.
 
+##### The kind and class on level sets, each piece's area kept (PLT-852, 2026-11-01)
+
+The arc-stock lane (docs/design/arc-stock.md, "Where the margins' area is") found the continental boundary on the pool at
+602,000 km at the end of a run, against Earth's 105,000 km of passive margins (Bradley 2008) and about 159,000 km of all
+margins (our back-calculation from Mercier de Lepinay et al. 2016). It was near the same with PLT-661 on or off, grew from
+84,000 km at the start, and a third of it at the end was raggedness at the lattice's scale. The nearest label walks a
+margin: `how_resamplings_roughen_a_margin` (plates/tests.rs) puts continental crust north of the equator and its own
+plate's ocean floor south of it, and resamples 40 times with nothing else in the step. The margin's samples spread from 0.44
+to 1.64 spacings about the equator and its lattice edges per spacing rise from 2.26 to 4.56, as plate outlines did before
+PLT-536's level set (0.44 to 1.73, 2.25 to 4.65). A run resamples about 50 times.
+
+The kind and the class now each have a level set (`tectonics.class_level_set`, on; `level_set.rs`, ledger PLT-852). Each
+sample keeps its distance from the outline between its kind (or class) and another of its group, set again after each
+resampling over the arcs between two labels of one group, and kept as a group's distance is. The level set alone (the
+heaviest label holds the point) is the median rule above with distances. On PLT-664's planet of strips one spacing wide and
+caps two spacings in radius (`thin_crust_through_resamplings`), it took 69 % of the crust by the fifth resampling and all of
+it by the twentieth. So each piece (the visible old samples of one label joined by lattice edges) keeps its old count of
+samples:
+1. Each continental piece takes the new points its interpolated signed distance against the ocean floor ranks most inside,
+   among those not yet taken, up to its count. The ocean floor takes the rest.
+2. Among the continental points, each hyper-extended piece and then each piece of the other continental crust keep their
+   counts the same way. The thin class goes first: the thick one, taking first, left coast points with no hyper-extended
+   corner where a one-row ring had gaps.
+3. The sample takes its labels from the nearest corner of the piece that took it (`ridges::conserved_classes`).
+
+A piece's count is its expected area on a lattice of the old one's density, so each outline stays where the level set puts
+it, shifted by one distance all round. On the tests:
+
+| test | nearest label (PLT-664) | level set alone | level set, each piece's count kept |
+|---|---|---|---|
+| static margin, 40 resamplings: spread, edges per spacing | 0.44 to 1.64, 2.26 to 4.56 | 0.41 to 0.32, 2.17 to 2.13 | 0.41 to 0.44, 2.16 to 2.13 |
+| strips and caps, 40 resamplings: samples (of 250), edges (of 844) | 240 to 270, up to 994 | 0 by the 20th | 250 throughout, 641 |
+| the ratchet planet with the steps, 24 resamplings: zone count, lowest z, core | 271 to 709, to −0.154, 130 columns past the edge | | 255 to 291, −0.040 to −0.067, 9,998 throughout |
+
+The margins stage's acceptance test (`a_converted_margins_zone_stays_flat_over_six_resamplings`, ignored since 2026-10-25)
+passes and runs. Its band for the count now includes the step's own churn (twice the largest net change one step makes):
+one resampling keeps the count exactly, and each step turns 15 to 48 columns and turns 16 to 47 back (PLT-661, PLT-667).
+
+What is left:
+- Shapes round off at their kept area. The strips' and caps' edges fall from 844 to 641 over 40 resamplings: a thin strip
+  shortens and widens.
+- Without the steps, the hyper-extended line drifts into the core by about 2.5 samples a resampling on the ratchet planet
+  (271 to 331 over 24, the core 9,998 to 9,938). The taper's steps reset it in a run.
+
+On the pool (arm kls-on, key 2ab6f14ad482, 8 runs, seeds 1 to 4 on both starts, against base37-s4; `pool.sh table`, and
+`arcstock.py` against arc-lith, base37-s4's code with the maps). The guard is clean: its worst 10,438 against 10,210 m
+(p 0.51), no step past two Earth reliefs. The V1 census, medians with p in brackets:
+- continental crust under the sea 0.630 against 0.686 (0.065);
+- largest landmass 0.061 against 0.052 (1.0), now at its target;
+- collisions per 100 Myr 4.40 against 5.15 (0.15);
+- the continental crust's net change +0.046 against +0.115 (< 0.001);
+- criteria met a mean of 4.88 against 4.62 (0.60).
+
+At the end of the run:
+
+| | arc-lith | kls-on |
+|---|---|---|
+| continental boundary, raw / smoothed over two spacings | 602,000 / 416,000 km | 484,000 / 378,000 km |
+| hyper-extended crust (PLT-661's margins) | 0.102 of the planet | 0.061 |
+| continental area (Earth 0.41) | 0.537 | 0.469 |
+| ocean floor enclosed by continental crust | 0.095 | 0.023 |
+| continents over 10⁵ km² | 13.5 | 23.5 |
+
+The crust budget (loss-budget.py, km³ a year) is otherwise unchanged. The resampling's part is −11.80 against −11.12.
+Sediment subduction rises to 3.08 against 2.69 (Earth 1.1), because fewer converted margins hold the sediment. The
+boundary is still about three times Earth's passive margins at the lattice's scale: what remains is the continents' shape
+(rifts, arcs), not the walk.
+
 #### The cumulative arm m5-cum (PLT-663 to PLT-667, 2026-10-25)
 
 Branch head f468a76f with the switches off: the class blend (PLT-663), the nearest-old-sample labels

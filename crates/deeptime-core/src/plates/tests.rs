@@ -2247,6 +2247,10 @@ fn equator_level_set(st: &mut PlateState, geo: &Geo) {
     st.level_set = Some(level_set::LevelSet {
         phi: geo.points().iter().map(|p| p.z.abs() as f32).collect(),
         member: st.samples.iter().map(|s| s.group).collect(),
+        kind_phi: Vec::new(),
+        kind_member: Vec::new(),
+        class_phi: Vec::new(),
+        class_member: Vec::new(),
     });
 }
 
@@ -2622,6 +2626,80 @@ fn how_resamplings_roughen_a_boundary() {
                  offset {o1} → {o}"
             );
         }
+    }
+}
+
+/// A margin inside one plate through resamplings (the arc-stock lane, 2026-11-01): a resampled
+/// sample's kind is its nearest old corner's (PLT-664), the rule the level set replaced for the
+/// plates' outlines (PLT-536), so a passive margin (continental crust and ocean floor of one
+/// plate) could walk as a plate's outline did without it. One plate, continental north of the
+/// equator and oceanic south of it, resampled 40 times with nothing else in the step: after each,
+/// the margin's continental samples (visible, with a visible oceanic neighbour), their offset from
+/// the equator and spread about it in lattice spacings, and the margin's lattice edges per spacing
+/// of its length.
+#[test]
+fn how_resamplings_roughen_a_margin() {
+    let p = preset(40_000, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let spacing = env.norm.spacing_rad();
+    let (mut st, mut geo) = plates_unresolved(&p, &env, glam::DQuat::IDENTITY, |q| q.z > 0.0);
+    for s in &mut st.samples {
+        s.group = 0;
+    }
+    st.groups.truncate(1);
+    st.plates[1].alive = false;
+    let mut pos = geometry::positions(&st, &geo);
+    st.recount(&pos);
+    let mut seen: Vec<(f64, f64, f64)> = Vec::new();
+    for k in 1..=40 {
+        let mut world = WorldState::new(1, 16_384, p.t_start_years());
+        let tree = Tree::over(&pos, |_| true);
+        geo = ridges::resample(&mut st, &mut world, &pos, &tree, &geo, &env).unwrap();
+        level_set::reinit(&mut st, &geo, spacing);
+        let pts = geo.points();
+        let mut lat: Vec<f64> = Vec::new();
+        let mut edges = 0usize;
+        for (i, q) in pts.iter().enumerate() {
+            let s = &st.samples[i];
+            if s.is_hidden() || s.kind != CONTINENTAL {
+                continue;
+            }
+            let n = geo
+                .edges(i as u32)
+                .filter(|&(j, _)| {
+                    let o = &st.samples[j as usize];
+                    !o.is_hidden() && o.kind != CONTINENTAL
+                })
+                .count();
+            if n == 0 {
+                continue;
+            }
+            lat.push(q.z.asin() / spacing);
+            edges += n;
+        }
+        let len = lat.len().max(1) as f64;
+        let mean = lat.iter().sum::<f64>() / len;
+        let rms = (lat.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / len).sqrt();
+        let per = edges as f64 / (std::f64::consts::TAU / spacing);
+        if [1, 2, 5, 10, 20, 30, 40].contains(&k) {
+            eprintln!(
+                "margin after {k} resamplings: {} samples, offset {mean:+.2} spacings, spread \
+                 {rms:.2}, edges per spacing {per:.2}",
+                lat.len()
+            );
+        }
+        seen.push((rms, per, mean));
+        pos = geometry::positions(&st, &geo);
+        st.recount(&pos);
+    }
+    let (s1, e1, o1) = seen[0];
+    for k in [10, 20, 30, 40] {
+        let (s, e, o) = seen[k - 1];
+        assert!(
+            s < s1 + SPREAD_SLACK && e < e1 * EDGE_SLACK && (o - o1).abs() < OFFSET_SLACK,
+            "after {k}: spread {s1} → {s}, edges per spacing {e1} → {e}, offset {o1} → {o}"
+        );
     }
 }
 
@@ -6299,6 +6377,9 @@ fn ratchet(chain: u64, steps: bool) -> Ratchet {
             &env,
         )
         .unwrap();
+        // As a run has it: the outlines' distances set again after the resampling (PLT-536,
+        // PLT-852).
+        level_set::reinit(&mut s2, &geo2, env.norm.spacing_rad());
         let pos2 = geometry::positions(&s2, &geo2);
         s2.recount(&pos2);
         (s2, geo2, pos2)
@@ -6445,22 +6526,27 @@ fn a_resampling_keeps_a_converted_margin_apart_from_its_core() {
 /// fraction of a spacing each time, and the one-way conversion keeps every move that puts an
 /// ocean-side column in the zone (plates.md "The residual ratchet").
 ///
-/// No rule tried passes it (2026-10-25, plates.md "Which old sample a new one follows"). A vote of
-/// the corners' weight at one half (motion by curvature) slows the count (274 to 337 over 24) but
-/// the lowest z still goes to −0.121, since the core's own edge roughens under every rule (the core
-/// south of the start's edge: 130 columns at −0.118 with the nearest label, 84 at −0.092 with the
-/// vote); and the vote eats any body a fixed 0.14 to 0.22 cells per resampling, so on the quick
-/// planet's lattice it took all of a strip one spacing wide (an island arc's band) by the 35th and
-/// half of a 500 km microcontinent by the 70th. A conservative remap keeps the felsic rock but
-/// spreads it onto ocean-kind columns and grows the core (+2.3 % in 24). The nearest label keeps
-/// the mass without bias ([`a_resampling_keeps_thin_crust_on_average`]), so it stays.
+/// No rule tried on 2026-10-25 passed it (plates.md "Which old sample a new one follows"). A vote
+/// of the corners' weight at one half (motion by curvature) slowed the count (274 to 337 over 24)
+/// but the lowest z still went to −0.121, since the core's own edge roughened under every rule
+/// (the core south of the start's edge: 130 columns at −0.118 with the nearest label, 84 at −0.092
+/// with the vote); and the vote ate any body a fixed 0.14 to 0.22 cells per resampling. A
+/// conservative remap kept the felsic rock but spread it onto ocean-kind columns and grew the core
+/// (+2.3 % in 24).
+///
+/// The kind and class level sets with each piece's count kept (PLT-852, 2026-11-01;
+/// `ridges::conserved_classes`) pass it: over 24 resamplings with the steps the count stays 255 to
+/// 291 and the lowest z −0.040 to −0.067, the core 9,998 to 9,999, 62 of its columns past the
+/// start's edge at −0.035 at most ([`the_ratchet_planet_over_24_resamplings`]). One resampling
+/// keeps the count exactly, so the band for the count is the step's own: each step turns 15 to
+/// 48 columns and turns 16 to 47 back (PLT-661, PLT-667), and the count may stand within twice
+/// the largest net change of one step of where it began; a ratchet's growth (271 to 442 over six
+/// with the nearest label) is a trend past that.
 ///
 /// This is the margins stage's acceptance test (the coordinator's call, 2026-10-25): the margins
 /// stage (PLT-661's switch), and anything else with a one-way conversion measured from the core's
-/// edge, cannot go on until a remap passes it. That remap is interface-tracking or
-/// volume-of-fluid, with the nearest label's unbiased mass.
+/// edge, could not go on until a remap passed it.
 #[test]
-#[ignore = "the margins stage's acceptance test: fails until an interface-tracking remap (PLT-664, plates.md \"Which old sample a new one follows\")"]
 fn a_converted_margins_zone_stays_flat_over_six_resamplings() {
     let r = ratchet(6, true);
     let band = |v0: f64, v: &[f64]| {
@@ -6468,7 +6554,15 @@ fn a_converted_margins_zone_stays_flat_over_six_resamplings() {
         let hi = v.iter().copied().fold(v0, f64::max);
         (lo - (hi - lo), hi + (hi - lo))
     };
-    let (count_lo, count_hi) = band(r.before as f64, &r.kept);
+    let (mut count_lo, mut count_hi) = band(r.before as f64, &r.kept);
+    // The step's own churn: twice the largest net change one step makes to the count.
+    let churn = r
+        .zone
+        .iter()
+        .map(|&(at, after, _)| (after as f64 - at as f64).abs())
+        .fold(0.0, f64::max);
+    count_lo -= 2.0 * churn;
+    count_hi += 2.0 * churn;
     let (z_lo, z_hi) = band(r.reach0, &r.reaches);
     for (k, &(_, after, z)) in r.zone.iter().enumerate() {
         assert!(
@@ -6482,6 +6576,38 @@ fn a_converted_margins_zone_stays_flat_over_six_resamplings() {
             "resampling {}: the zone's lowest z {z:.4} outside [{z_lo:.4}, {z_hi:.4}] ({:?})",
             k + 1,
             r.zone
+        );
+    }
+}
+
+/// The ratchet planet over 24 resamplings, each followed by a step and with none (a read for the
+/// class level set, PLT-852; plates.md "The residual ratchet" has the nearest label's: the count
+/// 271 to 709 with the steps and 257 to 302 without, the lowest z to −0.154 and −0.110, the core
+/// 130 columns past the start's edge).
+#[test]
+fn the_ratchet_planet_over_24_resamplings() {
+    for steps in [true, false] {
+        let r = ratchet(24, steps);
+        eprintln!(
+            "steps {steps}: before {} at z {:.4}, core {}; one resampling: {:?} at {:?}",
+            r.before, r.reach0, r.core0, r.kept, r.reaches
+        );
+        eprintln!(
+            "  zone (at the resampling, after the step, lowest z): {:?}",
+            r.zone
+                .iter()
+                .map(|z| format!("{} {} {:.3}", z.0, z.1, z.2))
+                .collect::<Vec<_>>()
+        );
+        eprintln!(
+            "  turned {:?} left {:?}; cores {:?}; core past the edge {:?}",
+            r.turned,
+            r.left,
+            r.cores,
+            r.core_out
+                .iter()
+                .map(|c| format!("{} {:.3}", c.0, c.1))
+                .collect::<Vec<_>>()
         );
     }
 }
@@ -8006,23 +8132,17 @@ fn why_law_2_propagations_end() {
     }
 }
 
-/// A resampling keeps thin continental crust on average (ledger: PLT-664). Twelve strips one
-/// spacing wide and 2,000 km long, an island arc's band, and eight caps two spacings in radius lie
-/// on one plate's ocean; one resampling on each of 24 lattices. A label from the nearest old sample
-/// carries each old sample's crust to the new points in its cell, so the continental area's mean
-/// over the lattices stays within three standard errors of where it was, the spread being the
-/// lattices' own (no tuned value). A threshold of the corners' weight at one half (a class vote,
-/// tried 2026-10-25) eats such strips from both sides: on the quick planet's lattice it took
-/// 6.7 % of a strip one spacing wide at the first resampling and all of it by the 35th.
-#[test]
-fn a_resampling_keeps_thin_crust_on_average() {
-    let n_samples = 20_000u32;
-    let p = preset(n_samples, 20.0, "supercontinent", 5);
-    let stage = PlatesStage::new(p.clone());
-    let env = stage.env(&p.tectonics, 1);
+/// PLT-664's planet of thin continental crust: twelve strips one spacing wide and 2,000 km long, an
+/// island arc's band, and eight caps two spacings in radius on plate 0's ocean, the rest of the
+/// planet plate 1 (`n_samples` the lattice's).
+fn thin_crust_planet(
+    p: &PlanetPreset,
+    env: &Env<'_>,
+    n_samples: u32,
+) -> (PlateState, Geo, Vec<DVec3>) {
     let r_km = env.norm.model_km;
     let h_km = r_km * (4.0 * std::f64::consts::PI / f64::from(n_samples)).sqrt();
-    let (mut st, geo, pos) = plates_split(&p, &env, 0.0, |q| q.z > -0.9);
+    let (mut st, geo, pos) = plates_split(p, env, 0.0, |q| q.z > -0.9);
     let inside = |q: DVec3| -> bool {
         for k in 0..12 {
             let th = (30.0 * f64::from(k)).to_radians();
@@ -8058,6 +8178,83 @@ fn a_resampling_keeps_thin_crust_on_average() {
         }
         s.thickness_m = pools::thickness(&s.pools);
     }
+    (st, geo, pos)
+}
+
+/// Thin continental crust through 40 resamplings with nothing else in the step, the outlines'
+/// distances set again after each as a run has them (the arc-stock lane, 2026-11-01; PLT-664,
+/// PLT-852): with the class on a level set and with the nearest corner's class, the continental
+/// samples and the lattice edges between continental crust and ocean floor after each, against
+/// the start. The nearest corner keeps the area on average and roughens the outlines; the level
+/// set holds an outline it resolves and drifts a curved one towards its centre (PLT-536's
+/// round plate); this measures both on the strips and caps of an island arc's size.
+#[test]
+fn thin_crust_through_resamplings() {
+    let n_samples = 20_000u32;
+    for on in [false, true] {
+        let mut p = preset(n_samples, 20.0, "supercontinent", 5);
+        p.tectonics.class_level_set = on;
+        let stage = PlatesStage::new(p.clone());
+        let env = stage.env(&p.tectonics, 1);
+        let spacing = env.norm.spacing_rad();
+        let (mut st, mut geo, mut pos) = thin_crust_planet(&p, &env, n_samples);
+        let count = |st: &PlateState, geo: &Geo| {
+            let mut n = 0usize;
+            let mut edges = 0usize;
+            for (i, s) in st.samples.iter().enumerate() {
+                if s.is_hidden() || s.kind != CONTINENTAL {
+                    continue;
+                }
+                n += 1;
+                edges += geo
+                    .edges(i as u32)
+                    .filter(|&(j, _)| {
+                        let o = &st.samples[j as usize];
+                        !o.is_hidden() && o.kind != CONTINENTAL
+                    })
+                    .count();
+            }
+            (n, edges)
+        };
+        let (n0, e0) = count(&st, &geo);
+        let mut line = Vec::new();
+        for k in 1..=40 {
+            let mut world = WorldState::new(1, 16_384, p.t_start_years());
+            let tree = Tree::over(&pos, |_| true);
+            geo = ridges::resample(&mut st, &mut world, &pos, &tree, &geo, &env).unwrap();
+            level_set::reinit(&mut st, &geo, spacing);
+            pos = geometry::positions(&st, &geo);
+            st.recount(&pos);
+            if [1, 2, 5, 10, 20, 30, 40].contains(&k) {
+                let (n, e) = count(&st, &geo);
+                line.push(format!(
+                    "{k}: {n} ({:+.1} %), edges {e}",
+                    (n as f64 / n0 as f64 - 1.0) * 100.0
+                ));
+            }
+        }
+        eprintln!(
+            "class level set {on}: start {n0}, edges {e0}; {}",
+            line.join("; ")
+        );
+    }
+}
+
+/// A resampling keeps thin continental crust on average (ledger: PLT-664). Twelve strips one
+/// spacing wide and 2,000 km long, an island arc's band, and eight caps two spacings in radius lie
+/// on one plate's ocean; one resampling on each of 24 lattices. A label from the nearest old sample
+/// carries each old sample's crust to the new points in its cell, so the continental area's mean
+/// over the lattices stays within three standard errors of where it was, the spread being the
+/// lattices' own (no tuned value). A threshold of the corners' weight at one half (a class vote,
+/// tried 2026-10-25) eats such strips from both sides: on the quick planet's lattice it took
+/// 6.7 % of a strip one spacing wide at the first resampling and all of it by the 35th.
+#[test]
+fn a_resampling_keeps_thin_crust_on_average() {
+    let n_samples = 20_000u32;
+    let p = preset(n_samples, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (st, geo, pos) = thin_crust_planet(&p, &env, n_samples);
     let continental = |st: &PlateState| {
         st.samples
             .iter()

@@ -194,6 +194,17 @@ the lattice raggedness); (2) margins a collision welds inland, which Earth's oro
 reads the orogens closed narrow and wide oceans made from hyper-extended margins; not read beyond that) where the model
 keeps them as margins at 2.4 km under the sea; (3) the share of edges the rule rings (0.73 against about 0.65).
 
+**What lengthens the boundary: the nearest label's walk** (2026-11-01, branch `margin-level-set`, PR #63). A resampled
+sample took its kind and class from its nearest old corner (PLT-664), the rule PLT-536's level set had replaced for plate
+outlines. The rule keeps a class's area on average but moves its edge by up to half a spacing at random at every resampling.
+The M5 lane measured it in 2026-10-25 ("Which old sample a new one follows", plates.md): 143 flecks and 138 holes on a
+supercontinent after 70 resamplings. A new test, `how_resamplings_roughen_a_margin`, puts continental crust and its own
+plate's ocean floor either side of the equator. Over 40 resamplings the margin's spread grows from 0.44 to 1.64 spacings
+and its edges per spacing from 2.26 to 4.56. A run resamples about 50 times (every 20 Myr), so this alone about doubles a
+margin's raw length. It matches the raw over smoothed lengths above (1.04 at the start, 1.45 on and 1.74 off at the end).
+The fix is a numerical one (PLT-852, plates.md "The kind and class on level sets, each piece's area kept"): the crust's kind
+and class on level sets, each piece keeping its count of samples. The arm `kls-on` reads it on the pool.
+
 **The sediment the margins hold** (`seased.py`, the same arms; GlobSed, Straume et al. 2019, Table 3 as bibliography.md
 quotes it: about 3.37 x 10⁸ km³ over about 3.63 x 10⁸ km², on the margins 1.43 x 10⁸ km³ over 4.69 x 10⁷ km², beyond
 200 km of the continent-ocean boundary 1.13 x 10⁸ km³ over 2.79 x 10⁸ km²):
