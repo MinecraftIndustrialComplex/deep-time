@@ -179,6 +179,10 @@ def run_stats(run):
             r["arc_o_made_km3"] = made
             r["arc_o_kept"] = standing / made if made else float("nan")
             r["alone_standing_km3"] = float(a[alone, 7].sum() / 1000.0 * cell_km2)
+        # The boundary's length at every snapshot (as at the end, below): the label against ocean floor.
+        if "coast_cont_km" not in r:
+            pairs = cKDTree(p).query_pairs(th.chord(1.2 * spacing), output_type="ndarray")
+            r["coast_cont_km"] = float((cont[pairs[:, 0]] != cont[pairs[:, 1]]).sum() * spacing / np.sqrt(3.0))
         out[t] = r
     return out
 
