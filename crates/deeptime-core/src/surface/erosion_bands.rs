@@ -158,8 +158,9 @@ pub struct StepErosion<'a> {
     pub closed: Option<&'a [bool]>,
     /// The cells whose runoff weight is at most [`DRY_WEIGHT`] (the stream power's dry ground).
     pub dry: Option<&'a [bool]>,
-    /// The cells whose mean temperature is below 0 °C (where the surface's runoff is all of P,
-    /// `surface/climate.rs`).
+    /// The cells whose mean temperature is below 0 °C: where the snapshot's own rule runs off all
+    /// of P (`surface/climate.rs`, ERO-010); with `surface.runoff_budget` they run off what the
+    /// budget leaves (ERO-221), so the class is a temperature class, not a runoff one.
     pub frozen: Option<&'a [bool]>,
 }
 

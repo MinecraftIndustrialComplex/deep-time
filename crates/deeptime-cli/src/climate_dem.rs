@@ -135,7 +135,11 @@ pub fn run(o: &Options) -> CliResult<()> {
         sea: 0.0,
         p: &p,
         planet,
-        monthly: o.dump.is_some(),
+        monthly: if o.dump.is_some() {
+            snapshot::MonthsKept::TemperaturesAndRain
+        } else {
+            snapshot::MonthsKept::None
+        },
         ice_prev: None,
         koppen_prev: None,
         correction: &deeptime_core::climate::percell::Correction::default(),
