@@ -134,11 +134,12 @@ pub struct SurfaceParams {
     /// The stream power's runoff from the bake's water budget (`HydroParams::budget`, the lake
     /// balance's): rain only in the thawed share of the year, snow melted by its degree-days,
     /// evapotranspiration on the liquid water with PET from the biotemperature, on the climate
-    /// stage's own warmest and coldest month; the young stage and the amplifier take the same
-    /// weight. On by default since 2026-10-31 (the coordinator's call, under Ben's rule of
-    /// 2026-10-23: physics goes on by default once built and correct; decisions log 2026-10-31;
-    /// the arm rb1 against base35-s4 after the law's review: the guard the base's, K's regions
-    /// inside Montgomery & Brandon's lines, the flat high ground wearing a quarter less).
+    /// stage's twelve months (its warmest and coldest month, else the mean +/- 8 C, where they are
+    /// missing); the young stage and the amplifier take the same weight. On by default since
+    /// 2026-10-31 (the coordinator's call, under Ben's rule of 2026-10-23: physics goes on by
+    /// default once built and correct; decisions log 2026-10-31 and 2026-11-01; the arm rb3
+    /// against base35-s4 after the law's third review: the guard the base's, K's regions inside
+    /// Montgomery & Brandon's lines, the flat high ground wearing a quarter less).
     /// `false`: PET is 60 mm/°C x the mean annual temperature, 0 below 0 °C, and all of the
     /// precipitation of a land below freezing runs off, as before (ERO-010). ledger: ERO-221,
     /// ERO-222

@@ -153,6 +153,25 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 
 ## Build log
 
+### 2026-11-01: The runoff law's third re-review fixes and the arms rb3 and rb3-off; the flip holds (the coordinator, inline after the lane stopped on the rate limit; branch `surface-runoff-budget`, PR #57; origin/master ad1e0f2b merged, CHECKPOINT_SCHEMA 15)
+
+- **The third re-review** (an Opus reviewer at 0da55f68, PR #57's comment): the carry and the half-sines right; seven
+  findings. Fixed in 39c599d6: one set of months in the world (the twelve carried as departures from the previous
+  step's row months, `carry_month`: half the months' cost in the world and in each epoch checkpoint), the carry tested
+  (three steps, two snapshots), `CHECKPOINT_SCHEMA` bumped, the months' rain at the last snapshot only
+  (`snapshot::MonthsKept`, the device's read-back reserved by what is kept), the water view on the twelve months,
+  HYD-031's extremes, MOI-076, the nits; design "The third re-review and its fixes".
+- **The nudge test** (`the_nudges_reach_their_targets_gently`): the law's small planet ends 0.0098 over the unsteered
+  run's land; the margin 0.005 (62d4da69).
+- **The arms** (8 runs each against base35-s4, key 3477d4965277; `arm_rb3.sh`, `pool.sh table`): rb3-off neutral (p
+  0.29 or more); rb3: the guard the base's (10,477 against 10,304 m), the flat high ground 106 against 139 m/Myr, K's
+  regions 4 to 14 % slower and inside Montgomery & Brandon's lines at 500 m and more, land 0.237 against 0.216,
+  continental crust under the sea 0.540 against 0.594, the criteria a median of 5.5 against 5 (no V1 column at p under
+  0.16). The flip holds (decisions log 2026-11-01); design "The arms on the fixed head".
+- **The merge with master** (PR #55's `converging` took schema 14): this branch's months are 15; PR #58's dynamics
+  record moves to 16.
+- **Next:** land PR #57; then PR #58 on top.
+
 ### 2026-10-31: The runoff law's second re-review fixes: one thaw law everywhere (the climate stage carries its twelve months every step), two half-sines where the months are missing (the runoff lane, worktree agent-a4e92fd13092b08b0, branch `surface-runoff-budget`, PR #57; origin/master e65259fe merged)
 
 - **The second re-review** (an Opus reviewer at e01f6bfa): the first re-review's code fixes right; two new problems.

@@ -1405,3 +1405,8 @@ All three are fixed. Armed again on base35-s4 (rb1, 8 runs): the guard the base'
 146.5 m/Myr (the months' correction alone, rb-months), the land above 2 km a sixth more over the run, K's regions 8 to
 18 % slower (inside Montgomery & Brandon's lines at 500 m of relief and more, above both under it, as on the base), the criteria a median of 6 against 5. The months' correction alone
 moves no column. On by default since 2026-10-31 (the coordinator's call, decisions log), the months' correction with it.
+Armed again on the head after its third re-review (rb3 and rb3-off on base35-s4, 8 runs each, 2026-11-01; the design's
+"The arms on the fixed head"): the corrections alone move no column (p 0.29 or more); with the law the guard is the
+base's, the flat high ground wears 106 against 139 m/Myr, K's regions 4 to 14 % slower (inside Montgomery & Brandon's
+lines at 500 m of relief and more, above both under it, as on the base), no V1 column moves at p under 0.16 and the
+criteria are a median of 5.5 against 5. The default held (decisions log 2026-11-01).
