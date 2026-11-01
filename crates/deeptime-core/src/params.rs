@@ -714,6 +714,14 @@ pub struct TectonicParams {
     /// for the reference depth is right yet, as the model's sea is not (an open fault,
     /// lithosphere-thermal-state.md); needs `thermal_state` (ledger ISO-110).
     pub thermal_isostasy_m: f64,
+    /// A continental column's height from its whole buoyancy (`plates/buoyancy.rs`): its pools'
+    /// rock at their depths, its mantle lithosphere's thermal contraction and its keel's depletion,
+    /// against a free asthenosphere set by the ridge's column, in place of PLT-281's one Airy line
+    /// where a column settles (`settle.rs`) and in the collapse's thin sheet; the start's
+    /// continents take the thickness at which the law holds them at their start heights. Off by
+    /// default (built 2026-10-31, not yet tested on the pool); needs `thermal_state` and excludes
+    /// `thermal_isostasy_m` (ledger PLT-830 to PLT-836).
+    pub column_buoyancy: bool,
     /// The lithosphere's depth, km, at which the model's Airy line stands (the thermal height is 0
     /// there), and the depth the start's continents begin at (ledger ISO-111).
     pub thermal_reference_km: f64,
@@ -1563,6 +1571,7 @@ impl Default for TectonicParams {
             collapse_sheet_thermal: true, // ledger: PLT-581 (on since 2026-10-25)
             thermal_state: true,          // ledger: PLT-460 (on since 2026-10-23)
             thermal_isostasy_m: 0.0,      // ledger: ISO-110 (off: an open fault; 1,600 m when on)
+            column_buoyancy: false,       // ledger: PLT-836 (off: built, not yet on the pool)
             thermal_reference_km: 225.0,  // ledger: ISO-111
             thermal_strength: true,       // ledger: ISO-112 (on since 2026-10-23)
             collision_underthrust: false, // ledger: PLT-546, ISO-131, ISO-136 (off: step noise on the pool)
@@ -2038,6 +2047,12 @@ impl PlanetPreset {
             k.thermal_state || (k.thermal_isostasy_m == 0.0 && !k.thermal_backstop),
             "$.tectonics.thermal_state",
             "thermal_isostasy_m and thermal_backstop need thermal_state",
+        )?;
+        // The whole column's buoyancy reads the state's L and K, and replaces ISO-110's term.
+        check(
+            !k.column_buoyancy || (k.thermal_state && k.thermal_isostasy_m == 0.0),
+            "$.tectonics.column_buoyancy",
+            "needs thermal_state and excludes thermal_isostasy_m",
         )?;
         // PLT-652 (`collision_upper_plate_shortening`, on by default) reads the sheet's strength
         // at the lithosphere's thermal age: without the state or a sheet viscosity it does nothing
@@ -2604,6 +2619,21 @@ mod tests {
         assert_eq!(
             edit(&|v| v["planet"]["ocean_fraction"] = json!(1.5)),
             "$.planet.ocean_fraction"
+        );
+        // The whole column's buoyancy reads the thermal state and replaces ISO-110's term.
+        assert_eq!(
+            edit(&|v| {
+                v["tectonics"]["column_buoyancy"] = json!(true);
+                v["tectonics"]["thermal_isostasy_m"] = json!(1600.0);
+            }),
+            "$.tectonics.column_buoyancy"
+        );
+        assert_eq!(
+            edit(&|v| {
+                v["tectonics"]["column_buoyancy"] = json!(true);
+                v["tectonics"]["thermal_state"] = json!(false);
+            }),
+            "$.tectonics.column_buoyancy"
         );
         assert_eq!(
             edit(&|v| v["resolution"]["l1_r"] = json!(7)),

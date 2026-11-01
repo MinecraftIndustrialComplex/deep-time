@@ -45,6 +45,7 @@
 //! a checkpoint) is reproducible.
 
 pub mod belts;
+pub mod buoyancy;
 pub mod check;
 pub mod collapse;
 pub mod collision;

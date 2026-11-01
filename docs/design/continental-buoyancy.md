@@ -1,42 +1,113 @@
 # A continental column's height from its whole buoyancy: design
 
-Status: **designed; being built behind `tectonics.column_buoyancy` (off)** (the low-continents lane's lead, the
-coordinator's task of 2026-10-31; branch `continental-buoyancy` from master 0a3ada8c). Ledger PLT-830 to PLT-849.
+Status: **built behind `tectonics.column_buoyancy` (off); gated; waiting for its pool arm** (the low-continents lane's
+lead, the coordinator's task of 2026-10-31; branch `continental-buoyancy`). Ledger PLT-830 to PLT-836 (PLT-837 to 849
+kept for what the arm asks). Science page: `docs/science/continental-buoyancy.md`.
 
 ## Why
 
 The low-continents diagnosis (sea-level.md, "Why base35's continents stand low, against Earth (2026-10-31)", revised
-after PR #56's review) found base35's continents low because its crust at least 20 km thick covers 0.48 of the planet
-instead of Earth's 0.38, with 10 % more volume than Earth's and 13 % thinner: the larger area holds the sea 292 m over
-Earth's fill (means; +492 m of it the area, -68 m the steering's nudge), and the thin crust stands low. The area has
-two sources of about equal weight:
+after PR #56's review and re-review) found base35's continents low because its crust at least 20 km thick covers 0.48
+of the planet instead of Earth's 0.38, 13 % thinner than Earth's: the larger area holds the sea 292 m over Earth's
+fill (means; +492 m of it the area, -68 m the residual, of which the steering's offset about -47), and the thin crust
+stands low. In logarithms of the area (per-run means):
 
-- **The start** (the preset): every run starts with 0.4225 of the planet continental in a uniform 35.1 km column
-  (PLT-131), 10 % over Earth's area with 6 % more volume (14.8 against 14.0 km planet-mean) and none of Earth's 0.117
-  of the planet at 40 km and more. It carries about 0.4 of base35's excess area (0.7 of base34's); on Earth's
-  histograms the start's area alone puts the sea 213 m over Earth's fill.
-- **The run's thinning** (35.1 to 32.0 km mean), about 0.4: the start's crust is taken under at trenches and
-  collisions (its volume kept by the crust budget) while new area grows on ocean floor as island-arc crust at 31.6 km,
-  and the start's own crust thins to 33.5 km. Its cause is a hypothesis, not measured: every continental column stands
-  on PLT-281's one Airy line, z = z_0 + (T - 35.1 km) / 7.02 over the datum (z_0 525 m, the middle of
-  `continent_elevation_m`), which with the sea at the datum is near Earth's at 32 to 34 km and stands 400 to 1,320 m
-  above Earth's ice-free crust at 36 to 44 km, so thick crust stands high and may wear to the column at the sea (33.6
-  km under base35's sea). The kept volume of the crust budget is the rest (about 0.2 on base35).
+- **The thickness carries about 0.6 of the excess.** Two parts:
+  - The start class (continental crust on no ocean basement) thins from 35.1 to 33.5 km, its column at the sea on
+    PLT-281's line (33.6 km under base35's sea; base34 32.8 against 32.6). Against Earth's 36.4 km this is 0.37 of
+    the excess. Its cause is a hypothesis, not measured: on PLT-281's one Airy line, z = z_0 + (T - 35.1 km) / 7.02
+    over the datum, thick crust stands high (400 to 1,320 m over Earth's ice-free crust at 36 to 44 km) and wears to
+    the column at the sea.
+  - The mix with crust converted on ocean floor (0.22): at the end that crust is 0.34 of the planet, 0.71 of the crust
+    at least 20 km thick, at 30.9 to 33.4 km (island-arc crust 0.157 of the planet at 31.3 km), and only 0.40 of it
+    stands dry, so it holds most of the drowned crust. It stands under the sea, which by the same hypothesis fills
+    rather than wears, so its thickness is what the conversion builds (arcs maturing, PLT-047 and PLT-760; the
+    thickening's spread, PLT-287; restacking onto upper plates on ocean floor).
+- **The start's volume, 0.27** (14.8 against Earth's 14.0 km planet-mean, 6 % over); 0.44 if the start's thinner
+  column (35.1 against 36.4 km) is counted as the start's.
+- **The net volume, 0.13**: ocean crust taken into the columns (+0.61) net of own crust lost (-0.48).
 
-Earth holds its thick crust low on cold, keeled lithosphere and its thin crust high on hot lithosphere: in CRUST1.0
-the Basin and Range and Cordillera stand 1,407 to 1,834 m on 30 to 45 km of crust and the cratons 140 to 660 m on 35
-to 45 km, with alike crustal densities (m4cold.py); Hyndman & Currie 2011 put a hot back-arc at the sea on about 27
-km and a craton on about 38 km, about 1,600 m apart at equal crust.
+Earth holds its thick crust low on cold, keeled lithosphere and its thin crust high on hot lithosphere: in CRUST1.0 the
+Basin and Range and Cordillera stand 1,407 to 1,834 m on 30 to 45 km of crust and the cratons 140 to 660 m on 35 to 45
+km, with alike crustal densities (m4cold.py); Hyndman & Currie 2011 put a hot back-arc at the sea on about 27 km and a
+craton on about 38 km, about 1,600 m apart at equal crust.
 
-**So the height law and the start's continents are one design.** A height law alone leaves the start's 0.4: on any
-craton line a 35.1 km start column stands under a sea at the datum (about 400 m on Hyndman & Currie's, and -350 m on
-this design's prototype with the start's L 225 km and K 200 km, `tools/review/buoyancy/law.py`, constants to be
-sourced), so the law with the start as it is would drown the start further. This design therefore also sets the
-start's continents from Earth's hypsometry and volume under the same law: their area (Earth's crust at least 20 km
-thick covers 0.384 of the planet, 14.0 km planet-mean), their thickness distribution (mean 36.4 km, p10 26.6, p50
-36.9, p90 44.5) and their lithosphere (cold keeled interiors, hotter margins), so that with the sea at the datum the
-start stands where Earth's continents stand. The run's thinning is what the arm tests: if the hypothesis holds, cold
-thick crust standing low under the law keeps its thickness and the same volume covers less area.
+**The lead** (PR #56's re-review's restatement, taken by the coordinator):
+
+1. The height law first, with the start's column set to match it. On any craton line a 35.1 km start column would
+   drown: Hyndman & Currie's craton line gives it a dry height of about -409 m, about 595 m under a datum sea under the
+   water load, and this law gives -95 m at 35 km on the craton's state. So the law and the start's column are one
+   design.
+2. The start's volume, a smaller second part.
+3. What the conversion builds, measured before the conversion rules are ruled out as a lever.
+
+The law is expected to move the start class's part (its column at the sea: on a cold, keeled lithosphere thicker crust
+stands at the sea, 35.7 km with the sea at the datum against PLT-281's 31.4, so by the hypothesis less of it wears
+away) and the converted crust's heights (through its lithosphere, PLT-820 and PLT-821: crust with no state on young
+floor reads its floor's thin L and stands high), not the converted crust's thickness, which the conversion rules set.
+
+## The law
+
+A column floats on the asthenosphere (Lachenbruch & Morgan 1990, eq. 1 as Zoback & Mooney 2003 print it): its dry
+height is the free asthenosphere's height H_f plus Σ (ρ_a - ρ) dz / ρ_a down the column. `plates/buoyancy.rs`:
+
+- the crust's pools at their depths with Christensen & Mooney 1995's rock densities (PLT-832; sediment by shale's
+  porosity, PLT-833), expanded by α T on ISO-138's geotherm, the eclogite root as before (PLT-278 to PLT-280);
+- the mantle lithosphere's thermal contraction from the Moho to L, less 0.4 of the keel's (Kaban et al. 2003, PLT-831);
+- α 3.28 × 10⁻⁵ /K and ρ_m0 3,330 kg/m³, Parsons & Sclater's plate as Stein & Stein 1992 print it, with T_m 1,350 °C
+  (PLT-830): ρ_a 3,183 kg/m³;
+- H_f from the ridge: GDH1's 2,600 m of water over 7 km of ocean crust at T_m, -2,580 m (H_0 2.58 km against Zoback &
+  Mooney's 2.78 ± 0.35);
+- L as the heat-flow law reads it, `thermal::sample_l_km` (the lid's floor, PLT-820; crust with no state from its
+  floor's age, PLT-821).
+
+No constant is fitted. The tests hold it to Earth (Kaban et al.'s 0.35 km as the tolerance): the five cratons' 40 to
+45 km band and the Basin and Range and Cordillera's 30 to 40 km bands on CRUST1.0's own crusts; Hyndman & Currie's
+slopes at their mean crusts (126 and 124 m/km against 141 ± 27 and 131 ± 12) and gap (1,846 m against ~1,600); H_0; GDH1 on young floor.
+Hasterok & Chapman 2007's mantle density stays out until their text is read.
+
+## Where it applies
+
+- **The settling** (`settle.rs`, ISO-078): every continental column's target height, in place of PLT-281's line plus
+  ISO-110's term. The settling goes the whole way each step (τ 4 kyr), so this sets every continental height.
+- **The collapse's thin sheet** (PLT-414): the column's potential energy at the law's height, against the normal
+  column at `continent_elevation_m`'s middle as before.
+- **Not changed:** the processes' within-step caps (`collapse::toward` in the collapse, the arcs, the flow, the
+  peaks, the ridges and subduction), the collapse's room (PLT-412, T_n + 7.02 S) and T_n itself (35.1 km); the
+  measurement budgets (gap budget, crust budget) keep reading PLT-281's line. The settling moves every column to the
+  law's height after them; a cap that stops a process at PLT-281's height only shapes the step's path. Moving the caps
+  to the law is a follow-up if the arm shows them binding.
+- **The switch:** `tectonics.column_buoyancy`, off; needs `thermal_state`; excludes `thermal_isostasy_m` (params.rs).
+
+## The start
+
+Whether Ben chose the start's area or column (the coordinator's check): he did not. The decisions log's only row is
+2026-09-29, the meaning of the editor's "ocean fraction" (the water's share, with flooded shelves). The values behind
+the start's 0.4225 of the planet (`ocean_fraction` 0.7, P1-03; `continental_shelf_share` 0.29, Cogley 1984, P1-17)
+and the 35.1 km column (P1-03, "design choice: 35 km", PLT-131) were agents' (git log -S on both; ledger PLT-131,
+HYP-013, HYP-014). So the start goes with the law as one design, under the same switch, with no question for Ben.
+
+With `column_buoyancy` each start continent takes the thickness at which the law holds Rudnick & Gao's three-layer
+column (Hacker, Kelemen & Behn 2015's Fig. 1, PLT-834) at the height the preset gives it, on the craton's state the
+thermal state starts it with (L 225 km, K 200 km): 34.8 km at the shelf break (-130 m, under a datum sea), 35.7 km at
+the coast, 39.3 km at the inland middle (525 m) and 41.9 km at 900 m (PLT-835). The start's area stays the preset's.
+Its volume then rises from 14.8 to about 16 km planet-mean (our arithmetic: about 0.71 of the start dry at a mean
+39.3 km and 0.29 on the shelf at about 35.3 km, over 0.4225 of the planet), about 15 % over Earth's 14.0.
+
+That is the second part, kept apart on purpose: the arm measures the law with the start's heights held, and the area
+is the preset's values, not Ben's. If the arm shows the start's volume carrying the excess, the next step is the
+start's area from Earth's like-for-like measure (`continental_shelf_share` from the share of Earth's crust at least 20
+km thick under the sea, 0.248 by RLC-030, and `ocean_fraction` at Earth's 0.71, which give 0.384 of the planet), a
+change to two preset values the editor shows; it would go to Ben as a question then, with the arm's numbers.
+
+## What the arm measures
+
+One 8-run arm, `column_buoyancy` on, against base35-s4 (the pool's base35 seeds 1 to 4 on both starts): the census
+(land, the continental label under the sea, RLC-032's check), lowcont.py's `area` (the start class's thickness against
+its column at the sea under the law, the converted crust's dry share and height by source, the log factors) and
+`model` (the split's line term, the sea against Earth's fill), and the guards. What would say the law works: the
+start class keeps more of its thickness, the converted crust stands higher on its hot lithosphere, the line term
+moves toward Earth's at 36 to 44 km, and the drowned share falls, with no guard failure.
 
 ## Why thermal isostasy (ISO-110) is built and off, and whether that still holds
 
@@ -63,3 +134,15 @@ So the reason ISO-110 is off still holds for its form (a frame on a median line)
 rather than choosing one: every column's height is its buoyancy against the ridge's column, whose depth the model
 already carries (GDH1's 2,600 m, PLT-352). ISO-110 stays off with the new law on (the switches exclude each other).
 The cold line's flatness is a separate term of the crust's own density (below, "The lower crust").
+
+## With the lid's floor (PR #58) and crust with no state
+
+The law reads L through `thermal::sample_l_km`, the heat-flow law's reading: never above the lid's floor, 1.25 times
+the crust (PLT-820), and for crust with no state its floor's lithosphere (PLT-821). PR #58's review (finding 3) found
+the stored L can sit under the floor after a resampling until the next `thermal::step`; the hotspot lane is storing the
+floored L at refresh. The law floors L on read, so it reads the same L either way. Its finding 10 (ISO-110's
+interaction: PLT-821 moves crust with no state from a thermal height of 0 to about +2 km at E = 1,600 m) has its
+counterpart here: crust made continental on young floor reads a thin, hot lithosphere and stands high under the law
+too, by its own column's buoyancy rather than by ISO-110's linear term, and sinks as `thermal::step` cools it. That is
+the converted crust's height the arm reads. If the floor is later solved on ISO-138's own geotherm (finding 6), the
+law follows it through `thermal::lid_floor_km`.
