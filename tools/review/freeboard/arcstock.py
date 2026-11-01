@@ -142,6 +142,13 @@ def run_stats(run):
                 edge_km = float((near > 0).sum() * spacing)
                 r["core_edge_km"] = edge_km
                 r["hyper_rows"] = float(hyper.sum() * (4.0 * np.pi * R_KM**2 / n0) / (edge_km * spacing))
+            # How broken the continental crust is: its components (the continental samples linked within LINK
+            # spacings), the count over 10^5 km2, and the share of its area in the largest seven.
+            cell_km2_all = 4.0 * np.pi * R_KM**2 / n0
+            sizes = np.bincount(lab[cont]) * cell_km2_all
+            sizes = np.sort(sizes[sizes > 0])[::-1]
+            r["parts_over_1e5km2"] = int((sizes > 1.0e5).sum())
+            r["largest7_share"] = float(sizes[:7].sum() / sizes.sum()) if sizes.size else float("nan")
             for k, m in classes_end.items():
                 r[f"{k}_area"] = float(m.sum() / n0)
                 if not m.any():
