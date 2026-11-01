@@ -14470,3 +14470,37 @@ A cone whose growth held no cell no longer backs rock its hotspot's other cones 
 test now on a planet whose kernel holds several samples, its netting exact, and the volcanic margin's
 test checks each gap point's thickness against its share. The arms above predate the fixes; the
 default without the budget is unchanged.
+
+## The height follows the rock (PLT-850, PLT-851; 2026-11-01)
+
+A resampling rebuilds the sample lattice and interpolates each new sample from the three old samples about it. Its
+rock pools were blended over the corners of its own class since PLT-663 (a continental sample does not take an ocean
+corner's crust, nor ocean floor a continent's), but its height was blended over all three. Ocean floor beside a
+continent or an island arc therefore took a share of their height and none of their rock. A continental column
+settles back to its rock's height within the step (`settle.rs`, ISO-078), but ocean floor has no settling: under GDH1
+it sinks only by its age's increments (PLT-352), and the trench release lifts only floor under its age's curve
+(PLT-443). So the share stayed, and grew with every resampling. The hotspot lane found it diagnosing hs-lid's sea
+(`tools/review/crustcycle/bare_lift.py`, medians of 8 runs' final frames): floor with no thick crust of its own plate
+nearby sat on GDH1 (-39 m on base35), floor beside its own plate's continents 251 m over it (668 m on 60 to 200 Myr
+old floor), beside its own plate's thick ocean crust 83 m; under hs-lid, with its thicker ocean crust, 392, 1,095 and
+365 m, +96 m of that arm's +301 m sea.
+
+The rule now (PLT-850): a resampled sample stands at the height its own rock and age hold it at (`rock_height_m`:
+continental crust its pools' Airy height and ISO-110's thermal height, the dry height the settling holds it to; ocean
+crust its age's floor plus the Airy change of its pools over the ocean's own 7 km column, water-loaded under the
+datum), plus its class corners' blended departures from theirs, which keep what flexure, a trench's pull, a margin's
+held floor or a step's lag held them at. And one rule for every field the resampling blends (PLT-851): a field of the
+column is blended over the corners whose rock the sample takes; a field that records rock taken from the nearest corner
+alone is that corner's. The test `a_resampled_floor_stands_on_its_own_rock`: floor beside a continent 2 km high stands
+at its own rock's height, beside an arc it takes the arc's departure not its height, ten resamplings raise it by
+nothing, and a trench's pull under its law is kept.
+
+**The arm rh2** (2026-11-01; this rule on master cd3544fa, 8 runs against base36-s4, key c4b450e13282): no V1
+measure moves at p under 0.15 (land 0.211 against 0.215, continental crust under the sea 0.607 against 0.602, the
+criteria a median of 5.5 against 4.5), the guard clean (worst 10,165 against 9,960 m, p 0.083; no step beyond two
+Earth reliefs), the sea at the end 346 against 323 m. `bare_lift.py` on the two (medians of the 8 final frames, m over
+GDH1): floor beside its own plate's continents 201 against 258 (on 60 to 200 Myr floor 563 against 611), beside its
+own plate's thick ocean crust 67 against 93, floor near neither -45 against -67. The resampling's blend was about a
+fifth of the lift beside the continents; the rest, about 200 m, has another cause, not yet found (flexure under the
+margin's load, sediment the bare-floor test does not see, the trench release and the margins' held floor are the
+candidates to read). Landed as a correctness fix with no switch (decisions log 2026-11-01).
