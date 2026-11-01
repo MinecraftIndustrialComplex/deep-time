@@ -8379,3 +8379,45 @@ fn a_sourced_plume_head_erupts_a_recorded_province() {
         assert!(ridges::hot_mantle_at(&hot, at, env.t_myr + 21.0).is_none());
     }
 }
+
+/// With `column_buoyancy` the start's continents take the thickness at which the whole column's
+/// buoyancy holds them at their start heights (the shelves' under a sea at the datum), so the
+/// first settling leaves them where they start; a short run keeps every height and thickness
+/// finite and its continents on the law's heights (ledger: PLT-834 to PLT-836).
+#[test]
+fn the_buoyant_start_stands_where_it_starts() {
+    let mut p = builtin_preset("earthlike_quick_16k", 4_000, 20.0, "supercontinent", 2);
+    p.tectonics.column_buoyancy = true;
+    p.validate().unwrap();
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (st, _) = init::initial_state(&p, &env).unwrap();
+    let law = buoyancy::Law::new(env.gravity);
+    let (mut shelf, mut n) = (0, 0);
+    for s in st.samples.iter().filter(|s| s.kind == CONTINENTAL) {
+        let z = settle::equilibrium_m(law.sample_m(s, st.t_myr), 0.0);
+        assert!(
+            (z - f64::from(s.elevation_m)).abs() < 1.0,
+            "{z} against {}",
+            s.elevation_m
+        );
+        // From a shelf's break (-130 m wet, -89 m dry: 34.8 km) to the highest start (900 m:
+        // 41.9 km) on the craton's state (L 225 km, K 200 km).
+        let t = f64::from(s.thickness_m) / 1000.0;
+        assert!((34.5..42.2).contains(&t), "{t}");
+        shelf += usize::from(s.elevation_m < 0.0);
+        n += 1;
+    }
+    assert!(
+        shelf > 0 && shelf < n,
+        "the preset floods a shelf: {shelf} of {n}"
+    );
+    let mut steps = 0;
+    run_stage(&p, |_, _, st| {
+        steps += 1;
+        for s in &st.samples {
+            assert!(s.elevation_m.is_finite() && s.thickness_m.is_finite());
+        }
+    });
+    assert!(steps >= 10, "{steps}");
+}

@@ -454,6 +454,10 @@ pub(super) struct Sheet {
     /// `collapse_sheet_thermal` with `thermal_strength`: crust no orogeny raised flows at its
     /// lithosphere's thermal age too (ledger: PLT-581).
     untagged: bool,
+    /// With `column_buoyancy`, the column's height is the whole column's buoyancy (`buoyancy.rs`)
+    /// in place of its Airy height and ISO-110's term; the normal column it is measured against
+    /// keeps `continent_elevation_m`'s middle (ledger: PLT-836).
+    law: Option<super::buoyancy::Law>,
 }
 
 impl Sheet {
@@ -484,6 +488,9 @@ impl Sheet {
             gravity: env.gravity,
             thermal: super::thermal::Switches::of(k),
             untagged: k.collapse_sheet_thermal && k.thermal_state && k.thermal_strength,
+            law: k
+                .column_buoyancy
+                .then(|| super::buoyancy::Law::new(env.gravity)),
         })
     }
 
@@ -497,8 +504,13 @@ impl Sheet {
         if s.orogeny == OROGENY_NONE && !(self.untagged && s.lithosphere_km > 0.0) {
             return 0.0;
         }
-        let z =
-            iso_height(&s.pools, self.z_0, self.gravity) + self.thermal.uplift_m(s.lithosphere_km);
+        let z = match &self.law {
+            Some(law) => law.sample_m(s, self.t_myr),
+            None => {
+                iso_height(&s.pools, self.z_0, self.gravity)
+                    + self.thermal.uplift_m(s.lithosphere_km)
+            }
+        };
         let du = column_energy(z, true, 0.0, 0.0, f64::INFINITY, self.sea_m, self.gravity)
             - self.u_normal;
         if du.is_nan() || du <= 0.0 {
