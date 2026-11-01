@@ -1548,8 +1548,11 @@ fn the_rifts_stretching_keeps_its_crust_and_off_changes_nothing() {
     let off = run_stage_with(PlatesStage::new(q.clone()), &q, |_, _, st| {
         assert!(st.rift_fill.is_empty() && st.top_deficit_m.is_empty());
     });
-    // No rift floor stacks crust: the thickest column is the run's own, give or take the
-    // fallback's 10 km (the ext-cum arm's divergence, 2026-10-31).
+    // No rift floor stacks crust (the ext-cum arm's divergence, 2026-10-31: floors stacked to
+    // surfaces 322 and 387 km from the sea; a floor now takes at most its source columns' own
+    // thickness, `lay`, tested there). The guard here is against that kind of stacking only:
+    // with the stretching on the run is another run, and its thickest column moves by some km
+    // (62.0 against 51.2 km since Buck's band, PLT-786), the fallback adding up to 10 km a fill.
     let thickest = |w: &WorldState| {
         w.plates
             .as_ref()
@@ -1562,7 +1565,7 @@ fn the_rifts_stretching_keeps_its_crust_and_off_changes_nothing() {
     };
     let (t_on, t_off) = (thickest(&with), thickest(&off));
     eprintln!("thickest continental column: {t_on:.0} m with the stretching, {t_off:.0} m without");
-    assert!(t_on <= t_off + 10_000.0, "{t_on} against {t_off}");
+    assert!(t_on <= 1.5 * t_off, "{t_on} against {t_off}");
     let base = run_stage_with(
         PlatesStage::new(preset(8000, 200.0, "supercontinent", 3)),
         &q,

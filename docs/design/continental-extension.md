@@ -4,7 +4,10 @@ Status: **designed and built, both off; armed on base35-s4: clean after two fixe
 not default-on as built** (2026-10-31, the runoff lane's next task, branch `continental-extension` from
 `uplift-trace` 9cbdd3c5; "The second arm"). `tectonics.rift_stretching` (`plates/extension.rs`, PLT-781 to PLT-784) and
 `tectonics.settle_top_density` (`plates/settle.rs`, PLT-780), with a measurement of what the rate cap trims (the land
-ledger's `cap_land` and `cap_sea`, PLT-785). The arm waits for base35-s4 ("The arm").
+ledger's `cap_land` and `cap_sea`, PLT-785). The arm waits for base35-s4 ("The arm"). Since ext-cum2: the rift trace
+(measurement only, "The rift trace"), Buck's mode map in place of the 700 °C Moho test and a wide side's strain spread
+evenly over its region in the band (PLT-786, PLT-787, "The modes since the trace"), and the rifting rule read against
+Earth's rifts ("The rifting rule against Earth's rifts"); the arm ext-cum3 is next.
 
 ## Why
 
@@ -197,7 +200,8 @@ its β is the integral of ε̇ the plates' motion sets. It never keeps less than
 and its surface goes down by the Airy change of what it lost. A column at the limit takes no share. What the opening
 asks beyond the columns that can still thin is break-up: new sea floor.
 
-**Narrow or wide (PLT-782).** The test is the Moho's temperature on the plate model's own geotherm
+**Narrow or wide (PLT-782; since the rift trace PLT-786 and PLT-787, "The modes since the trace", which replace the
+Moho test and the wide side's decay below).** The test was the Moho's temperature on the plate model's own geotherm
 (`thermal::geotherm_share`, T_m at L). A side whose edge columns' Moho stands at 700 °C or more is wide, else narrow:
 Rey et al.'s "≥700 °C" (p. 443), the middle of Wernicke et al.'s "~650-750 °C" (p. 216). On the model's geotherm, with
 the lithosphere from the heat flow by the model's own law (q = 26 + 3,375 / L), it puts each of Buck's Fig. 30 rifts in
@@ -214,7 +218,7 @@ its mode:
 | southern Rio Grande | 26 | 87 | 679 | narrow |
 
 The Moho temperatures are the agent's arithmetic on the model's geotherm, and the test
-`the_moho_test_puts_bucks_rifts_in_their_modes` repeats it. The mode then sets which columns take part:
+(until the trace) `the_moho_test_puts_bucks_rifts_in_their_modes` repeated it. The mode then sets which columns take part:
 - **A narrow side** takes its share evenly over the columns within L_lith / 2 of the rift, L_lith its edge columns' mean
   lithosphere: "about as wide as the lithosphere is thick" (Buck et al. 1999).
 - **A wide side** spreads it over its hot columns, each with its own Moho at 700 °C or more, as e^(−x/L) with
@@ -412,3 +416,96 @@ thin a whole hot region, and the result is a planet whose continents are mostly 
    dependence, read for its numbers) in place of a fixed Moho test, and the wide reach bounded by the hot region
    that is still over its own strength;
 3. then the arm again. The settling's light top can go on its own arm meanwhile (its mean is about 10 m).
+
+## The rift trace (ext-trace, 2026-10-31: measurement only)
+
+ext-cum2 drowned the continents, and the question was which rifts did it: how far a pair opens before it breaks up,
+which mode its sides take, and how much ground each mode thins. `DEEPTIME_RIFT_TRACE=<folder>` writes, with the
+stretching on, one row per pair and step (`steps.tsv`: the pair, its boundary length and opening speed, the area the
+opening asks and the stretching takes, per side its mode, its edge columns' crust, lithosphere and Moho temperature, how
+far its thinned columns reach and the area they cover) and one row per laid fill (`lays.tsv`: its gap, the column, a
+break-up, what waits). No rule reads it (`plates/rift_trace.rs`; the identity test `the_rift_trace_rows_match_their_headers`,
+and `tools/review/extension/trace_identity.py` checks the traced runs are ext-cum2's own). The arm ext-trace (key
+e5329a3bdd42, argkey 7050a4c4) ran ext-cum2's sets on scattered continents and the supercontinent, seeds 1 and 2;
+`tools/review/extension/rift_trace.py` reads it. Per run:
+- 11.7 to 16.4 pairs of plates rift a step; their boundaries are 69 to 77 km long at p10, 528 to 576 km at the median
+  and 3,059 to 3,943 km at p90, opening at a median of 9.9 to 16.1 mm/yr;
+- the stretching takes 0.43 to 0.48 of the opening's area (the rest is break-up, new sea floor), and stretches 2.5 to
+  3.2 x 10^9 km³ of crust over the 1,000 Myr;
+- a pair opens a median of 112 to 188 km before it breaks up (p90 543 to 849 km), and 0.32 to 0.46 of the pairs break
+  up within 100 km;
+- narrow sides stretch 0.47 to 0.75 of that crust, wide sides 0.25 to 0.53. A narrow side reaches a median of 29 to
+  30 km from its rift, at an edge crust of 14.2 to 15.0 km (mostly margins already thinned); a wide side a median of
+  812 to 1,250 km and at p90 2,479 to 4,149 km, at an edge crust of 32.7 to 35.8 km;
+- by the edge crust, the share of sides that are wide: 0.065 to 0.17 at 20 to 25 km, 0.25 to 0.43 at 25 to 30, 0.49 to
+  0.63 at 30 to 35, 0.70 to 0.76 at 35 to 45, their Moho medians 531 to 578, 623 to 682, 690 to 744 and 853 to 878 °C.
+
+So both modes drowned the continents, and the wide sides' reach was the outlier: the 700 °C test made sides of 25 to
+35 km of crust wide (Earth's normal crust, at a Moho of 650 to 750 °C on the model's geotherm), and e^(−x/L) with
+L = 2W/π carried their strain over thousands of km for a boundary of thousands. Buck's map has those sides narrow; it
+puts its wide band's narrow edge at 810 to 910 °C on the same geotherm (`bucks_band_puts_his_rifts_in_their_modes`).
+That is the change below.
+
+## The modes since the trace: Buck's band (PLT-786, PLT-787)
+
+- **The test** is Buck's mode map (Buck 1991, as Buck 2007's Fig. 30 reprints it, read off the plot): the wide-rift
+  band's narrow edge in crustal thickness against surface heat flow, at about 41.5 km at 74 mW/m², 34 at 83, 28 at
+  98, 24 at 110 and 20 at 136, ending in a tip near 56 km at about 70 mW/m², under which no wide rift is predicted
+  (`BAND_EDGE`, `in_wide_band`). The heat flow is the plate model's own (q = 26 + 3,375 / L). A side whose edge
+  columns' mean crust and lithosphere put it in the band or above it (the core-complex field) is wide, else narrow.
+  Buck's rifts fall in their modes:
+
+  | rift (Buck's Fig. 30, as read) | crust, km | heat flow, mW/m² | mode |
+  |---|---|---|---|
+  | northern Basin and Range | 33 | 90 | wide |
+  | Altiplano | 48 | 90 | wide (above the band) |
+  | Tibet | 64 | 87 | wide (above the band) |
+  | Rhinegraben | 36 | 68 | narrow (under the tip) |
+  | East Africa, Baikal | 40 | 51 | narrow |
+  | northern Red Sea | 30 | 45 | narrow |
+  | southern Rio Grande | 26 | 87 | narrow |
+
+- **A wide side's strain** is spread evenly over its region in the band: the columns of its plate's continental crust
+  that are each in the band, reached from the rift through the band (PLT-787). Buck's wide rift is a zone of pure
+  shear about one lithosphere wide that migrates as the force rises ("Migration of extension would eventually produce
+  a wide rift", Buck 2007, p. 28); the sources give no speed for the migration, so a step spreads its strain over the
+  whole region, which the band bounds (the Basin and Range's region of normal faulting is "as much as 800 km wide",
+  Buck 2007, p. 25). A narrow side keeps its share over half its lithosphere's width.
+- **The progression.** As a wide side thins its crust and lithosphere by the same share its heat flow rises, and it
+  stays in the band until its crust is about 20 km; as its lithosphere cools the edge rises, and under about
+  70 mW/m² it is narrow whatever its crust (`a_wide_side_leaves_the_band_as_it_thins_and_cools`): Buck's progression
+  from core complex to wide to narrow.
+
+## The rifting rule against Earth's rifts (2026-10-31, measured on ext-trace)
+
+The coordinator asked two things of the count: whether 12 to 16 rifting pairs a step is more than Earth has, and
+whether the plates' rifting rule starts rifts where Earth would not. `tools/review/extension/rift_starts.py` reads the
+trace: per step the rifts' boundary length and opening, and each pair's first step (its sides' edge crust and heat
+flow).
+
+**The count is not above Earth's.** Bird 2003's plate boundary model counts 27,472 km of continental rift boundary
+(CRB) opening 0.363 km² a year, and 11 runs of 500 km or more. The model per step: a median of 12,500 to 19,200 km of
+rift boundary opening 0.19 to 0.22 km² a year, with 6 to 9 pairs of 500 km or more. A "pair" is two plates and all
+their rift boundary; Bird's runs are stretches of one boundary class, so the pair count is not his rift count, but the
+length and the opening are the same kind and the model's are under Earth's.
+
+**Where rifts start.** The sources read say cold, normal lithosphere does not rift under the forces plates have:
+- Hopper & Buck 1993: lithosphere is stronger than 20 TN/m under about 60 mW/m², and the plate forces are 1 to 5 TN/m;
+- Kusznir & Park (1986, 1987): extension needs 60 to 65 mW/m² or more;
+- so a rift starts where the lithosphere is weak: hot or already thinned (Buck 2007, p. 36), weakened by dikes where
+  magma is supplied (Bialas, Buck & Qin 2010), or along an inherited weakness, an old suture or mobile belt (Brune et
+  al. 2023).
+- Earth's narrow rifts at about 51 mW/m² (East Africa, Baikal) are of those kinds: on inherited belts, and East Africa
+  over a plume.
+
+The model: 15 to 22 % of the pairs start with a side under 60 mW/m² whose edge crust is 30 km or more (cold and of
+normal thickness), and those pairs stretch 35 to 47 % of the crust; the first step's edge crust is a median of 21.5
+to 25.3 km, so most rifts start on margins thinned before. The plates' rule (`rifting.rs`) already weights where a
+plate splits by its thin lithosphere (PLT-506), a large igneous province under it and its stress. What it does not
+have is a test that a boundary opening through cold, normal lithosphere has one of Earth's reasons; a reopened suture
+(two plates that collided and part again) is one, and the trace does not yet say how many of the cold starts are.
+
+**What the extension needs from it** (the coordinator's call: the rifting rule should need what Earth needs): a rift
+through cold, normal lithosphere stretches only where it has a weakness Earth's would have (thin or hot lithosphere,
+magma, or an inherited suture); elsewhere the plates' motion opens it as before. The next step measures the cold
+starts' kind (suture, plume, split) on the trace before the rule changes.

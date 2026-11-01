@@ -245,7 +245,7 @@ pub const BAND_EDGE: [(f64, f64); 6] = [
 // ledger: PLT-786
 pub fn band_edge_km(q_mw_m2: f64) -> Option<f64> {
     let (q0, _) = BAND_EDGE[0];
-    if !(q_mw_m2 >= q0) {
+    if q_mw_m2.is_nan() || q_mw_m2 < q0 {
         return None;
     }
     for w in BAND_EDGE.windows(2) {
@@ -283,12 +283,18 @@ fn sample_lith_km(s: &Sample, reference_km: f64) -> f64 {
 
 /// A sample's Moho temperature, °C (the record's; no rule reads it).
 fn sample_moho_c(s: &Sample, reference_km: f64) -> f64 {
-    moho_c(f64::from(s.thickness_m) / 1000.0, sample_lith_km(s, reference_km))
+    moho_c(
+        f64::from(s.thickness_m) / 1000.0,
+        sample_lith_km(s, reference_km),
+    )
 }
 
 /// Whether a sample is in Buck's wide band ([`in_wide_band`]).
 fn sample_in_band(s: &Sample, reference_km: f64) -> bool {
-    in_wide_band(f64::from(s.thickness_m) / 1000.0, sample_lith_km(s, reference_km))
+    in_wide_band(
+        f64::from(s.thickness_m) / 1000.0,
+        sample_lith_km(s, reference_km),
+    )
 }
 
 /// One side of a rift: a sample of plate `plate` on its boundary with `other`, the opening speed
@@ -975,7 +981,10 @@ mod tests {
         assert!((r.taken_km2 / r.asked_km2 - 1.0).abs() < 1e-6, "{r:?}");
         for s in &r.sides {
             assert!(s.mode > 0 && s.edges > 0 && s.thinned > 0, "{s:?}");
-            assert!(s.far_km <= s.reach_km + 1e-9 && s.mean_km <= s.far_km + 1e-9, "{s:?}");
+            assert!(
+                s.far_km <= s.reach_km + 1e-9 && s.mean_km <= s.far_km + 1e-9,
+                "{s:?}"
+            );
         }
         // The crust it gives is about the opening's area over the step times a column: the sides
         // move apart at 20 mm/yr (10 each way, along x at +y) over a rift of W km, u W δt T.
@@ -1051,7 +1060,10 @@ mod tests {
         // a Moho of 700 to 840 °C were wide here and are narrow on Buck's map).
         for &(q, h) in &BAND_EDGE[1..] {
             let t = moho_c(h, lith(q));
-            assert!((800.0..=910.0).contains(&t), "edge at {q} mW/m²: Moho {t:.0} °C");
+            assert!(
+                (800.0..=910.0).contains(&t),
+                "edge at {q} mW/m²: Moho {t:.0} °C"
+            );
         }
     }
 
@@ -1063,7 +1075,10 @@ mod tests {
     // ledger: PLT-786
     #[test]
     fn a_wide_side_leaves_the_band_as_it_thins_and_cools() {
-        let (h, l) = (35.0, thermal::MANTLE_HEAT_MW_M2_KM / (90.0 - thermal::CRUST_HEAT_MW_M2));
+        let (h, l) = (
+            35.0,
+            thermal::MANTLE_HEAT_MW_M2_KM / (90.0 - thermal::CRUST_HEAT_MW_M2),
+        );
         assert!(in_wide_band(h, l));
         for keep in [0.9, 0.8, 0.7, 0.6] {
             assert!(in_wide_band(h * keep, l * keep), "keep {keep}");
@@ -1181,7 +1196,10 @@ mod tests {
         // The trace's record: four gap samples, one column (break-up), none waits.
         let r = laid.records[0];
         assert_eq!((r.gap, r.columns), (4, 1), "{r:?}");
-        assert!((r.floor_m - total_col / 2.0).abs() < 1.0 && r.waits_m == 0.0, "{r:?}");
+        assert!(
+            (r.floor_m - total_col / 2.0).abs() < 1.0 && r.waits_m == 0.0,
+            "{r:?}"
+        );
         assert!(r.crystalline_m >= HYPER_EXTENDED_M, "{r:?}");
 
         // No gap between the pair: it waits while both live …
@@ -1254,7 +1272,10 @@ mod tests {
         assert!((fills[0].source_m / fills[0].total_m() - total_col).abs() < 1.0);
         let r = laid.records[0];
         assert_eq!((r.gap, r.columns), (4, 4), "{r:?}");
-        assert!((r.column_m - total_col).abs() < 1.0 && r.even_m > 2.0 * total_col, "{r:?}");
+        assert!(
+            (r.column_m - total_col).abs() < 1.0 && r.even_m > 2.0 * total_col,
+            "{r:?}"
+        );
         assert!((r.waits_m - 6.0 * total_col).abs() < 1.0, "{r:?}");
         // … and goes to the fallback when one of them has died.
         let mut fills = vec![fill_of(10.0)];

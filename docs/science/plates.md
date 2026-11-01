@@ -13730,14 +13730,21 @@ the lowland's column. Neither stretches a continent where its plate boundary ope
 - **How much.** The two sides' continental columns take that area in pure shear, Σ ε̇_i A = u W (McKenzie 1978's
   uniform stretching; PLT-781). Each keeps e^(−ε̇ δt) of its crust and never less than 10 km of crystalline crust
   (Brune et al. 2014; PLT-783). Its lithosphere thins by the same factor.
-- **Narrow or wide (PLT-782).** A side is wide if its edge columns' Moho, on the model's own geotherm, stands at 700 °C
-  or more (Rey, Vanderhaeghe & Teyssier 2001, p. 443; Wernicke et al. 1987, p. 216), else narrow.
+- **Narrow or wide (PLT-786; PLT-782 until the rift trace).** A side is wide if its edge columns' mean crust and
+  lithosphere put it in Buck's wide-rift band or above it: his mode map against crustal thickness and surface heat flow
+  (Buck 1991, as Buck 2007's Fig. 30 reprints it, read off the plot), whose narrow edge runs from about 41.5 km of crust
+  at 74 mW/m² to 20 km at 136, with no wide rift under about 70 mW/m²; the heat flow is the plate model's own. Else
+  narrow. On the model's geotherm that edge lies at a Moho of 810 to 910 °C; the 700 °C test it replaced (Rey,
+  Vanderhaeghe & Teyssier 2001, p. 443) made sides of normal crust wide, which the rift trace found thinning continents
+  thousands of km from their rifts (docs/design/continental-extension.md, "The rift trace").
   - A narrow side spreads the strain evenly over half a lithosphere's thickness from the rift (Buck et al. 1999, p. 673:
     "about as wide as the lithosphere is thick").
-  - A wide side spreads it over its hot columns by the thin sheet's decay e^(−x/L), L = 2W/π (PLT-733's form): Buck
-    2007's Basin and Range, "as much as 800 km wide".
-  - On the model's geotherm the test puts each of Buck's (1991) Fig. 30 rifts in its mode (test
-    `the_moho_test_puts_bucks_rifts_in_their_modes`).
+  - A wide side spreads it evenly over its region in the band, the columns reached from the rift through the band
+    (PLT-787): Buck's zone of pure shear one lithosphere wide that migrates (Buck 2007, p. 28), with no speed for the
+    migration read, the band bounding the region (the Basin and Range, "as much as 800 km wide", p. 25). Until the
+    trace, the thin sheet's decay e^(−x/L), L = 2W/π, over the hot columns.
+  - Buck's rifts fall in their modes (test `bucks_band_puts_his_rifts_in_their_modes`), and a wide side leaves the band
+    as it thins and as it cools (`a_wide_side_leaves_the_band_as_it_thins_and_cools`).
 - **Where the crust goes (PLT-784).** It waits on the pair until the next resampling, which lays it in the gap as the
   rift's floor of stretched continental crust. Past break-up (under 10 km), it is laid as hyper-extended margins nearest
   the plates' edges, and the rest of the gap is sea floor.
@@ -13757,7 +13764,7 @@ normal column, so it is a numerical guard and a stand-in for the orogen's wideni
 "The rate cap").
 
 Tests:
-- `extension.rs`: seven tests (the opening's area, the pure shear and its limit, Buck's rifts, the wide decay, a rift
+- `extension.rs`: seven tests (the opening's area, the pure shear and its limit, Buck's band and his rifts, a wide side leaving the band, a rift
   that keeps its crust, the weaker side, the resampling's floor and break-up);
 - `settle.rs`: `rock_off_the_top_lowers_the_column_by_the_upper_crusts_airy_share`;
 - `gap_budget.rs`: `the_rate_caps_release_goes_to_the_parts_that_thickened_the_column`;
