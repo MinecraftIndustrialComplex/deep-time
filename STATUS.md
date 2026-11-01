@@ -153,6 +153,27 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 
 ## Build log
 
+### 2026-11-01: The crust's kind and class on level sets, each piece's area kept (PLT-852; the coordinator, inline; branch `margin-level-set`, PR #63)
+
+- **Cause found** (Ben's "Keep on, find why"): a resampled sample took its kind from its nearest old corner (PLT-664),
+  which walks a margin inside a plate. `how_resamplings_roughen_a_margin`: a static margin's edges per spacing 2.26 to
+  4.56 in 40 resamplings; a run has about 50.
+- **Built:** `tectonics.class_level_set` (on): level sets for the crust's kind and class (`level_set.rs`), and
+  `ridges::conserved_classes`, where each continental piece, then each hyper-extended and core piece, keeps its old
+  count of samples and takes the points its signed distance ranks most inside. A level set alone ate PLT-664's strips
+  (none left by the 20th resampling). CHECKPOINT_SCHEMA 17. The margins stage's acceptance test passes and runs (its
+  count band now includes one step's churn).
+- **Gate on the branch** (VM): fmt clean, clippy -D warnings clean, deny ok, workspace tests pass (core 1,234 passed, 11
+  ignored).
+- **Arm kls-on** (`pool.sh run kls-on --seeds 1,2,3,4 +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`,
+  key 2ab6f14ad482; `pool.sh table --base base37-s4 --arm kls-on`, `--measure guard`; `arcstock.py`, `lossb.sh`): the
+  guard is clean (10,438 against 10,210 m). Continental crust under the sea is 0.630 against 0.686 and the largest
+  landmass 0.061 against 0.052. The boundary is 484,000 km against 602,000, PLT-661's margins 0.061 of the planet against
+  0.102, the continental area 0.469 against 0.537, and the enclosed ocean floor 0.023 against 0.095.
+- **Next:** the 24-run base on the merged master, the gate batch and the instances. Then what is left of the boundary's
+  length (the continents' shape: early splits, the island-arc strips) and sediment subduction at 3.08 against Earth's 1.1
+  km³/yr.
+
 ### 2026-11-01: Why PLT-661's margins cover so much (the coordinator, inline; branch `arc-stock`; measurement only, nothing in the model changed; Ben's answer of 2026-11-01, "Keep on, find why")
 
 - **Measured** (`arcstock.py`, `ratchet.py`, `seased.py` in tools/review/freeboard/, on the cached arms arc-lith, the
