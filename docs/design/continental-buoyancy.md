@@ -156,6 +156,30 @@ pool), and the rule it replaces goes off with it. Here PLT-281's line is replace
 collapse's sheet; ISO-110 was already off. The branch was merged with master and PR #58 before the flip. A fresh arm,
 cb-on2 (the branch's default against the next base), reads it on the merged head.
 
+**cb-on2** (2026-11-01; the law on by default on master 07f3ffe4 with PR #59, key 9a1acfe5579c, 8 runs against
+base36-s4, with rh2, master's code with the switch's predecessor, beside it):
+
+| | land | largest landmass | continental crust under the sea | land above 2 km | coast with high ground | land under ice | collisions per 100 Myr | crust's net change | criteria median, mean | sea after 100 Myr / end, m |
+|---|---|---|---|---|---|---|---|---|---|---|
+| base36-s4 | 0.215 | 0.062 | 0.602 | 0.030 | 0.122 | 0.062 | 5.30 | +0.112 | 4.5, 4.88 | 306 / 323 |
+| rh2 | 0.211 (0.65) | 0.069 (0.23) | 0.607 (0.80) | 0.018 (0.44) | 0.098 (0.19) | 0.084 (0.51) | 5.50 (0.56) | +0.109 (1.0) | 5.5, 5.62 (0.15) | 340 / 346 |
+| cb-on2 | 0.171 (0.021) | 0.052 (0.44) | 0.686 (0.038) | 0.041 (0.065) | 0.134 (0.44) | 0.066 (0.38) | 5.15 (0.71) | +0.115 (0.88) | 5, 4.62 (0.73) | 310 / 124 |
+
+The guard: worst 10,210 m against 9,960 (p 0.28), no step beyond two Earth reliefs, the largest one-step rise and fall
+7,606 and 7,525 m against 6,980 and 6,978, the highest plate 5,036 against 4,746 m. cb-on's reading holds on the merged
+head: the land falls and the drowned share rises as the model's mafic converted crust stands as low as its rock.
+
+**Where that crust stands** (`tools/review/freeboard/arcstock.py` on base36, 24 runs, final frames, shares of the
+planet): island-arc crust 0.189, of which 0.175 in a continental component that holds start-class crust (taken in)
+and 0.0098 standing alone (0.0054 at 20 km and more, 22.7 km thick, 8 % dry). Earth's intra-oceanic arcs, 14,500 to
+17,000 km long (Stern & Scholl 2010; Gerya 2011, quoting Leat & Larter 2003) and juvenile arcs "approximately 200-300
+km across and up to 30 km thick" (Stern & Scholl 2010), stand on about 0.006 to 0.010 of the planet (our arithmetic):
+the alone part is Earth's. The start class shrinks from 0.414 of the planet at -900 Myr to 0.113 at the end while the
+taken-in arc crust grows to 0.175; the run makes 1.7 km3 of island-arc magma a year (Stern & Scholl's intra-oceanic
+arcs about 1.5) and keeps 0.40 of it. So the model's continents end mostly accreted arc crust, still mafic. Whether
+Earth's accreted arc crust matures (its dense lower crust foundering) where the model keeps it, and where the start
+class goes, is the next lane (branch `arc-stock`).
+
 ## Why thermal isostasy (ISO-110) is built and off, and whether that still holds
 
 - **Built** 2026-10-23 with the lithosphere's thermal state (gap 4 stage 1, commits 63f99656 and cce71817; ISO-110 to

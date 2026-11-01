@@ -153,6 +153,20 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 
 ## Build log
 
+### 2026-11-01: The whole column's buoyancy: cb-on2 on the merged head and the landing (the coordinator, inline; branch `continental-buoyancy`, PR #60, on top of PR #59)
+
+- **The combined gate** (f520c8c6, PR #59 merged in, `rock_height_m` on the law when it is on): fmt, clippy, 1,515
+  passed, 0 failed; the weld sweep (scattered 1, 3, 5, 7 to 9, 11, 13 to 24; supercontinent 3, 11, 14 to 16, 21, 24): the
+  tests' seeds still weld, comments updated. The collapse fixture turns the law off with the state.
+- **cb-on2** (8 runs against base36-s4, key 9a1acfe5579c): the guard clean (10,210 against 9,960 m); land 0.171 (p
+  0.021), continental crust under the sea 0.686 (p 0.038), land above 2 km 0.041, the sea at the end 124 m; the
+  criteria a median of 5 against 4.5.
+- **arcstock.py** (new, base36, 24 runs): island-arc crust 0.189 of the planet at the end, 0.175 taken into continents,
+  0.0098 standing alone (Earth's intra-oceanic arcs about 0.006 to 0.010, from Stern & Scholl 2010 and Gerya 2011);
+  the start class 0.414 at -900 Myr to 0.113; 0.40 of the arc magma made is kept. The default holds (decisions log).
+- **Next:** land PR #60; the lane `arc-stock`: where the start class goes and whether Earth's accreted arc crust
+  matures where the model keeps it mafic.
+
 ### 2026-11-01: The whole column's buoyancy on by default after its arm cb-on (the coordinator, inline; branch `continental-buoyancy`; origin/continental-heat-ceiling merged: master f785ed6f and PR #58)
 
 - **The arm cb-on** (1b85d0d0 with the switch on, 8 runs, against base35-s4 and hc-on; `pool.sh table`,

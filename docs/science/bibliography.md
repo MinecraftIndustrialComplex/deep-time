@@ -10972,3 +10972,21 @@ A continental column's height from its whole buoyancy (`continental-buoyancy.md`
 ### Not read, or read and not used (the continental-buoyancy lane)
 - Abstracts only: Lee 2003 (the intrinsic density of cratonic mantle "balances to within error its negative thermal buoyancy"), Schutt & Lesher 2006 (at 20 % melt removal the residue's density changes by −0.42 % to −1.14 % by pressure; α 4.91 to 3.47 × 10⁻⁵ /K from 1 to 7 GPa), Hasterok & Chapman 2007 (above).
 - Not fetched: Rudnick & Gao 2003 and 2014 for the layers (Hacker et al.'s Fig. 1 read instead; a search tool's weights 0.317 / 0.296 / 0.388 from Rudnick & Fountain 1995, not read), Rudnick & Fountain 1995, Sclater & Christie 1980, Parsons & Sclater 1977, McKenzie 1978 (primary), Poudjom Djomani et al. 2001, Ringwood & Green 1966, Ahrens & Schubert 1975, Austrheim 1998, Castellanos et al. 2022.
+
+### SternScholl2010
+- Reference: Stern, R. J. and Scholl, D. W. (2010). Yin and yang of continental crust creation and destruction by plate tectonic processes. International Geology Review 52(1):1-31.
+- DOI or URL: 10.1080/00206810903332322
+- Cited as: "Stern & Scholl 2010".
+- Ledger ids: none (a measurement's comparison, docs/design/continental-buoyancy.md "The arm cb-on and the default", tools/review/freeboard/arcstock.py).
+- Access: read through a copy found by a Sonnet research sub-agent, 2026-11-01; page numbers not recorded.
+- Library: not kept.
+- Read so far (by the project): "the present 14,500 km of intra-oceanic arcs"; "The combined length of continental margin arcs is approximately 27,500 km (Scholl and von Huene 2007)"; juvenile arcs "approximately 200-300 km across and up to 30 km thick"; Izu-Bonin-Mariana and the Aleutians "130-135 km3/km-million years" (range 90 to 180); intra-oceanic arcs about 1.5 km³/yr, continental arcs about 1.0, about 2.7 in all. The area 0.006 to 0.010 of the planet (length times width) is our arithmetic.
+
+### Gerya2011
+- Reference: Gerya, T. V. (2011). Intra-oceanic subduction zones. In Brown, D. and Ryan, P. D. (eds.), Arc-Continent Collision, Frontiers in Earth Sciences, Springer, chapter 2.
+- DOI or URL: 10.1007/978-3-540-88558-0_2; read at the author's PDF (jupiter.ethz.ch), 2026-11-01, by a Sonnet research sub-agent.
+- Cited as: "Gerya 2011".
+- Ledger ids: none (the same comparison as SternScholl2010).
+- Access: author copy, full text.
+- Library: not kept.
+- Read so far (by the project): "Intra-oceanic subduction zones comprise around 17,000 km, or nearly 40%, of the subduction margins of the Earth (Leat and Larter 2003)" (Leat & Larter 2003 itself not read); major parts of the arcs "often located below sea level" (not quantified).
