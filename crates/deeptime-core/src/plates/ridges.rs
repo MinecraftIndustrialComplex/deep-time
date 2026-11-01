@@ -1700,6 +1700,85 @@ pub fn bury(
 mod tests {
     use super::*;
 
+    /// The height follows the rock (PLT-850): ocean floor at its age's floor, interpolated
+    /// beside a continental corner 2 km over the sea and an island arc's thick crust, stands
+    /// where its own rock and age hold it (`rock_height_m`), not a share of the others' height;
+    /// resampled again and again it does not rise. Until 2026-10-31 the height was blended over
+    /// all three corners: the bare floor took 30 % of the continent's height at each resampling,
+    /// and kept it (the floor's law only sinks it by its age's increments). A floor a trench pulled
+    /// 1 km under its law keeps that departure when its own corners carry it.
+    #[test]
+    fn a_resampled_floor_stands_on_its_own_rock() {
+        let k = &crate::params::TectonicParams::default();
+        let t = 500.0;
+        let h = Heights {
+            k,
+            gravity: 9.81,
+            t_myr: t,
+        };
+        let floor = |age: f64| {
+            let mut s = Sample::blank(0);
+            s.pools = oceanic_column();
+            s.thickness_m = thickness(&s.pools);
+            s.formed_myr = (t - age) as f32;
+            s.elevation_m = rock_height_m(&s, k, 9.81, t) as f32;
+            s
+        };
+        let mut continent = Sample::blank(0);
+        continent.kind = CONTINENTAL;
+        continent.pools = super::super::pools::continental_column();
+        continent.thickness_m = thickness(&continent.pools);
+        continent.elevation_m = 2000.0;
+        let mut arc = floor(60.0);
+        arc.pools[pool::MAFIC_PLUTONIC] += 15_000.0;
+        arc.thickness_m = thickness(&arc.pools);
+        arc.elevation_m = -500.0;
+        let cover = Cover {
+            t: 0,
+            tri: [0, 1, 2],
+            w: [0.4, 0.3, 0.3],
+        };
+        let old = floor(80.0);
+        let own = rock_height_m(&old, k, 9.81, t);
+        // Beside a continent: the floor's own height to rounding.
+        let src = [old, continent, floor(80.0)];
+        let s = interpolate(&src, &cover, DQuat::IDENTITY, 0, h);
+        assert_eq!(s.kind, OCEANIC);
+        assert!(
+            (f64::from(s.elevation_m) - own).abs() < 1.0,
+            "{} against its rock's {own}",
+            s.elevation_m
+        );
+        // Beside an arc's thick ocean crust (the same class): the arc's departure from its own
+        // rock is blended, not its height.
+        let src = [old, floor(80.0), arc];
+        let s = interpolate(&src, &cover, DQuat::IDENTITY, 0, h);
+        let arc_departure = f64::from(arc.elevation_m) - rock_height_m(&arc, k, 9.81, t);
+        let want = rock_height_m(&s, k, 9.81, t) + 0.3 * arc_departure;
+        assert!(
+            (f64::from(s.elevation_m) - want).abs() < 1.0,
+            "{} against {want}",
+            s.elevation_m
+        );
+        // Resampled ten times beside the continent: no lift builds up.
+        let mut z = old;
+        for _ in 0..10 {
+            let src = [z, continent, z];
+            z = interpolate(&src, &cover, DQuat::IDENTITY, 0, h);
+        }
+        assert!(
+            (f64::from(z.elevation_m) - own).abs() < 1.0,
+            "{} after ten resamplings, its rock's {own}",
+            z.elevation_m
+        );
+        // A trench's pull, 1 km under the law at all three corners, is kept.
+        let mut pulled = old;
+        pulled.elevation_m = (own - 1000.0) as f32;
+        let src = [pulled, pulled, pulled];
+        let s = interpolate(&src, &cover, DQuat::IDENTITY, 0, h);
+        assert!((f64::from(s.elevation_m) - (own - 1000.0)).abs() < 1.0);
+    }
+
     /// PLT-760 through a resampling (PR #53's review): the island-arc class of continental crust
     /// is the nearest corner's, as the kind is, whatever the blend makes of the columns' island-arc
     /// crust and basement. Leak B: a matured arc's edge column (8.5 km of island-arc crust over its
