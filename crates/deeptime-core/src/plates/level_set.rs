@@ -46,11 +46,18 @@
 //! line PLT-661's margins end at) walked by up to half a spacing at every resampling, its static
 //! samples spreading from 0.44 to 1.64 spacings and its lattice edges per spacing rising from
 //! 2.26 to 4.56 in 40 resamplings (`plates::tests::how_resamplings_roughen_a_margin`), as a
-//! plate's outline did. The class has a level set of its own ([`LevelSet::class_phi`]): each
-//! sample's distance from the outline between its class and another class of its group (the
-//! group's own outline is not one, [`distances_where`]), kept as the group's is
-//! ([`old_class_distances`]), and in the cover's triangle the class whose corners weigh the
-//! largest Σ w ψ holds the point (`ridges::class_corner`).
+//! plate's outline did. The kind and the class each have a level set of their own
+//! ([`LevelSet::kind_phi`], [`LevelSet::class_phi`]): each sample's distance from the outline
+//! between its kind (class) and another of its group (the group's own outline is not one,
+//! [`distances_where`]), kept as the group's is ([`old_kind_distances`],
+//! [`old_class_distances`]). The level set alone (the label whose corners weigh the largest
+//! Σ w ψ holds the point) drifts a curved outline towards its centre and eats crust one spacing
+//! wide, as the corner vote does (`plates::tests::thin_crust_through_resamplings`), so each piece
+//! keeps its old count of samples, taking the new points its interpolated signed distance ranks
+//! most inside (`ridges::conserved_classes`): each continental piece against the ocean floor,
+//! then each piece of crust that is not hyper-extended within the continental crust, the
+//! hyper-extended crust taking the rest. An outline stays where the level set puts it, shifted
+//! by one distance all round to keep the piece's area.
 
 use glam::{DQuat, DVec3};
 use rayon::prelude::*;
@@ -68,14 +75,26 @@ pub struct LevelSet {
     /// Each sample's group then. Only which samples shared a group is read: a sample whose
     /// neighbours' membership changed since ([`old_distances`]) has no outline distance to keep.
     pub member: Vec<u32>,
-    /// The sine of the angular distance from each sample to the outline of its crust's class
-    /// inside its group ([`class_of`]; ≥ 0, at most [`CAP_SPACINGS`] spacings). Empty where no
-    /// reinitialisation set it (ledger: PLT-852).
+    /// The sine of the angular distance from each sample to the outline of its crust's kind
+    /// inside its group, continental crust against ocean floor ([`kind_of`]; ≥ 0, at most
+    /// [`CAP_SPACINGS`] spacings). Empty where no reinitialisation set it (ledger: PLT-852).
+    #[serde(default)]
+    pub kind_phi: Vec<f32>,
+    /// Each sample's kind label then ([`kind_of`]), read as `member` is.
+    #[serde(default)]
+    pub kind_member: Vec<u32>,
+    /// The same for its crust's class ([`class_of`]).
     #[serde(default)]
     pub class_phi: Vec<f32>,
     /// Each sample's class label then ([`class_of`]), read as `member` is.
     #[serde(default)]
     pub class_member: Vec<u32>,
+}
+
+/// A sample's kind label for the kind level set (ledger: PLT-852): its group's ocean floor or
+/// continental crust.
+pub fn kind_of(s: &Sample) -> u32 {
+    s.group * 2 + u32::from(s.kind != OCEANIC)
 }
 
 /// A sample's class label for the class level set (ledger: PLT-852): its group's three classes,
@@ -115,13 +134,30 @@ pub fn old_distances(ls: Option<&LevelSet>, groups: &[u32], geo: &Geo, spacing: 
         ls.map(|l| (&l.phi[..], &l.member[..])),
         groups,
         geo,
-        spacing,
+        STALE_SPACINGS * spacing,
+    )
+}
+
+/// [`old_distances`] for the kind level set (ledger: PLT-852): `kinds` each sample's kind label
+/// now ([`kind_of`]), kept as [`old_class_distances`] keeps a class's.
+pub fn old_kind_distances(
+    ls: Option<&LevelSet>,
+    kinds: &[u32],
+    geo: &Geo,
+    spacing: f64,
+) -> Vec<f64> {
+    kept_distances(
+        ls.map(|l| (&l.kind_phi[..], &l.kind_member[..])),
+        kinds,
+        geo,
+        STALE_SPACINGS * spacing,
     )
 }
 
 /// [`old_distances`] for the class level set (ledger: PLT-852): `classes` each sample's class
 /// label now ([`class_of`]); a sample keeps its class distance unless the labels about it changed
-/// since the reinitialisation (a margin PLT-661 turned, a column across the 10 km line, a rift).
+/// since the reinitialisation (a margin PLT-661 turned, a column across the 10 km line, a rift);
+/// it gets [`STALE_SPACINGS`] then, as a group's does.
 pub fn old_class_distances(
     ls: Option<&LevelSet>,
     classes: &[u32],
@@ -132,21 +168,15 @@ pub fn old_class_distances(
         ls.map(|l| (&l.class_phi[..], &l.class_member[..])),
         classes,
         geo,
-        spacing,
+        STALE_SPACINGS * spacing,
     )
 }
 
 /// The distances `prev` (each sample's distance and label at the last reinitialisation) keeps
-/// for the labels `labels` now: [`STALE_SPACINGS`] where a neighbour's sharing of a label with
-/// the sample changed, and everywhere when there is none.
-fn kept_distances(
-    prev: Option<(&[f32], &[u32])>,
-    labels: &[u32],
-    geo: &Geo,
-    spacing: f64,
-) -> Vec<f64> {
+/// for the labels `labels` now: `d0` where a neighbour's sharing of a label with the sample
+/// changed, and everywhere when there is none.
+fn kept_distances(prev: Option<(&[f32], &[u32])>, labels: &[u32], geo: &Geo, d0: f64) -> Vec<f64> {
     let n = labels.len();
-    let d0 = STALE_SPACINGS * spacing;
     let Some((phi, member)) = prev.filter(|(p, m)| p.len() == n && m.len() == n) else {
         return vec![d0; n];
     };
@@ -417,17 +447,34 @@ pub fn reinit(state: &mut PlateState, geo: &Geo, spacing: f64) {
     let phi = distances(&groups, &phi, geo, CAP_SPACINGS * spacing);
     // The class level set (ledger: PLT-852): the same from the class labels, over the arcs between
     // two classes of one group.
-    let class_phi: Vec<f64> = match state.level_set.as_ref().filter(|l| l.class_phi.len() == n) {
-        Some(l) => l.class_phi.iter().map(|&x| f64::from(x)).collect(),
-        None => vec![STALE_SPACINGS * spacing; n],
+    // The kind and class level sets (ledger: PLT-852): the same from the labels, over the arcs
+    // between two labels of one group. A new sample the resampling gave no distance (NaN) crosses
+    // the outline at the stale half spacing.
+    let stale = STALE_SPACINGS * spacing;
+    let given = |v: Option<&Vec<f32>>| -> Vec<f64> {
+        match v.filter(|x| x.len() == n) {
+            Some(x) => x
+                .iter()
+                .map(|&d| if d.is_finite() { f64::from(d) } else { stale })
+                .collect(),
+            None => vec![stale; n],
+        }
     };
+    let kinds: Vec<u32> = state.samples.iter().map(kind_of).collect();
+    let kind_phi = given(state.level_set.as_ref().map(|l| &l.kind_phi));
+    let kind_phi = distances_where(&kinds, &kind_phi, geo, CAP_SPACINGS * spacing, |a, b| {
+        a / 2 == b / 2
+    });
     let classes: Vec<u32> = state.samples.iter().map(class_of).collect();
+    let class_phi = given(state.level_set.as_ref().map(|l| &l.class_phi));
     let class_phi = distances_where(&classes, &class_phi, geo, CAP_SPACINGS * spacing, |a, b| {
         a / 3 == b / 3
     });
     state.level_set = Some(LevelSet {
         phi,
         member: groups,
+        kind_phi,
+        kind_member: kinds,
         class_phi,
         class_member: classes,
     });
@@ -583,6 +630,8 @@ mod tests {
         let ls = LevelSet {
             phi: vec![0.01; n],
             member: vec![0; n],
+            kind_phi: Vec::new(),
+            kind_member: Vec::new(),
             class_phi: Vec::new(),
             class_member: Vec::new(),
         };

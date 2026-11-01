@@ -174,72 +174,242 @@ fn nearest_corner(geo: &Geo, c: &Cover, rot: DQuat, q: DVec3) -> u32 {
     best
 }
 
-/// The old sample whose labels a new sample at `q` takes from the cover `c` of a group turned by
-/// `rot`, and `q`'s distance from its class's outline (sine, ≥ 0). With the class level set
-/// (`phi`, each old sample's distance from its class's outline, `level_set::old_class_distances`;
-/// ledger PLT-852) the class (`level_set::class_of`) whose corners in the cover weigh the largest
-/// A = Σ w ψ holds `q`, as a group holds it (`level_set::margin`), and the sample takes the
-/// labels of that class's corner nearest `q`; the distance is (A − the largest other A) / |Σ w v|,
-/// the interpolated signed distance, or A / |Σ w v| with one class in the cover. Without it, the
-/// nearest corner's labels (PLT-664) and no distance.
-fn class_corner(
+/// The kind and class level sets' assignment, each piece's area kept (ledger: PLT-852): for
+/// every new point a top cover holds (`found`, at `new_pts`, its group turned by `rots`), the old
+/// sample whose labels it takes and its distances from its kind's and its class's outlines (NaN
+/// where none).
+///
+/// A piece is the visible old samples of one label joined by lattice edges: a group's continental
+/// crust (`level_set::kind_of`), or its crust that is not hyper-extended (`level_set::class_of`).
+/// In the point's cover each piece among the corners weighs A = Σ w ψ (`kind_phi`, `class_phi`:
+/// the corners' distances from their outlines; `stale` where a corner has none), and the point's
+/// signed distance inside it is (A − the largest other A) / |Σ w v|. The level set alone gives
+/// the point to the heaviest label, which drifts a curved outline towards its centre and eats
+/// crust one spacing wide (`plates::tests::thin_crust_through_resamplings`; the median rule of
+/// plates.md "Which old sample a new one follows" loses a quarter of a cell per resampling from
+/// every closed body). Here each continental piece keeps its old count of samples: it takes the
+/// points its signed distance against the ocean floor ranks most inside, up to its count, among
+/// the points not yet taken, which shifts its outline by one distance all round (an expected
+/// count: the new lattice has the old one's density, and a piece's cells hold its area). The
+/// ocean floor takes the rest, as new sea floor does. Then, among the continental points, each
+/// piece of hyper-extended crust keeps its count the same way, and then each piece of the other
+/// continental crust among the points left (the thin class first: the thick one taking first
+/// left coast points with no hyper-extended corner where a one-row ring has gaps, and the ring
+/// went to the core at a sample a resampling). A continental point neither takes gets its
+/// nearest continental corner's labels, and an ocean point with no ocean corner its nearest
+/// corner's.
+#[allow(clippy::too_many_arguments)]
+fn conserved_classes(
     geo: &Geo,
     src: &[Sample],
-    c: &Cover,
-    rot: DQuat,
-    q: DVec3,
-    phi: Option<&[f64]>,
-) -> (u32, f64) {
-    let nearest = nearest_corner(geo, c, rot, q);
-    let Some(phi) = phi else {
-        return (nearest, 0.0);
+    found: &[Found],
+    new_pts: &[DVec3],
+    rots: &[DQuat],
+    kind_phi: &[f64],
+    class_phi: &[f64],
+    stale: f64,
+) -> (Vec<u32>, Vec<f32>, Vec<f32>) {
+    let n_old = src.len();
+    let kind: Vec<u32> = src.iter().map(level_set::kind_of).collect();
+    let class: Vec<u32> = src.iter().map(level_set::class_of).collect();
+    let continental = |v: usize| kind[v] % 2 == 1;
+    let core = |v: usize| class[v] % 3 == 2;
+    // The pieces: union-find over the old lattice's edges between visible samples of one label.
+    fn root(parent: &mut [u32], mut x: u32) -> u32 {
+        while parent[x as usize] != x {
+            let up = parent[parent[x as usize] as usize];
+            parent[x as usize] = up;
+            x = up;
+        }
+        x
+    }
+    let pieces = |label: &[u32]| -> (Vec<u32>, Vec<u32>) {
+        let mut parent: Vec<u32> = (0..n_old as u32).collect();
+        for i in 0..n_old {
+            if src[i].is_hidden() {
+                continue;
+            }
+            for (j, _) in geo.edges(i as u32) {
+                let j = j as usize;
+                if j > i && !src[j].is_hidden() && label[j] == label[i] {
+                    let (a, b) = (root(&mut parent, i as u32), root(&mut parent, j as u32));
+                    if a != b {
+                        parent[a.max(b) as usize] = a.min(b);
+                    }
+                }
+            }
+        }
+        let piece: Vec<u32> = (0..n_old as u32).map(|i| root(&mut parent, i)).collect();
+        let mut size = vec![0u32; n_old];
+        for (x, &pc) in src.iter().zip(&piece) {
+            if !x.is_hidden() {
+                size[pc as usize] += 1;
+            }
+        }
+        (piece, size)
     };
-    let local = rot.inverse() * q;
+    let (kind_piece, kind_size) = pieces(&kind);
+    let (class_piece, class_size) = pieces(&class);
     let pts = geo.points();
-    let labels = c.tri.map(|v| level_set::class_of(&src[v as usize]));
-    // Each class's weight over the cover's corners (the group's own; the others weigh 0), in the
-    // corners' order.
-    let mut weigh: [(u32, f64); 3] = [(u32::MAX, f64::NEG_INFINITY); 3];
-    for k in 0..3 {
-        if c.w[k] <= 0.0 && c.tri[k] != nearest {
-            continue;
-        }
-        let a = c.w[k] * phi[c.tri[k] as usize];
-        if let Some(e) = weigh.iter_mut().find(|e| e.0 == labels[k]) {
-            e.1 += a;
-        } else if let Some(e) = weigh.iter_mut().find(|e| e.0 == u32::MAX) {
-            *e = (labels[k], a);
-        }
-    }
-    // The heaviest class; on a tie, the nearest corner's.
-    let own = level_set::class_of(&src[nearest as usize]);
-    let mut win = (own, f64::NEG_INFINITY);
-    for e in weigh.iter().filter(|e| e.0 != u32::MAX) {
-        if e.1 > win.1 || (e.1 == win.1 && e.0 == own) {
-            win = *e;
-        }
-    }
-    let rival = weigh
-        .iter()
-        .filter(|e| e.0 != u32::MAX && e.0 != win.0)
-        .map(|e| e.1)
-        .reduce(f64::max);
-    let len = (0..3)
-        .map(|k| pts[c.tri[k] as usize] * c.w[k])
-        .sum::<DVec3>()
-        .length()
-        .max(1e-12);
-    let d = (win.1 - rival.unwrap_or(0.0)).max(0.0) / len;
-    // That class's corner nearest `q`.
-    let m = (0..3)
-        .filter(|&k| labels[k] == win.0 && (c.w[k] > 0.0 || c.tri[k] == nearest))
-        .max_by(|&a, &b| {
-            pts[c.tri[a] as usize]
-                .dot(local)
-                .total_cmp(&pts[c.tri[b] as usize].dot(local))
+    // Each covered point's visible corners in its cover: (old sample, weight, dot with the point)
+    // and |Σ w v|.
+    type Corners = ([(u32, f64, f64); 3], usize, f64);
+    let corners: Vec<Option<Corners>> = found
+        .par_iter()
+        .zip(new_pts.par_iter())
+        .map(|((top, _), &q)| {
+            let (g, c) = top.as_ref()?;
+            let local = rots[*g as usize].inverse() * q;
+            let mut out = [(u32::MAX, 0.0, 0.0); 3];
+            let mut len = 0usize;
+            for k in 0..3 {
+                let v = c.tri[k];
+                if c.w[k] > 0.0 && !src[v as usize].is_hidden() {
+                    out[len] = (v, c.w[k], pts[v as usize].dot(local));
+                    len += 1;
+                }
+            }
+            if len == 0 {
+                return None;
+            }
+            let norm = (0..3)
+                .map(|k| pts[c.tri[k] as usize] * c.w[k])
+                .sum::<DVec3>()
+                .length()
+                .max(1e-12);
+            Some((out, len, norm))
         })
-        .map_or(nearest, |k| c.tri[k]);
-    (m, d)
+        .collect();
+    let at = |phi: &[f64], v: u32| {
+        let x = phi[v as usize];
+        if x.is_finite() { x } else { stale }
+    };
+    // A point's signed distance inside piece `pc` of `piece` among the corners `keep` admits.
+    let signed =
+        |cs: &Corners, piece: &[u32], phi: &[f64], keep: &dyn Fn(usize) -> bool, pc: u32| -> f64 {
+            let (out, len, norm) = cs;
+            let mut own = 0.0;
+            let mut others: [(u32, f64); 3] = [(u32::MAX, 0.0); 3];
+            for &(v, w, _) in &out[..*len] {
+                if !keep(v as usize) {
+                    continue;
+                }
+                let a = w * at(phi, v);
+                let p = piece[v as usize];
+                if p == pc {
+                    own += a;
+                } else if let Some(o) = others.iter_mut().find(|o| o.0 == p || o.0 == u32::MAX) {
+                    *o = (p, o.1 + a);
+                }
+            }
+            let rival = others.iter().map(|o| o.1).fold(0.0, f64::max);
+            (own - rival) / norm
+        };
+    // Greedy by rank: every piece in `pieces` keeps up to its count of the points it ranks most
+    // inside among `pool`'s (ties by point).
+    let assign = |piece: &[u32],
+                  size: &[u32],
+                  phi: &[f64],
+                  keep: &dyn Fn(usize) -> bool,
+                  pool: &dyn Fn(usize) -> bool,
+                  wants: &dyn Fn(usize) -> bool|
+     -> Vec<u32> {
+        let mut cand: Vec<(u32, f64, u32)> = Vec::new();
+        for (i, cs) in corners.iter().enumerate() {
+            let Some(cs) = cs else { continue };
+            if !pool(i) {
+                continue;
+            }
+            let mut seen = [u32::MAX; 3];
+            for &(v, _, _) in &cs.0[..cs.1] {
+                let pc = piece[v as usize];
+                if !wants(v as usize) || seen.contains(&pc) {
+                    continue;
+                }
+                if let Some(s) = seen.iter_mut().find(|s| **s == u32::MAX) {
+                    *s = pc;
+                }
+                cand.push((pc, -signed(cs, piece, phi, keep, pc), i as u32));
+            }
+        }
+        cand.par_sort_unstable_by(|a, b| {
+            a.0.cmp(&b.0).then(a.1.total_cmp(&b.1)).then(a.2.cmp(&b.2))
+        });
+        let mut taken = vec![u32::MAX; corners.len()];
+        let mut left = size.to_vec();
+        for &(pc, _, i) in &cand {
+            if taken[i as usize] == u32::MAX && left[pc as usize] > 0 {
+                taken[i as usize] = pc;
+                left[pc as usize] -= 1;
+            }
+        }
+        taken
+    };
+    // The continental pieces against the ocean floor, then within the continental points the
+    // hyper-extended crust's pieces and the core's: the thin class first, as the continental
+    // crust before the ocean floor, so the thick one takes what is left where it stands.
+    let all = |_: usize| true;
+    let hyper = |v: usize| continental(v) && !core(v);
+    let kinds = assign(&kind_piece, &kind_size, kind_phi, &all, &all, &continental);
+    let hypers = assign(
+        &class_piece,
+        &class_size,
+        class_phi,
+        &continental,
+        &|i: usize| kinds[i] != u32::MAX,
+        &hyper,
+    );
+    let cores = assign(
+        &class_piece,
+        &class_size,
+        class_phi,
+        &continental,
+        &|i: usize| kinds[i] != u32::MAX && hypers[i] == u32::MAX,
+        &core,
+    );
+    let nearest_of = |cs: &Corners, ok: &dyn Fn(u32) -> bool| -> Option<u32> {
+        cs.0[..cs.1]
+            .iter()
+            .filter(|c| ok(c.0))
+            .max_by(|a, b| a.2.total_cmp(&b.2))
+            .map(|c| c.0)
+    };
+    (0..corners.len())
+        .into_par_iter()
+        .map(|i| {
+            let Some(cs) = &corners[i] else {
+                return (u32::MAX, f32::NAN, f32::NAN);
+            };
+            let pos = |d: f64| if d > 0.0 { d as f32 } else { f32::NAN };
+            let m = if kinds[i] == u32::MAX {
+                nearest_of(cs, &|v| !continental(v as usize))
+            } else {
+                let pc = if hypers[i] != u32::MAX {
+                    hypers[i]
+                } else {
+                    cores[i]
+                };
+                nearest_of(cs, &|v| class_piece[v as usize] == pc)
+                    .or_else(|| nearest_of(cs, &|v| continental(v as usize)))
+            };
+            let Some(m) = m.or_else(|| nearest_of(cs, &|_| true)) else {
+                return (u32::MAX, f32::NAN, f32::NAN);
+            };
+            let dk = signed(cs, &kind_piece, kind_phi, &all, kind_piece[m as usize]);
+            let dc = signed(cs, &class_piece, class_phi, &all, class_piece[m as usize]);
+            (m, pos(dk), pos(dc))
+        })
+        .collect::<Vec<_>>()
+        .into_iter()
+        .fold(
+            (Vec::new(), Vec::new(), Vec::new()),
+            |(mut a, mut b, mut c), (m, dk, dc)| {
+                a.push(m);
+                b.push(dk);
+                c.push(dc);
+                (a, b, c)
+            },
+        )
 }
 
 /// What a resampling measures a column's height from: the height its own rock and age hold it at,
@@ -901,11 +1071,16 @@ pub fn resample(
         let groups: Vec<u32> = src.iter().map(|s| s.group).collect();
         level_set::old_distances(state.level_set.as_ref(), &groups, old, spacing)
     });
-    // … and from its crust's class's outline inside its group (ledger: PLT-852).
-    let old_class_phi: Option<Vec<f64>> = k.level_set_membership.then(|| {
-        let classes: Vec<u32> = src.iter().map(level_set::class_of).collect();
-        level_set::old_class_distances(state.level_set.as_ref(), &classes, old, spacing)
-    });
+    // … and from its crust's kind's and class's outlines inside its group (ledger: PLT-852).
+    let old_kind_phi: Option<(Vec<f64>, Vec<f64>)> = (k.level_set_membership && k.class_level_set)
+        .then(|| {
+            let kinds: Vec<u32> = src.iter().map(level_set::kind_of).collect();
+            let classes: Vec<u32> = src.iter().map(level_set::class_of).collect();
+            (
+                level_set::old_kind_distances(state.level_set.as_ref(), &kinds, old, spacing),
+                level_set::old_class_distances(state.level_set.as_ref(), &classes, old, spacing),
+            )
+        });
     // Held crust (one-way subduction, `subduction::resolve`; none with the switch off): the slab,
     // never on top of the new lattice (ledger: PLT-542).
     let one_way = state.one_way.as_ref();
@@ -1053,8 +1228,28 @@ pub fn resample(
     };
     let interp = |g: u32, c: &Cover, q: DVec3| {
         let rot = rots[g as usize];
-        let (m, _) = class_corner(old, src, c, rot, q, old_class_phi.as_deref());
-        interpolate(src, c, rot, m, heights)
+        interpolate(src, c, rot, nearest_corner(old, c, rot, q), heights)
+    };
+    // With the class level set, the top cover's labels from the corner the conserving
+    // assignment gives (ledger: PLT-852), and the new samples' distances from their classes'
+    // outlines until `level_set::reinit` sets them.
+    type Given = (Vec<u32>, Option<(Vec<f32>, Vec<f32>)>);
+    let (chosen, labels_phi_new): Given = match &old_kind_phi {
+        Some((kp, cp)) => {
+            let (m, dk, dc) = conserved_classes(
+                old,
+                src,
+                &found,
+                &new_pts,
+                &rots,
+                kp,
+                cp,
+                level_set::STALE_SPACINGS * spacing,
+            );
+            let capped = |d: Vec<f32>| d.into_iter().map(|x| x.min(cap as f32)).collect();
+            (m, Some((capped(dk), capped(dc))))
+        }
+        None => (vec![u32::MAX; new_pts.len()], None),
     };
     let mut samples: Vec<Sample> = found
         .par_iter()
@@ -1063,182 +1258,174 @@ pub fn resample(
         .zip(traces.par_iter_mut())
         .zip(limits.par_iter_mut())
         .zip(new_pts.par_iter())
-        .map(|((((((top, rest), pl), tally), tr), lim), &q)| match top {
-            None => {
-                // One-way subduction's gap (the covers are all held crust; none elsewhere): its
-                // conserved pools went down with the slab, its sediment counted as subducted
-                // sediment too (ledger: PLT-542, PLT-440).
-                for (g2, c2) in rest {
-                    let u = interp(*g2, c2, q);
-                    tally[8] += u.pools[..pool::CONSERVED]
-                        .iter()
-                        .map(|&x| f64::from(x))
-                        .sum::<f64>();
-                    let pile = f64::from(u.pools[pool::SEDIMENT].max(0.0))
-                        + f64::from(u.pools[pool::SEDIMENTARY].max(0.0));
-                    tally[7] += pile;
-                    tally[11] += pile;
-                }
-                Sample::blank(0)
-            }
-            Some((g, c)) => {
-                let mut s = interp(*g, c, q);
-                *pl = group_plate[*g as usize];
-                if s.kind == CONTINENTAL {
-                    let blended = s.basement() > 0.0 && s.arc_oceanic_m >= mature_m;
-                    if s.island_arc_marked() && !blended {
-                        tally[12] += 1.0;
-                    } else if !s.island_arc_marked() && blended {
-                        tally[13] += 1.0;
-                    }
-                }
-                if let Some(old) = old_limits {
-                    let blend = |v: &[f32]| -> f32 {
-                        (0..3)
-                            .map(|k| c.w[k] * f64::from(v[c.tri[k] as usize]))
-                            .sum::<f64>() as f32
-                    };
-                    *lim = [blend(&old.ceiling_m), s.elevation_m, blend(&old.top_m)];
-                }
-                if tracing {
-                    *tr = Some(gap_budget::Trace {
-                        tri: c.tri,
-                        w: c.w,
-                        pools: s.pools,
-                        z: s.elevation_m,
-                    });
-                }
-                let blended = s.pools;
-                for (g2, c2) in rest {
-                    let under = &src[c2.major() as usize];
-                    let p2 = group_plate[*g2 as usize];
-                    // Every cover under the top is taken: hidden crust, the same plate's, a plate
-                    // the top overrides, and, as the consumer of last resort, visible crust of a
-                    // plate with no contact under the top, as a contact would take it (ledger
-                    // PLT-812; PR #55's re-review: the gate decides where contacts begin, never
-                    // the books). Until then that continental crust was dropped
-                    // (`DROPPED_GLOBAL`) and that ocean floor went with its sediment untallied.
-                    let no_contact = !under.is_hidden() && p2 != *pl && !overrides(*pl, p2);
-                    {
-                        let mut u = interp(*g2, c2, q);
-                        let conserved: f64 = u.pools[..pool::CONSERVED]
+        .zip(chosen.par_iter())
+        .map(
+            |(((((((top, rest), pl), tally), tr), lim), &q), &m)| match top {
+                None => {
+                    // One-way subduction's gap (the covers are all held crust; none elsewhere): its
+                    // conserved pools went down with the slab, its sediment counted as subducted
+                    // sediment too (ledger: PLT-542, PLT-440).
+                    for (g2, c2) in rest {
+                        let u = interp(*g2, c2, q);
+                        tally[8] += u.pools[..pool::CONSERVED]
                             .iter()
                             .map(|&x| f64::from(x))
-                            .sum();
-                        if no_contact {
-                            let slot = if under.kind == CONTINENTAL { 14 } else { 15 };
-                            tally[slot] += conserved;
-                            tally[17] = 1.0;
-                            if under.kind != CONTINENTAL {
-                                tally[16] += f64::from(u.pools[pool::SEDIMENT].max(0.0))
-                                    + f64::from(u.pools[pool::SEDIMENTARY].max(0.0));
-                            }
+                            .sum::<f64>();
+                        let pile = f64::from(u.pools[pool::SEDIMENT].max(0.0))
+                            + f64::from(u.pools[pool::SEDIMENTARY].max(0.0));
+                        tally[7] += pile;
+                        tally[11] += pile;
+                    }
+                    Sample::blank(0)
+                }
+                Some((g, c)) => {
+                    let mut s = if m == u32::MAX {
+                        interp(*g, c, q)
+                    } else {
+                        interpolate(src, c, rots[*g as usize], m, heights)
+                    };
+                    *pl = group_plate[*g as usize];
+                    if s.kind == CONTINENTAL {
+                        let blended = s.basement() > 0.0 && s.arc_oceanic_m >= mature_m;
+                        if s.island_arc_marked() && !blended {
+                            tally[12] += 1.0;
+                        } else if !s.island_arc_marked() && blended {
+                            tally[13] += 1.0;
                         }
-                        // Crust a collision took across its front is consumed, hidden or
-                        // not: the belt stacked its share and the rest went down with the slab.
-                        if (under.is_hidden() && under.stacked())
-                            || (!under.is_hidden()
-                                && under.kind == CONTINENTAL
-                                && p2 != *pl
-                                && collides(*pl, p2))
+                    }
+                    if let Some(old) = old_limits {
+                        let blend = |v: &[f32]| -> f32 {
+                            (0..3)
+                                .map(|k| c.w[k] * f64::from(v[c.tri[k] as usize]))
+                                .sum::<f64>() as f32
+                        };
+                        *lim = [blend(&old.ceiling_m), s.elevation_m, blend(&old.top_m)];
+                    }
+                    if tracing {
+                        *tr = Some(gap_budget::Trace {
+                            tri: c.tri,
+                            w: c.w,
+                            pools: s.pools,
+                            z: s.elevation_m,
+                        });
+                    }
+                    let blended = s.pools;
+                    for (g2, c2) in rest {
+                        let under = &src[c2.major() as usize];
+                        let p2 = group_plate[*g2 as usize];
+                        // Every cover under the top is taken: hidden crust, the same plate's, a plate
+                        // the top overrides, and, as the consumer of last resort, visible crust of a
+                        // plate with no contact under the top, as a contact would take it (ledger
+                        // PLT-812; PR #55's re-review: the gate decides where contacts begin, never
+                        // the books). Until then that continental crust was dropped
+                        // (`DROPPED_GLOBAL`) and that ocean floor went with its sediment untallied.
+                        let no_contact = !under.is_hidden() && p2 != *pl && !overrides(*pl, p2);
                         {
-                            tally[1] += conserved;
-                        } else {
-                            // Sediment subduction: of ocean floor that went under (hidden, or
-                            // of a plate the top overrides), the share of its sediment and
-                            // sedimentary rock the slab takes down past the margin; the rest
-                            // accretes. ledger: PLT-440; with `sediment_subduction_sourced`
-                            // the share follows the margin's type (PLT-660).
-                            let mut subducted = 0.0_f64;
-                            let going_under =
-                                under.kind != CONTINENTAL && (under.is_hidden() || p2 != *pl);
-                            if going_under {
-                                // Measurement only: what reaches the trench, before the share.
-                                let pile = f64::from(u.pools[pool::SEDIMENT].max(0.0))
-                                    + f64::from(u.pools[pool::SEDIMENTARY].max(0.0));
-                                let slot = if s.kind == CONTINENTAL { 9 } else { 10 };
-                                tally[slot] += pile;
-                            }
-                            if (sourced || sediment_share > 0.0) && going_under {
-                                let share = if sourced {
-                                    let pile = u.pools[pool::SEDIMENT].max(0.0)
-                                        + u.pools[pool::SEDIMENTARY].max(0.0);
-                                    sediment_subducted_share_at(
-                                        f64::from(pile),
-                                        super::subduction::orthogonal_convergence_mm_yr(&s),
-                                        pile_line_m,
-                                    ) as f32
-                                } else {
-                                    sediment_share
-                                };
-                                for kp in [pool::SEDIMENT, pool::SEDIMENTARY] {
-                                    let down = u.pools[kp].max(0.0) * share;
-                                    u.pools[kp] -= down;
-                                    subducted += f64::from(down);
+                            let mut u = interp(*g2, c2, q);
+                            let conserved: f64 = u.pools[..pool::CONSERVED]
+                                .iter()
+                                .map(|&x| f64::from(x))
+                                .sum();
+                            if no_contact {
+                                let slot = if under.kind == CONTINENTAL { 14 } else { 15 };
+                                tally[slot] += conserved;
+                                tally[17] = 1.0;
+                                if under.kind != CONTINENTAL {
+                                    tally[16] += f64::from(u.pools[pool::SEDIMENT].max(0.0))
+                                        + f64::from(u.pools[pool::SEDIMENTARY].max(0.0));
                                 }
                             }
-                            tally[7] += subducted;
-                            let kept = conserved - subducted;
-                            // What accretes: hidden continental crust, hidden ocean floor's
-                            // sediment, or visible crust under the top (the same plate's, a
-                            // subducting plate's, or the consumer of last resort's).
-                            tally[0] += kept;
-                            if !under.is_hidden() {
-                                tally[3] += kept;
-                            } else if under.kind == CONTINENTAL {
-                                tally[2] += conserved;
+                            // Crust a collision took across its front is consumed, hidden or
+                            // not: the belt stacked its share and the rest went down with the slab.
+                            if (under.is_hidden() && under.stacked())
+                                || (!under.is_hidden()
+                                    && under.kind == CONTINENTAL
+                                    && p2 != *pl
+                                    && collides(*pl, p2))
+                            {
+                                tally[1] += conserved;
+                            } else {
+                                // Sediment subduction: of ocean floor that went under (hidden, or
+                                // of a plate the top overrides), the share of its sediment and
+                                // sedimentary rock the slab takes down past the margin; the rest
+                                // accretes. ledger: PLT-440; with `sediment_subduction_sourced`
+                                // the share follows the margin's type (PLT-660).
+                                let mut subducted = 0.0_f64;
+                                let going_under =
+                                    under.kind != CONTINENTAL && (under.is_hidden() || p2 != *pl);
+                                if going_under {
+                                    // Measurement only: what reaches the trench, before the share.
+                                    let pile = f64::from(u.pools[pool::SEDIMENT].max(0.0))
+                                        + f64::from(u.pools[pool::SEDIMENTARY].max(0.0));
+                                    let slot = if s.kind == CONTINENTAL { 9 } else { 10 };
+                                    tally[slot] += pile;
+                                }
+                                if (sourced || sediment_share > 0.0) && going_under {
+                                    let share = if sourced {
+                                        let pile = u.pools[pool::SEDIMENT].max(0.0)
+                                            + u.pools[pool::SEDIMENTARY].max(0.0);
+                                        sediment_subducted_share_at(
+                                            f64::from(pile),
+                                            super::subduction::orthogonal_convergence_mm_yr(&s),
+                                            pile_line_m,
+                                        ) as f32
+                                    } else {
+                                        sediment_share
+                                    };
+                                    for kp in [pool::SEDIMENT, pool::SEDIMENTARY] {
+                                        let down = u.pools[kp].max(0.0) * share;
+                                        u.pools[kp] -= down;
+                                        subducted += f64::from(down);
+                                    }
+                                }
+                                tally[7] += subducted;
+                                let kept = conserved - subducted;
+                                // What accretes: hidden continental crust, hidden ocean floor's
+                                // sediment, or visible crust under the top (the same plate's, a
+                                // subducting plate's, or the consumer of last resort's).
+                                tally[0] += kept;
+                                if !under.is_hidden() {
+                                    tally[3] += kept;
+                                } else if under.kind == CONTINENTAL {
+                                    tally[2] += conserved;
+                                }
+                                if under.kind == CONTINENTAL {
+                                    tally[6] += u.pools[pool::CONSERVED..]
+                                        .iter()
+                                        .map(|&x| f64::from(x))
+                                        .sum::<f64>();
+                                }
+                                accrete(&mut s.pools, &u.pools);
                             }
-                            if under.kind == CONTINENTAL {
-                                tally[6] += u.pools[pool::CONSERVED..]
-                                    .iter()
-                                    .map(|&x| f64::from(x))
-                                    .sum::<f64>();
-                            }
-                            accrete(&mut s.pools, &u.pools);
                         }
                     }
-                }
-                // Accreted crust stands up by its Airy height, capped at the column's, and the
-                // surface gets it as uplift, as the collapse raises its receivers (the gap
-                // budget's recommendation 1; plate task 8; before, accretion added thickness and
-                // no height). ledger: PLT-284
-                if s.kind == CONTINENTAL && !s.is_hidden() && s.pools != blended {
-                    let z = f64::from(s.elevation_m);
-                    let change = isostatic_change_m(&blended, &s.pools, gravity);
-                    let rise = toward(z, change, iso_height(&s.pools, z_0, gravity))
-                        .min(k.max_elevation_m)
-                        - z;
-                    if rise > 0.0 {
-                        s.elevation_m = (z + rise) as f32;
-                        s.uplift_mm_yr += (rise / env.dt_yr * 1.0e3) as f32;
-                        tally[4] += rise;
-                        if tally[17] > 0.0 {
-                            tally[18] = rise;
+                    // Accreted crust stands up by its Airy height, capped at the column's, and the
+                    // surface gets it as uplift, as the collapse raises its receivers (the gap
+                    // budget's recommendation 1; plate task 8; before, accretion added thickness and
+                    // no height). ledger: PLT-284
+                    if s.kind == CONTINENTAL && !s.is_hidden() && s.pools != blended {
+                        let z = f64::from(s.elevation_m);
+                        let change = isostatic_change_m(&blended, &s.pools, gravity);
+                        let rise = toward(z, change, iso_height(&s.pools, z_0, gravity))
+                            .min(k.max_elevation_m)
+                            - z;
+                        if rise > 0.0 {
+                            s.elevation_m = (z + rise) as f32;
+                            s.uplift_mm_yr += (rise / env.dt_yr * 1.0e3) as f32;
+                            tally[4] += rise;
+                            if tally[17] > 0.0 {
+                                tally[18] = rise;
+                            }
                         }
                     }
+                    // The accreted crust is crust uplift, whatever its rise (ledger: ISO-091).
+                    s.crust_uplift_mm_yr += accreted_uplift_mm_yr(&blended, &s.pools, gravity, env);
+                    s.thickness_m = thickness(&s.pools);
+                    s
                 }
-                // The accreted crust is crust uplift, whatever its rise (ledger: ISO-091).
-                s.crust_uplift_mm_yr += accreted_uplift_mm_yr(&blended, &s.pools, gravity, env);
-                s.thickness_m = thickness(&s.pools);
-                s
-            }
-        })
+            },
+        )
         .collect();
-    // The new samples' distances from their classes' outlines, until `level_set::reinit` sets
-    // them (ledger: PLT-852): a covered point's from the cover that holds it, new sea floor's the
-    // stale half spacing.
-    let class_phi_new: Option<Vec<f32>> = old_class_phi.as_deref().map(|cp| {
-        found
-            .par_iter()
-            .zip(new_pts.par_iter())
-            .map(|((top, _), &q)| match top {
-                Some((g, c)) => class_corner(old, src, c, rots[*g as usize], q, Some(cp))
-                    .1
-                    .min(cap) as f32,
-                None => (level_set::STALE_SPACINGS * spacing) as f32,
-            })
-            .collect()
-    });
     let area_km2 = norm.sample_area_km2();
     let sum = |k: usize| tally.iter().map(|t| t[k]).sum::<f64>() * area_km2 / 1000.0;
     for (name, k) in [
@@ -1606,7 +1793,12 @@ pub fn resample(
         state.level_set = Some(level_set::LevelSet {
             phi: phi_new,
             member: state.samples.iter().map(|s| s.group).collect(),
-            class_phi: class_phi_new.unwrap_or_default(),
+            kind_phi: labels_phi_new
+                .as_ref()
+                .map(|l| l.0.clone())
+                .unwrap_or_default(),
+            kind_member: state.samples.iter().map(level_set::kind_of).collect(),
+            class_phi: labels_phi_new.map(|l| l.1).unwrap_or_default(),
             class_member: state.samples.iter().map(level_set::class_of).collect(),
         });
     }
