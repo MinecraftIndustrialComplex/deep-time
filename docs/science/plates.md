@@ -13873,7 +13873,7 @@ coordinator's call, decisions log: a correctness fix, Bird 2003 paragraph [126])
 `weld_seed_sweep` welds scattered 3, 5, 7, 9, 11, 13 to 16, 18 and 22 and supercontinent 1, 2,
 8, 9, 12, 13, 16, 17 and 19; the sutures test moved from scattered 8 to 3. Test fixtures whose
 plates were turned but left at rest resolve their overlaps moving about their turn at 50 mm/yr
-(`resolve_turned` in the tests, 16 call sites), so their contacts begin as PLT-810 asks.
+(`resolve_turned` in the tests, 15 call sites), so their contacts begin as PLT-810 asks.
 
 ### The review's fixes (PR #55, 2026-10-31)
 
@@ -13907,14 +13907,16 @@ began 11 to 5 Ma (their Table 1); "relatively minor adjustments in relative plat
 a transform fault into a convergent plate boundary" (Stern 2004, p. 280). (Both read in the
 library's texts by a Sonnet research sub-agent, 2026-10-31.) The depth rule would stand on the
 lattice's resolution, not on a source, and the accretion would thicken the top plate with ocean
-floor that on Earth subducts. So PLT-810 now begins a contact where the two plates' mean
-convergence across the overlap's samples is positive, at any angle. That mean is the rate at
-which the overlap grows, so an overlap that grows always gets its consumer, and one that does not
-(plates sliding past, or parting) begins none and does not deepen. PLT-311's 20 degrees stay
-where they were before the gate: the boundary classes and the arcs' fronts (PLT-330), so a
-transpressive contact builds no arc on its strike-slip stretches. In the overlap trace's records
-(rule as built), the pairs read as transforms were 0.275 of the ocean-ocean onsets, and 0.66 of
-them had a convergent component: those now begin.
+floor that on Earth subducts. So PLT-810 began a contact where the two plates' mean convergence
+across the overlap's samples is positive, at any angle. (That mean is not the rate the overlap
+grows, and read each step alone it has no dead band: the re-review's fixes, below, replace it.)
+PLT-311's 20 degrees stay where they were before the gate: the boundary classes and the arcs'
+fronts (PLT-330), so a transpressive contact builds no arc on its strike-slip stretches, and
+continental crust converging under 20 degrees hides with no collision or belt, coming back at the
+resampling's accretion. In the overlap trace's records (oo-overlap, gate off), the samples' mean
+convergence is positive for 0.880 of the ocean-ocean onsets of plates that came to converge, and
+for 0.690 of those the rule as built read as transforms (`onsets.py`): the first fix let those
+begin.
 
 **The pair's reading from its samples (PLT-811).** The reading summed the samples' unit normals at
 the overlap's centroid: two overlaps on opposite flanks of a rotating plate cancel, and the
@@ -13932,7 +13934,9 @@ converging or not. So do a polarity reversal's new onset and an initiation's pla
 
 **Tests.** `a_contact_begins_only_where_its_plates_converge`: head-on and 10 degrees off the
 boundary towards it (transpression), a contact with the switch on; 10 degrees off away from it
-and head-on away, none, and the overlap's samples stay visible. `a_contact_goes_on_and_reverses_whatever_its_plates_do`:
+and head-on away, none (the pure strike-slip case was dropped here, and the check that the
+overlap's samples stay visible could not fail: the re-review's fixes restore the one and replace
+the other). `a_contact_goes_on_and_reverses_whatever_its_plates_do`:
 a contact begun converging is seen again the next step while its plates part, and reverses the
 step after, with continental crust on its subducting side, though they still part.
 `onsets_carry_their_plates_motion_across_the_overlap`: with the gate on (the default), every new
@@ -13949,12 +13953,63 @@ record. The key adds the onset's convergence. `onsets.py` says the records' sign
 its 48 runs (scattered 11, supercontinent 9), against 28 with the gate off (16 and 12). With the
 gate on any angle of convergence, 26 (13 and 13: scattered 2, 3, 5 to 7, 10 to 13, 17, 19, 22 and
 24; supercontinent 1, 2, 4, 5, 7, 8, 10, 12, 13, 17, 20, 21 and 24; the guard binding on none).
-So most of the drop was oblique collisions the 20 degrees refused at their onset, whose crust the
-next resampling dropped; the rest is within the sweep's chaos (each switch changes which seeds
-weld, not only how many). The weld, recording and sutures tests keep their seeds (scattered 3,
-supercontinent 2).
+These counts are within the sweep's chaos: a 48-run count spreads by about 3.5, a difference of
+two by about 5, and each switch reshuffles which seeds weld (between the two gates scattered shares
+6 of 11 seeds, supercontinent 6 of 9). The sweep shows no cause. The weld, recording and sutures
+tests keep their seeds (scattered 3, supercontinent 2).
 
-Not run yet: the arm oo-gate2 (the fixed gate, 8 runs against base35-s4) needs a simulation slot.
+**The arm oo-gate2** (4583ad7e, the first fix, 8 runs against base35-s4, the crust-budget envs).
+Guard clean (0 steps beyond two Earth reliefs). No V1 check beyond the seeds' spread: land 0.216
+to 0.209 (p 0.72), largest landmass 0.048 to 0.063, continental crust under the sea 0.594 to 0.602
+(p 0.72), coast with high ground 0.071 to 0.074, collisions 4.85 to 5.00 per 100 Myr, criteria met
+5 against 5.5 (p 0.91). The continental crust dropped at resamplings 0.0115 km³ a year (oo-gate
+0.0228, base35-s4 0.0049; p 0.01 against the base): halved, not gone. The intra-oceanic front past
+incipient 21,065 km (base35-s4 20,265, oo-gate 21,296); on the maps 19,309 km at a snapshot, 0.513
+of it on floor under 55 Myr (9,905 km); the subducting fronts 48,916 km.
+
+### The re-review's fixes (PR #55, 2026-10-31, second pass)
+
+An Opus re-review of 5eb0cf81..4583ad7e. Its findings and what changed.
+
+**A. No dead band** (the coordinator's call for the law). A strict mean above 0, read each step
+alone, lets plates sliding past begin contacts on the lattice's noise: overlaps form only where the
+outline converges locally, so their mean leans positive, and on a straight transform its sign is
+noise. By the overlap trace's records the strict mean refused only 0.12 of the ocean-ocean onsets
+(above). Now each pair without a contact sums its overlap's mean convergence times the step while
+it overlaps by a contact's worth of samples (from nothing when it stops), and begins a contact once
+the sum reaches half a lattice spacing (PLT-811's resolution threshold): Gurnis et al. 2004's
+"Cumulative convergence, not the rate of convergence, is the dominant control". Transpression adds
+up; a reading whose sign flips from step to step does not. Tests: the pure strike-slip case is back
+(no contact in 30 steps; transpression begins one later than head-on), and
+`plates_sliding_past_along_their_boundary_begin_no_contact`: plates sliding along their shared
+boundary, a great circle about their pole, do not overlap at all (with the level set's outline or
+the lattice's triangles), and a reading that flips sign each step begins no contact in 30 steps,
+where the first fix's rule would have begun one on the first.
+
+**B. The consumer of last resort.** The pair's mean is not the rate its overlap grows: a growing
+flank can be outweighed by one that is not, and refused. Now the resampling takes every cover under
+the top as a contact would: visible crust of a plate with no contact under the top goes too, ocean
+floor under with its sediment's share (the rest accreted), continental crust accreted, tallied in
+`plates/resample_last_resort_ocean_km3` and `plates/resample_last_resort_continent_km3`; nothing is
+dropped (`plates/resample_dropped_km3` stays 0). The gate decides where contacts begin, never the
+books. Test `a_refused_overlap_is_taken_at_the_resampling`: two continental plates overlapping,
+sliding past (refused) or 10 degrees transpressive (a contact once converged), held 30 steps and
+resampled: nothing dropped either way, and the refused pair's crust taken by the last resort.
+
+**C. A reversal's route.** The onset trace called a reversal route 1 only when the old polarity was
+active the step before, so a dormant contact's reversal read as plates that came to converge. Now
+`resolve` names the pairs it reversed (`Resolved::reversed`), and the record takes the route from
+that. A reversal's onset now carries the new polarity's slab age and convergence (the old
+polarity's stayed before).
+
+**D. The weld sweep** is within its chaos (above). **E. The two young-floor fronts.** gapfronts.py
+counted the snapshots taken at a resampling, which carry no front flags, so its km at a snapshot
+read low by 131 to 152; it leaves them out now, as oofronts.py does: 10,141 km of young-floor
+intra-oceanic front on oo-gate, against oofronts.py's 10,151 (0.520 of 19,512 and 19,521). The
+Earth comparison uses these. **G.** The quarter-spacing threshold's test now uses two Fibonacci
+lattices at a random offset (`a_mixed_neighbourhood_gives_no_normal`). **Smaller.** gapfronts.py
+links a split's copy through the plates' lineage (rec.json `parent`) and reads the run's step;
+dropped.py takes the run's start from rec.json.
 
 ### The gap fill and the intra-oceanic front (2026-10-31, a read)
 
@@ -13971,13 +14026,14 @@ on floor under 55 Myr, `oofronts.py`). Each onset is classed by the time since t
 by its first front samples on the subducting side (gap fill for half or more, PLT-502; other; no
 front sample), and by its pair's history (`since_spread_myr`: the pair's boundary spread since the
 resampling before the fill, only earlier, or never). The maps' intra-oceanic front samples (as
-`oofronts.py` classes them, -950 to -50 Myr) are linked to their contact's onset by the pair (0.60
-on oo-gate), or by one side for a split's copies (0.38), 0.01 unlinked.
+`oofronts.py` classes them, -950 to -50 Myr, leaving out the snapshots at a resampling) are
+linked to their contact's onset by the pair (0.60 on oo-gate), or through the plates' lineage for a
+split's copies (0.39), 0.01 unlinked.
 
-**The share.** Of the young-floor intra-oceanic front (under 55 Myr, 8,740 km at a snapshot on
-oo-gate, 0.520 of it), contacts begun within two steps of a resampling on gap fill hold 0.333
-(0.275 the step after alone); on oo-overlap 0.333 too. Of the old-floor front (55 Myr or more)
-they hold 0.297 and 0.312. The step after a resampling holds 0.41 of both (oo-gate). Over the run
+**The share.** Of the young-floor intra-oceanic front (under 55 Myr, 10,141 km at a snapshot on
+oo-gate, 0.520 of it), contacts begun within two steps of a resampling on gap fill hold 0.335
+(0.288 the step after alone); on oo-overlap 0.342. Of the old-floor front (55 Myr or more) they
+hold 0.332 and 0.271. The step after a resampling holds 0.42 of the young-floor front (oo-gate). Over the run
 (the onsets' `front_km_myr`), the step-after onsets on gap fill make 0.275 of the intra-oceanic
 front on oo-gate and 0.266 on oo-overlap. So these contacts make about a third of the
 intra-oceanic front whatever floor it now takes; they are not where the young-floor excess lies.
@@ -13992,9 +14048,9 @@ starts about a tenth of them.
 whose boundary spread since the resampling before: the fill closed their own spreading gap, and
 on the resampling's step the boundary was still spreading for 0.57 of them. 0.52 (0.50 of their
 front) never spread across a boundary they shared (not lattice neighbours on the old lattice for
-0.986 of them), so the gap between them was not theirs to open. Every one of them converges across
-its overlap at the onset (29 mm/yr median, the gate as built). oo-overlap: 0.42, 0.50 and 0.08
-(spread only earlier).
+0.986 of them), so the gap between them was not theirs to open. (On oo-gate all of them read
+converging at the onset, 29 mm/yr median: the gate as built checking itself.) oo-overlap: 0.42,
+0.50 and 0.08 (spread only earlier).
 
 **What the sources say** (Stern 2004 and Gurnis et al. 2004 read in full in the library, Hall et al.
 2003's abstract only, no open full text found; Crameri et al. 2020 main text, Supplementary Data 1
@@ -14026,21 +14082,78 @@ convergent boundaries -0.007, subduction zones -0.087).
   rule leaves to every pair that does not part) in a gap between two plates that never parted
   across it: half the step-after onsets on gap fill begin on such floor. Earth makes lithosphere
   only where plates diverge (Bird's Table 3), so that floor, and its age, is the model's. Its share
-  of the intra-oceanic front is small: the never-spread pairs hold 0.144 of the young-floor front
-  and 0.115 of the old (oo-gate; 0.146 and 0.096 on oo-overlap), about 1,260 km of the 8,740, against
-  an excess over Earth of about 4,900 to 6,500 km.
+  of the intra-oceanic front is small: the never-spread pairs hold 0.137 of the young-floor front
+  and 0.124 of the old (oo-gate; 0.137 and 0.107 on oo-overlap), about 1,390 km of the 10,141,
+  against an excess over Earth's 2,240 to 3,860 km of about 6,300 to 7,900 km.
 - The pairs that did part begin a contact across the floor the fill just made, the step after the
   fill, while their boundary spread on the fill's own step. On Earth a ridge turns into a trench
   only after a lag of several to 10 Myr (Gurnis et al. [53]), except perhaps behind an arc ([55]).
-  The model has no such lag; but by the numbers this is a timing and a floor-age question for 0.17
+  The model has no such lag; but by the numbers this is a timing and a floor-age question for 0.18
   of the young-floor front, not its length.
 - The floor at the onset is 4 to 7 Myr old, not zero, and these contacts make the same share of the
   old-floor front. The young floor at the intra-oceanic fronts at any time is the subducting
   plates' floor as it arrives, not the fill's: what feeds young floor to intra-oceanic trenches
   for the life of a contact (young subducting plates, rift-born; the earlier diagnosis: 0.57 of the
-  intra-oceanic front belongs to contacts whose first floor down was under 12 Myr) is the next read.
+  intra-oceanic front belongs to contacts whose first floor down was under 12 Myr) is the next read
+  (below).
 
 The tables: `gapfronts.py` on oo-gate and oo-overlap (the folders above).
+
+### What floor the subducting plates bring to the intra-oceanic trenches (2026-10-31, a read)
+
+The question after the gap fill read: over a contact's life, what floor reaches the model's
+intra-oceanic trenches, and why it is young. Nothing is built.
+
+**Tools.** `tools/review/crustcycle/slabfloor.py` (no simulation) on the maps of base35-s4 (8 runs),
+oo-gate (8) and oo-overlap (2): each intra-oceanic front sample's subducting plate (the nearest
+sample of another plate), its age and origin (rec.json's plate lives), its floor's median and 90th
+percentile, its share of the planet, and its spreading ridge: the nearest of its floor within 5 Myr
+of the planet's youngest (new floor is made only at resamplings, so between them the youngest floor
+ages), the distance to it, and the plate across that ridge; on the traced runs, the contact's age
+(linked as gapfronts.py links). `tools/review/crustcycle/earth_ridge.py` reads Earth's: Bird 2003's
+SUB steps classed as `earth_fronts.py` classes them (CRUST1.0 at 15 km), the floor going under from
+Seton et al. 2020, the nearest floor under 5 Myr on the subducting side of the step's great circle
+(any plate's: a lower bound of the subducting plate's own ridge's distance), and the nearest
+spreading step of the same plate pair (Bird's OSR and CRB).
+
+**Not young plates.** Of the young-floor intra-oceanic front (base35-s4, 9,080 km at a snapshot,
+0.487), 0.62 lies on subducting plates older than 100 Myr and 0.25 on plates born in the last 55
+Myr; the plates' floor reaches past 100 Myr (90th percentile) under 0.71 of it; their origins are
+the old front's (rifts 0.50, the first plates 0.17, initiations 0.13).
+
+**Their ridge is near.** The subducting plate's ridge lies within 500 km of 0.46 of the young-floor
+front (oo-gate 0.55), median 353 km (oo-gate 309, oo-overlap 293); of the old-floor front, median
+1,363 km (1,226, 1,273). Earth's intra-oceanic trenches on young floor (2,251 km at 15 km of
+crust) lie a median 1,216 km from the nearest young floor on their subducting side (0.25 within 500
+km), on old floor (8,394 km) 3,214 km; Earth's continental margins on young floor 865 km. The half
+rate the distance implies with the floor's age is slow in the model (0.48 of the young-floor front
+under 20 mm/yr, against 0.29 on Earth's).
+
+**And the ridge is the pair's own.** Where the subducting plate's ridge is within 1,000 km of the
+young-floor front, the plate across it is the overriding plate itself for 0.75 of it (oo-gate 0.76,
+oo-overlap 0.77; of the old-floor front 0.51): the two plates spread along one stretch of their
+boundary and converge along another, a few hundred km apart, slowly on both. That is a pair whose
+relative pole lies on or near their shared boundary.
+
+**Over a contact's life the floor does not age.** On oo-gate the share of the floor going under
+that is younger than 55 Myr is 0.48 at contacts under 10 Myr old, 0.57 to 0.62 from 10 to 55 Myr,
+0.52 at 55 to 100 Myr and 0.46 to 0.47 beyond (oo-overlap 0.62, 0.68, 0.56, 0.49, 0.45, 0.51); the
+median floor at the trench is 32 to 53 Myr at every contact age. On Earth a trench begun on a
+fracture zone takes the older plate's interior (Gurnis et al. 2004 [60]: "the older plate is
+thrust beneath the younger"), whose floor ages away from its ridge.
+
+**Against Earth's pairs.** On Earth (`earth_ridge.py`), a spreading step of the same plate pair
+lies within 1,000 km of 0.44 of the young-floor intra-oceanic front (about 990 of 2,251 km) and of
+0.09 of the old (about 750 of 8,394). In the model, the young-floor front whose subducting plate's
+ridge within 1,000 km faces the overriding plate is 0.45 of 9,080 km on base35-s4 (about 4,070 km)
+and 0.53 of 10,141 on oo-gate (about 5,340); the old-floor front's, 0.15 of 9,564 (about 1,390).
+(The two measures differ: Bird's steps of the pair against the model's ridge sample's neighbour.)
+So such pairs hold about 3,100 to 4,350 km more young-floor intra-oceanic front than Earth's, about
+half of the young-floor excess (6,300 to 7,900 km). **Is a law wrong?** Not yet named: the young
+floor at the model's intra-oceanic trenches comes, for half the excess, from ridges of the same two
+plates a few hundred km along their boundary, at slow rates near their relative pole. Whether the model makes such pairs more often than Earth (its plate
+motions from the force balance, `forces.rs`, and the contacts begun where the pair's boundary
+spread, the onset trace's 0.33 of the intra-oceanic front) is the next read.
 
 ## Hotspots, plume heads and volcanic margins from sources (2026-10-31)
 

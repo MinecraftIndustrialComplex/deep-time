@@ -997,25 +997,25 @@ pub struct TectonicParams {
     /// holds under ERO-215's porosity law (536 m). Off, the solid pile is read against 1 km.
     /// ledger: PLT-762
     pub trench_pile_in_place: bool,
-    /// A contact begins only where its plates converge across their overlap (the oceanic-fronts
-    /// lane, 2026-10-31; on by default since 2026-10-31, the coordinator's call under Ben's rule
-    /// of 2026-10-23, decisions log): `subduction::resolve` makes a new contact from an overlap of
-    /// `MIN_CONTACT` samples or more only where the two plates' mean convergence across the
-    /// boundary's normal over the overlapping samples is positive, at any angle to the boundary
-    /// (Bird 2003 [126]: a subduction zone is a step "with a convergent (component of)
-    /// velocity"; Puysegur began as a strike-slip boundary "with a component of convergence",
-    /// Gurnis et al. 2004 [25]). Then the overlap grows, and the contact consumes it; an overlap
-    /// that does not grow (plates sliding past or parting) begins none and stays visible. The 20
-    /// degrees of PLT-311 stay with the arcs' fronts (PLT-330). The normal is read from the samples
-    /// about each overlapping one (`subduction::overlap_normal`, PLT-811), since a pair that met
-    /// since the last resampling has no lattice edge. Until PR #55's review (2026-10-31) the gate
-    /// also refused motion within PLT-311's 20 degrees, so a transpressive overlap grew until the
-    /// resampling dropped the lower plate's crust (continental crust dropped 0.0049 to 0.0228
-    /// km³ a year on the arm oo-gate against base35-s4). Off, any overlap of `MIN_CONTACT`
-    /// samples makes a contact: plates sliding past each other overlap where the lattice's
-    /// outline zigzags (the overlap trace, plates.md). Polarity reversals and existing contacts
-    /// (active, carried through a resampling, or dormant until `contact_timeout_myr`, PLT-059)
-    /// are not gated. ledger: PLT-810
+    /// A contact begins only where its plates have converged across their overlap (the
+    /// oceanic-fronts lane, 2026-10-31; on by default since 2026-10-31, the coordinator's call under
+    /// Ben's rule of 2026-10-23, decisions log): `subduction::resolve` makes a new contact from an
+    /// overlap of `MIN_CONTACT` samples or more only once the pair's cumulative convergence across
+    /// it (the overlapping samples' mean convergence across the boundary's normal times each
+    /// step's Myr, summed while the pair overlaps, from nothing when it stops) reaches half a
+    /// lattice spacing (`subduction::CONTACT_CONVERGENCE_SPACINGS`, a resolution threshold, PLT-811),
+    /// at any angle to the boundary. Bird 2003 [126]: a subduction zone is a step "with a
+    /// convergent (component of) velocity"; Gurnis et al. 2004: "Cumulative convergence, not the
+    /// rate of convergence, is the dominant control"; Puysegur began as a strike-slip boundary
+    /// "with a component of convergence" (their [25]). Transpression adds up; a reading whose
+    /// sign is the lattice's noise does not. An overlap refused at the next resampling is taken
+    /// there as a contact would take it (`ridges::resample`, the consumer of last resort). The 20
+    /// degrees of PLT-311 stay with the arcs' fronts (PLT-330). Off, any overlap of `MIN_CONTACT`
+    /// samples makes a contact. Polarity reversals and existing contacts (active, carried through
+    /// a resampling, or dormant until `contact_timeout_myr`, PLT-059) are not gated. History: the
+    /// gate as built took PLT-311's 20 degrees (a transpressive overlap grew until the resampling
+    /// dropped its crust); the first review's fix read each step's mean alone, with no dead band.
+    /// ledger: PLT-810
     pub contact_needs_convergence: bool,
     /// Hotspots from sources (the hotspot lane, 2026-10-31; off by default;
     /// docs/design/hotspots-lips-margins.md): the plume tails' number, lifetimes and buoyancy
