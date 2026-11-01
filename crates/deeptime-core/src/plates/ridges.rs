@@ -1723,6 +1723,72 @@ mod tests {
         assert!(!back.island_arc_marked());
     }
 
+    /// PLT-824 through a resampling, before the final pass (PR #58's re-review): under the thermal
+    /// state a thick continental sample takes its own law over its own lithosphere and the nearest
+    /// corner's magmatic excess, so neither a hot hyper-extended corner nor a hot corner of its
+    /// own class enters its heat flow; without the state it is the blend over its class's corners,
+    /// the hyper-extended corner left out.
+    #[test]
+    fn a_resampled_column_takes_its_own_heat_flow() {
+        use super::super::thermal::{
+            ARC_HEAT_MW_M2, HOTSPOT_HEAT_MW_M2, conductive_mw_m2, sample_l_km,
+        };
+        use super::super::transition::hyper_extended;
+        let t = 500.0;
+        let column = |scale: f32, l_km: f32, q: f32| {
+            let mut s = Sample::blank(0);
+            s.kind = CONTINENTAL;
+            s.pools = super::super::pools::continental_column().map(|v| v * scale);
+            s.thickness_m = thickness(&s.pools);
+            s.lithosphere_km = l_km;
+            s.heat_flow_mw_m2 = q;
+            s
+        };
+        let near_l = 150.0;
+        let thick = column(1.0, near_l, 0.0);
+        // The nearest corner: its law over its own L plus 30 mW/m² of an arc's heat.
+        let near_q = (conductive_mw_m2(sample_l_km(&thick, t)) + 30.0) as f32;
+        let near = column(1.0, near_l, near_q);
+        let hyper = column(0.2, 20.0, 300.0);
+        let hot = column(1.0, 25.0, 230.0);
+        assert!(hyper_extended(&hyper) && !hyper_extended(&near) && !hyper_extended(&hot));
+        let cover = Cover {
+            t: 0,
+            tri: [0, 1, 2],
+            w: [0.5, 0.3, 0.2],
+        };
+        let src = [near, hyper, hot];
+        let on = crate::params::TectonicParams {
+            thermal_state: true,
+            ..Default::default()
+        };
+        let s = interpolate(&src, &cover, DQuat::IDENTITY, 0, At { k: &on, t_myr: t });
+        let excess = (f64::from(near_q) - conductive_mw_m2(sample_l_km(&near, t)))
+            .clamp(0.0, ARC_HEAT_MW_M2 + HOTSPOT_HEAT_MW_M2);
+        let want = conductive_mw_m2(sample_l_km(&s, t)) + excess;
+        assert!(
+            (f64::from(s.heat_flow_mw_m2) - want).abs() < 1e-3,
+            "{} against its own law's {want}",
+            s.heat_flow_mw_m2
+        );
+        // The other corners' heat flow does not enter.
+        let colder = [near, column(0.2, 20.0, 60.0), column(1.0, 25.0, 50.0)];
+        let s2 = interpolate(&colder, &cover, DQuat::IDENTITY, 0, At { k: &on, t_myr: t });
+        assert_eq!(s.heat_flow_mw_m2, s2.heat_flow_mw_m2);
+        // Without the state: the class's blend, the hyper-extended corner out.
+        let off = crate::params::TectonicParams {
+            thermal_state: false,
+            ..Default::default()
+        };
+        let s = interpolate(&src, &cover, DQuat::IDENTITY, 0, At { k: &off, t_myr: t });
+        let want = (0.5 * f64::from(near_q) + 0.2 * 230.0) / 0.7;
+        assert!(
+            (f64::from(s.heat_flow_mw_m2) - want).abs() < 1e-3,
+            "{} against the class blend's {want}",
+            s.heat_flow_mw_m2
+        );
+    }
+
     /// PLT-660, Clift & Vannucchi (2004): an accretionary margin (a pile over 1 km, convergence
     /// under 76 mm/yr) subducts 83 % of the incoming pile; an erosive one (a thinner pile or a
     /// faster convergence) all of it (von Huene & Scholl 1991's type 2). The bounds are strict,

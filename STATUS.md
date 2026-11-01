@@ -153,6 +153,13 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 
 ## Build log
 
+### 2026-11-01: PR #58's re-review answered on continental-heat-ceiling: a resampled column's own heat flow, Newton's floor, the plates' skip, the docs (the coordinator, session 88bb1af2-7722-4f74-9e04-4e8b8af667a9, inline, finishing the hotspot lane's work after it stopped on the account's rate limit)
+
+- A resampled continental column under the thermal state takes its own law over its own lithosphere plus the nearest corner's magmatic excess (0 to 80 mW/m²), so no hotter corner of its class enters (PLT-824); a count of how often the column ceiling binds (`plates/heat_flow_clamped`, `_last`); `a_resampled_column_takes_its_own_heat_flow` (ridges.rs) checks it before the final pass, and the class blend without the state.
+- The lid's floor by Newton's method (five to six steps against the bisection's 48); stage 3's removed share on Houseman & Molnar's quantity (of the mantle lithosphere: 0.56 at 65 and 70 km, 0.54 at 78 km); the final-frame test checks PLT-821 on a constructed final pass, not on the seed's luck; the plate-stage test skips exactly the plates the step's balance left out (`out_of_balance` in the dynamics record).
+- Docs: PLT-469 (the pass now reaches the plates through L), PLT-460, PLT-663, PLT-820, PLT-821's formula, PLT-824, plates.md, the page (the nearest corner, T_s as one place's value with its OCR caveat, the arcs' stiffening confined to their thick tail); a dated decisions-log entry: on, provided hc-on2 against base35-s4 is clean.
+- Next: the gate, then hc-on2 (after rb3 in the slot queue).
+
 ### 2026-10-31: PR #58's review fixed on continental-heat-ceiling (lane agent, worktree .claude/worktrees/agent-abc417f512034b877; sub-agent of session 88bb1af2-7722-4f74-9e04-4e8b8af667a9)
 
 - **The review** (Opus, standing in for Graphide, https://github.com/MinecraftIndustrialComplex/deep-time/pull/58#issuecomment-6550375147), ten findings; the coordinator's calls, all taken.

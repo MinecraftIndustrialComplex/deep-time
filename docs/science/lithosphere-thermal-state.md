@@ -70,8 +70,8 @@ settling, when this step's flags are all set. For each visible continental sampl
    its floor's lithosphere at the floor's age, at least its lid's floor, and no keel (PLT-821,
    since 2026-10-31; L_ref until then).
 
-A resampling copies both numbers from the nearest corner of the sample's kind (`ridges.rs`
-`interpolate` keeps the major corner's values).
+A resampling copies both numbers from the nearest corner (`ridges.rs` `interpolate`, PLT-664), and
+the final pass raises L to the new column's lid floor (PLT-820).
 
 ### Where the state goes
 
@@ -245,7 +245,9 @@ than 2 to 4 km in diameter").
 The rule (PLT-820). A continental column's thermal lithosphere reaches no shallower than where the
 plate model's own steady geotherm (ISO-138, `thermal::geotherm_share`: the crust's radiogenic heat
 decaying as e^(−z/h_r) over the mantle's B / L, T_m = 1,350 °C at L) puts its Moho at the crust's
-basal solidus T_s = 1,080 °C (PLT-822): T(z_Moho) = T_s, solved for L by bisection
+basal solidus T_s = 1,080 °C (PLT-822; one place's value, the Salton Trough's at its 23.5 km Moho, applied to
+every Moho depth and crust: the agent's extrapolation, and the caption's symbol was lost to the scan's OCR):
+T(z_Moho) = T_s, solved for L by Newton's method
 (`thermal::lid_floor_km`), with z_Moho the column's rock: 1.254 z_Moho over the ocean's 7 km column,
 1.268 over 23.5 km, 1.274 over 70 km. (The mantle part alone, linear through the lid, would put T_s
 at 1.25 z_Moho, the first build's floor; the radiogenic part heats the Moho beyond that.) A
@@ -312,7 +314,7 @@ base35-s4, medians of 8 with Mann-Whitney p: no guard failure (the worst 10,241 
 under 0.3. Land 0.211 against 0.216; largest landmass 0.060 against 0.048; coast with high ground
 0.111 against 0.071 (p 0.51; over its 0.11 in 4 runs against 1); criteria met 5, mean 5.00 against
 5.38 (p 0.32). The high coasts shift towards collision belts (coastset: their share 0.750 against
-0.517, the arcs' 0.172 against 0.355), not explained at 8 runs. The heat flow at the final frame
+0.517, the arcs' 0.172 against 0.355; read below, "What the review's fixes found"). The heat flow at the final frame
 (the pool's `hfcells`, version 2, against base35-hf: base35's key run again with the heat-flow fields
 kept, its 8 worlds bit-identical to base35-s4's by the state's sha256): median 48.8 mW/m² against
 47.4 (p 0.19), mean 53.7 against 52.6 (0.10); maximum 196.5 against 162.3 (0.013), 406.7 in one run;
@@ -353,9 +355,11 @@ against 0.228, p 0.01; their rate of high coast 0.071 against 0.131, p 0.083; th
 crust 49.0 against 47.7 km, p 0.13). By the code the floor reaches the plates only through the laws
 that read L (the collapse's and the interior's thin sheets, PLT-415 and PLT-733 by PLT-652's
 weakness; the rifts' weakness, PLT-506; the flexure's Te through the thermal age), and the columns it
-binds are heated crust over 47 km, arcs and collision belts, at a thermal age of about 40 Myr where
-they were at 0 (η_0 / η 0.53 against 1): stiffer arc belts are the reading that fits, not shown by a
-single-cause arm. The weld seeds: the sweep's welding seeds did not fall (master 16 scattered and 12
+binds are heated crust over 47 km, arcs and collision belts. How much stiffer depends on the crust: a
+70 km belt reaches a thermal age of about 40 Myr where it was at 0 (η_0 / η 0.53 against 1), but at
+the arcs' high-ground crust of 49 km (the median above) the floor is 62.4 km, a thermal age of 3.0 Myr
+and η_0 / η 0.95, at 55 km 12.8 Myr and 0.82: the stiffening is in the arcs' thick tail, so stiffer
+arc belts are a weak fit for the median arc, not shown by a single-cause arm. The weld seeds: the sweep's welding seeds did not fall (master 16 scattered and 12
 supercontinent of 24; the first build 17 and 14; with the review's fixes 18 and 17), so the seeds
 that stopped welding are the planets' divergence from a changed L, not fewer welds; the weld tests'
 seeds still weld.
