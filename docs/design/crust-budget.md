@@ -311,3 +311,28 @@ The re-review of a7c42428, two must-fixes and the follow-ups, on the same branch
   (25.3 against 34.1), and what is left is the intra-oceanic fronts' length, 1.9 times Earth's.
   The floor's stock agrees (young floor 1.9 times GlobSed in place). Next: which law sets the
   export's rate, the surface's erosion or the plates' uplift.
+- The intra-oceanic fronts' length (25,744 km against Clift's 13,550). Diagnosed 2026-10-31
+  (plates.md, "The intra-oceanic fronts' length"; trace oo-trace, measurement only, bit for bit
+  on base34's seed 1; Earth from Bird 2003's steps, CRUST1.0 and Seton et al. 2020's floor ages).
+  Part is the measure (the counter takes incipient fronts, 1.25 times; Clift's inventory is 0.78
+  of Bird's); the trench in all is Bird's length, and matched class by class the intra-oceanic
+  share is 1.3 to 2.1 times Earth's. The excess is intra-oceanic subduction of floor younger than
+  55 Myr (10,840 km against Earth's 2,240 to 3,860; on older floor the length is Earth's), which
+  Earth puts down at continental margins. 0.57 of that front belongs to contacts whose first floor
+  down was younger than 12 Myr; the young slabs converge more slowly than Earth's intra-oceanic
+  fronts, open no back-arcs (young floor behind 0.04 against 0.31 to 0.43) and last (arcs older
+  than 50 Myr: 0.61; Earth's zones began 55 Ma or later). A missing law by its signature: a
+  subduction zone starts at any converging boundary after 100 km of slab. Next: whether the start
+  condition or the kinematics that make young boundaries converge is missing (one trace: each
+  contact's boundary the step before its onset). The onset trace (oo-onset, 2026-10-31): neither
+  in the plain sense. Onsets between two floors younger than 10 Myr make 0.03 of the
+  intra-oceanic front; 0.90 of the onsets come at pairs that had not converged before (parting,
+  or not touching on the lattice, the step before), about half on the step after a resampling,
+  where the first floor down is the resampling's new floor (median 7 Myr). The contacts begin
+  where the resampling and the plates' motion first make two plates overlap. Reported before
+  building. The resampling trace (oo-resample) and the overlap trace (oo-overlap) followed:
+  half the intra-oceanic onsets fall on the step after a resampling, on its gap fill, mostly
+  between plates that converge; 0.31 of them began on a pair not converging across the overlap.
+  The gate PLT-810 (a new contact only where the plates converge across their overlap, at any
+  angle since PR #55's review) is on by default; it does not shorten the intra-oceanic front
+  (plates.md "The overlap trace" and "The review's fixes (PR #55)").

@@ -62,6 +62,8 @@ pub const COLLISIONS_GLOBAL: &str = "plates/inherited_collisions";
 /// … and slabs handed over whole, and copied.
 pub const SLABS_MOVED_GLOBAL: &str = "plates/inherited_slabs_moved";
 pub const SLABS_COPIED_GLOBAL: &str = "plates/inherited_slabs_copied";
+/// … and cumulative convergence sums of pairs with no contact copied to a piece (PLT-810).
+pub const SUMS_COPIED_GLOBAL: &str = "plates/inherited_convergence_sums_copied";
 
 /// A pair of plates, the subducting one first.
 type Pair = (u32, u32);
@@ -74,6 +76,7 @@ pub struct Inherited {
     pub collisions_moved: u32,
     pub slabs_moved: u32,
     pub slabs_copied: u32,
+    pub sums_copied: u32,
 }
 
 impl Inherited {
@@ -85,6 +88,7 @@ impl Inherited {
             (COLLISIONS_GLOBAL, self.collisions_moved),
             (SLABS_MOVED_GLOBAL, self.slabs_moved),
             (SLABS_COPIED_GLOBAL, self.slabs_copied),
+            (SUMS_COPIED_GLOBAL, self.sums_copied),
         ] {
             *world.globals.entry(key.to_owned()).or_insert(0.0) += f64::from(x);
         }
@@ -137,7 +141,8 @@ pub fn inherit(
         .contacts
         .iter()
         .map(|c| (c.under, c.over))
-        .chain(state.slabs.iter().map(|s| (s.under, s.over)));
+        .chain(state.slabs.iter().map(|s| (s.under, s.over)))
+        .chain(state.converging.iter().map(|c| (c.lo, c.hi)));
     for (a, b) in pairs {
         if !concerns(a, b) {
             continue;
@@ -335,6 +340,31 @@ pub fn inherit(
         }
     }
     state.slabs.extend(new_slabs);
+
+    // Cumulative convergence of a pair with no contact (PLT-810): each piece that borders the
+    // other plate takes a copy of the pair's sum (the parent keeps its own; a pair that no longer
+    // overlaps starts again at its next resolve), the larger where a piece's pair has one already.
+    let mut sums: BTreeMap<(u32, u32), (f64, u32)> = state
+        .converging
+        .iter()
+        .map(|c| ((c.lo, c.hi), (c.km, c.steps)))
+        .collect();
+    for c in state.converging.clone() {
+        if !concerns(c.lo, c.hi) {
+            continue;
+        }
+        for (a, b) in bordering(c.lo, c.hi) {
+            let e = sums.entry(key(a, b)).or_insert((0.0, 0));
+            if c.km > e.0 {
+                *e = (c.km, c.steps);
+                out.sums_copied += 1;
+            }
+        }
+    }
+    state.converging = sums
+        .into_iter()
+        .map(|((lo, hi), (km, steps))| super::state::PairConvergence { lo, hi, km, steps })
+        .collect();
     out
 }
 
@@ -583,6 +613,7 @@ pub(in crate::plates) mod tests {
                 collisions_moved: 0,
                 slabs_moved: 1,
                 slabs_copied: 1,
+                sums_copied: 0,
             }
         );
 
@@ -655,6 +686,7 @@ pub(in crate::plates) mod tests {
                 collisions_moved: 1,
                 slabs_moved: 1,
                 slabs_copied: 0,
+                sums_copied: 0,
             }
         );
     }
@@ -692,6 +724,70 @@ pub(in crate::plates) mod tests {
         assert_eq!((st.contacts.clone(), st.slabs.clone()), before);
         let got = inherit(&mut st, &pos, &env(&k), &[(1, vec![])]);
         assert_eq!(got, Inherited::default());
+    }
+
+    /// A pair's cumulative convergence with no contact (PLT-810; PR #55's third review) goes to
+    /// every piece that borders the other plate, as a contact does: plate 0 has converged 40 km
+    /// on plate 1 (z > 0.5) and 25 km on plate 2 (a cap on the -x side); plate 0 splits along
+    /// x = 0 into itself (+x) and plate 3 (-x). Both halves border plate 1 and take its sum; only
+    /// plate 3 borders plate 2 and takes that one, and the parent keeps its own (its pair starts
+    /// again at its next resolve if it no longer overlaps).
+    #[test]
+    fn a_split_plates_pieces_take_its_convergence_sums() {
+        let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let k = TectonicParams::default();
+        let cap2 = DVec3::new(-1.0, 0.0, -0.2).normalize();
+        let mut st = one_plate(&geo, 5, |_| old_floor());
+        add_plate(&mut st, &geo, 1, |p| p.z > 0.5);
+        add_plate(&mut st, &geo, 2, move |p| {
+            p.z <= 0.5 && p.dot(cap2) > 0.3f64.cos()
+        });
+        st.converging = vec![
+            crate::plates::state::PairConvergence {
+                lo: 0,
+                hi: 1,
+                km: 40.0,
+                steps: 4,
+            },
+            crate::plates::state::PairConvergence {
+                lo: 0,
+                hi: 2,
+                km: 25.0,
+                steps: 3,
+            },
+        ];
+        let mut p3 = st.plates[0].clone();
+        p3.id = 3;
+        p3.parent = Some(0);
+        st.plates.push(p3);
+        st.groups.push(Group {
+            plate: 3,
+            rot: [0.0, 0.0, 0.0, 1.0],
+        });
+        let pts = geo.points();
+        for (i, p) in pts.iter().enumerate() {
+            if st.plate_of(i) == 0 && p.x < 0.0 {
+                st.samples[i].group = 3;
+            }
+        }
+        let pos = positions(&st, &geo);
+        st.recount(&pos);
+        let got = inherit(&mut st, &pos, &env(&k), &[(0, vec![3])]);
+        let sums: Vec<(u32, u32, f64, u32)> = st
+            .converging
+            .iter()
+            .map(|c| (c.lo, c.hi, c.km, c.steps))
+            .collect();
+        assert_eq!(
+            sums,
+            vec![
+                (0, 1, 40.0, 4),
+                (0, 2, 25.0, 3),
+                (1, 3, 40.0, 4),
+                (2, 3, 25.0, 3)
+            ]
+        );
+        assert_eq!(got.sums_copied, 2);
     }
 
     /// A split hands the slab's pull to its pieces and adds none: the slab is one sheet along the

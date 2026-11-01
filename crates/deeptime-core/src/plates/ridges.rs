@@ -391,8 +391,9 @@ pub const ACCRETED_GLOBAL: &str = "plates/resample_accreted_km3";
 /// stacked into the belt or went down with the slab; ledger PLT-276, PLT-292), km³
 /// (Earth-normalized).
 pub const STACKED_CONSUMED_GLOBAL: &str = "plates/resample_stacked_km3";
-/// Of the crust accreted: hidden continental crust (not a collision's) and visible crust of the
-/// same or a subducting plate, km³ (the rest is the sediment of hidden ocean floor).
+/// Of the crust accreted: hidden continental crust (not a collision's) and visible crust under
+/// the top (of the same plate, a plate the top overrides, or a plate with no contact under the
+/// top, the consumer of last resort's), km³ (the rest is the sediment of hidden ocean floor).
 pub const ACCRETED_HIDDEN_CONTINENT_GLOBAL: &str = "plates/resample_accreted_continent_km3";
 pub const ACCRETED_VISIBLE_GLOBAL: &str = "plates/resample_accreted_visible_km3";
 /// World global: the surface accretion raised at resamplings, km² × m / 1000 (km³ of rise,
@@ -400,8 +401,25 @@ pub const ACCRETED_VISIBLE_GLOBAL: &str = "plates/resample_accreted_visible_km3"
 pub const ACCRETED_RISE_GLOBAL: &str = "plates/resample_accreted_rise_km3";
 /// World global (measurement, the crust budget `crust_budget.rs`): visible continental crust of
 /// another plate under the top cover that neither accretes nor is consumed (no subduction
-/// contact puts it under the top's plate), dropped with all its pools, km³ (Earth-normalized) …
+/// contact puts it under the top's plate), dropped with all its pools, km³ (Earth-normalized).
+/// None since the consumer of last resort (PR #55's re-review, 2026-10-31,
+/// [`LAST_RESORT_CONTINENT_GLOBAL`]): kept so the books read 0 where they read the drop …
 pub const DROPPED_GLOBAL: &str = "plates/resample_dropped_km3";
+/// World globals (measurement only): the conserved pools of visible crust of another plate under
+/// the top cover with no contact between them, which the resampling takes as a contact would
+/// (the consumer of last resort, ledger PLT-812): continental crust, accreted …
+pub const LAST_RESORT_CONTINENT_GLOBAL: &str = "plates/resample_last_resort_continent_km3";
+/// … and ocean floor, under with its sediment's share (the rest accreted), km³ (Earth-normalized).
+/// Both are parts of the other globals already (`ACCRETED_GLOBAL`, `ACCRETED_VISIBLE_GLOBAL`,
+/// `MAFIC_DROPPED_GLOBAL`, `SEDIMENT_SUBDUCTED_GLOBAL`, `SEDIMENT_REACHING_TRENCH*`): no tool adds
+/// them to those. Of the ocean floor's: its sediment and sedimentary rock before the slab's share
+/// (in `SEDIMENT_REACHING_TRENCH*` too, though it reached no trench) …
+pub const LAST_RESORT_OCEAN_GLOBAL: &str = "plates/resample_last_resort_ocean_km3";
+pub const LAST_RESORT_SEDIMENT_GLOBAL: &str = "plates/resample_last_resort_sediment_km3";
+/// … the new samples that took a last-resort cover, summed over the resamplings …
+pub const LAST_RESORT_SAMPLES_GLOBAL: &str = "plates/resample_last_resort_samples";
+/// … and the largest rise the accretion gave one of them, m (the largest over the run).
+pub const LAST_RESORT_RISE_MAX_GLOBAL: &str = "plates/resample_last_resort_rise_max_m";
 /// … and the mafic pools of the continental crust that accretes, which `pools::accrete` does not
 /// carry (only the conserved pools join the column on top), km³.
 pub const MAFIC_DROPPED_GLOBAL: &str = "plates/resample_mafic_dropped_km3";
@@ -420,7 +438,9 @@ pub const SEDIMENT_SUBDUCTED_GLOBAL: &str = "plates/sediment_subducted_km3";
 /// sediment and sedimentary rock of ocean floor that goes under at resamplings, before the share
 /// the slab takes (PLT-440, PLT-660) is applied, slab path included, km³ (Earth-normalized),
 /// whether or not sediment subduction is on. It separates what reaches the trenches from what
-/// they keep. Split by the crust type of the sample on top: continental …
+/// they keep. It holds the consumer of last resort's ocean floor too, whose sediment reached no
+/// trench (`LAST_RESORT_SEDIMENT_GLOBAL` is that part: less it for the trenches' own). Split by
+/// the crust type of the sample on top: continental …
 pub const SEDIMENT_REACHING_TRENCH_GLOBAL: &str = "plates/sediment_reaching_trench_km3";
 pub const SEDIMENT_REACHING_TRENCH_CONTINENTAL_GLOBAL: &str =
     "plates/sediment_reaching_trench_continental_km3";
@@ -858,7 +878,11 @@ pub fn resample(
     // one-way slab's (measurement only); 12 and 13: the new continental samples whose island-arc
     // class, carried from the nearest corner, the blend of their columns would have lost or given
     // (measurement only, PLT-760: the old reading of the class).
-    let mut tally: Vec<[f64; 14]> = vec![[0.0; 14]; n];
+    // 14 and 15: the conserved pools of visible continental crust and ocean floor of a plate with
+    // no contact under the top, taken as a contact would take them (the consumer of last resort);
+    // 16 the ocean floor's sediment and sedimentary rock there, 17 one for a sample that took such
+    // a cover and 18 its accretion's rise, m (measurement only).
+    let mut tally: Vec<[f64; 19]> = vec![[0.0; 19]; n];
     let mature_m = super::subduction::mature_arc_m(k);
     let sediment_share = k.sediment_subduction_share as f32; // ledger: PLT-440
     // By margin type instead of one share (ledger: PLT-660).
@@ -933,12 +957,28 @@ pub fn resample(
                 for (g2, c2) in rest {
                     let under = &src[c2.major() as usize];
                     let p2 = group_plate[*g2 as usize];
-                    if under.is_hidden() || p2 == *pl || overrides(*pl, p2) {
+                    // Every cover under the top is taken: hidden crust, the same plate's, a plate
+                    // the top overrides, and, as the consumer of last resort, visible crust of a
+                    // plate with no contact under the top, as a contact would take it (ledger
+                    // PLT-812; PR #55's re-review: the gate decides where contacts begin, never
+                    // the books). Until then that continental crust was dropped
+                    // (`DROPPED_GLOBAL`) and that ocean floor went with its sediment untallied.
+                    let no_contact = !under.is_hidden() && p2 != *pl && !overrides(*pl, p2);
+                    {
                         let mut u = interp(*g2, c2, q);
                         let conserved: f64 = u.pools[..pool::CONSERVED]
                             .iter()
                             .map(|&x| f64::from(x))
                             .sum();
+                        if no_contact {
+                            let slot = if under.kind == CONTINENTAL { 14 } else { 15 };
+                            tally[slot] += conserved;
+                            tally[17] = 1.0;
+                            if under.kind != CONTINENTAL {
+                                tally[16] += f64::from(u.pools[pool::SEDIMENT].max(0.0))
+                                    + f64::from(u.pools[pool::SEDIMENTARY].max(0.0));
+                            }
+                        }
                         // Crust a collision took across its front is consumed, hidden or
                         // not: the belt stacked its share and the rest went down with the slab.
                         if (under.is_hidden() && under.stacked())
@@ -955,8 +995,8 @@ pub fn resample(
                             // accretes. ledger: PLT-440; with `sediment_subduction_sourced`
                             // the share follows the margin's type (PLT-660).
                             let mut subducted = 0.0_f64;
-                            let going_under = under.kind != CONTINENTAL
-                                && (under.is_hidden() || (p2 != *pl && overrides(*pl, p2)));
+                            let going_under =
+                                under.kind != CONTINENTAL && (under.is_hidden() || p2 != *pl);
                             if going_under {
                                 // Measurement only: what reaches the trench, before the share.
                                 let pile = f64::from(u.pools[pool::SEDIMENT].max(0.0))
@@ -985,7 +1025,8 @@ pub fn resample(
                             tally[7] += subducted;
                             let kept = conserved - subducted;
                             // What accretes: hidden continental crust, hidden ocean floor's
-                            // sediment, or visible crust of the same or a subducting plate.
+                            // sediment, or visible crust under the top (the same plate's, a
+                            // subducting plate's, or the consumer of last resort's).
                             tally[0] += kept;
                             if !under.is_hidden() {
                                 tally[3] += kept;
@@ -1000,9 +1041,6 @@ pub fn resample(
                             }
                             accrete(&mut s.pools, &u.pools);
                         }
-                    } else if under.kind == CONTINENTAL {
-                        let u = interp(*g2, c2, q);
-                        tally[5] += f64::from(u.thickness_m);
                     }
                 }
                 // Accreted crust stands up by its Airy height, capped at the column's, and the
@@ -1019,6 +1057,9 @@ pub fn resample(
                         s.elevation_m = (z + rise) as f32;
                         s.uplift_mm_yr += (rise / env.dt_yr * 1.0e3) as f32;
                         tally[4] += rise;
+                        if tally[17] > 0.0 {
+                            tally[18] = rise;
+                        }
                     }
                 }
                 // The accreted crust is crust uplift, whatever its rise (ledger: ISO-091).
@@ -1037,10 +1078,25 @@ pub fn resample(
         (ACCRETED_VISIBLE_GLOBAL, 3),
         (ACCRETED_RISE_GLOBAL, 4),
         (DROPPED_GLOBAL, 5),
+        (LAST_RESORT_CONTINENT_GLOBAL, 14),
+        (LAST_RESORT_OCEAN_GLOBAL, 15),
+        (LAST_RESORT_SEDIMENT_GLOBAL, 16),
         (MAFIC_DROPPED_GLOBAL, 6),
     ] {
         *world.globals.entry(name.to_owned()).or_insert(0.0) += sum(k);
     }
+    // Measurement only: how many new samples the consumer of last resort touched, and its
+    // largest rise.
+    *world
+        .globals
+        .entry(LAST_RESORT_SAMPLES_GLOBAL.to_owned())
+        .or_insert(0.0) += tally.iter().map(|t| t[17]).sum::<f64>();
+    let rise_max = tally.iter().map(|t| t[18]).fold(0.0_f64, f64::max);
+    let e = world
+        .globals
+        .entry(LAST_RESORT_RISE_MAX_GLOBAL.to_owned())
+        .or_insert(0.0);
+    *e = e.max(rise_max);
     // Only with the rule on, so a run with it off keeps the state it had before it existed.
     if sourced || sediment_share > 0.0 {
         *world
@@ -1244,6 +1300,46 @@ pub fn resample(
             (VOLCANIC_MARGIN_SAMPLES_GLOBAL, margin_n as f64),
         ] {
             *world.globals.entry(name.to_owned()).or_insert(0.0) += v;
+        }
+    }
+    // Measurement only (the resampling trace, 2026-10-31): how each new sample was made, and the
+    // resampling's counts, in the dynamics record.
+    if state.dynamics.is_some() {
+        let mut prov: Vec<u8> = found
+            .iter()
+            .map(|(top, rest)| match top {
+                None if rest.is_empty() => super::dynamics::PROV_GAP,
+                None => super::dynamics::PROV_SLAB_GAP,
+                Some(_) if !rest.is_empty() => super::dynamics::PROV_CONTESTED,
+                Some(_) => 0,
+            })
+            .collect();
+        for &i in &orphans {
+            prov[i] |= super::dynamics::PROV_ORPHAN;
+        }
+        // The plate the new sample took, against the old sample nearest it (orphans take
+        // theirs below, and the same test).
+        for (i, x) in prov.iter_mut().enumerate() {
+            let (j, _) = tree.nearest(new_pts[i]).unwrap_or((0, 0.0));
+            let near = group_plate[src[j as usize].group as usize];
+            if plate_new[i] != u32::MAX && plate_new[i] != near {
+                *x |= super::dynamics::PROV_MOVED;
+            }
+        }
+        let mut bits = [0u32; super::dynamics::PROV_BITS];
+        for &x in &prov {
+            for (b, c) in bits.iter_mut().enumerate() {
+                *c += u32::from(x & (1 << b) != 0);
+            }
+        }
+        if let Some(d) = state.dynamics.as_mut() {
+            d.resamples.push(super::dynamics::ResampleRec {
+                t,
+                step: env.step,
+                samples: n as u32,
+                bits,
+            });
+            d.prov = prov;
         }
     }
     for i in orphans {
