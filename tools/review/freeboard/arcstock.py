@@ -228,6 +228,15 @@ def run_stats(run):
                     r["encl_young"] = float((age[ocean_in] < 20.0).mean())
                     r["encl_old"] = float((age[ocean_in] > 100.0).mean())
                     r["world_young"] = float((age[ocean_w] < 20.0).mean())
+            # The crust across that boundary: island-arc crust, the start class, collision belts (Himalayan
+            # orogeny) or other converted crust, shares of the boundary's length against enclosed floor.
+            ce = np.where(cont[pairs[:, 0]], pairs[:, 0], pairs[:, 1])[diff][enclosed]
+            if ce.size:
+                belt_c = cont & ~start & ~island & (a[:, 5] > 1.5)
+                r["encl_rim_island"] = float(island[ce].mean())
+                r["encl_rim_start"] = float(start[ce].mean())
+                r["encl_rim_belt"] = float(belt_c[ce].mean())
+                r["encl_rim_other"] = float((~island[ce] & ~start[ce] & ~belt_c[ce]).mean())
             if pf.exists():
                 pl = np.fromfile(pf, "<u4")
                 if len(pl) == len(a):
