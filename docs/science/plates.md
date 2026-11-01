@@ -12041,7 +12041,7 @@ crystalline crust, PLT-661's line from Brune et al. 2014) or not, the class of i
 the kind already is (PLT-293). A column's own crystalline crust is its crystalline pools less its
 basement, both blended with the same weights, so a blend over one class is a convex mean of columns
 on one side of the 10 km line and stays there. The sediment pool still blends over all three corners,
-the heat flow over the kind. There is no switch: with the switches off it keeps an old arc's thin
+the heat flow over the class (under the thermal state, since PR #58, a continental sample's own law plus the nearest corner's magmatic excess, PLT-824). There is no switch: with the switches off it keeps an old arc's thin
 continental crust apart from the thick crust beside it too.
 
 The unit test `a_resampling_keeps_a_converted_margin_apart_from_its_core` (written first, failing on

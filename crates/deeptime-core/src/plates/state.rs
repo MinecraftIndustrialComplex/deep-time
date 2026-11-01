@@ -341,6 +341,14 @@ impl Sample {
             return;
         }
         self.kind = CONTINENTAL;
+        // The floor's lithosphere goes on as the crust's, never above its lid's floor (only with
+        // the thermal state, which alone sets L; ledger: PLT-820).
+        if self.lithosphere_km > 0.0 {
+            self.lithosphere_km = super::thermal::continental_l_km(
+                f64::from(self.lithosphere_km),
+                super::thermal::moho_km(self),
+            ) as f32;
+        }
         let ocean = super::pools::oceanic_column();
         let own = ocean[pool::MAFIC_VOLCANIC] + ocean[pool::MAFIC_PLUTONIC];
         self.basement_m = own.min(self.mafic_m());
