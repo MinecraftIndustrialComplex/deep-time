@@ -1,6 +1,6 @@
 # The surface's runoff from the bake's water budget: design
 
-Status: **on by default since 2026-10-31** (the coordinator's call, decisions log 2026-10-31, after its review's fixes and the arm rb1 on base35-s4)
+Status: **on by default since 2026-10-31** (the coordinator's call, decisions log 2026-10-31, after its review's fixes and the arm rb1 on base35-s4; held on 2026-11-01 by rb3 and rb3-off on the fixed head, "The arms on the fixed head")
 (2026-10-31, the runoff lane, branch `surface-runoff-budget` on `plateau-drainage` 7df49df8). The switch is
 `surface.runoff_budget` (`crates/deeptime-core/src/surface/climate.rs`, ERO-221). The checks against cold basins are
 ERO-222. The arm plat-rb0 ran on the closed basins ("The arm's results"): the flat high ground wears a third less, the
@@ -16,7 +16,9 @@ where the year reaches below freezing. The re-review (an Opus reviewer at 5e04e9
 on a lopsided year; fixed with the arms again ("The re-review and its fixes"). The second re-review (at e01f6bfa)
 found the history switched thaw law at its last step and the stand-in year ignored the coldest month: now one law
 everywhere, the climate stage carrying its twelve months at every step, and two half-sines where they are missing
-("The second re-review and its fixes"); armed again as rb3 and rb3-off.
+("The second re-review and its fixes"). The third (at 0da55f68) asked for one set of months in the world, a test
+of their carry and the schema's bump ("The third re-review and its fixes"). Armed again on the fixed head as rb3 and
+rb3-off: the corrections alone neutral, the law as before ("The arms on the fixed head").
 
 ## Why
 
@@ -492,7 +494,7 @@ current. The lakes' network keeps three values per lake cell (the mean, the warm
 (`WATER_BYTES_PER_L1_CELL` 120: about 54 MB on full 32k).
 
 A and B change planets, so rb2 and rb2-off (run on e01f6bfa's code) measure the old head; rb3 and rb3-off run on the
-fixed head after origin/master e65259fe, and the flip's numbers are restated from them ("The arms after the second
+fixed head after origin/master e65259fe, and the flip's numbers are restated from them ("The arms on the fixed
 re-review").
 
 ## The third re-review and its fixes (2026-11-01, at 0da55f68)
@@ -528,8 +530,55 @@ inline by the coordinator after the lane stopped on the account's rate limit:
    (a year whose warmest month is its mean has no cold half); the continuity test takes each half's month to the mean;
    the table's -0.4 % is -0.5 %.
 
-rb3 and rb3-off run on this head against base35-s4; the flip's numbers are restated from them ("The arms after the
-second re-review").
+rb3 and rb3-off ran on this head against base35-s4; the flip's numbers are restated from them ("The arms on the fixed
+head").
+
+## The arms on the fixed head (rb3 and rb3-off on base35-s4, 2026-11-01)
+
+The head after the third re-review's fixes (62d4da69, key 3477d4965277, origin/master e65259fe merged), 8 runs each on
+base35-s4's starts and seeds (base35's own runs of seeds 1 to 4), the crust budget's words as the base's. rb3 is the
+branch's default (the law on, the climate stage's twelve months every step); rb3-off has
+`surface.runoff_budget=false` (the months' correction and the thaw's fixes alone). Read with
+`tools/review/plateau/arm_rb3.sh` (`recal.sh`, `wear.sh`; cached folders only) and
+`pool.sh table --base base35-s4 --arm rb3` (and `--measure guard`).
+
+**The table** (medians of 8, Mann-Whitney p against base35-s4):
+
+| | land | largest landmass | continental crust under the sea | land above 2 km | coast with high ground | land under ice | collisions per 100 Myr | crust's net change | criteria median, mean | sea after 100 Myr / end, m |
+|---|---|---|---|---|---|---|---|---|---|---|
+| base35-s4 | 0.216 | 0.048 | 0.594 | 0.009 | 0.071 | 0.062 | 4.85 | +0.113 | 5, 5.38 | 280 / 339 |
+| rb3 | 0.237 (0.65) | 0.065 (0.44) | 0.540 (0.96) | 0.015 (0.72) | 0.097 (0.16) | 0.059 (0.80) | 4.50 (0.75) | +0.102 (0.80) | 5.5, 5.75 (0.44) | 319 / 335 |
+| rb3-off | 0.217 (0.88) | 0.068 (0.44) | 0.599 (1.0) | 0.017 (0.33) | 0.081 (0.44) | 0.063 (0.57) | 4.90 (0.60) | +0.110 (1.0) | 6, 5.75 (0.29) | 346 / 329 |
+
+**The guard** (`measure guard`): worst 10,477 m (rb3, p 1.0) and 10,340 (rb3-off) against 10,304; no step beyond two
+Earth reliefs; the largest one-step rise 7,186 and 7,464 against 7,144 m; the highest plate 3,868 and 4,406 against
+4,413; the plate cells' largest excess over Airy 3,322 and 2,647 against 2,990 m.
+
+**The plateau reads** (base35-s4's own 8 runs this time, not base35's 24):
+- runoff weight on rb3: land 0.755 used against the snapshot's own 0.840, above 2 km 0.457 against 0.966;
+- the flat high ground (`wear.sh`): rb3 106.1 m/Myr net on 0.0036 of the land (per run 95 to 147), rb3-off 140.6 on
+  0.0027, base35-s4 138.8 on 0.0031; of it below 0 C on the year (`flatf`) 0.68, 0.66 and 0.66;
+- land above 2 / 3 / 4 km over the run (the median share at each of the 20 maps, averaged): rb3 0.0230 / 0.0068 /
+  0.00057, rb3-off 0.0208 / 0.0062 / 0.00041, base35-s4 0.0199 / 0.0058 / 0.00044 (not the per-run means rb1's
+  paragraph gives);
+- K's regions (8 x 8-cell windows by their mean relief, m/Myr; Montgomery & Brandon's power law and quiet-land line in
+  brackets): 100 m and more 48.0 (rb3-off 50.6, base35-s4 50.0; 15 and 35), 250 m and more 96.7 (108.2, 104.6; 60 and
+  75), 500 m and more 187.5 (217.3, 215.7; 210 and 150), 1,000 m and more 336.9 (387.6, 389.6; 525 and 250), 1,500 m
+  and more 522.9 (567.3, 534.8; 963 and 350). Against base35-s4 the law wears them 4 to 14 % slower up to 1,000 m and
+  more, 2 % at 1,500 m: between the two lines at 500 m of relief and more, above both at 100 and 250 m, as on the base;
+- the land's mean net lowering 38.4 m/Myr (rb3-off 37.4, base35-s4 37.8).
+
+**Reading.**
+- **rb3-off is neutral:** no column moves (p 0.29 or more), and its plateau reads are the base's. The months' and the
+  thaw's corrections can land as corrections of master's default.
+- **The law** behaves as rb1 and plat-rb0 did, now on the right base: the high ground's runoff weight halves, the flat
+  high ground wears a quarter less (106 against 139 m/Myr) and there is 1.2 times as much of it, the land above 2 km is
+  about a sixth more over the run, K's regions at 500 m and more stay inside Montgomery & Brandon's lines, the land's
+  mean lowering does not move, and the guard is the base's. No V1 column moves at p under 0.16. The land is 0.237
+  against 0.216, the continental crust under the sea 0.540 against 0.594 (under its 0.56), the coast with high ground
+  0.097 (p 0.16, inside its 0.11), the criteria a median of 5.5 against 5. rb1's higher sea (462 against 339 m) does
+  not repeat (335 m): rb1 ran without PR #54's cone budget, which base35 has.
+- **The flip stands:** `surface.runoff_budget` on by default (decisions log 2026-11-01).
 
 ## The continents' export: the erosion law or the plates' uplift (2026-10-31, a diagnosis)
 
