@@ -94,6 +94,12 @@ def run_stats(run):
             "alone_dry": float((a[alone, 2] > sea).mean()) if alone.any() else float("nan"),
             "alone_parts": int(len(np.unique(lab[alone]))),
             "start": start.sum() / n0,
+            # The start's own samples by their age (a continental sample keeps its nearest corner's formed_myr
+            # through a resampling, and the start's carry 0): how much of the start's crust still stands, and how
+            # much of it the basement rule now reads as converted.
+            "formed0": (cont & (pp[:, 8] == 0.0)).sum() / n0,
+            "formed0_conv": (cont & ~start & (pp[:, 8] == 0.0)).sum() / n0,
+            "formed0_island": (island & (pp[:, 8] == 0.0)).sum() / n0,
         }
         if t == 0:
             cell_km2 = 4.0 * np.pi * R_KM**2 / n0
