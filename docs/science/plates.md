@@ -14494,3 +14494,13 @@ column is blended over the corners whose rock the sample takes; a field that rec
 alone is that corner's. The test `a_resampled_floor_stands_on_its_own_rock`: floor beside a continent 2 km high stands
 at its own rock's height, beside an arc it takes the arc's departure not its height, ten resamplings raise it by
 nothing, and a trench's pull under its law is kept.
+
+**The arm rh2** (2026-11-01; this rule on master cd3544fa, 8 runs against base36-s4, key c4b450e13282): no V1
+measure moves at p under 0.15 (land 0.211 against 0.215, continental crust under the sea 0.607 against 0.602, the
+criteria a median of 5.5 against 4.5), the guard clean (worst 10,165 against 9,960 m, p 0.083; no step beyond two
+Earth reliefs), the sea at the end 346 against 323 m. `bare_lift.py` on the two (medians of the 8 final frames, m over
+GDH1): floor beside its own plate's continents 201 against 258 (on 60 to 200 Myr floor 563 against 611), beside its
+own plate's thick ocean crust 67 against 93, floor near neither -45 against -67. The resampling's blend was about a
+fifth of the lift beside the continents; the rest, about 200 m, has another cause, not yet found (flexure under the
+margin's load, sediment the bare-floor test does not see, the trench release and the margins' held floor are the
+candidates to read). Landed as a correctness fix with no switch (decisions log 2026-11-01).
