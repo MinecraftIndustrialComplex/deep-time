@@ -47,8 +47,9 @@ pub const MAGIC: [u8; 4] = *b"DTCP";
 /// steering controllers, docs/design/playability-steering.md; 14: the plates' cumulative
 /// convergence of each pair without a contact, `PlateState::converging`, PLT-810; 15: the climate's
 /// per-row months, `snapshot::Refs::t_month`, the runoff law's second re-review; 16: the plates'
-/// dynamics record's plates out of the balance, PR #58's re-review).
-pub const CHECKPOINT_SCHEMA: u32 = 16;
+/// dynamics record's plates out of the balance, PR #58's re-review; 17: the plates' level set
+/// carries the crust's class, `LevelSet::class_phi`, PLT-852).
+pub const CHECKPOINT_SCHEMA: u32 = 17;
 const FIXED_BYTES: usize = 8;
 /// The sections before the history's frames.
 const HEAD_SECTIONS: usize = 2;

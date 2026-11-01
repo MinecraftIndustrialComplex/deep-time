@@ -1181,6 +1181,15 @@ pub struct TectonicParams {
     /// does not move roughens (`plates::tests::how_resamplings_roughen_a_boundary`). ledger:
     /// PLT-536
     pub level_set_membership: bool,
+    /// The crust's class on a level set too (the arc-stock lane, 2026-11-01; with
+    /// `level_set_membership`): a resampled point takes its kind and class (ocean floor,
+    /// hyper-extended or other continental crust) from the distances of its old corners from
+    /// their class's outline inside their group, each piece of continental crust keeping its
+    /// count of samples and taking the points its interpolated signed distance ranks most inside
+    /// (`ridges::conserved_classes`). Off, the nearest old corner's (PLT-664), which keeps the
+    /// area on average but walks a margin inside a plate by up to half a spacing at every
+    /// resampling (`plates::tests::how_resamplings_roughen_a_margin`). ledger: PLT-852
+    pub class_level_set: bool,
     /// Hotspots at the start.
     pub hotspots_initial: u32,
     /// New hotspots per 100 Myr (Poisson).
@@ -1658,6 +1667,7 @@ impl Default for TectonicParams {
             plate_fission: true,               // ledger: PLT-532
             split_inheritance: true,           // ledger: PLT-534
             level_set_membership: true,        // ledger: PLT-536
+            class_level_set: true,             // ledger: PLT-852
             hotspots_initial: 8,
             hotspot_births_per_100myr: 3.0,
             hotspot_lifetime_myr: [40.0, 150.0],
