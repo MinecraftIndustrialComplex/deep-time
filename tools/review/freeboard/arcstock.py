@@ -108,6 +108,24 @@ def run_stats(run):
             "arc_vol": float(T[island].sum() / n0),
         }
         if t == 0:
+            # Each class's rock at the end: the shares of its column in cover (sediment and sedimentary rock),
+            # felsic and metamorphic rock and mafic rock, its ocean basement (km) and its height over the sea (p50).
+            # The start column (PLT-834, Rudnick & Gao's layers as Hacker et al. 2015 print them) is 0.05, 0.61, 0.34.
+            conv = cont & ~start
+            belt = conv & ~island & (a[:, 5] > 1.5)
+            col = pp[:, 0:7].sum(1)
+            classes_end = {"start": start, "taken": taken, "alone": alone, "belt": belt,
+                           "otherconv": conv & ~island & ~belt}
+            for k, m in classes_end.items():
+                if not m.any():
+                    continue
+                c_sum = col[m].sum()
+                r[f"{k}_cover"] = float(pp[m, 0:2].sum() / c_sum)
+                r[f"{k}_felsic"] = float(pp[m, 2:5].sum() / c_sum)
+                r[f"{k}_mafic"] = float(pp[m, 5:7].sum() / c_sum)
+                r[f"{k}_base_km"] = float(np.clip(pp[m, 7], 0.0, None).mean() / 1000.0)
+                r[f"{k}_T"] = float(T[m].mean())
+                r[f"{k}_zs"] = float(np.median(a[m, 2] - sea))
             cell_km2 = 4.0 * np.pi * R_KM**2 / n0
             standing = float(a[:, 7].sum() / 1000.0 * cell_km2)
             g = cbread.last_globals(run / "summary.txt") or {}
