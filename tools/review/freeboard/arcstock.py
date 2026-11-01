@@ -202,6 +202,13 @@ def run_stats(run):
         r["coast_enclosed_km"] = float(enclosed.sum() * spacing / np.sqrt(3.0))
         r["enclosed_area"] = float(((~cont) & (olab != world)).sum() / n0)
         r["enclosed_parts"] = int(len(np.unique(olab[(~cont) & (olab != world)])))
+        # The same length on the label smoothed by a majority over each sample's neighbours within 2 spacings:
+        # what is lattice-scale raggedness falls away, what is the continents' shape stays.
+        tree = cKDTree(p)
+        nb = tree.query_ball_point(p, th.chord(2.0 * spacing))
+        smooth = np.array([cont[j].mean() > 0.5 for j in nb])
+        r["coast_smooth_km"] = float((smooth[pairs[:, 0]] != smooth[pairs[:, 1]]).sum() * spacing / np.sqrt(3.0))
+        r["smooth_area"] = float(smooth.sum() / n0)
         out[t] = r
     return out
 
