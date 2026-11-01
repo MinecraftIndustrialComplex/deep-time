@@ -24,6 +24,7 @@ Through the whole history, rivers cut into rising land (the stream power law: er
 | [ERO](ledger/ERO.md) | chemical denudation: the dissolved load of the carbon cycle's silicate weathering | ERO-205 to ERO-207 (3) |
 | [ERO](ledger/ERO.md) | the pelagic rain: dust, the dissolved load back as opal and carbonate, its test, its facies | ERO-208 to ERO-216 (9) |
 | [ERO](ledger/ERO.md) | closed basins: what a lake passes on by its water balance, the internally drained plateau test, the flat high ground split by its water | ERO-217 to ERO-220 (4) |
+| [ERO](ledger/ERO.md) | the stream power's runoff from the bake's water budget (cold lands evaporate in their summer, frozen ground runs off nothing) and its checks against cold basins | ERO-221 to ERO-222 (2) |
 
 Rows by status (2026-10-18, `tools/review/claims_counts.py`): `verified` 10, `cited-unverified` 82, `from-memory` 2, `abstract-only` 4, `calibrated` 8, `game-choice` 11, `uncited` 56.
 
@@ -1333,3 +1334,79 @@ HYD-041), about half Tibet's 650 to 1,300 (Wang et al. 2020) and Titicaca's 1,10
 - **The next lead is frozen ground's runoff.** The surface still runs off all precipitation below 0 °C (ERO-010). The
   bake's budget has not done so since 2026-10-01: rain share HYD-036, degree-day melt HYD-037, biotemperature PET
   HYD-029, HYD-030 and HYD-035.
+
+## Cold lands' runoff (the runoff lane, 2026-10-31)
+
+**What was asked.** The plateau lane's arm found the flat high ground's wear on frozen ground. Over the run, 0.67 of it
+is below 0 °C on the year and it wears at 141 m/Myr. There the surface's runoff is all of the precipitation (PET 60
+mm/°C x the mean temperature, 0 below 0 °C, MOI-067). The bake's water budget stopped doing that on 2026-10-01. The
+question: give the stream power the bake's budget, and test it against cold basins. The measurements and the arm are in
+docs/design/surface-runoff-budget.md; this is the summary.
+
+**What cold lands do.**
+- **Permafrost basins** run off part of their precipitation. The Mackenzie: P 410 mm, ET 237, runoff 169 (MAGS Water
+  and Energy Budget Synthesis, Table 2.1; Woo & Thorne 2003, Table 2). The Lena's runoff ratio is "about 0.50", the
+  Ob's "around 0.30" (Yang et al. 2002, p. 14-3).
+- **A polar desert** loses its snow: in the Dry Valleys 7 to 11 mm of snowfall, "most of which is lost to sublimation"
+  (Fountain et al.).
+- **The Tibetan Plateau's lakes** run off 0.26 to 0.31 of P at a MAAT of 0 to -3 °C (Biskop et al. 2016, Table 4,
+  modelled).
+- **Sublimation** takes 10 to 90 % of winter snowfall in the Alps (Strasser et al. 2008) and 20 to 32 % in the Rockies
+  (MacDonald et al. 2010).
+
+**The law (ERO-221; `surface.runoff_budget`, on by default since 2026-10-31).** The stream power's runoff weight (ERO-010) takes each cell's runoff
+from `HydroParams::budget`, the same budget the lakes' balance uses. Precipitation is rain in the thawed share of the
+year (HYD-036) and the snow melts by its degree-days (HYD-037: 4 mm per °C per day, a choice inside Hock 2003's 2.5 to
+5.5 for snow at non-glaciated sites). PET is Holdridge's 58.93, here 60, x the biotemperature (HYD-029, HYD-030), and
+Fu's curve acts on the liquid water (HYD-034, HYD-035). The months are the climate stage's twelve months, which it
+writes every step (between snapshots each row's month plus the month's departure carried with the plates, MOI-052),
+and the year's thaw is Holdridge's monthly method without his 30 °C cut on them, one law through the history, the
+young stage and the bake; where the months are missing, a year of two half-sines that keeps the mean (HYD-030,
+HYD-031; since the re-reviews of 2026-10-31: the sinusoid centred between the two months dropped the mean on a
+lopsided year, and the history took the twelve months at its last step only). With no month below freezing it is the
+old runoff to 1e-12, on lopsided years too. Land with a mean above freezing and a frosty month runs off less (its
+biotemperature is never under its mean: P 600 mm at 5 ± 15 °C, 336 against 245 mm), and so does land below cold
+headwaters. Ground that never thaws runs off nothing, so its weight sits at ERO-011's floor, which is then
+load-bearing (25 mm a year where the lakes count 0). The young landscape and the amplifier take the same weight
+(YNG-011).
+
+**The checks (ERO-222).**
+- **The Mackenzie:** budget runoff 204 mm and ET 206, against 169 and 237 measured: within the 54 mm mean absolute
+  error of Fu's curve (Zhang et al. 2004). The old rule gives 410 and 0.
+- **The Dry Valleys:** nothing runs off when the warmest month stays below freezing. But a warmest month just above
+  0 °C melts all the snow and evaporates little, so 0.24 to 0.85 of P runs off: the budget has no sublimation.
+- **The Tibetan lakes:** the budget evaporates 69 to 141 mm against their modelled 170 to 290. It still runs off 0.46
+  to 0.83 of P, against all of it under the old rule. The shortfall is printed, not asserted.
+- **A polar year's months as given:** a mean of -17 °C with months of -5 and -40 °C runs off nothing. Centred on the
+  mean, the same range put the warmest month at +0.5 °C and ran some of it off (corrected 2026-10-31; this changes the
+  closed basins' and the flexure's lakes on cold ground too).
+- **Verkhoyansk's biotemperature:** 3.05 °C by its twelve months, Holdridge's monthly method and his value; 2.80 by
+  the two half-sines from its mean, warmest and coldest month.
+- **A lopsided year** (P 600, mean 4, warmest month 10 °C): with a coldest month at or above 0 °C, the mean itself and
+  the old runoff (380.7 mm); at a coldest month of -6 °C, 5.08 °C and 332.9 mm. The sinusoid between the two months gave 4.00 and 5.00 °C either side of a
+  coldest month of 0 °C, and the sinusoid about the mean 4.35 °C (364.5 mm) whatever the coldest month.
+- **The cold controlled plateau:** the interior wears 88.0 against 118.0 m/Myr; never thawing, 3.8.
+
+**Left as it is.**
+- Sublimation of the cold season's snow (its shares vary 10 to 90 % with no law read).
+- The plateau's higher evaporation (Holdridge's PET has no radiation term).
+- Land ice (HYD-038).
+- Holdridge's 30 °C cut (HYD-030).
+- The aridity index and the facies (they keep the snapshot's PET).
+- K and ERO-011's floor.
+
+Measured on the pool (the arm plat-rb0, 8 runs, on the closed basins; the design's "The arm's results"): the flat high
+ground wears 92 against 141 m/Myr and the land above 4 km doubles (0.0022 against 0.0010 of the land, Earth 0.0195);
+K's regions wear 11 % slower at 250 to 500 m of relief, 19 and 16 % at 500 and 1,000 m and more, 8 % at 1,500 m and
+more, inside Montgomery & Brandon's lines at 500 m and more and above both under it, as on the base; the export to the sea does not move (3.34 against 3.36 km³ a year). The
+verdict then was default-on. The runoff law's review (2026-10-31) held it: the young stage and the amplifier kept the
+old rule (the pool's runs never reach them), the months were centred on the mean, and no test went through the switch.
+All three are fixed. Armed again on base35-s4 (rb1, 8 runs): the guard the base's, the flat high ground 110 against
+146.5 m/Myr (the months' correction alone, rb-months), the land above 2 km a sixth more over the run, K's regions 8 to
+18 % slower (inside Montgomery & Brandon's lines at 500 m of relief and more, above both under it, as on the base), the criteria a median of 6 against 5. The months' correction alone
+moves no column. On by default since 2026-10-31 (the coordinator's call, decisions log), the months' correction with it.
+Armed again on the head after its third re-review (rb3 and rb3-off on base35-s4, 8 runs each, 2026-11-01; the design's
+"The arms on the fixed head"): the corrections alone move no column (p 0.29 or more); with the law the guard is the
+base's, the flat high ground wears 106 against 139 m/Myr, K's regions 4 to 14 % slower (inside Montgomery & Brandon's
+lines at 500 m of relief and more, above both under it, as on the base), no V1 column moves at p under 0.16 and the
+criteria are a median of 5.5 against 5. The default held (decisions log 2026-11-01).

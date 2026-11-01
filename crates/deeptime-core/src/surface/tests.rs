@@ -885,3 +885,130 @@ fn two_substeps_keep_the_periplatform_tracer_within_its_source() {
         t.mass_residual_km3
     );
 }
+
+// ledger: ERO-221, ERO-011, HYD-033
+/// The step's wiring of `surface.runoff_budget` (the runoff law's review): with the switch, the
+/// step takes the bake's budget per cell (`step_water`) on the climate stage's own months and
+/// the stream power's weight (`runoff_weight`) is its runoff; without it, the snapshot's own,
+/// whatever the lakes take. Four climates at 1 km on the stage's fields: ground that never
+/// thaws (mean −12, months −2 and −25 °C), a polar desert's year (−17, −5 and −40: centred on its
+/// mean, the range would put its warmest month above freezing), a cold mean with a summer (−1.5,
+/// 6.5 and −9.5) and frost-free land (15, 22 and 8).
+#[test]
+fn the_runoff_budget_reaches_the_stream_power_s_weight() {
+    let grid = deeptime_format::GridDesc::for_planet("L1", 16384, 64).unwrap();
+    let (w, h) = (grid.w as usize, grid.h as usize);
+    let n = w * h;
+    let d = Dims::new(w, h, 4800.0, true);
+    let climates = [
+        (300.0f32, -12.0f32, -2.0f32, -25.0f32),
+        (300.0, -17.0, -5.0, -40.0),
+        (300.0, -1.5, 6.5, -9.5),
+        (800.0, 15.0, 22.0, 8.0),
+    ];
+    let of = |c: usize| climates[(c % w) % climates.len()];
+    let mut world = WorldState::new(1, 16384, 0.0);
+    for (name, pick) in [
+        (climate::P_FIELD, 0usize),
+        (climate::T_FIELD, 1),
+        (crate::climate::field::T_WARM, 2),
+        (crate::climate::field::T_COLD, 3),
+    ] {
+        let data = (0..n)
+            .map(|c| {
+                let (p, t, wm, cd) = of(c);
+                [p, t, wm, cd][pick]
+            })
+            .collect();
+        world.fields.insert(
+            name.into(),
+            Field {
+                grid: grid.clone(),
+                data,
+            },
+        );
+    }
+    let elevation = vec![1000.0; n];
+    let clim = climate::snapshot(&world, &d, &|_| 0.0, &elevation, 0.0);
+    assert!(clim.from_stage);
+    let hydro = crate::hydro::HydroParams::default();
+    let params = |budget: bool, closed: bool| {
+        let mut p = SurfaceParams {
+            runoff_budget: budget,
+            closed_basins: closed,
+            ..SurfaceParams::default()
+        };
+        p.flexure.water_by_basin = false;
+        p
+    };
+    let weights = |p: &SurfaceParams| -> Vec<f32> {
+        let water = step_water(&world, &clim, &hydro, p);
+        assert_eq!(
+            water.is_some(),
+            p.runoff_budget || p.closed_basins,
+            "the budget is taken when the stream power or the lakes read it"
+        );
+        (0..4)
+            .map(|c| runoff_weight(p, &clim, water.as_deref(), c))
+            .collect()
+    };
+    let off = weights(&params(false, false));
+    let lakes_only = weights(&params(false, true));
+    let on = weights(&params(true, false));
+    eprintln!("weights off {off:?}, the lakes' budget only {lakes_only:?}, on {on:?}");
+    // Off: a mean below freezing runs off all of P (0.3 m over the reference 0.5 m).
+    for (c, w) in off.iter().enumerate().take(3) {
+        assert!((w - 0.6).abs() < 1.0e-6, "cell {c}: {w}");
+    }
+    assert_eq!(lakes_only, off, "the lakes' budget alone leaves the weight");
+    // On: ground that never thaws, and the polar desert's year as the stage gave it, at the floor.
+    assert_eq!(on[0], 0.05);
+    assert_eq!(on[1], 0.05, "the polar desert's months taken as given");
+    assert!(
+        on[2] > 0.05 && on[2] < 0.9 * off[2],
+        "the cold land's summer: {}",
+        on[2]
+    );
+    assert!(
+        (on[3] - off[3]).abs() < 1.0e-6,
+        "frost-free land is the same: {} against {}",
+        on[3],
+        off[3]
+    );
+}
+
+// ledger: ERO-221
+/// The switch reaches the stream power through the surface's step itself (the runoff law's
+/// re-review, finding 5): one step of the coupled pipeline (the plates, the climate stage, the
+/// surface) with `surface.runoff_budget` on. The step's measurement
+/// (`Totals::runoff_weight_km2_myr`) sums over its land the weight its stream power used and the
+/// snapshot's own; the planet's frozen and frosty ground makes the used one smaller (a step that
+/// read the snapshot's runoff again, or the budget's water not at all, gives the two the same).
+#[test]
+fn one_surface_step_takes_the_budget_s_weight() {
+    let mut v: serde_json::Value =
+        serde_json::from_str(&pipeline_json(3000, 2.0, 5)).expect("the pipeline's preset");
+    v["surface"]["runoff_budget"] = serde_json::json!(true);
+    let dir = temp_dir("runoff-budget-step");
+    let s = session(&v.to_string(), &dir);
+    finish(&s);
+    let world = s.checkpoint().unwrap().world;
+    let t = world
+        .surface
+        .as_ref()
+        .expect("the surface ran")
+        .totals
+        .clone();
+    let [land, used, own, high, high_used, high_own] = t.runoff_weight_km2_myr;
+    eprintln!(
+        "one step, {} steps: land {land:.4e} km2 Myr, used weight {:.3}, own {:.3}; above 2 km {high:.4e}, {:.3} and {:.3}",
+        t.steps,
+        used / land,
+        own / land,
+        high_used / high.max(1.0e-30),
+        high_own / high.max(1.0e-30)
+    );
+    assert!(t.steps >= 1 && land > 0.0, "{t:?}");
+    assert!(used > 0.0 && used < own, "used {used}, own {own}");
+    let _ = std::fs::remove_dir_all(&dir);
+}

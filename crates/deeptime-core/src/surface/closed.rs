@@ -68,8 +68,10 @@
 //!   between the two receives the rivers; at 4.8-km cells and 2-Myr steps that floor is the
 //!   aggrading basin of the sources, so the solve's lake stands for it.
 //! - The share is the balance's (the bake's water budget), applied to the stream power's
-//!   runoff-weighted area (ERO-010, the surface's own runoff): the two runoffs differ on frozen
-//!   ground (the surface counts all of P as runoff below 0 °C, the bake only melted snow).
+//!   runoff-weighted area (ERO-010, the surface's own runoff). By default the two runoffs are the
+//!   same budget (`surface.runoff_budget`, ERO-221) but for ERO-011's floor (a weight of 0.05
+//!   where the balance counts 0); with the switch off they differ on frozen ground (the surface
+//!   counts all of P as runoff below 0 °C, the bake only melted snow).
 //! - A lake the step's sediment fills is open for the whole step (the step is solved again with
 //!   its water passed on), though it filled at some time within it; the flexure's water over it
 //!   stays the balance's level of the step's start.
