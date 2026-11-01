@@ -6399,7 +6399,10 @@ fn a_continental_lithosphere_reaches_down_to_at_least_its_moho() {
     let s = &st.samples[belt];
     let want = belt_floor + (100.0 - belt_floor) * (-30.0 * env.dt_myr / HEATING_MYR).exp();
     let got = f64::from(s.lithosphere_km);
-    assert!((got - want).abs() < 1e-3 && got >= belt_floor, "{got} against {want}");
+    assert!(
+        (got - want).abs() < 1e-3 && got >= belt_floor,
+        "{got} against {want}"
+    );
     let q = f64::from(continental_heat_flow(s, t, true));
     assert!(
         (q - (26.0 + 3375.0 / got + ARC_HEAT_MW_M2)).abs() < 1e-2,
@@ -7449,6 +7452,18 @@ fn a_deferred_collision_leaves_both_plates_to_the_balance() {
                 .any(|&(u2, o2, on2, _)| (u, o, on) == (u2, o2, on2))
         };
         let alive: Vec<bool> = st.plates.iter().map(|q| q.alive).collect();
+        // A plate with no visible sample is not in the balance (`forces::Answer::omega` is
+        // `None` for it: a terrane wholly under the other plate) and keeps its rotation by
+        // design (scattered seed 2 on the continental lid's floor branch, 2026-10-31: plate 27
+        // under plate 1 at steps 77 and 78).
+        let mut in_balance = vec![false; st.plates.len()];
+        for (i, s) in st.samples.iter().enumerate() {
+            if !s.is_hidden()
+                && let Some(b) = in_balance.get_mut(st.plate_of(i) as usize)
+            {
+                *b = true;
+            }
+        }
         // A step that killed a plate (a weld or a healed rift) or left the balance unsolved is
         // not read; nor are the plates of a collision that ended (a transfer kills no plate).
         let died = prev_alive.iter().zip(&alive).any(|(&was, &is)| was && !is);
@@ -7465,6 +7480,7 @@ fn a_deferred_collision_leaves_both_plates_to_the_balance() {
                         || moved.contains(&q)
                         || qi >= prev_omega.len()
                         || !alive[qi]
+                        || !in_balance[qi]
                     {
                         continue;
                     }
@@ -8435,7 +8451,10 @@ fn the_final_frame_holds_every_continental_column_to_its_lid_floor() {
         let l = f64::from(s.lithosphere_km);
         let q = f64::from(s.heat_flow_mw_m2);
         let ceiling = conductive_mw_m2(lid_floor_km(z)) + ARC_HEAT_MW_M2 + HOTSPOT_HEAT_MW_M2;
-        assert!(q <= ceiling + 1e-2, "{q} mW/m² over a {z} km column's {ceiling}");
+        assert!(
+            q <= ceiling + 1e-2,
+            "{q} mW/m² over a {z} km column's {ceiling}"
+        );
         if l > 0.0 {
             let base = isotherm_km(l, CRUST_BASE_C);
             assert!(
@@ -8445,7 +8464,10 @@ fn the_final_frame_holds_every_continental_column_to_its_lid_floor() {
             if base < 1.02 * z {
                 near += 1;
             }
-            assert!(q >= conductive_mw_m2(l) - 1e-2, "{q} under its law at {l} km");
+            assert!(
+                q >= conductive_mw_m2(l) - 1e-2,
+                "{q} under its law at {l} km"
+            );
         } else {
             unset += 1;
             let age = (t - f64::from(s.formed_myr)).max(0.0);
@@ -8456,6 +8478,12 @@ fn the_final_frame_holds_every_continental_column_to_its_lid_floor() {
             );
         }
     }
-    assert!(unset > 0, "no crust with no state at the final frame: PLT-821 unseen");
-    assert!(near > 0, "no column near its floor at the final frame: PLT-820 unseen");
+    assert!(
+        unset > 0,
+        "no crust with no state at the final frame: PLT-821 unseen"
+    );
+    assert!(
+        near > 0,
+        "no column near its floor at the final frame: PLT-820 unseen"
+    );
 }
