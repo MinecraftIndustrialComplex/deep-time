@@ -863,6 +863,18 @@ impl PlatesStage {
                 .entry(UNSOLVED_GLOBAL.to_owned())
                 .or_insert(0.0) += 1.0;
         }
+        // The live plates a solved balance left out (no visible sample: they keep their
+        // rotation), for the dynamics record.
+        let out_of_balance: Vec<u32> = if balance.solved {
+            (0..st.plates.len())
+                .filter(|&p| {
+                    st.plates[p].alive && balance.omega.get(p).copied().flatten().is_none()
+                })
+                .map(|p| p as u32)
+                .collect()
+        } else {
+            Vec::new()
+        };
         lap(&mut clock, "forces");
         cut_trace::mark(st, &cache.geo, "forces");
         let mut causes: BTreeMap<u32, EventId> = BTreeMap::new();
@@ -1073,8 +1085,16 @@ impl PlatesStage {
             cut_trace::mark(st, &cache.geo, "resample");
         }
         rate::end(st);
-        // Crust made continental after `finish_samples` set the heat flow (ledger: PLT-469).
-        thermal::refresh_heat_flow(st, env.k, env.t_myr);
+        // Crust made continental after `finish_samples` set the heat flow (ledger: PLT-469), and
+        // how often the columns' ceiling binds (measurement, PLT-824).
+        let clamped = thermal::refresh_heat_flow(st, env.k, env.t_myr) as f64;
+        *world
+            .globals
+            .entry(thermal::CLAMPED_GLOBAL.to_owned())
+            .or_insert(0.0) += clamped;
+        world
+            .globals
+            .insert(thermal::CLAMPED_LAST_GLOBAL.to_owned(), clamped);
 
         book(st, gap_budget::Part::Other);
         if tracing {
@@ -1139,6 +1159,7 @@ impl PlatesStage {
                 forces: balance.recorded.as_ref(),
                 guarded: &guarded,
                 sea_m: sea,
+                out_of_balance: &out_of_balance,
             },
         );
         lap(&mut clock, "record");

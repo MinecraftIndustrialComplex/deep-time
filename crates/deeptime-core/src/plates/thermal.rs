@@ -55,8 +55,9 @@ pub const HEATING_MYR: f64 = 10.0; // ledger: PLT-464
 /// Rayleigh-Taylor removal of a thickened mantle lithosphere (stage 3), e-folding time, Myr:
 /// "between 50 (for rheological parameters representative of dry olivine) and 75 per cent (for wet
 /// olivine) of the lithospheric mantle would be involved in an instability whose duration is of the
-/// order of 10 Myr" (Houseman & Molnar 1997, conclusions); 1 − e^(−1), 63 per cent, goes in the
-/// first 10 Myr here.
+/// order of 10 Myr" (Houseman & Molnar 1997, conclusions); 1 − e^(−1) of the way to its lid's
+/// floor goes in the first 10 Myr here, 0.56 of the mantle lithosphere under a 65 km or a 70 km
+/// belt's Moho, 0.54 under 78 km.
 pub const ROOT_REMOVAL_MYR: f64 = 10.0; // ledger: PLT-477
 
 /// McKenzie's (1978) plate: a = 125 km, τ = 62.8 My (Table 1), τ = a²/(π²κ) (eq. 6).
@@ -120,32 +121,40 @@ pub const CRUST_BASE_C: f64 = 1080.0; // ledger: PLT-822
 /// The shallowest a continental column's thermal lithosphere reaches, km: the depth L at which
 /// the plate model's own steady geotherm (ISO-138, [`geotherm_share`]: the crust's radiogenic heat
 /// decaying as e^(−z/h_r) over the mantle's B / L, T_m at L) puts the column's Moho at the crust's
-/// basal solidus T_s ([`CRUST_BASE_C`]), T(z_Moho) = T_s, solved by bisection (at a given Moho the
-/// share falls as L grows). A lithosphere thinned to its crust (Lachenbruch et al. 1985: "thinned
-/// to the crust", the crust "lying directly on asthenosphere") has its Moho at the solidus. The
-/// root lies between z_Moho T_m / T_s = 1.25 z_Moho, where the mantle part alone would put T_s
-/// (the radiogenic part is concave, so it heats the Moho beyond that), and 1.5 z_Moho (the
-/// radiogenic part is at most q_c h_r = 260 against B's 3,375): 1.254 z_Moho over 7 km of crust,
-/// 1.268 over 23.5 km, 1.274 over 70 km. The law there is at most 139.3 mW/m² with the crust's 26
-/// over the Salton Trough's 23.5 km (PLT-823).
+/// basal solidus T_s ([`CRUST_BASE_C`]), T(z_Moho) = T_s. A lithosphere thinned to its crust
+/// (Lachenbruch et al. 1985: "thinned to the crust", the crust "lying directly on asthenosphere")
+/// has its Moho at the solidus. The root lies between z_Moho T_m / T_s = 1.25 z_Moho, where the
+/// mantle part alone would put T_s (the radiogenic part is concave, so it heats the Moho beyond
+/// that), and 1.5 z_Moho (the radiogenic part is at most q_c h_r = 260 against B's 3,375): 1.254
+/// z_Moho over 7 km of crust, 1.268 over 23.5 km, 1.274 over 70 km. The law there is at most
+/// 139.3 mW/m² with the crust's 26 over the Salton Trough's 23.5 km (PLT-823).
+///
+/// Solved by Newton's method on f(L) = B z / L + R(z) − s (B + R(L)), R(x) = q_c h_r (1 −
+/// e^(−x/h_r)), s = T_s / T_m (the geotherm's T(z) = s T_m with its denominator multiplied out),
+/// from 1.25 z_Moho: f falls with L and is convex, and f > 0 there, so each tangent's root lies
+/// between the last iterate and the root, and the iterates rise to it without leaving the
+/// bracket (five to six steps to 1e-12 z; a bisection took 48, PR #58's re-review).
 // ledger: PLT-820, PLT-822, ISO-138
 pub fn lid_floor_km(moho_km: f64) -> f64 {
     let z = moho_km.max(0.0);
     if z <= 0.0 {
         return 0.0;
     }
-    let share = CRUST_BASE_C / MANTLE_C;
-    let (mut lo, mut hi) = (z * MANTLE_C / CRUST_BASE_C, 1.5 * z);
-    // 48 halvings of a bracket 0.25 z wide: under 1e-15 z.
-    for _ in 0..48 {
-        let mid = 0.5 * (lo + hi);
-        if geotherm_share(mid, z) > share {
-            lo = mid;
-        } else {
-            hi = mid;
+    let s = CRUST_BASE_C / MANTLE_C;
+    let (b, qc, hr) = (MANTLE_HEAT_MW_M2_KM, CRUST_HEAT_MW_M2, RADIOGENIC_DEPTH_KM);
+    let radiogenic = |x: f64| qc * hr * (1.0 - (-x / hr).exp());
+    let rz = radiogenic(z);
+    let mut l = z * MANTLE_C / CRUST_BASE_C;
+    for _ in 0..30 {
+        let f = b * z / l + rz - s * (b + radiogenic(l));
+        let df = -b * z / (l * l) - s * qc * (-l / hr).exp();
+        let step = -f / df;
+        l += step;
+        if step.abs() <= 1.0e-12 * z {
+            break;
         }
     }
-    0.5 * (lo + hi)
+    l
 }
 
 /// A continental column's thermal lithosphere, km: its L, never above [`lid_floor_km`]. The
@@ -503,46 +512,69 @@ pub fn sample_heat_flow(l_km: f32, flags: u8) -> f32 {
 /// floor of the thicker crust it now has; every law that reads L after the step reads it: the
 /// flexure's thermal age, the strength laws; PLT-820), and its heat flow is at most its column's
 /// ceiling, its law at its lid's floor with an arc's and a hotspot's terms
-/// ([`column_ceiling_mw_m2`]): a resampling's blend of a hotter corner of the same class is not
-/// the column's (PLT-824).
-pub fn refresh_heat_flow(state: &mut PlateState, k: &TectonicParams, t_myr: f64) {
+/// ([`column_ceiling_mw_m2`], PLT-824): the bound a column's own law and its magmatic terms
+/// can reach. Returns how many columns the ceiling held down (measurement: how often PLT-824
+/// binds, [`CLAMPED_GLOBAL`]).
+pub fn refresh_heat_flow(state: &mut PlateState, k: &TectonicParams, t_myr: f64) -> u64 {
     if !(k.heat_flow_refresh || k.thermal_state) {
-        return;
+        return 0;
     }
     let thermal = k.thermal_state;
-    state.samples.par_iter_mut().for_each(|s| {
-        if s.kind != CONTINENTAL {
-            return;
-        }
-        let floor_km = if thermal {
-            let floor_km = lid_floor_km(moho_km(s));
-            if s.lithosphere_km > 0.0 {
-                // ledger: PLT-820
-                s.lithosphere_km = f64::from(s.lithosphere_km).max(floor_km) as f32;
+    state
+        .samples
+        .par_iter_mut()
+        .map(|s| {
+            if s.kind != CONTINENTAL {
+                return 0;
             }
-            Some(floor_km)
-        } else {
-            None
-        };
-        if s.heat_flow_mw_m2 <= 0.0 {
-            s.heat_flow_mw_m2 = super::continental_heat_flow(s, t_myr, thermal);
-            return;
-        }
-        let low = if thermal {
-            // ledger: PLT-820, PLT-821
-            conductive_mw_m2(sample_l_km(s, t_myr))
-        } else {
-            let since = (t_myr - f64::from(s.orogeny_myr)).max(0.0);
-            55.0 + 35.0 * (-since / 60.0).exp() // ledger: PLT-137
-        };
-        let mut q = f64::from(s.heat_flow_mw_m2).max(low);
-        if let Some(floor_km) = floor_km {
-            // ledger: PLT-824
-            q = q.min(conductive_mw_m2(floor_km) + ARC_HEAT_MW_M2 + HOTSPOT_HEAT_MW_M2);
-        }
-        s.heat_flow_mw_m2 = q as f32;
-    });
+            let floor_km = if thermal {
+                let floor_km = lid_floor_km(moho_km(s));
+                if s.lithosphere_km > 0.0 {
+                    // ledger: PLT-820
+                    s.lithosphere_km = f64::from(s.lithosphere_km).max(floor_km) as f32;
+                }
+                Some(floor_km)
+            } else {
+                None
+            };
+            if s.heat_flow_mw_m2 <= 0.0 {
+                s.heat_flow_mw_m2 = super::continental_heat_flow(s, t_myr, thermal);
+                return 0;
+            }
+            let low = match floor_km {
+                // The floored L just stored, or the floor's for crust with no state (PLT-821):
+                // the floor once per column (PR #58's re-review). ledger: PLT-820, PLT-821
+                Some(floor_km) => conductive_mw_m2(if s.lithosphere_km > 0.0 {
+                    f64::from(s.lithosphere_km)
+                } else {
+                    let age = (t_myr - f64::from(s.formed_myr)).max(0.0);
+                    ocean_km(age).max(floor_km)
+                }),
+                None => {
+                    let since = (t_myr - f64::from(s.orogeny_myr)).max(0.0);
+                    55.0 + 35.0 * (-since / 60.0).exp() // ledger: PLT-137
+                }
+            };
+            let mut q = f64::from(s.heat_flow_mw_m2).max(low);
+            let mut clamped = 0;
+            if let Some(floor_km) = floor_km {
+                // ledger: PLT-824
+                let ceiling = conductive_mw_m2(floor_km) + ARC_HEAT_MW_M2 + HOTSPOT_HEAT_MW_M2;
+                if q > ceiling {
+                    q = ceiling;
+                    clamped = 1;
+                }
+            }
+            s.heat_flow_mw_m2 = q as f32;
+            clamped
+        })
+        .sum()
 }
+
+/// `WorldState::globals` (measurement, PLT-824): the continental columns the final pass's ceiling
+/// held down over the run (column-steps) and at the last step.
+pub const CLAMPED_GLOBAL: &str = "plates/heat_flow_clamped";
+pub const CLAMPED_LAST_GLOBAL: &str = "plates/heat_flow_clamped_last";
 
 #[cfg(test)]
 mod tests {
@@ -621,12 +653,26 @@ mod tests {
     }
 
     /// Stage 3 (PLT-477): a collision belt with no keel loses half to three quarters of its
-    /// mantle lithosphere in 10 Myr (Houseman & Molnar 1997) and its lithosphere ends at its lid's
-    /// floor (PLT-820: 1.274 times its 65 km of crust, 82.8 km, where its Moho stands at the
-    /// crust's basal solidus); a keel holds it (the target is the keel); a rift or an arc's
-    /// heating comes first, towards the floor too.
+    /// mantle lithosphere in 10 Myr (Houseman & Molnar 1997: "between 50 ... and 75 per cent ...
+    /// of the lithospheric mantle"), its lithosphere under its Moho, and its lithosphere ends at
+    /// its lid's floor (PLT-820: 1.274 times its 65 km of crust, 82.8 km, where its Moho stands
+    /// at the crust's basal solidus); a keel holds it (the target is the keel); a rift or an arc's
+    /// heating comes first, towards the floor too. The share is 0.56 at 65 and 70 km and 0.54 at
+    /// 78 km, the thickest continental column in base35-s4's frames (8 runs, every 50 Myr; the
+    /// frames' largest has a median of 69.8 km; `tools/review/crustcycle/thickest.py`), and falls
+    /// under one half past about 97 km of crust.
     #[test]
     fn a_belts_thickened_mantle_lithosphere_drops_off_unless_a_keel_holds_it() {
+        for crust in [65.0, 70.0, 78.0] {
+            let floor = lid_floor_km(crust);
+            let mut l = L_COLD_KM;
+            for _ in 0..5 {
+                (l, _) = advance_with_root(l, 0.0, 0, Some(crust), floor, 2.0);
+            }
+            // Of the mantle lithosphere, the source's quantity (PR #58's re-review).
+            let removed = (L_COLD_KM - l) / (L_COLD_KM - crust);
+            assert!((0.5..=0.75).contains(&removed), "{crust}: {removed}");
+        }
         let crust = 65.0;
         let floor = lid_floor_km(crust);
         assert!((floor / crust - 1.274).abs() < 0.001, "{floor}");
@@ -634,15 +680,14 @@ mod tests {
         for _ in 0..5 {
             (l, keel) = advance_with_root(l, keel, 0, Some(crust), floor, 2.0);
         }
-        let removed = (L_COLD_KM - l) / (L_COLD_KM - floor);
-        assert!((0.5..=0.75).contains(&removed), "{removed}");
         for _ in 0..50 {
             (l, keel) = advance_with_root(l, keel, 0, Some(crust), floor, 2.0);
         }
         assert!((l - floor).abs() < 0.1, "{l}");
         assert!(l >= floor);
         assert_eq!(keel, 0.0);
-        // Its heat flow is a back-arc's, its thermal age young (30 Myr at 82.8 km).
+        // Its heat flow 66.8 mW/m² (a back-arc's, at L_hot, is 82.25), its thermal age young (30
+        // Myr at 82.8 km).
         assert!(conductive_mw_m2(l) > 66.0 && thermal_age_myr(l) < 35.0);
         // A keel holds it: the lithosphere stops at the keel.
         let (mut l, mut keel) = (L_COLD_KM, KEEL_KM);

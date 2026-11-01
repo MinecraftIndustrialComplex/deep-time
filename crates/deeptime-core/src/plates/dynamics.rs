@@ -236,6 +236,10 @@ pub struct StepRec {
     /// resampling what it consumed and what escaped it (`shown.rs`; the front lane, 2026-10-24).
     #[serde(default)]
     pub shown: super::shown::Step,
+    /// The live plates the step's solved balance left out (no visible sample when it was solved:
+    /// `forces::Answer::omega` `None`), which keep their rotation; empty in almost every step.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub out_of_balance: Vec<u32>,
 }
 
 /// One plate's force budget in a step (`forces.rs`, version 4): the size of each torque term,
@@ -1627,6 +1631,9 @@ pub struct Observed<'a> {
     pub guarded: &'a [u32],
     /// The sea the step stood under, m (the land is the ground above it).
     pub sea_m: f64,
+    /// The live plates the step's solved balance left out (`forces::Answer::omega` `None`: no
+    /// visible sample), which keep their rotation.
+    pub out_of_balance: &'a [u32],
 }
 
 /// What [`record_step`] counts over the samples (P1-19: per run of samples, then merged).
@@ -1947,6 +1954,7 @@ pub fn record_step(
         breakoffs: seen.forces.map_or(0, |f| f.breakoffs),
         matured: seen.forces.map(|f| f.matured.clone()).unwrap_or_default(),
         shown: super::shown::take_step(st),
+        out_of_balance: seen.out_of_balance.to_vec(),
     });
 
     let every = (AGE_EVERY_MYR / env.dt_myr).round().max(1.0) as u64;
