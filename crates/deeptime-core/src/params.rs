@@ -997,6 +997,30 @@ pub struct TectonicParams {
     /// holds under ERO-215's porosity law (536 m). Off, the solid pile is read against 1 km.
     /// ledger: PLT-762
     pub trench_pile_in_place: bool,
+    /// A contact begins only where its plates have converged across their overlap (the
+    /// oceanic-fronts lane, 2026-10-31; on by default since 2026-10-31, the coordinator's call under
+    /// Ben's rule of 2026-10-23, decisions log): `subduction::resolve` makes a new contact from an
+    /// overlap of `MIN_CONTACT` samples or more only once the pair's cumulative convergence across
+    /// it (the overlapping samples' mean convergence across the boundary's normal times each
+    /// step's Myr, never below 0, kept while the overlap is under a contact's size, from nothing
+    /// when there is no overlap, inherited by a split's pieces) reaches half a
+    /// lattice spacing (`subduction::CONTACT_CONVERGENCE_SPACINGS`, a resolution threshold, PLT-811),
+    /// at any angle to the boundary. Bird 2003 [126]: a subduction zone is a step "with a
+    /// convergent (component of) velocity"; Gurnis et al. 2004: "Cumulative convergence, not the
+    /// rate of convergence, is the dominant control"; Puysegur began as a strike-slip boundary
+    /// "with a component of convergence" (their [25]). Transpression adds up; a reading whose
+    /// sign is the lattice's noise does not. An overlap refused at the next resampling is taken
+    /// there as a contact would take it (`ridges::resample`, the consumer of last resort, PLT-812).
+    /// An overlap with continental crust on both sides is not gated: a collision needs no
+    /// subduction start, so collisions, docking and welds keep their timing. The 20
+    /// degrees of PLT-311 stay with the arcs' fronts (PLT-330). Off, any overlap of `MIN_CONTACT`
+    /// samples makes a contact; off is not master's of before the gate, since the consumer of
+    /// last resort and a reversal's onset values (the new polarity's) act in both settings. Polarity reversals and existing contacts (active, carried through
+    /// a resampling, or dormant until `contact_timeout_myr`, PLT-059) are not gated. History: the
+    /// gate as built took PLT-311's 20 degrees (a transpressive overlap grew until the resampling
+    /// dropped its crust); the first review's fix read each step's mean alone, with no dead band.
+    /// ledger: PLT-810
+    pub contact_needs_convergence: bool,
     /// Hotspots from sources (the hotspot lane, 2026-10-31; off by default;
     /// docs/design/hotspots-lips-margins.md): the plume tails' number, lifetimes and buoyancy
     /// fluxes from the hotspot catalogues, each tail's magma from its flux, and the heights from
@@ -1602,11 +1626,12 @@ impl Default for TectonicParams {
             island_arc_own_crust: true, // ledger: PLT-760 (built 2026-10-31, on since 2026-10-31)
             collision_arc_magma: true, // ledger: PLT-763 (built 2026-10-31, on since 2026-10-31)
             trench_pile_in_place: true, // ledger: PLT-762 (built 2026-10-31, on since 2026-10-31)
-            hotspots_sourced: false, // ledger: PLT-790 (built 2026-10-31, off)
-            plume_heads_sourced: false, // ledger: PLT-795 (built 2026-10-31, off)
-            volcanic_margins: false, // ledger: PLT-799 (built 2026-10-31, off)
-            hotspot_cone_budget: true, // ledger: PLT-803 (on since 2026-10-31)
-            arc_mature_crust_km: 15.0, // ledger: PLT-047
+            contact_needs_convergence: true, // ledger: PLT-810 (built 2026-10-31, on since 2026-10-31)
+            hotspots_sourced: false,         // ledger: PLT-790 (built 2026-10-31, off)
+            plume_heads_sourced: false,      // ledger: PLT-795 (built 2026-10-31, off)
+            volcanic_margins: false,         // ledger: PLT-799 (built 2026-10-31, off)
+            hotspot_cone_budget: true,       // ledger: PLT-803 (on since 2026-10-31)
+            arc_mature_crust_km: 15.0,       // ledger: PLT-047
             cordillera_shortening_mm_yr: 0.0, // ledger: PLT-048
             cordillera_width_km: 120.0,
             cordillera_height_m: 2500.0,               // ledger: PLT-050

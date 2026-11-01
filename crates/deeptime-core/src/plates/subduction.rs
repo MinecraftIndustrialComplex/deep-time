@@ -80,6 +80,7 @@ use std::collections::BTreeMap;
 use deeptime_format::EventId;
 use glam::{DQuat, DVec3};
 use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
 
 use super::Env;
 use super::collapse::{iso_height, toward};
@@ -278,22 +279,252 @@ struct Agg {
     near: [u32; 2],
 }
 
+impl Agg {
+    /// Whether the overlap holds continental crust on both its sides (a contact's setting 2): the
+    /// share of each side's samples that are continental at least a half.
+    fn continental_both(&self) -> bool {
+        (0..2).all(|s| f64::from(self.cont[s]) / f64::from(self.seen[s].max(1)) >= 0.5)
+    }
+}
+
 /// What `resolve` found this step.
 pub struct Resolved {
     /// Per contact (by index): the subducting plate's continental samples in the overlap that are
     /// not freshly sutured, sorted, each once. They seed the terrane when the contact's collision
     /// fires (`shortening::advance`).
     pub seeds: BTreeMap<usize, Vec<u32>>,
+    /// The pairs (lower id first) whose contact reversed this step (the onset trace's route).
+    pub reversed: Vec<(u32, u32)>,
+    /// The pairs (lower id first) whose new contact crossed the gate this step (PLT-810): the
+    /// steps that added to the pair's cumulative convergence and the sum, km (the onset trace's
+    /// crossing; measurement only).
+    pub crossed: Vec<((u32, u32), u32, f64)>,
+}
+
+/// Two plates' motion across their overlap ([`overlap_motion`]; ledger: PLT-810, PLT-811): their
+/// relative velocity at the overlapping samples against the boundary's normal there. Plates `lo`
+/// and `hi` by id; the overlapping samples, and of them how many converge across the boundary
+/// more than 20 degrees from it, move along it by PLT-311's test (Bird 2003: within 20 degrees of
+/// the boundary, or at rest), part more than 20 degrees from it, or have no normal (the two
+/// plates' samples about it too mixed to give one, PLT-811); the mean convergence across over
+/// those with a normal, mm/yr (positive converging, the samples within 20 degrees of the boundary
+/// at their normal part: the rate the overlap grows at, per sample); and the pair's reading
+/// (`pair_conv_mm_yr`, the same mean since 2026-10-31's review fix, and `pair_class`): converging
+/// where that mean is positive over `MIN_CONTACT` samples with a normal or more, at any angle to
+/// the boundary (Bird 2003 [126]: a subduction zone converges at all); else parting or along the
+/// boundary by the most of its samples, or no normal. Until that fix the pair's reading summed the
+/// samples' normals at the overlap's centroid, which an overlap on two opposite flanks cancels and
+/// the relative pole beside the centroid turns to noise (PR #55's review).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct OverlapMotion {
+    pub lo: u32,
+    pub hi: u32,
+    pub n: u32,
+    pub converging: u32,
+    pub transform: u32,
+    pub parting: u32,
+    pub no_normal: u32,
+    pub conv_mm_yr: f64,
+    pub pair_conv_mm_yr: f64,
+    pub pair_class: u8,
+}
+
+impl Default for OverlapMotion {
+    fn default() -> OverlapMotion {
+        OverlapMotion {
+            lo: 0,
+            hi: 0,
+            n: 0,
+            converging: 0,
+            transform: 0,
+            parting: 0,
+            no_normal: 0,
+            conv_mm_yr: 0.0,
+            pair_conv_mm_yr: 0.0,
+            pair_class: OVERLAP_NO_NORMAL as u8,
+        }
+    }
+}
+
+/// [`OverlapMotion`]'s classes of motion across the boundary: converging …
+pub const OVERLAP_CONVERGING: usize = 0;
+/// … along it (PLT-311's transform, or at rest) …
+pub const OVERLAP_TRANSFORM: usize = 1;
+/// … parting …
+pub const OVERLAP_PARTING: usize = 2;
+/// … and no normal to read it against.
+pub const OVERLAP_NO_NORMAL: usize = 3;
+/// The nearest samples an overlapping sample's boundary normal is read from (numerical: about two
+/// rings of the lattice, as `shortening::boundary_normal` reads two lattice steps, PLT-310; read
+/// from the samples about it, not from the lattice, since a pair that met since the last
+/// resampling has no lattice edge to read). ledger: PLT-811
+const OVERLAP_NEAR: usize = 12;
+/// The least separation of the two plates' mean positions about an overlapping sample that gives
+/// a normal, in lattice spacings (numerical: deep in an overlap both plates' samples surround
+/// the sample, and the difference of their means is lattice noise; PR #55's review). ledger:
+/// PLT-811
+const OVERLAP_NORMAL_MIN_SPACINGS: f64 = 0.25;
+/// The cumulative convergence across an overlap that begins a contact, in lattice spacings
+/// (ledger PLT-810, PLT-811): a resolution threshold, the least convergence the lattice tells
+/// from a transform's zigzag (the coordinator's call on PR #55's re-review, 2026-10-31).
+pub const CONTACT_CONVERGENCE_SPACINGS: f64 = 0.5;
+
+/// The boundary's unit normal at the overlapping sample `p`, from plate lo's side towards plate
+/// hi's: the tangent part at `p` of the mean position of the hi samples among `near` (each
+/// `(position, is hi)`) less that of the lo samples; zero without both, or where that part is
+/// shorter than `min_rad` (radians on the unit sphere). ledger: PLT-811
+fn overlap_normal(p: DVec3, near: impl IntoIterator<Item = (DVec3, bool)>, min_rad: f64) -> DVec3 {
+    let (mut sum, mut count) = ([DVec3::ZERO; 2], [0u32; 2]);
+    for (q, hi) in near {
+        sum[usize::from(hi)] += q;
+        count[usize::from(hi)] += 1;
+    }
+    if count[0] == 0 || count[1] == 0 {
+        return DVec3::ZERO;
+    }
+    let d = tangent(
+        p,
+        sum[1] / f64::from(count[1]) - sum[0] / f64::from(count[0]),
+    );
+    if d.length() < min_rad {
+        return DVec3::ZERO;
+    }
+    d.normalize_or_zero()
+}
+
+/// One overlapping sample's class of motion ([`OVERLAP_CONVERGING`] …) and its convergence
+/// across the boundary, mm/yr: `rel` plate lo's velocity less plate hi's there, `normal` the
+/// boundary's unit normal from lo towards hi ([`overlap_normal`]; zero: no normal). The
+/// transform test is PLT-311's (`shortening::is_transform`). ledger: PLT-810
+fn overlap_class(rel: DVec3, normal: DVec3) -> (usize, f64) {
+    if normal == DVec3::ZERO {
+        return (OVERLAP_NO_NORMAL, 0.0);
+    }
+    let conv = rel.dot(normal);
+    let class = if is_transform(rel, normal) {
+        OVERLAP_TRANSFORM
+    } else if conv > 0.0 {
+        OVERLAP_CONVERGING
+    } else {
+        OVERLAP_PARTING
+    };
+    (class, conv)
+}
+
+/// One pair's [`OverlapMotion`] as its overlapping samples are added (in the overlaps' order,
+/// so the sums are the same each run).
+struct OverlapAcc {
+    rec: OverlapMotion,
+    conv: f64,
+    with_normal: u32,
+}
+
+impl OverlapAcc {
+    fn new(lo: u32, hi: u32) -> OverlapAcc {
+        OverlapAcc {
+            rec: OverlapMotion {
+                lo,
+                hi,
+                ..OverlapMotion::default()
+            },
+            conv: 0.0,
+            with_normal: 0,
+        }
+    }
+
+    /// An overlapping sample with its boundary normal and the plates' relative velocity there
+    /// (lo's less hi's, mm/yr).
+    fn add(&mut self, normal: DVec3, rel: DVec3) {
+        let (class, conv) = overlap_class(rel, normal);
+        let r = &mut self.rec;
+        r.n += 1;
+        match class {
+            OVERLAP_CONVERGING => r.converging += 1,
+            OVERLAP_TRANSFORM => r.transform += 1,
+            OVERLAP_PARTING => r.parting += 1,
+            _ => r.no_normal += 1,
+        }
+        if class != OVERLAP_NO_NORMAL {
+            self.conv += conv;
+            self.with_normal += 1;
+        }
+    }
+
+    /// The record, with the pair's reading from its samples: converging where their mean
+    /// convergence across is positive over `MIN_CONTACT` samples with a normal or more, at any
+    /// angle to the boundary (the overlap grows; Bird 2003 [126], ledger PLT-810); else parting
+    /// or along the boundary by the most of them, or no normal (PLT-811).
+    fn finish(self) -> OverlapMotion {
+        let mut r = self.rec;
+        if self.with_normal > 0 {
+            r.conv_mm_yr = self.conv / f64::from(self.with_normal);
+        }
+        r.pair_conv_mm_yr = r.conv_mm_yr;
+        r.pair_class = if self.with_normal < MIN_CONTACT {
+            OVERLAP_NO_NORMAL
+        } else if r.conv_mm_yr > 0.0 {
+            OVERLAP_CONVERGING
+        } else if r.parting > r.transform + r.converging {
+            OVERLAP_PARTING
+        } else {
+            OVERLAP_TRANSFORM
+        } as u8;
+        r
+    }
+}
+
+/// The two plates' motion across each overlap of a pair `keep` takes ([`OverlapMotion`], by the
+/// pair's ids, lower first): every overlapping sample's boundary normal from the [`OVERLAP_NEAR`]
+/// samples about it ([`overlap_normal`]) and the plates' relative velocity there (`omega` as this
+/// step moved them), and the pair's reading from its samples. Reads only. ledger: PLT-810,
+/// PLT-811
+pub fn overlap_motion(
+    state: &PlateState,
+    overlaps: &[Overlap],
+    pos: &[DVec3],
+    tree: &Tree,
+    env: &Env,
+    keep: impl Fn((u32, u32)) -> bool,
+) -> BTreeMap<(u32, u32), OverlapMotion> {
+    let rel_at = |(lo, hi): (u32, u32), p: DVec3| {
+        let w = |id: u32| DVec3::from_array(state.plates[id as usize].omega);
+        env.norm.velocity_mm_yr(w(lo) - w(hi), p)
+    };
+    let min_rad = OVERLAP_NORMAL_MIN_SPACINGS * env.norm.spacing_rad();
+    let mut acc: BTreeMap<(u32, u32), OverlapAcc> = BTreeMap::new();
+    for o in overlaps {
+        let a = state.plate_of(o.i as usize);
+        let b = state.groups[o.group as usize].plate;
+        let key = (a.min(b), a.max(b));
+        if !keep(key) {
+            continue;
+        }
+        let p = pos[o.i as usize];
+        let near = tree
+            .nearest_n(p, OVERLAP_NEAR)
+            .into_iter()
+            .filter_map(|(j, _)| {
+                let q = state.plate_of(j as usize);
+                (q == key.0 || q == key.1).then_some((pos[j as usize], q == key.1))
+            });
+        let normal = overlap_normal(p, near, min_rad);
+        acc.entry(key)
+            .or_insert_with(|| OverlapAcc::new(key.0, key.1))
+            .add(normal, rel_at(key, p));
+    }
+    acc.into_iter().map(|(key, a)| (key, a.finish())).collect()
 }
 
 /// Establishes contacts and their polarity, hides subducted samples, lists the continental crust
 /// forced under, and emits subduction_onset events. `step` is the number of this step.
+#[allow(clippy::too_many_arguments)]
 pub fn resolve(
     state: &mut PlateState,
     world: &mut WorldState,
     geo: &Geo,
     overlaps: &[Overlap],
     pos: &[DVec3],
+    tree: &Tree,
     env: &Env,
 ) -> Result<Resolved, CoreError> {
     let (step, t_myr) = (env.step, env.t_myr);
@@ -424,6 +655,49 @@ pub fn resolve(
     for (k, c) in state.contacts.iter().enumerate() {
         index.insert((c.under.min(c.over), c.under.max(c.over)), k);
     }
+    // A new contact only where its plates have converged across their overlap by half a lattice
+    // spacing (ledger: PLT-810, PLT-811): the pairs with no contact and an overlap of a contact's
+    // size, read once, each adding its overlap's mean convergence times the step to its sum, which
+    // never falls below 0 (a pair that parted owes nothing). A pair whose overlap is smaller keeps
+    // its sum as it is; one with no overlap at all starts again from nothing. An overlap with
+    // continental crust on both sides needs no subduction to begin (Bird 2003 [126] defines the
+    // subduction zone; a collision is the continental convergent boundary): its contact begins as
+    // before the gate, so collisions, docking and welds keep their timing. A contact that exists
+    // (active, carried through a resampling or dormant until `contact_timeout_myr`, PLT-059) goes
+    // on whatever its plates do, as a reversal does: the gate is on a new contact only.
+    let gated = |key: (u32, u32), a: &Agg| !index.contains_key(&key) && !a.continental_both();
+    let motion = env.k.contact_needs_convergence.then(|| {
+        let st: &PlateState = state;
+        overlap_motion(st, overlaps, pos, tree, env, |key| {
+            aggs.get(&key)
+                .is_some_and(|a| gated(key, a) && a.count >= MIN_CONTACT)
+        })
+    });
+    let converged: BTreeMap<(u32, u32), (f64, u32)> = match &motion {
+        Some(m) => {
+            let before: BTreeMap<(u32, u32), (f64, u32)> = state
+                .converging
+                .iter()
+                .map(|c| ((c.lo, c.hi), (c.km, c.steps)))
+                .collect();
+            aggs.iter()
+                .filter(|&(&key, a)| gated(key, a))
+                .map(|(&key, _)| {
+                    let (km, steps) = before.get(&key).copied().unwrap_or((0.0, 0));
+                    let now = match m.get(&key) {
+                        Some(r) if usize::from(r.pair_class) != OVERLAP_NO_NORMAL => {
+                            ((km + r.conv_mm_yr * env.dt_myr).max(0.0), steps + 1)
+                        }
+                        _ => (km, steps),
+                    };
+                    (key, now)
+                })
+                .collect()
+        }
+        None => BTreeMap::new(),
+    };
+    let mut crossed = Vec::new();
+    let need_km = CONTACT_CONVERGENCE_SPACINGS * env.norm.km(env.norm.spacing_rad());
     for (&(lo, hi), agg) in &aggs {
         let centroid = agg.sum.normalize_or(DVec3::Z);
         let frac = |s: usize| f64::from(agg.cont[s]) / f64::from(agg.seen[s].max(1));
@@ -445,7 +719,20 @@ pub fn resolve(
             if agg.count >= MIN_CONTACT
                 && reverses([frac(u), frac(o)], near(o), [lock(u), lock(o)], by_arc)
             {
-                reverse(state, world, env, k)?;
+                // The new polarity's onset: the floor of the plate that goes under now (the old
+                // overriding side's) and the plates' convergence, as a new contact's.
+                let oceanic = agg.seen[o] - agg.cont[o];
+                let slab_age = if oceanic == 0 {
+                    0.0
+                } else {
+                    agg.age[o] / f64::from(oceanic)
+                };
+                let conv = env.norm.speed_mm_yr(
+                    DVec3::from_array(state.plates[c.over as usize].omega)
+                        - DVec3::from_array(state.plates[c.under as usize].omega),
+                    centroid,
+                );
+                reverse(state, world, env, k, slab_age, conv)?;
                 reversed_now.push((lo, hi));
             }
         }
@@ -454,6 +741,15 @@ pub fn resolve(
             None => {
                 if agg.count < MIN_CONTACT {
                     continue;
+                }
+                // Plates that have not converged across the overlap by half a spacing (sliding
+                // past, parting, or not yet) make no subduction zone (ledger: PLT-810); continental
+                // crust on both sides is a collision's and needs none.
+                if motion.is_some() && !agg.continental_both() {
+                    match converged.get(&(lo, hi)) {
+                        Some(&(km, steps)) if km >= need_km => crossed.push(((lo, hi), steps, km)),
+                        _ => continue,
+                    }
                 }
                 let mean_age = |s: usize| {
                     let oceanic = agg.seen[s] - agg.cont[s];
@@ -627,7 +923,17 @@ pub fn resolve(
         list.sort_unstable();
         list.dedup();
     }
-    Ok(Resolved { seeds })
+    // The pairs still without a contact keep their sums; the rest start again.
+    state.converging = converged
+        .into_iter()
+        .filter(|(key, _)| !index.contains_key(key))
+        .map(|((lo, hi), (km, steps))| super::state::PairConvergence { lo, hi, km, steps })
+        .collect();
+    Ok(Resolved {
+        seeds,
+        reversed: reversed_now,
+        crossed,
+    })
 }
 
 /// The isostatic ceiling on uplift (design choice): crust at height z above the sea (the callers
@@ -773,6 +1079,8 @@ fn reverse(
     world: &mut WorldState,
     env: &Env,
     k: usize,
+    slab_age_myr: f64,
+    convergence_mm_yr: f64,
 ) -> Result<(), CoreError> {
     let old = state.contacts[k].clone();
     if let Some(onset) = old.onset_event
@@ -801,6 +1109,10 @@ fn reverse(
     c.onset_myr = env.t_myr;
     c.onset_step = env.step;
     c.onset_event = None;
+    // The new polarity's own onset floor and convergence (until PR #55's re-review the old
+    // polarity's stayed).
+    c.onset_slab_age_myr = slab_age_myr;
+    c.onset_convergence_mm_yr = convergence_mm_yr;
     c.setting = 1;
     c.cont_in = 0;
     c.max_uplift_mm_yr = 0.0;
@@ -2711,7 +3023,163 @@ pub fn close_contacts(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The plates' motion across an overlap (PLT-810, PLT-811; the overlap trace reads it too): an
+    /// overlapping sample's boundary normal points from
+    /// the lower plate's samples about it towards the higher plate's, and the two plates' motion
+    /// across it is split by PLT-311's test (Bird 2003: within 20 degrees of the boundary is a
+    /// transform) into converging, a transform and parting; with no sample of one plate about it,
+    /// or the two plates' samples so mixed that their means lie closer than a quarter spacing,
+    /// there is no normal. The pair converges where its samples' mean convergence is positive,
+    /// within 20 degrees of the boundary too (Bird 2003 [126]); else it parts or slides past by
+    /// the most of its samples.
+    #[test]
+    fn the_overlap_trace_reads_the_motion_across_the_boundary() {
+        let on_sphere = |lon_deg: f64, lat_deg: f64| {
+            let (lo, la) = (f64::to_radians(lon_deg), f64::to_radians(lat_deg));
+            DVec3::new(la.cos() * lo.cos(), la.cos() * lo.sin(), la.sin())
+        };
+        // Plate lo west of the meridian, plate hi east of it; the overlapping sample on it.
+        let p = on_sphere(0.0, 0.0);
+        let mut near = Vec::new();
+        for i in 1..=4 {
+            for j in -2..=2 {
+                let (x, y) = (0.5 * f64::from(i), 0.5 * f64::from(j));
+                near.push((on_sphere(-x, y), false));
+                near.push((on_sphere(x, y), true));
+            }
+        }
+        // A quarter of a 0.5-degree spacing.
+        let min_rad = 0.25 * 0.5_f64.to_radians();
+        let n = overlap_normal(p, near.iter().copied(), min_rad);
+        let (east, north) = (on_sphere(90.0, 0.0), DVec3::Z);
+        assert!(n.dot(east) > 0.999, "{n}");
+        let close = |a: f64, b: f64| (a - b).abs() < 1e-9;
+        // Plate lo moving east into plate hi at 30 mm/yr converges; north, it slides past; west,
+        // it parts.
+        let (k, conv) = overlap_class(30.0 * east, n);
+        assert!(
+            k == OVERLAP_CONVERGING && (conv - 30.0).abs() < 0.1,
+            "{k} {conv}"
+        );
+        let (k, conv) = overlap_class(30.0 * north, n);
+        assert!(k == OVERLAP_TRANSFORM && conv.abs() < 0.1, "{k} {conv}");
+        let (k, conv) = overlap_class(-30.0 * east, n);
+        assert!(
+            k == OVERLAP_PARTING && (conv + 30.0).abs() < 0.1,
+            "{k} {conv}"
+        );
+        // 30 degrees off the boundary converges, 10 degrees off is a transform; plates at rest
+        // are a transform by the same test.
+        let off = |deg: f64| {
+            let r = deg.to_radians();
+            30.0 * (r.cos() * north + r.sin() * east)
+        };
+        assert_eq!(overlap_class(off(30.0), n).0, OVERLAP_CONVERGING);
+        assert_eq!(overlap_class(off(10.0), n).0, OVERLAP_TRANSFORM);
+        assert_eq!(overlap_class(DVec3::ZERO, n).0, OVERLAP_TRANSFORM);
+        // Only one plate about the sample: no normal.
+        let lone = overlap_normal(p, near.iter().copied().filter(|x| !x.1), min_rad);
+        assert_eq!(lone, DVec3::ZERO);
+        let (k, conv) = overlap_class(30.0 * east, lone);
+        assert!(k == OVERLAP_NO_NORMAL && close(conv, 0.0), "{k} {conv}");
+        // (Deep in an overlap: `a_mixed_neighbourhood_gives_no_normal`.)
+        // A contact's record: its samples by class, the mean convergence over those with a
+        // normal, and the pair's reading, the same mean.
+        let mut acc = OverlapAcc::new(1, 2);
+        for _ in 0..3 {
+            acc.add(n, 30.0 * east);
+        }
+        acc.add(DVec3::ZERO, 30.0 * east);
+        acc.add(n, 30.0 * north);
+        let r = acc.finish();
+        assert_eq!(
+            (
+                r.lo,
+                r.hi,
+                r.n,
+                r.converging,
+                r.transform,
+                r.parting,
+                r.no_normal
+            ),
+            (1, 2, 5, 3, 1, 0, 1)
+        );
+        assert!((r.conv_mm_yr - 22.5).abs() < 0.1, "{}", r.conv_mm_yr);
+        assert!(
+            r.pair_class == OVERLAP_CONVERGING as u8 && (r.pair_conv_mm_yr - 22.5).abs() < 0.1,
+            "{r:?}"
+        );
+        // Every sample within 20 degrees of the boundary: converging across it (transpression),
+        // the pair converges; parting across it (transtension), it slides past.
+        let pair = |deg: f64, k: usize| {
+            let mut acc = OverlapAcc::new(1, 2);
+            for _ in 0..k {
+                acc.add(n, off(deg));
+            }
+            acc.finish()
+        };
+        let r = pair(10.0, 4);
+        assert_eq!((r.transform, r.pair_class), (4, OVERLAP_CONVERGING as u8));
+        assert!((r.pair_conv_mm_yr - 30.0 * 10.0_f64.to_radians().sin()).abs() < 0.1);
+        assert_eq!(pair(-10.0, 4).pair_class, OVERLAP_TRANSFORM as u8);
+        assert_eq!(pair(-60.0, 4).pair_class, OVERLAP_PARTING as u8);
+        // Fewer than a contact's samples with a normal, or none: no normal.
+        assert_eq!(pair(30.0, 2).pair_class, OVERLAP_NO_NORMAL as u8);
+        let r = OverlapAcc::new(1, 2).finish();
+        assert_eq!((r.n, r.pair_class), (0, OVERLAP_NO_NORMAL as u8));
+    }
+
     use crate::sphere::{SplitMix64, fibonacci_sphere};
+
+    /// The quarter-spacing threshold on two offset lattices (PLT-811; PR #55's re-review): two
+    /// Fibonacci lattices of 20,000 samples, the second turned by a random rotation. Deep in an
+    /// overlap, both plates' samples about every point (the sample itself among its 12 nearest,
+    /// as `overlap_motion` reads them), most points give no normal; at a clean boundary (plate
+    /// lo's samples where x < 0, hi's where x > 0) every point within half a spacing of it gives
+    /// the normal along +x.
+    #[test]
+    fn a_mixed_neighbourhood_gives_no_normal() {
+        let n = 20_000;
+        let spacing = (4.0 * std::f64::consts::PI / n as f64).sqrt();
+        let min_rad = OVERLAP_NORMAL_MIN_SPACINGS * spacing;
+        let mut rng = SplitMix64::new(29);
+        let turn = super::super::init::random_rotation(&mut rng);
+        let lo = fibonacci_sphere(n);
+        let hi: Vec<DVec3> = lo.iter().map(|&q| turn * q).collect();
+        let mut all: Vec<(DVec3, bool)> = lo.iter().map(|&q| (q, false)).collect();
+        all.extend(hi.iter().map(|&q| (q, true)));
+        let near = |p: DVec3, pts: &[(DVec3, bool)]| -> Vec<(DVec3, bool)> {
+            let mut d: Vec<(f64, (DVec3, bool))> =
+                pts.iter().map(|&x| ((x.0 - p).length(), x)).collect();
+            d.sort_by(|a, b| a.0.total_cmp(&b.0));
+            d.into_iter().take(OVERLAP_NEAR).map(|x| x.1).collect()
+        };
+        // Deep in the overlap: points of either lattice, both plates all about.
+        let probes: Vec<DVec3> = (0..200).map(|k| all[k * 199 % all.len()].0).collect();
+        let none = probes
+            .iter()
+            .filter(|&&p| overlap_normal(p, near(p, &all), min_rad) == DVec3::ZERO)
+            .count();
+        assert!(none * 2 > probes.len(), "{none} of {}", probes.len());
+        // A clean boundary: each plate on its own side of x = 0.
+        let split: Vec<(DVec3, bool)> = all
+            .iter()
+            .copied()
+            .filter(|&(q, h)| (q.x > 0.0) == h)
+            .collect();
+        let edge: Vec<DVec3> = split
+            .iter()
+            .map(|x| x.0)
+            .filter(|q| q.x.abs() < 0.5 * spacing)
+            .take(100)
+            .collect();
+        assert!(edge.len() >= 50);
+        for &p in &edge {
+            let nrm = overlap_normal(p, near(p, &split), min_rad);
+            assert!(nrm.dot(DVec3::X) > 0.8, "{p} {nrm}");
+        }
+    }
 
     /// The trench's retreat against its sources (PLT-522, PLT-523): Scholl & von Huene 2010's
     /// ~2.5 km/Myr, inside Clift & Vannucchi 2004's Table 2 range (0.9 to 4.7); on the normal
