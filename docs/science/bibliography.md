@@ -10647,6 +10647,81 @@ The runoff lane's sources (docs/design/surface-runoff-budget.md, erosion-and-sed
 - Read so far (by the project): the abstract, 2026-10-31 (the orogen lane, by a Sonnet sub-agent): "observed east-west thinning of the upper crust"; "we report a minimum age of approximately 13.5 Myr for the onset of graben formation in central Tibet"; "Thinning of the upper crust is most plausibly the result of potential-energy increases resulting from spatially and temporally heterogeneous changes in thermal structure and density distribution within the crust and upper mantle beneath Tibet".
 - Reference check: as the agent printed it from the record.
 
+## The sources of the continental lid's floor (PLT-820 to PLT-823), added 2026-10-31
+
+What bounds continental surface heat flow, for the lid's floor of the lithosphere's thermal state (`lithosphere-thermal-state.md` "The lid's floor (2026-10-31)"). All read by one Sonnet research sub-agent of the continental heat-ceiling lane on 2026-10-31; the quotes are as it printed them. It ran `pdftotext` on PDFs the fetch tool returned as bytes; the McKenzie and Blackwell copies have an OCR layer, so their quotes may carry OCR damage. Its DOIs were checked against Crossref (all but Blackwell 1983, which has none).
+
+### LachenbruchSassGalanis1985
+- Reference: Lachenbruch, A. H., Sass, J. H. and Galanis, S. P., Jr. (1985). Heat flow in southernmost California and the origin of the Salton Trough. Journal of Geophysical Research 90(B8):6709-6736.
+- DOI or URL: 10.1029/JB090iB08p06709; read at https://oceanrep.geomar.de/id/eprint/29926/1/Lachenbruch.pdf
+- Cited as: "Lachenbruch, Sass & Galanis 1985" (the crust on the asthenosphere at the basalt solidus; the Imperial Valley's heat flow).
+- Ledger ids: PLT-820, PLT-822, PLT-823
+- Access: full text (a PDF mirror).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent). p. 6709 (abstract): "Heat flow in the Imperial Valley and adjacent crystalline rocks is very high (~140 mW m-2)"; "faster rates would probably cause massive crustal melting"; assumption 4, "The crust base temperature remained close to the mantle solidus during extension". p. 6712: "a background heat flux between 100 and 200 mW m-2. Higher values (> 200 mW m-2) all correspond to known geothermal fields which are generally associated with upward water flow"; "The formal mean for all 99 3 arc min × 3 arc min average heat flows within the valley is 166 mW m-2 …, but with the exception of 10 very high values associated with geothermal areas … they are distributed normally about a mean and modal value of about 140 mW m-2"; "Allowing about 15 mW m-2 for the contribution from crustal radioactivity … we estimate the modal reduced heat flow for the Imperial Valley to be ~125 mW m-2 (~3 HFU)". p. 6711: about 80 mW/m² for the adjacent Basin and Range, about 60 for the Peninsular Ranges. p. 6723 (§7): "The base of the crust is at or near asthenosphere (basalt-solidus) temperatures and has been throughout this period"; "It will be noted that these assumptions imply that the lithosphere mantle was missing or at least thermally decoupled from the crust by sill intrusion throughout much of the stretching episode"; "heat flow close to the basin average has been measured in bordering crystalline rocks … This suggests that a subcrustal asthenosphere (assumption 2, above) might extend more widely than the locus of rapid extension". p. 6724, Fig. 18's caption: "= 1080°C, a = 23.5 km for Salton Trough. The basalt solidus is shown for these dimensional values" (the symbol before "=" lost in the OCR; the sub-agent took 1080 °C as the adjusted basalt solidus); with K ≈ 2.72 W/m/K (eq. 35), "q* = KG*", "q* ≈ 125 mW/m² ≈ 3 HFU" (1080 / 23.5 × 2.72 = 125, the sub-agent's arithmetic). p. 6725: "But this static conductive value is the same as the mean reduced heat flow observed in the Imperial Valley." p. 6728: "minimum extension rates (25%/m.y.) … are compatible with the assumption of a near-solidus basal temperature; for larger extension rates the temperature will not be much higher because of the narrow melting interval for basalt"; §10, "(Because of possible transient and three-dimensional departures from the simple models illustrated, rapid crustal extension is, of course, neither a necessary nor sufficient condition for the crust to be lying directly on asthenosphere.)". p. 6730: "Instantaneous homogeneous extension increases the area of the basin and the thermal gradient by some factor β > 1 and thins the lithosphere and crust by β⁻¹". p. 6731 (§12): "This implies that the lithosphere has been thinned to the crust by some 'dismantling' process (three have been discussed: delamination of the cold mantle, warming the cold mantle from below, or stretching it until it disappears …)".
+
+### JaupartMareschal2007
+- Reference: Jaupart, C. and Mareschal, J.-C. (2007). Heat Flow and Thermal Structure of the Lithosphere. Treatise on Geophysics vol. 6, ch. 6.05, Elsevier, pp. 217-251.
+- DOI or URL: 10.1016/B978-044452748-6.00104-8; read at https://booksite.elsevier.com/brochures/geophysics/PDFs/00104.pdf
+- Cited as: "Jaupart & Mareschal 2007" (the thermal lithosphere as the conductive lid; steady models below about 90 mW/m²).
+- Ledger ids: PLT-820, PLT-823
+- Access: full text (the publisher's sample chapter).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent). p. 220 (§6.05.2.3): "The shallowest boundary, h1, corresponds to the lower boundary of the conductive upper part and of what we shall call the thermal lithosphere"; "The temperature at the base of the conductive upper part is Tb, which is significantly smaller than the well-mixed potential temperature Tw"; "Excluding the values from the US, where many values were obtained in the Basin and Range Province, the mean continental heat flux drops to only 65 mWm-2" (Table 1: the world's 1° averages 65.3, N 3024; the USA's 1° averages 84). p. 221, eqs. [1] to [3]: Q0 = Qcrust + Qlith + Qb, steady Q0 = Qb = k(Tb – T0)/h1, "A common procedure is to introduce a heat transfer coefficient B: Qb = B (Tw – Tb)". p. 230, eq. [20]: "Note that one may not assume that Qb, the heat flux at the base of the lithosphere, is equal to QM, the heat flux at the Moho, because of long thermal transients and heat production in the lithospheric mantle". p. 233: "Rudnick and Nyblade (1999) found a best-fit Moho heat flux 18 mW m-2, within a range of 17–25 mW m-2". p. 238: "Steady-state thermal models are only valid if heat flux is less than about 90 mW m–2. Higher values imply melting in the crust or weak lithospheric mantle that can deform easily, suggesting that other heat transport mechanisms are effective"; the Basin and Range and Rio Grande data "very noisy because of hydrological perturbations". p. 239: "In the Basin and Range Province of the southwestern US (Sass et al., 1994; Morgan, 1983), high heat flux values (110 mW m-2) are consistent with an extension rate of 100%"; "The thermal effects of extension are transient and after return to equilibrium, the heat flux at the surface of thinned crust will reflect the smaller amount of radioactive elements and hence will be lower than before extension". p. 235, Table 3: Archean 41 ± 0.8, Proterozoic 48 ± 0.8, Paleozoic 58.3 ± 0.5 mW/m².
+
+### HasterokChapman2011
+- Reference: Hasterok, D. and Chapman, D. S. (2011). Heat production and geotherms for the continental lithosphere. Earth and Planetary Science Letters 307:59-70.
+- DOI or URL: 10.1016/j.epsl.2011.04.034; read at a course repository copy (moodle2.units.it)
+- Cited as: "Hasterok & Chapman 2011" (regional continental heat flow up to 120 mW/m²).
+- Ledger ids: PLT-823
+- Access: full text (a repository copy).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent). p. 66 (§6.1): "Typical values for regional HF on the continents range from a little less than 40 mW/m² to ∼100 mW/m² and can reach 120 mW/m² in magmatic provinces and active rift zones. In cases of extremely low crustal HP the conductive HF can be as low as ∼ 20 mW/m²." p. 60: "This reference geotherm reaches the 1300 °C adiabat at ∼ 90 km, assumed to identify the lithosphere–asthenosphere boundary" (60 mW/m²). p. 68 (§6.4): "Lithospheric thickness ranges from just under 200 km at 40 mW/m² surface HF to ∼ 50 km at 90 mW/m²"; "Minimum sub-lithospheric HF for the preferred geotherm family is 11 mW/m² and increases to just under 65 mW/m² for a 100 mW/m² surface HF".
+
+### Davies2013
+- Reference: Davies, J. H. (2013). Global map of solid Earth surface heat flow. Geochemistry, Geophysics, Geosystems 14:4608-4622.
+- DOI or URL: 10.1002/ggge.20271; read at https://www.mantleplumes.org/WebDocuments/Davies2013.pdf (the accepted manuscript; its page numbers)
+- Cited as: "Davies 2013" (continental heat flow above 120 mW/m² implies melting).
+- Ledger ids: PLT-823
+- Access: full text (the accepted manuscript).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent). p. 9 (§4): "the mean continental heat flow (including arcs and continental margins) is 64.7 mW m-2, while the mean oceanic heat flow is 95.9 mW m-2". p. 10 (§4.3): "some continental pixels have values above 120 mW m-2 and such values in continental areas would suggest extensive melting which is not common in the crust [Chapman, 1986]. In some cases, these values might reflect more localized heat flow …". Fig. 8: high heat flow in "the west of the USA (Yellowstone, Basin and Range, Rio Grande)".
+
+### Blackwell1983
+- Reference: Blackwell, D. D. (1983). Heat flow in the northern Basin and Range province. In: The Role of Heat in the Development of Energy and Mineral Resources in the Northern Basin and Range Province, Geothermal Resources Council Special Report 13, pp. 81-93.
+- DOI or URL: no DOI; read at https://www.smu.edu/-/media/site/dedman/academics/programs/geothermal-lab/documents/hfinnbr.pdf
+- Cited as: "Blackwell 1983" (the Battle Mountain High).
+- Ledger ids: PLT-823
+- Access: full text (OCR).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent; a summary of Lachenbruch & Sass 1978 among others). p. 81: "Typical heat-flow values for the Basin and Range province average 85 ± 10 mWm-2. The higher estimates are probably based on biased sets of heat-flow measurements, and actual averages are on the order of 100 ± 10 mWm-2." p. 82: "Heat-flow values generally exceed 100 mWm-2 within the area identified as the Battle Mountain Heat Flow High"; "there are definite limits to the enhancement of surface heat flow by this mechanism if the spreading does not lead rapidly to ocean basin formation". p. 84: "Heat flow values in the Battle Mountain Heat Flow High range from 100 to 150 mWm-2, and the reduced heat flow … according to Lachenbruch and Sass (1977, 1978) ranges from 85-100 mWm-2." p. 88: a value "measured in the granite of Pahisupp Mountain was 188 mWm-2, clearly much in excess of any possible regional value, and affected in some way by a geothermal system."
+
+### PoortKlerkx2004
+- Reference: Poort, J. and Klerkx, J. (2004). Absence of a regional surface thermal high in the Baikal rift; new insights from detailed contouring of heat flow anomalies. Tectonophysics 383:217-241.
+- DOI or URL: 10.1016/j.tecto.2004.03.011; read at https://www.vliz.be/imisdocs/publications/227774.pdf
+- Cited as: "Poort & Klerkx 2004" (a rift's spot anomalies are not conductive).
+- Ledger ids: PLT-823 (the page's text)
+- Access: full text.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent). p. 217 (abstract): "The maximum measured heat flow reaches values of 300 – 35000 mW/m2, but the extent of the anomalies is not larger than 2 to 4 km in diameter"; "Aside of these local anomalies, heat flow variations are restricted to near background values of 50 – 70 mW/m2 … The extent of the local anomalies excludes a conductive source, and therefore heat transport by fluids must be considered"; "continental rifting is not by default characterized by high heat flow".
+
+### LachenbruchSassMorgan1994
+- Reference: Lachenbruch, A. H., Sass, J. H. and Morgan, P. (1994). Thermal regime of the southern Basin and Range Province: 2. Implications of heat flow for regional extension and metamorphic core complexes. Journal of Geophysical Research 99:22121-22133.
+- DOI or URL: 10.1029/94JB01890
+- Cited as: not cited in a row (the page's background).
+- Ledger ids: none
+- Access: paywalled (Wiley 403); the abstract only, through the fetch tool's summary, so not verbatim.
+- Library: not kept.
+- Read so far (by the project): the abstract as summarized, 2026-10-31 (the research sub-agent): the southern Basin and Range 82 ± 3 and the northern 92 ± 9 mW/m²; 100 % extension consistent with the observed heat flow "but not required by it"; lithosphere thinning "by delamination (and not solely by stretching), and/or magmatic additions".
+
+### Notes on entries above (2026-10-31, the continental heat-ceiling lane)
+- McKenzie1978, read again (the OCR copy at zetaware.com, by the research sub-agent): p. 27, "The stretching increases the heat flow by β at t = 0 if it occurs instantaneously"; p. 28, "However the heat flux is insensitive to β when β is large because almost all the region between z = 0 and z = a is replaced with asthenosphere during extension"; p. 30, the crust's heat "Fc before stretching it is reduced to Fc/β after extension" (the OCR prints "Fc/15"). The paper states no β at which the continental crust is thinned away, only the limit β → ∞. Ledger ids: PLT-476 (unchanged), PLT-820 (the page's text).
+- HyndmanCurrieMazzotti2005, read again (full text, GSA Today): p. 4, "Moho temperatures are 800–900 °C and lithosphere thicknesses are 50–60 km, compared to 400–500 °C and 150–300 km for cratons"; p. 6, "The heat flow averages range from 70 to 85 mW/m²"; the crust "thin (32–35 km thick)" (the page numbers are the sub-agent's mapping from the PDF's order). Ledger ids: PLT-461 (unchanged), PLT-820.
+- Sass1994, read again (the abstract, full-text copy): "Heat flow ranges from about 5 mW m-2 on the CP near Flagstaff, Arizona, to more than 150 mW m-2 in the crystalline rocks bordering the Salton Trough in SE California"; "Contemporary and Neogene extensional tectonism appears to be responsible for the very high heat flow (> 100 mW m-2) associated with the Salton Trough and its neighboring ranges". Ledger ids: RCK-030 (unchanged), PLT-823 (the page's text).
+- Davies2010 (Davies & Davies 2010), Table 3 (p. 15), read by the sub-agent: "Cenozoic Ext." (its reading: extrusive volcanic) 102.4 mW/m² mean over 13 polygons and 16 observations; Quaternary 82.0, Tertiary 77.3, Precambrian 59.9. Not used in a row.
+- Pollack1993: the abstract only, through secondary summaries (Wiley 403): the continental mean 65, oceanic 101, global 87 mW/m². Its age and rock-type table not read.
+- Morgan1983 (Tectonophysics 94:277, doi:10.1016/0040-1951(83)90021-5): a search engine's excerpt of the abstract only: "most of the data indicate high heat flow, with means of 70–125 mW m-2, from the grabens in the rift systems". Not used in a row.
+- Not read (403 or not found): Lachenbruch & Sass 1978 (GSA Memoir 152), Lucazeau 2019, Lysak 1992, Wheildon et al. 1994, Chapman 1986, Pribnow & Schellschmidt 2000, Turcotte & Schubert (excerpts only), Pollack & Chapman 1977, Sclater et al. 1980 (abstract only).
 ## The sources of the low-continents lane (2026-10-31)
 
 Why base35's continents stand low against Earth (sea-level.md, "Why base35's continents stand low, against Earth (2026-10-31)"; build log 2026-10-31, "Low continents lane"). No ledger value changed. Clift et al. 2009 was read by the lane agent in the source library's text (`Clift2009/Clift2009.txt`); the rest was fetched and read by one Sonnet research sub-agent, whose report is copied here: what it read, at what level, and its URLs. Where it had only a search summary or a fetch tool's paraphrase, that is said. Numbers marked "(the agent's arithmetic)" are its own.

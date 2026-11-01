@@ -6713,7 +6713,7 @@ fn young_floor_made_continental_after_the_step_takes_the_continental_law() {
     for &i in &sea {
         assert_eq!(
             st.samples[i].heat_flow_mw_m2,
-            continental_heat_flow(&st.samples[i], t, false, 0.0),
+            continental_heat_flow(&st.samples[i], t, false),
             "what finish_samples sets"
         );
     }
@@ -6747,6 +6747,167 @@ fn young_floor_made_continental_after_the_step_takes_the_continental_law() {
     let mut st = made.clone();
     thermal::refresh_heat_flow(&mut st, &off, t);
     assert_eq!(st, made);
+}
+
+/// The continental lithosphere's floor (PLT-820 to PLT-823): a continental column's thermal
+/// lithosphere reaches no shallower than where the plate model's own geotherm (ISO-138) puts its
+/// Moho at the crust's basal solidus, 1080 °C (Lachenbruch, Sass & Galanis 1985), 1.254 to 1.274
+/// times its crust, so the law is bounded by the crust: 139.3 mW/m² over the Salton Trough's
+/// 23.5 km crust before the magmatic terms, against the Imperial Valley's ~140. A 70 km belt
+/// under an arc's heating e-folds towards its 89.2 km floor (the heating's target raised to it
+/// from L_hot's 60); floor made continental keeps the floor's 2.32 √(κt) or its lid's floor,
+/// whichever is deeper; a stretch thins L with the crust down to the stretched column's floor,
+/// not to 1 km; crust with no state takes its floor's lithosphere at the floor's age (at least its
+/// lid's floor), not the frame's 225 km; and the law no longer reaches the 1 km clamp's
+/// 3,401 mW/m².
+#[test]
+fn a_continental_lithosphere_reaches_down_to_at_least_its_moho() {
+    use super::thermal::{
+        ARC_HEAT_MW_M2, CRUST_BASE_C, HEATING_MYR, L_COLD_KM, conductive_mw_m2, continental_l_km,
+        cooling_myr, isotherm_km, lid_floor_km, moho_km, ocean_km, stretch,
+    };
+    let p = preset(2_000, 20.0, "supercontinent", 5);
+    assert!(p.tectonics.thermal_state, "the state is the default");
+    // The bound against the Salton Trough (PLT-823): the law at the floor of a 23.5 km crust,
+    // whose 1080 °C isotherm is its Moho.
+    let salton = conductive_mw_m2(lid_floor_km(23.5));
+    assert!((salton - 139.3).abs() < 0.05, "{salton}");
+    assert!((isotherm_km(lid_floor_km(23.5), CRUST_BASE_C) - 23.5).abs() < 1e-6);
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (mut st, _geo) = init::initial_state(&p, &env).unwrap();
+    let t = env.t_myr;
+    let visible = |st: &PlateState, kind: u8| -> Vec<usize> {
+        (0..st.samples.len())
+            .filter(|&i| st.samples[i].kind == kind && !st.samples[i].is_hidden())
+            .collect()
+    };
+    let land = visible(&st, CONTINENTAL);
+    let sea = visible(&st, OCEANIC);
+    let column_of = |km: f64| {
+        let base = pools::continental_column();
+        let total: f32 = base.iter().sum();
+        base.map(|x| x * (km * 1000.0) as f32 / total)
+    };
+    // A 70 km Andean belt under an arc, its lithosphere 100 km.
+    let belt = land[0];
+    {
+        let s = &mut st.samples[belt];
+        s.pools = column_of(70.0);
+        s.thickness_m = s.pools.iter().sum();
+        s.lithosphere_km = 100.0;
+        s.keel_km = 0.0;
+        s.flags = ARC;
+        s.orogeny = state::OROGENY_ANDEAN;
+    }
+    let belt_floor = lid_floor_km(70.0);
+    assert!((belt_floor - 89.21).abs() < 0.01, "{belt_floor}");
+    // Floor 2.4 Myr old (L = 18 km) made continental under 5 km of rock (a 12 km column, its
+    // floor 15.1 km) and under 18 km (25 km, its floor 31.7 km).
+    let age = 2.4;
+    for (&i, extra) in sea[..2].iter().zip([5000.0f32, 18_000.0]) {
+        let s = &mut st.samples[i];
+        s.pools = pools::oceanic_column();
+        s.pools[state::pool::SEDIMENT] += extra;
+        s.thickness_m = s.pools.iter().sum();
+        s.formed_myr = (t - age) as f32;
+        s.lithosphere_km = ocean_km(age) as f32;
+        s.flags = 0;
+        s.make_continental();
+    }
+    let floor_l = ocean_km(age);
+    assert!((floor_l - 18.0).abs() < 0.1, "{floor_l}");
+    assert!(lid_floor_km(12.0) < floor_l);
+    assert!((f64::from(st.samples[sea[0]].lithosphere_km) - floor_l).abs() < 1e-4);
+    let deep = lid_floor_km(moho_km(&st.samples[sea[1]]));
+    assert!((deep - 31.71).abs() < 0.01, "{deep}");
+    assert!((f64::from(st.samples[sea[1]].lithosphere_km) - deep).abs() < 1e-4);
+    // Floor the last resampling made (no state), 0.5 Myr old, made continental under 2 km of
+    // rock: its floor's 2.32 √(κ 0.5) = 8.2 km against its 9 km column's 11.3 km floor.
+    let unset = sea[2];
+    {
+        let s = &mut st.samples[unset];
+        s.pools = pools::oceanic_column();
+        s.pools[state::pool::SEDIMENT] += 2000.0;
+        s.thickness_m = s.pools.iter().sum();
+        s.formed_myr = (t - 0.5) as f32;
+        s.lithosphere_km = 0.0;
+        s.flags = 0;
+        s.make_continental();
+    }
+    assert_eq!(st.samples[unset].lithosphere_km, 0.0, "no state yet");
+    let unset_floor = lid_floor_km(moho_km(&st.samples[unset]));
+    assert!((unset_floor - 11.31).abs() < 0.01, "{unset_floor}");
+    assert!(ocean_km(0.5) < unset_floor);
+    let q_unset = f64::from(continental_heat_flow(&st.samples[unset], t, true));
+    assert!(
+        (q_unset - conductive_mw_m2(unset_floor)).abs() < 1e-2,
+        "{q_unset} against {}",
+        conductive_mw_m2(unset_floor)
+    );
+    let before = st.clone();
+    for _ in 0..30 {
+        thermal::step(&mut st, &env);
+    }
+    // The belt: e-folding towards its floor, not to L_hot's 60 km and not clamped partway; its
+    // heat flow the law over its lithosphere with the arc's 40.
+    let s = &st.samples[belt];
+    let want = belt_floor + (100.0 - belt_floor) * (-30.0 * env.dt_myr / HEATING_MYR).exp();
+    let got = f64::from(s.lithosphere_km);
+    assert!(
+        (got - want).abs() < 1e-3 && got >= belt_floor,
+        "{got} against {want}"
+    );
+    let q = f64::from(continental_heat_flow(s, t, true));
+    assert!(
+        (q - (26.0 + 3375.0 / got + ARC_HEAT_MW_M2)).abs() < 1e-2,
+        "{q}"
+    );
+    // The crust with no state: its floor's lithosphere at its lid's floor, then cooling towards
+    // L_cold (one step from 11.3 km).
+    let mut once = before.clone();
+    thermal::step(&mut once, &env);
+    let want = L_COLD_KM + (unset_floor - L_COLD_KM) * (-env.dt_myr / cooling_myr()).exp();
+    let got = f64::from(once.samples[unset].lithosphere_km);
+    assert!((got - want).abs() < 1e-3, "{got} against {want}");
+    // Every continental column's lithosphere at or below its floor after the steps.
+    for s in st.samples.iter().filter(|s| s.kind == CONTINENTAL) {
+        assert!(
+            f64::from(s.lithosphere_km) >= lid_floor_km(moho_km(s)) - 1e-3,
+            "{} km over a {} km column",
+            s.lithosphere_km,
+            moho_km(s)
+        );
+    }
+    // A stretch thins L with the crust to the stretched column's floor: by β = 2 over 35 km of
+    // crust (17.5 km after, its floor 22.1 km), a 60 km lithosphere to 30 km and a 40 km one to
+    // the floor.
+    let stretched_floor = lid_floor_km(17.5);
+    assert!((stretched_floor - 22.12).abs() < 0.01, "{stretched_floor}");
+    for (l, want) in [(60.0, 30.0), (40.0, stretched_floor)] {
+        let mut s = state::Sample::blank(0);
+        s.kind = CONTINENTAL;
+        s.pools = column_of(35.0).map(|x| x * 0.5);
+        s.thickness_m = s.pools.iter().sum();
+        s.lithosphere_km = l;
+        stretch(&mut s, 0.5);
+        assert!(
+            (f64::from(s.lithosphere_km) - want).abs() < 1e-3,
+            "{} against {want}",
+            s.lithosphere_km
+        );
+    }
+    // The 1 km clamp is out of reach: a lithosphere set at 0.5 km over a 7 km column reads its
+    // floor's 8.78 km.
+    let mut thin = before.samples[unset];
+    thin.pools = pools::oceanic_column();
+    thin.lithosphere_km = 0.5;
+    let thin_floor = lid_floor_km(7.0);
+    assert!((continental_l_km(0.5, moho_km(&thin)) - thin_floor).abs() < 1e-9);
+    assert!((thin_floor - 8.78).abs() < 0.01, "{thin_floor}");
+    let q = f64::from(continental_heat_flow(&thin, t, true));
+    assert!((q - conductive_mw_m2(thin_floor)).abs() < 1e-2, "{q}");
+    assert!(q < 420.0 && conductive_mw_m2(1.0) > 3400.0);
 }
 
 /// The front lane's cut trace (2026-10-24, plates.md "The front's length: why the plates are
@@ -7746,6 +7907,17 @@ fn a_deferred_collision_leaves_both_plates_to_the_balance() {
                 .any(|&(u2, o2, on2, _)| (u, o, on) == (u2, o2, on2))
         };
         let alive: Vec<bool> = st.plates.iter().map(|q| q.alive).collect();
+        // A plate with no visible sample when the balance was solved is not in it
+        // (`forces::Answer::omega` is `None` for it: a terrane wholly under the other plate) and
+        // keeps its rotation by design (scattered seed 2 on the continental lid's floor branch,
+        // 2026-10-31: plate 27 under plate 1 at steps 77 and 78). Exactly the plates the step's
+        // balance left out are skipped, as the dynamics record has them (PR #58's re-review).
+        let out_of_balance: Vec<u32> = st
+            .dynamics
+            .as_ref()
+            .and_then(|d| d.steps.last())
+            .map(|r| r.out_of_balance.clone())
+            .unwrap_or_default();
         // A step that killed a plate (a weld or a healed rift) or left the balance unsolved is
         // not read; nor are the plates of a collision that ended (a transfer kills no plate).
         let died = prev_alive.iter().zip(&alive).any(|(&was, &is)| was && !is);
@@ -7762,6 +7934,7 @@ fn a_deferred_collision_leaves_both_plates_to_the_balance() {
                         || moved.contains(&q)
                         || qi >= prev_omega.len()
                         || !alive[qi]
+                        || out_of_balance.contains(&q)
                     {
                         continue;
                     }
@@ -8684,5 +8857,118 @@ fn a_sourced_plume_head_erupts_a_recorded_province() {
         assert!((hot[0].radius_rad - env.norm.rad(1000.0)).abs() < 1e-12);
         assert!(ridges::hot_mantle_at(&hot, at, env.t_myr + 19.0).is_some());
         assert!(ridges::hot_mantle_at(&hot, at, env.t_myr + 21.0).is_none());
+    }
+}
+
+/// PLT-820, PLT-821 and PLT-824 at the plate stage's final frame (PR #58's review): every visible
+/// continental sample of a 60 Myr run holds its lithosphere at or below its lid's floor (the 1080 °C
+/// isotherm of the plate model's own geotherm at or below its Moho, which the test reads from the
+/// geotherm itself, `isotherm_km`), its heat flow at least its law over that lithosphere and at
+/// most its column's ceiling (its law at its lid's floor with an arc's and a hotspot's terms), and
+/// crust with no state reads its floor's: at least the law over the deeper of 2.32 √(κt) at the
+/// floor's age and its lid's floor, not over the frame's 225 km. The planet (`pipeline_quick_16k`
+/// at 3,000 samples, scattered continents, seed 4) ends with columns at their floor (the final
+/// pass stores every column's L at its floor or below), so the run fails with PLT-820 reverted
+/// (checked 2026-10-31: a 57.9 km column at L 62.0, its isotherm at 48.7 km). Whether a run ends
+/// with crust with no state is the seed's (4 of 16 in the lane's sweep), so PLT-821 is checked on
+/// a constructed final pass as well (PR #58's re-review): continental crust spread onto floor
+/// made in the step, one column with no heat flow yet and one with a stale 41 mW/m², which fails
+/// with PLT-821 reverted (the frame's 225 km reads 41 mW/m² there).
+#[test]
+fn the_final_frame_holds_every_continental_column_to_its_lid_floor() {
+    use super::thermal::{
+        ARC_HEAT_MW_M2, CRUST_BASE_C, HOTSPOT_HEAT_MW_M2, conductive_mw_m2, isotherm_km,
+        lid_floor_km, moho_km, ocean_km,
+    };
+    let json = with_timeline(
+        crate::params::planet_builtin("pipeline_quick_16k").unwrap(),
+        Some("scattered_continents"),
+        Some(60.0),
+    )
+    .unwrap();
+    let mut v: serde_json::Value = serde_json::from_str(&json).unwrap();
+    v["resolution"]["l0_samples"] = serde_json::json!(3000);
+    v["resolution"]["l1_r"] = serde_json::json!(64);
+    v["keyframes"]["size"] = serde_json::json!([128, 64]);
+    v["keyframes"]["every_myr"] = serde_json::json!(20.0);
+    v["seed"] = serde_json::json!(4);
+    let PresetBody::Planet(p) = Preset::from_json(&v.to_string()).unwrap().body else {
+        panic!("not a planet preset")
+    };
+    assert!(p.tectonics.thermal_state, "the state is the default");
+    let world = run_stage(&p, |_, _, _| {});
+    let st = world.plates.as_ref().unwrap();
+    let t = st.t_myr;
+    let mut near = 0;
+    for s in st
+        .samples
+        .iter()
+        .filter(|s| s.kind == CONTINENTAL && !s.is_hidden())
+    {
+        let z = moho_km(s);
+        let l = f64::from(s.lithosphere_km);
+        let q = f64::from(s.heat_flow_mw_m2);
+        let ceiling = conductive_mw_m2(lid_floor_km(z)) + ARC_HEAT_MW_M2 + HOTSPOT_HEAT_MW_M2;
+        assert!(
+            q <= ceiling + 1e-2,
+            "{q} mW/m² over a {z} km column's {ceiling}"
+        );
+        if l > 0.0 {
+            let base = isotherm_km(l, CRUST_BASE_C);
+            assert!(
+                base >= z - 1e-3,
+                "{l} km: its 1080 °C isotherm at {base} km, above its {z} km Moho"
+            );
+            if base < 1.02 * z {
+                near += 1;
+            }
+            assert!(
+                q >= conductive_mw_m2(l) - 1e-2,
+                "{q} under its law at {l} km"
+            );
+        } else {
+            let age = (t - f64::from(s.formed_myr)).max(0.0);
+            let own = ocean_km(age).max(lid_floor_km(z));
+            assert!(
+                q >= conductive_mw_m2(own) - 1e-2,
+                "{q} mW/m² over crust with no state on {age} Myr floor, its floor's {own} km"
+            );
+        }
+    }
+    assert!(
+        near > 0,
+        "no column near its floor at the final frame: PLT-820 unseen"
+    );
+    // PLT-821 on a constructed final pass: 10 km of continental crust spread onto floor made in
+    // the step (the rate guard's spread, `collapse::spread`), with no state.
+    let mut st2 = st.clone();
+    let made: Vec<usize> = st2
+        .samples
+        .iter()
+        .enumerate()
+        .filter(|(_, s)| s.kind == state::OCEANIC && !s.is_hidden())
+        .map(|(i, _)| i)
+        .take(2)
+        .collect();
+    assert_eq!(made.len(), 2);
+    for (n, &i) in made.iter().enumerate() {
+        let s = &mut st2.samples[i];
+        s.formed_myr = t as f32;
+        s.pools = pools::oceanic_column();
+        s.pools[state::pool::FELSIC_PLUTONIC] += 10_000.0;
+        s.thickness_m = pools::thickness(&s.pools);
+        s.lithosphere_km = 0.0;
+        s.make_continental();
+        s.heat_flow_mw_m2 = if n == 0 { 0.0 } else { 41.0 };
+    }
+    thermal::refresh_heat_flow(&mut st2, &p.tectonics, t);
+    for &i in &made {
+        let s = &st2.samples[i];
+        let own = ocean_km(0.0).max(lid_floor_km(moho_km(s)));
+        let q = f64::from(s.heat_flow_mw_m2);
+        assert!(
+            q >= conductive_mw_m2(own) - 1e-2,
+            "{q} mW/m² over crust spread onto new floor, its floor's {own} km"
+        );
     }
 }

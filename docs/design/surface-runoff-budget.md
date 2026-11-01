@@ -508,7 +508,7 @@ inline by the coordinator after the lane stopped on the account's rate limit:
    rain) and the surface reads them; each cell's departure of the months' mean from `D_MEAN` is its row's month mean (a
    carry that left the snapshot's months where they were while the mean moved with the crust fails it); after step 3
    the bake's 24 months are there and only two snapshots were taken.
-2. **The checkpoint schema.** `CHECKPOINT_SCHEMA` 14 (`snapshot::Refs::t_month` in the climate's saved state): an
+2. **The checkpoint schema.** `CHECKPOINT_SCHEMA` 14, 15 after the merge with PR #55's 14 (`snapshot::Refs::t_month` in the climate's saved state): an
    older checkpoint is refused by name instead of failing to decode.
 3. **One set of months.** The world keeps the twelve months alone, not their departures as well: at an advect step each
    month's departure from the previous step's row month is carried and the new row month added (`carry_month`), which
