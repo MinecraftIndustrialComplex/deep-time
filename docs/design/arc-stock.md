@@ -86,6 +86,11 @@ margin's sediment counted continental, PLT-661, "the rest converted" carries 18 
 redeposition), and the second the extra volume; arc foundering (Jagoutz & Kelemen 2015) would remove volume but is
 not shown to be missing until the arcs' net rates are read as net or gross.
 
+**Foundering would count twice.** The arcs' rates (PLT-045, PLT-285) are Stern & Scholl 2010's crustal growth rates,
+the arc crust standing today over its age (p. 12: "adopted as a useful long-term rate estimate for continental margin
+arc productivity"; Izu-Bonin-Mariana's 130 to 135 from its crust's volume): net of whatever foundered. A foundering
+law on top of them would remove rock the rates already left out, so it is not a missing law at these rates.
+
 ## Earth's side (sources read by Sonnet lookups, 2026-11-01; bibliography entries to add when used)
 
 - Condie & Aster 2010 (Precambrian Res. 180:227-236): "only 14% during the last 400 My" (the body says 600 My).
@@ -101,7 +106,5 @@ not shown to be missing until the arcs' net rates are read as net or gross.
    crust's layers (Rudnick & Gao's as Hacker et al. 2015 print them, PLT-834), and their heights under the law.
 2. Whether the label (cb_origin's) or the rock is wrong: a column of start crust stacked under an arc is continental
    crust on Earth (an arc-continent collision, the arc accreted to the margin).
-3. Whether arc magma's dense cumulates should founder (Jagoutz & Kelemen 2015) where the model keeps them, with
-   Stern & Scholl's net growth rates read as net (the model's arc rate per km may already be a net rate: check its
-   calibration, PLT-760's rows, before adding a loss).
+3. Answered: the arcs' rates are net (above), so no foundering law at these rates.
 4. Subduction erosion at 0.31 against Earth's 1.4 km³/yr.
