@@ -120,7 +120,13 @@ def run_stats(run):
             col = pp[:, 0:7].sum(1)
             classes_end = {"start": start, "taken": taken, "alone": alone, "belt": belt,
                            "otherconv": conv & ~island & ~belt}
+            # Hyper-extended continental crust (under 10 km of its own crystalline crust, PLT-661's margins and
+            # the like: transition::hyper_extended, Brune et al. 2014's limit) and each class's area.
+            own_cryst = pp[:, 2:7].sum(1) - np.clip(np.minimum(pp[:, 7], pp[:, 5] + pp[:, 6]), 0.0, None)
+            classes_end["hyper"] = cont & (own_cryst < 10_000.0)
+            classes_end["cont"] = cont
             for k, m in classes_end.items():
+                r[f"{k}_area"] = float(m.sum() / n0)
                 if not m.any():
                     continue
                 c_sum = col[m].sum()
