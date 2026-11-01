@@ -505,6 +505,29 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
     state.slabs = earlier_slabs(&geo, &plate, &state.samples, &omega, k, t0, &norm);
     // The start's continents carry an old craton's lithosphere and keel (ledger: PLT-463).
     super::thermal::start(&mut state, k);
+    // With `column_buoyancy` the start's continents take the thickness at which the whole
+    // column's buoyancy holds them where they start (under a sea at the datum, a drowned shelf's
+    // dry height is its depth over the water's load), on the lithosphere and keel just set, in
+    // Rudnick & Gao's three layers (ledger: PLT-834, PLT-835).
+    if k.column_buoyancy {
+        let law = super::buoyancy::Law::new(env.gravity);
+        state
+            .samples
+            .par_iter_mut()
+            .filter(|s| s.kind == CONTINENTAL)
+            .for_each(|s| {
+                let z = f64::from(s.elevation_m);
+                let dry = if z >= 0.0 {
+                    z
+                } else {
+                    z / super::settle::WATER_LOADED
+                };
+                let t =
+                    law.start_thickness_m(dry, f64::from(s.lithosphere_km), f64::from(s.keel_km));
+                s.pools = super::buoyancy::start_column(t);
+                s.thickness_m = s.pools.iter().sum();
+            });
+    }
     Ok((state, geo))
 }
 

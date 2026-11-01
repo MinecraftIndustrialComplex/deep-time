@@ -454,6 +454,10 @@ pub(super) struct Sheet {
     /// `collapse_sheet_thermal` with `thermal_strength`: crust no orogeny raised flows at its
     /// lithosphere's thermal age too (ledger: PLT-581).
     untagged: bool,
+    /// With `column_buoyancy`, the column's height is the whole column's buoyancy (`buoyancy.rs`)
+    /// in place of its Airy height and ISO-110's term; the normal column it is measured against
+    /// keeps `continent_elevation_m`'s middle (ledger: PLT-836).
+    law: Option<super::buoyancy::Law>,
 }
 
 impl Sheet {
@@ -484,6 +488,9 @@ impl Sheet {
             gravity: env.gravity,
             thermal: super::thermal::Switches::of(k),
             untagged: k.collapse_sheet_thermal && k.thermal_state && k.thermal_strength,
+            law: k
+                .column_buoyancy
+                .then(|| super::buoyancy::Law::new(env.gravity)),
         })
     }
 
@@ -497,8 +504,13 @@ impl Sheet {
         if s.orogeny == OROGENY_NONE && !(self.untagged && s.lithosphere_km > 0.0) {
             return 0.0;
         }
-        let z =
-            iso_height(&s.pools, self.z_0, self.gravity) + self.thermal.uplift_m(s.lithosphere_km);
+        let z = match &self.law {
+            Some(law) => law.sample_m(s, self.t_myr),
+            None => {
+                iso_height(&s.pools, self.z_0, self.gravity)
+                    + self.thermal.uplift_m(s.lithosphere_km)
+            }
+        };
         let du = column_energy(z, true, 0.0, 0.0, f64::INFINITY, self.sea_m, self.gravity)
             - self.u_normal;
         if du.is_nan() || du <= 0.0 {
@@ -871,8 +883,9 @@ pub(in crate::plates) mod tests {
     impl Fx {
         /// The threshold law alone: the column from the sea, its cap and the sheet (PLT-412 to
         /// PLT-414), the lithosphere's thermal state and strength (PLT-460, ISO-112), all on by
-        /// default since 2026-10-23, and the sheet's thermal reading (PLT-581, on since
-        /// 2026-10-25) are off here, and each test turns on the law it tests.
+        /// default since 2026-10-23, the sheet's thermal reading (PLT-581, on since 2026-10-25)
+        /// and the whole column's buoyancy (PLT-836, on since 2026-11-01) are off here, and each
+        /// test turns on the law it tests.
         pub(in crate::plates) fn new() -> Fx {
             let k = TectonicParams {
                 collapse_myr: 25.0,
@@ -885,6 +898,7 @@ pub(in crate::plates) mod tests {
                 thermal_state: false,
                 thermal_strength: false,
                 collapse_sheet_thermal: false,
+                column_buoyancy: false,
                 ..TectonicParams::default()
             };
             Fx {
@@ -1340,6 +1354,16 @@ pub(in crate::plates) mod tests {
         let long = Sheet::new(&fx_long.k, &fx_long.env(0), t_n, 0.0).unwrap();
         s.orogeny_myr = 0.0;
         assert!((long.release(&s) - (t - t_n)).abs() < 1e-6);
+        // With the whole column's buoyancy (and the state it reads) the column's height is the
+        // law's (PLT-836): the young high column still thins, at the rate its own height gives.
+        fx.k.thermal_state = true;
+        fx.k.column_buoyancy = true;
+        let law = Sheet::new(&fx.k, &fx.env(0), t_n, 0.0).unwrap();
+        let z_law = super::super::buoyancy::Law::new(9.81).sample_m(&s, 0.0);
+        assert!(z_law > 2000.0, "{z_law}");
+        let e_law = law.rate_per_myr(&s);
+        assert!(e_law > 0.0 && e_law.is_finite(), "{e_law}");
+        assert_ne!(e_law, e, "the law's height, not the line's");
     }
 
     /// With the sheet on, a quiet belt raised by an orogeny thins past T_c towards the normal

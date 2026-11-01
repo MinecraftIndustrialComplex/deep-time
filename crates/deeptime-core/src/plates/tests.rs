@@ -609,7 +609,10 @@ fn sutures_and_initiations_keep_continents_whole() {
     // 17, 20, 21 and 24 and scattered 2, 3, 5 to 7, 10 to 13, 17, 19, 22 and 24, the same two;
     // with the gate on cumulative convergence, PR #55's re-review, supercontinent 1, 3, 4, 8, 13,
     // 14, 16, 17, 19 and 20 and scattered 3, 8, 11, 13, 14, 16 to 18, 21 and 23, supercontinent 2 no
-    // more, so supercontinent 1 and scattered 3).
+    // more, so supercontinent 1 and scattered 3; supercontinent 1 welds no more with the lid's
+    // floor, PR #58, the height following the rock, PR #59, or the whole column's buoyancy,
+    // PLT-836, 2026-11-01, and is kept, the sutures counted over both starts, scattered 3 still
+    // welding: the sweep's supercontinent seeds in the weld test's comment).
     for (start, seed) in [("supercontinent", 1), ("scattered_continents", 3)] {
         let mut p = preset(8000, 300.0, start, seed);
         // The old law (PLT-585 off, PLT-540 on): under Forsyth & Uyeda's balance on this small
@@ -971,7 +974,13 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // review: 2, 3, 5 to 7, 10 to 13, 17, 19, 22 and 24, seed 3 still welds; from the
     // supercontinent 1, 2, 4, 5, 7, 8, 10, 12, 13, 17, 20, 21 and 24; 10 of 24 with the gate on
     // cumulative convergence, PR #55's re-review: 3, 8, 11, 13, 14, 16 to 18, 21 and 23, seed 3
-    // still welds; from the supercontinent 1, 3, 4, 8, 13, 14, 16, 17, 19 and 20).
+    // still welds; from the supercontinent 1, 3, 4, 8, 13, 14, 16, 17, 19 and 20; 12 of 24 with
+    // the lid's floor, PR #58: 1 to 4, 7 to 9, 14, 18, 19, 21 and 23, seed 3 still welds; from the
+    // supercontinent 5, 8, 9, 15 and 20 to 22; 16 of 24 with the height following the rock, PR
+    // #59: 3, 4, 6 to 11, 14 and 16 to 22, seed 3 still welds; from the supercontinent 2, 4, 5, 7,
+    // 11, 12, 16, 18, 20 and 22; 19 of 24 with the whole column's buoyancy on by default, PLT-836,
+    // 2026-11-01: 1, 3, 5, 7 to 9, 11 and 13 to 24, seed 3 still welds; from the supercontinent
+    // 3, 11, 14 to 16, 21 and 24).
     let mut p = preset(8000, 300.0, "scattered_continents", 3);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: under Forsyth & Uyeda's
     // balance on this small planet, whose ridge push is several times Earth's
@@ -1189,7 +1198,10 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // (the sweep's welding seeds 3, 5, 7, 9, 11, 13 to 16, 18 and 22, the guard binding on none), and
     // with the gate on any angle of convergence (PR #55's review: 2, 3, 5 to 7, 10 to 13, 17, 19, 22
     // and 24, the guard binding on none), and with the gate on cumulative convergence (PR #55's
-    // re-review: 3, 8, 11, 13, 14, 16 to 18, 21 and 23, the guard binding on none).
+    // re-review: 3, 8, 11, 13, 14, 16 to 18, 21 and 23, the guard binding on none), the lid's
+    // floor (PR #58: 1 to 4, 7 to 9, 14, 18, 19, 21 and 23), the height following the rock (PR
+    // #59: 3, 4, 6 to 11, 14 and 16 to 22) and the whole column's buoyancy (PLT-836: 1, 3, 5, 7
+    // to 9, 11 and 13 to 24), the guard binding on none in each.
     let mut p = preset(8000, 300.0, "scattered_continents", 3);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: the guard asserted below
     // bound under Forsyth & Uyeda's balance on every welding seed of 1 to 24 of this small planet
@@ -6600,6 +6612,7 @@ fn thick_ocean_crust_cools_towards_the_floor_it_holds_up() {
 fn the_final_heat_flow_pass_lifts_only_low_continental_samples() {
     let mut p = preset(2_000, 20.0, "supercontinent", 5);
     p.tectonics.thermal_state = false;
+    p.tectonics.column_buoyancy = false; // it reads the state (PLT-836)
     let stage = PlatesStage::new(p.clone());
     let env = stage.env(&p.tectonics, 1);
     let (mut st, _geo) = init::initial_state(&p, &env).unwrap();
@@ -6666,6 +6679,7 @@ fn the_final_heat_flow_pass_lifts_only_low_continental_samples() {
 fn young_floor_made_continental_after_the_step_takes_the_continental_law() {
     let mut p = preset(2_000, 20.0, "supercontinent", 5);
     p.tectonics.thermal_state = false;
+    p.tectonics.column_buoyancy = false; // it reads the state (PLT-836)
     let stage = PlatesStage::new(p.clone());
     let env = stage.env(&p.tectonics, 1);
     let (mut st, _geo) = init::initial_state(&p, &env).unwrap();
@@ -8858,6 +8872,48 @@ fn a_sourced_plume_head_erupts_a_recorded_province() {
         assert!(ridges::hot_mantle_at(&hot, at, env.t_myr + 19.0).is_some());
         assert!(ridges::hot_mantle_at(&hot, at, env.t_myr + 21.0).is_none());
     }
+}
+
+/// With `column_buoyancy` the start's continents take the thickness at which the whole column's
+/// buoyancy holds them at their start heights (the shelves' under a sea at the datum), so the
+/// first settling leaves them where they start; a short run keeps every height and thickness
+/// finite and its continents on the law's heights (ledger: PLT-834 to PLT-836).
+#[test]
+fn the_buoyant_start_stands_where_it_starts() {
+    let mut p = builtin_preset("earthlike_quick_16k", 4_000, 20.0, "supercontinent", 2);
+    p.tectonics.column_buoyancy = true;
+    p.validate().unwrap();
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (st, _) = init::initial_state(&p, &env).unwrap();
+    let law = buoyancy::Law::new(env.gravity);
+    let (mut shelf, mut n) = (0, 0);
+    for s in st.samples.iter().filter(|s| s.kind == CONTINENTAL) {
+        let z = settle::equilibrium_m(law.sample_m(s, st.t_myr), 0.0);
+        assert!(
+            (z - f64::from(s.elevation_m)).abs() < 1.0,
+            "{z} against {}",
+            s.elevation_m
+        );
+        // From a shelf's break (-130 m wet, -89 m dry: 34.8 km) to the highest start (900 m:
+        // 41.9 km) on the craton's state (L 225 km, K 200 km).
+        let t = f64::from(s.thickness_m) / 1000.0;
+        assert!((34.5..42.2).contains(&t), "{t}");
+        shelf += usize::from(s.elevation_m < 0.0);
+        n += 1;
+    }
+    assert!(
+        shelf > 0 && shelf < n,
+        "the preset floods a shelf: {shelf} of {n}"
+    );
+    let mut steps = 0;
+    run_stage(&p, |_, _, st| {
+        steps += 1;
+        for s in &st.samples {
+            assert!(s.elevation_m.is_finite() && s.thickness_m.is_finite());
+        }
+    });
+    assert!(steps >= 10, "{steps}");
 }
 
 /// PLT-820, PLT-821 and PLT-824 at the plate stage's final frame (PR #58's review): every visible
