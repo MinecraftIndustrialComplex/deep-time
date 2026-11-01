@@ -194,6 +194,26 @@ the lattice raggedness); (2) margins a collision welds inland, which Earth's oro
 reads the orogens closed narrow and wide oceans made from hyper-extended margins; not read beyond that) where the model
 keeps them as margins at 2.4 km under the sea; (3) the share of edges the rule rings (0.73 against about 0.65).
 
+**The sediment the margins hold** (`seased.py`, the same arms; GlobSed, Straume et al. 2019, Table 3 as bibliography.md
+quotes it: about 3.37 x 10⁸ km³ over about 3.63 x 10⁸ km², on the margins 1.43 x 10⁸ km³ over 4.69 x 10⁷ km², beyond
+200 km of the continent-ocean boundary 1.13 x 10⁸ km³ over 2.79 x 10⁸ km²):
+
+| final frame | on | off |
+|---|---|---|
+| sediment and sedimentary rock on the ocean floor | 3.78 x 10⁸ km³ (a mean of 1,554 m) | 5.26 x 10⁸ km³ (1,446 m) |
+| of it within 200 km of continental crust | 2.93 x 10⁸ km³ over 8.5 x 10⁷ km² (3,397 m) | 2.86 x 10⁸ km³ (3,378 m) |
+| beyond 200 km | 8.5 x 10⁷ km³ (559 m) | 2.45 x 10⁸ km³ (862 m) |
+| the cover of continental crust on an ocean basement | 6.68 x 10⁸ km³ | 1.84 x 10⁸ km³ |
+
+- With the switch on, the ocean floor's sediment is near GlobSed's, in total and near the margins (3.4 against 3.05
+  km). The converted margins hold another 6.7 x 10⁸ km³ of cover, twice GlobSed's whole ocean, and nearly all of it
+  under the sea. GlobSed's area is the ocean's, shelves and slopes included. So the sediment under the sea is about
+  three times Earth's, and the margins hold two thirds of it. With the switch off it lies on the far ocean floor (862
+  m against 405).
+- At the trenches (the ocean floor flagged at a trench at -500 and -100 Myr; the final frame carries no step flags), a
+  third of the samples hold 1 km or more (0.27 to 0.34 on, 0.34 to 0.39 off; near continental crust 0.44 to 0.56), a
+  median of 100 to 300 m. So PLT-442's sediment gate is not what keeps subduction erosion small (below).
+
 ## Earth's side (sources read by Sonnet lookups, 2026-11-01; bibliography entries to add when used)
 
 - Condie & Aster 2010 (Precambrian Res. 180:227-236): "only 14% during the last 400 My" (the body says 600 My).
@@ -210,4 +230,9 @@ keeps them as margins at 2.4 km under the sea; (3) the share of edges the rule r
 2. Whether the label (cb_origin's) or the rock is wrong: a column of start crust stacked under an arc is continental
    crust on Earth (an arc-continent collision, the arc accreted to the margin).
 3. Answered: the arcs' rates are net (above), so no foundering law at these rates.
-4. Subduction erosion at 0.31 against Earth's 1.4 km³/yr.
+4. Subduction erosion at 0.31 against Earth's 1.4 km³/yr. arc-lith's globals (two runs): the erosive fronts (PLT-442)
+   average 9,100 km of the fronts' 52,800 (straight, PLT-530), 85 % of them intra-oceanic. At PLT-441's 90 km³/km/Myr
+   they ask 0.82 km³/yr. The band gives 0.27; 0.55 (`plates/forearc_short_km3`) is not there, since an intra-oceanic
+   forearc holds little crust beyond a normal ocean floor's 7 km. So the gap is the length that erodes (17 % of the
+   fronts) and the forearcs' crust, not the rate. Next: which gate stops the rest (the 60 mm/yr normal convergence),
+   and Clift & Vannucchi 2004's share of erosive margins by length.
