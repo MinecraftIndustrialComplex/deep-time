@@ -1240,7 +1240,7 @@ pub fn resample(
                 old,
                 src,
                 &found,
-                &new_pts,
+                new_pts,
                 &rots,
                 kp,
                 cp,
