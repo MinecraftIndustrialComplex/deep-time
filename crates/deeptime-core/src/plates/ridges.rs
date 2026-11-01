@@ -177,7 +177,9 @@ fn nearest_corner(geo: &Geo, c: &Cover, rot: DQuat, q: DVec3) -> u32 {
 /// What a resampling measures a column's height from: the height its own rock and age hold it at,
 /// m (ledger: PLT-850). Continental crust: its pools' Airy height (`collapse::iso_height`, about
 /// the continents' reference height) and its lithosphere's thermal height (`thermal::uplift_m`,
-/// ISO-110; 0 when off), the dry height the settling holds it to (`settle.rs`, ISO-078). Ocean
+/// ISO-110; 0 when off), or with `column_buoyancy` its whole column's buoyancy
+/// (`buoyancy::Law::sample_m`, PLT-836): the dry height the settling holds it to (`settle.rs`,
+/// ISO-078) either way. Ocean
 /// crust: the floor its age's law makes (`pools::floor_at`, GDH1 by default, PLT-351) and the
 /// Airy change of its pools over the ocean's own 7 km column (`pools::isostatic_change_m`), water
 /// loaded under the datum as the hotspots' magma is (`hotspots::add_magma`; ISO-044): the floor
@@ -186,7 +188,9 @@ fn nearest_corner(geo: &Geo, c: &Cover, rot: DQuat, q: DVec3) -> u32 {
 /// increments, PLT-352, and the trench release lifts only floor under the curve, PLT-443), so a
 /// height the resampling gave it that its rock does not hold would stay.
 pub(crate) fn rock_height_m(s: &Sample, k: &TectonicParams, gravity: f64, t_myr: f64) -> f64 {
-    if s.kind == CONTINENTAL {
+    if s.kind == CONTINENTAL && k.column_buoyancy {
+        super::buoyancy::Law::new(gravity).sample_m(s, t_myr)
+    } else if s.kind == CONTINENTAL {
         let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
         iso_height(&s.pools, z_0, gravity) + super::thermal::uplift_m(k, s.lithosphere_km)
     } else {

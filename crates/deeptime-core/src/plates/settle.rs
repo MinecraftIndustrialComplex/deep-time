@@ -43,7 +43,10 @@
 //! or below local isostasy; 0 without a surface stage), τ = `isostasy_relax_myr` (4 kyr: the
 //! whole way at any plate step, ISO-078). The change is the step's uplift; the step's rise guard
 //! (PLT-288) runs after it. With `tectonics.thermal_isostasy_m` on, z_A gains the lithosphere's
-//! thermal height (`thermal::uplift_m`, ISO-110): a hot lithosphere holds its column higher.
+//! thermal height (`thermal::uplift_m`, ISO-110): a hot lithosphere holds its column higher. With
+//! `tectonics.column_buoyancy` on, z_A is the whole column's buoyancy instead (`buoyancy.rs`: the
+//! pools' rock at their depths, the mantle lithosphere's contraction and its keel, against a free
+//! asthenosphere set by the ridge's column; PLT-830 to PLT-836).
 //!
 //! The settling moves a height alone: it adds and removes no crust, so the surface's flexure
 //! takes it as no load (ISO-091). The flexure books only `Sample::crust_uplift_mm_yr`, the change
@@ -126,6 +129,9 @@ pub fn step(state: &mut PlateState, env: &Env, flexure: Option<&[f64]>, sea: f64
     let share = 1.0 - (-env.dt_myr / tau).exp();
     let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
     let g = env.gravity;
+    // With `column_buoyancy` the whole column's buoyancy in place of PLT-281's line (ledger:
+    // PLT-836).
+    let law = k.column_buoyancy.then(|| super::buoyancy::Law::new(g));
     // The changes are collected and summed in sample order: a parallel sum's order, so its last
     // bits, would change from run to run.
     let changes: Vec<f64> = state
@@ -141,7 +147,10 @@ pub fn step(state: &mut PlateState, env: &Env, flexure: Option<&[f64]>, sea: f64
                 .filter(|f| f.is_finite())
                 .unwrap_or(0.0);
             // The lithosphere's thermal height joins the crust's (ledger: ISO-110; 0 when off).
-            let z_a = iso_height(&s.pools, z_0, g) + thermal::uplift_m(k, s.lithosphere_km);
+            let z_a = match &law {
+                Some(law) => law.sample_m(s, env.t_myr),
+                None => iso_height(&s.pools, z_0, g) + thermal::uplift_m(k, s.lithosphere_km),
+            };
             let target = equilibrium_m(z_a, sea) + f;
             let z = f64::from(s.elevation_m);
             let dz = (target - z) * share;
