@@ -505,7 +505,18 @@ plate splits by its thin lithosphere (PLT-506), a large igneous province under i
 have is a test that a boundary opening through cold, normal lithosphere has one of Earth's reasons; a reopened suture
 (two plates that collided and part again) is one, and the trace does not yet say how many of the cold starts are.
 
-**What the extension needs from it** (the coordinator's call: the rifting rule should need what Earth needs): a rift
-through cold, normal lithosphere stretches only where it has a weakness Earth's would have (thin or hot lithosphere,
-magma, or an inherited suture); elsewhere the plates' motion opens it as before. The next step measures the cold
-starts' kind (suture, plume, split) on the trace before the rule changes.
+**What the extension needs from it** (the coordinator's call: the rifting rule should need what Earth needs). Where a
+rift starts is the plates' rule, not the extension's: a plate splits by Cortial's hazard (`rifting.rs`, PLT-082) along
+the cheapest path through its lithosphere (PLT-506), and two plates part where the force balance pulls them apart.
+The extension only decides how the opening is taken. So the rule to change is where the plates may part through cold,
+normal lithosphere: only where Earth's would, through thin or hot lithosphere (60 mW/m² or more), an old suture or
+belt (the samples a collision stamped, `Sample::collision_onset`), or a large igneous province. Which of the three to
+build, and where (the split's path, its hazard, or the pair's opening), depends on what the cold starts are, so it is
+measured first:
+- the trace records per side the share of its edge columns a collision ever stamped (`belt`), whether its plate's
+  igneous province still boosts its rifting (`lip`), and the plate's parent and birth (`parent`, `born_myr`), so
+  `rift_starts.py` sorts each pair's first step into a split (born of one parent within 10 Myr), an old belt, magma,
+  or none;
+- ext-cum3 (Buck's band) runs with the trace on, so its runs give the count for the band's planets; the rule follows
+  as its own stage (ext-cum4), behind its own switch, and the cold starts with no belt and no magma are the share it
+  would move.
