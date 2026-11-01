@@ -342,7 +342,23 @@ state through PLT-821 (PLT-506). (4) The floor was the mantle part's linear geot
 which the rule cited; it is now solved on ISO-138's geotherm (the rule above), the Salton Trough's
 bound 139.3 with its parts the agent's comparison (PLT-823), and T_s is labelled one place's value
 (PLT-822). The final-frame test runs the plate stage and fails with either PLT-820 or PLT-821
-reverted.
+reverted (checked: with the floor at 0, a 57.9 km column at L = 62.0 km has its 1080 °C isotherm at
+48.7 km; with crust with no state at 225 km, its heat flow falls under its floor's law).
+
+What the first arm's shifts come from (the coordinator's question; hc-on, the first build, against
+base35-s4, from the cached runs). The high coasts' share in collision belts rose from 0.517 to 0.750
+(Mann-Whitney p 0.021) while the rate of high ground on a collision belt's coast did not move (0.445
+against 0.470, p 0.96): the arcs lost theirs (their share of the coast 0.182
+against 0.228, p 0.01; their rate of high coast 0.071 against 0.131, p 0.083; their high ground's
+crust 49.0 against 47.7 km, p 0.13). By the code the floor reaches the plates only through the laws
+that read L (the collapse's and the interior's thin sheets, PLT-415 and PLT-733 by PLT-652's
+weakness; the rifts' weakness, PLT-506; the flexure's Te through the thermal age), and the columns it
+binds are heated crust over 47 km, arcs and collision belts, at a thermal age of about 40 Myr where
+they were at 0 (η_0 / η 0.53 against 1): stiffer arc belts are the reading that fits, not shown by a
+single-cause arm. The weld seeds: the sweep's welding seeds did not fall (master 16 scattered and 12
+supercontinent of 24; the first build 17 and 14; with the review's fixes 18 and 17), so the seeds
+that stopped welding are the planets' divergence from a changed L, not fewer welds; the weld tests'
+seeds still weld.
 
 ### The order of the stages
 

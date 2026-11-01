@@ -538,9 +538,7 @@ pub fn refresh_heat_flow(state: &mut PlateState, k: &TectonicParams, t_myr: f64)
         let mut q = f64::from(s.heat_flow_mw_m2).max(low);
         if let Some(floor_km) = floor_km {
             // ledger: PLT-824
-            q = q.min(
-                conductive_mw_m2(floor_km) + ARC_HEAT_MW_M2 + HOTSPOT_HEAT_MW_M2,
-            );
+            q = q.min(conductive_mw_m2(floor_km) + ARC_HEAT_MW_M2 + HOTSPOT_HEAT_MW_M2);
         }
         s.heat_flow_mw_m2 = q as f32;
     });
@@ -673,7 +671,12 @@ mod tests {
     /// 139.3 mW/m² (PLT-823), the ceiling with both magmatic terms over 7 km 490.4.
     #[test]
     fn the_lid_floor_puts_the_moho_at_the_crusts_basal_solidus() {
-        for (z, ratio) in [(7.0, 1.2543), (23.5, 1.2677), (35.0, 1.2719), (70.0, 1.2744)] {
+        for (z, ratio) in [
+            (7.0, 1.2543),
+            (23.5, 1.2677),
+            (35.0, 1.2719),
+            (70.0, 1.2744),
+        ] {
             let f = lid_floor_km(z);
             assert!((f / z - ratio).abs() < 1e-4, "{z}: {}", f / z);
             assert!((isotherm_km(f, CRUST_BASE_C) - z).abs() < 1e-6, "{z}");
