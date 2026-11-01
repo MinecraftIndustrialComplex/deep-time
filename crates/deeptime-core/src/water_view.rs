@@ -223,12 +223,14 @@ fn work_terrain(field: &Field, sea_raw: i32) -> (GridDesc, Vec<i16>) {
     (grid, elev)
 }
 
-/// The climate at block (x, z), as the bake's water part reads it: precipitation, mean
-/// temperature and the warmest and coldest month (`climate/t_warm_c`, `climate/t_cold_c`; the
-/// mean ± 8 °C without them) bilinear from the frame's L1 climate, else the surface stage's zonal
-/// stand-in. The year is drawn about the mean from the warmest month (`Climate::thaw`): a frame's
-/// world holds the climate stage's twelve months only at the last step, where the bake takes
-/// them, and the final frame draws the bake's own files ([`from_bake`]).
+/// The climate at block (x, z), as the bake's water part and the history's lakes read it:
+/// precipitation and mean temperature bilinear from the frame's L1 climate, and the climate
+/// stage's twelve months (`climate/month/t_sl_c_*`, which it writes every step), each bilinear,
+/// their departures from their mean added to the cell's mean (HYD-033, `Climate::of_months`), so
+/// the frame's lakes and playas take the history's thaw law (the runoff law's third re-review);
+/// without the months its warmest and coldest month (`climate/t_warm_c`, `climate/t_cold_c`; the
+/// mean ± 8 °C without them, the two half-sines of `Climate::thaw`); without the stage the
+/// surface stage's zonal stand-in. The final frame draws the bake's own files ([`from_bake`]).
 pub(crate) fn climate_at<'w>(
     world: &'w WorldState,
     circumference: f64,
@@ -238,17 +240,33 @@ pub(crate) fn climate_at<'w>(
     let p = world.fields.get(P_FIELD).filter(ok);
     let warm = world.fields.get(crate::climate::field::T_WARM).filter(ok);
     let cold = world.fields.get(crate::climate::field::T_COLD).filter(ok);
+    let twelve: Option<Vec<&Field>> = (0..12)
+        .map(|m| {
+            world
+                .fields
+                .get(&crate::climate::field::t_sl_month(m))
+                .filter(ok)
+        })
+        .collect();
     move |bx, bz| {
         let (x, z) = (bx as f64, bz as f64);
         let at =
             |f: Option<&Field>| f.map_or(f64::NAN, |f| f64::from(crate::bake::bilinear(f, x, z)));
         match (t, p) {
-            (Some(t), Some(p)) => Climate::of(
-                f64::from(crate::bake::bilinear(p, x, z)),
-                f64::from(crate::bake::bilinear(t, x, z)),
-                at(warm),
-                at(cold),
-            ),
+            (Some(t), Some(p)) => {
+                let (pr, tm) = (
+                    f64::from(crate::bake::bilinear(p, x, z)),
+                    f64::from(crate::bake::bilinear(t, x, z)),
+                );
+                match &twelve {
+                    Some(months) => {
+                        let sl: [f64; 12] = std::array::from_fn(|m| at(Some(months[m])));
+                        let mean = sl.iter().sum::<f64>() / 12.0;
+                        Climate::of_months(pr, tm, &std::array::from_fn(|m| sl[m] - mean))
+                    }
+                    None => Climate::of(pr, tm, at(warm), at(cold)),
+                }
+            }
             _ => {
                 let lat = deeptime_format::Projection::of(circumference).lat_deg(z);
                 Climate::of(

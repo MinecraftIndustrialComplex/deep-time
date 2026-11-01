@@ -590,8 +590,9 @@ mod tests {
     // ledger: HYD-030, HYD-031
     /// The biotemperature and the thawed share are continuous in all three months (unclamped):
     /// either side of the coldest month at 0 °C, of the warmest at 0 °C and of the mean at 0 °C,
-    /// the values differ by little (the share by up to a square root of the step, where a half's
-    /// minimum or maximum touches freezing).
+    /// and as the warmest or the coldest month reaches the mean, the values differ by little (the
+    /// share by up to a square root of the step, where a half's minimum or maximum touches
+    /// freezing).
     #[test]
     fn the_two_half_sines_are_continuous_in_the_three_months() {
         let f = crate::hydro::half_sines_thaw;
@@ -619,7 +620,14 @@ mod tests {
         for (warm, cold) in [(10.0, -10.0), (3.0, -30.0), (25.0, -2.0)] {
             close(f(eps, warm, cold), f(-eps, warm, cold), "mean at 0");
         }
-        // The degenerate year (no range) meets its neighbours.
+        // A half that vanishes as its month reaches the mean (its weight goes to 0), and the
+        // degenerate year (no range): each meets its neighbours.
+        for (mean, cold) in [(4.0, -6.0), (-3.0, -20.0), (0.5, -1.0)] {
+            close(f(mean, mean + eps, cold), f(mean, mean, cold), "warmest month at the mean");
+        }
+        for (mean, warm) in [(-3.0, 5.0), (4.0, 20.0), (-0.5, 1.0)] {
+            close(f(mean, warm, mean - eps), f(mean, warm, mean), "coldest month at the mean");
+        }
         close(f(5.0, 5.0 + eps, 5.0 - eps), f(5.0, 5.0, 5.0), "no range");
     }
 

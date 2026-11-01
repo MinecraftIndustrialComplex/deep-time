@@ -606,8 +606,12 @@ impl Climate {
     /// - Else (a world without the stage's months) a year of two half-sines ([`half_sines_thaw`],
     ///   the runoff law's second re-review): a warm half of amplitude warm − mean and a cold half
     ///   of amplitude mean − cold, the warm half lasting (mean − cold) / (warm − cold) of the year
-    ///   so that the year's mean is the mean; frosty exactly when the coldest month is below 0 °C,
-    ///   no thaw when the warmest is at or below it. Until 2026-10-31 a sinusoid centred between
+    ///   so that the year's mean is the mean; frosty exactly when the coldest month is below 0 °C
+    ///   (with the warmest above the mean: a year whose warmest month is its mean has no cold
+    ///   half), no thaw when the warmest is at or below it. The two months are read as the
+    ///   curve's extremes, not as monthly means: a short half's warmest month averages under its
+    ///   peak, so a short summer under-warms (eleven months at −5 °C and one at 10: 0.44 °C
+    ///   against the twelve months' 0.83; HYD-031). Until 2026-10-31 a sinusoid centred between
     ///   the two months, which dropped the mean on a lopsided year; then for a day a sinusoid
     ///   about the mean that ignored the coldest month.
     ///
