@@ -125,6 +125,23 @@ def run_stats(run):
             own_cryst = pp[:, 2:7].sum(1) - np.clip(np.minimum(pp[:, 7], pp[:, 5] + pp[:, 6]), 0.0, None)
             classes_end["hyper"] = cont & (own_cryst < 10_000.0)
             classes_end["cont"] = cont
+            # Where the hyper-extended crust lies: its distance to the nearest continental sample that is not
+            # hyper-extended (km, p50 and p90), and the length of that crust's boundary with ocean floor or
+            # hyper-extended crust (its samples within LINK spacings of one, times the spacing, km): the ring's
+            # rows are the hyper area over that length times the spacing.
+            hyper = classes_end["hyper"]
+            core = cont & ~hyper
+            if hyper.any() and core.any():
+                tree_core = cKDTree(p[core])
+                dist, _ = tree_core.query(p[hyper])
+                dist_km = 2.0 * np.arcsin(np.clip(dist / 2.0, 0.0, 1.0)) * R_KM
+                r["hyper_dist_p50_km"] = float(np.median(dist_km))
+                r["hyper_dist_p90_km"] = float(np.quantile(dist_km, 0.9))
+                outside = cKDTree(p[~core])
+                near = outside.query_ball_point(p[core], th.chord(LINK * spacing), return_length=True)
+                edge_km = float((near > 0).sum() * spacing)
+                r["core_edge_km"] = edge_km
+                r["hyper_rows"] = float(hyper.sum() * (4.0 * np.pi * R_KM**2 / n0) / (edge_km * spacing))
             for k, m in classes_end.items():
                 r[f"{k}_area"] = float(m.sum() / n0)
                 if not m.any():
