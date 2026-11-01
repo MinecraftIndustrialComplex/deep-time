@@ -1,0 +1,131 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
+"""Where the model's island-arc crust stands, against Earth's intra-oceanic arcs (measurement only, cached pool runs):
+arcstock.py <arm folder>[@N] ...
+
+The low-continents reads (sea-level.md, "Why base35's continents stand low"; the arm cb-on in
+docs/design/continental-buoyancy.md) found most of the drowned crust is crust converted on ocean floor, island-arc crust
+by cb_origin's rule the largest part (0.149 of the planet at 31.6 km on cb-on's final frames). Earth's intra-oceanic
+arcs are about 14,500 to 17,000 km long (Stern & Scholl 2010; Gerya 2011, quoting Leat & Larter 2003) and juvenile
+arcs "approximately 200-300 km across and up to 30 km thick" (Stern & Scholl 2010): about 0.006 to 0.010 of the
+planet standing (length x width, our arithmetic). Arc crust a continent took in is continent on Earth. So this splits
+the model's island-arc crust (crust_budget.rs `origin`: continental label, an ocean basement over 1 km, at least
+1,000 m of island-arc magma and more than of continental-arc magma, as lowcont.py's `area`) by the continental
+component it stands in: one that holds start-class crust (the start's continents, no ocean basement: "taken in") or
+one that does not ("standing alone"). Components link continental samples within LINK (1.6 times the start's mean
+sample spacing). Per snapshot (TIMES): the shares of the planet (the start's visible samples) of island-arc crust
+taken in and standing alone, at any thickness and at 20 km and more, the alone part's mean thickness and dry share,
+the number of alone components; and, at the end, the island-arc magma standing (the maps' arc_oceanic_m over the
+visible samples, each the planet's area over the start's count) against what the run made (cb_globals arc_o,
+km3 over the run), the share kept. Medians over runs, per arm.
+Needs numpy and scipy (the VM's .pyenv-numpy, run with -I)."""
+import os
+import statistics
+import sys
+from pathlib import Path
+
+import numpy as np
+from scipy.sparse import coo_matrix
+from scipy.sparse.csgraph import connected_components
+from scipy.spatial import cKDTree
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import thinning as th  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "islfront"))
+import cbread  # noqa: E402
+
+R_KM = 6370.0
+T_MIN = 20.0
+TIMES = [int(x) for x in os.environ.get("TIMES", "-900,-500,-200,0").split(",")]
+LINK = float(os.environ.get("LINK", "1.6"))
+
+
+def classes(a, pp):
+    cont = a[:, 4] > 0.5
+    base = np.where(cont, np.clip(np.minimum(pp[:, 7], pp[:, 5] + pp[:, 6]), 0.0, None), 0.0) / 1000.0
+    conv = cont & (base > 1.0)
+    island = conv & (a[:, 7] >= 1000.0) & (a[:, 7] > a[:, 8])
+    start = cont & ~conv
+    return cont, start, island
+
+
+def components(p, cont, link_km):
+    idx = np.flatnonzero(cont)
+    tree = cKDTree(p[idx])
+    pairs = tree.query_pairs(th.chord(link_km), output_type="ndarray")
+    n = len(idx)
+    g = coo_matrix((np.ones(len(pairs)), (pairs[:, 0], pairs[:, 1])), shape=(n, n))
+    _, lab = connected_components(g, directed=False)
+    full = np.full(len(cont), -1)
+    full[idx] = lab
+    return full
+
+
+def run_stats(run):
+    a0, _ = th.read(run, -1000)
+    n0 = len(a0)
+    spacing = R_KM * np.sqrt(4.0 * np.pi / n0)
+    ser = th.sea_series(run)
+    out = {}
+    for t in TIMES:
+        try:
+            a, pp = th.read(run, t)
+        except FileNotFoundError:
+            continue
+        sea = th.sea_at(ser, t)
+        cont, start, island = classes(a, pp)
+        p = th.xyz(a[:, 0], a[:, 1])
+        lab = components(p, cont, LINK * spacing)
+        with_start = np.zeros(lab.max() + 1, bool)
+        with_start[np.unique(lab[start])] = True
+        taken = island & with_start[np.maximum(lab, 0)]
+        alone = island & ~taken
+        T = a[:, 3] / 1000.0
+        c = T >= T_MIN
+        r = {
+            "arc": island.sum() / n0,
+            "taken": taken.sum() / n0,
+            "alone": alone.sum() / n0,
+            "arc20": (island & c).sum() / n0,
+            "taken20": (taken & c).sum() / n0,
+            "alone20": (alone & c).sum() / n0,
+            "alone_T": float(T[alone].mean()) if alone.any() else float("nan"),
+            "alone_dry": float((a[alone, 2] > sea).mean()) if alone.any() else float("nan"),
+            "alone_parts": int(len(np.unique(lab[alone]))),
+            "start": start.sum() / n0,
+        }
+        if t == 0:
+            cell_km2 = 4.0 * np.pi * R_KM**2 / n0
+            standing = float(a[:, 7].sum() / 1000.0 * cell_km2)
+            g = cbread.last_globals(run / "summary.txt") or {}
+            made = g.get("arc_o", float("nan"))
+            r["arc_o_standing_km3"] = standing
+            r["arc_o_made_km3"] = made
+            r["arc_o_kept"] = standing / made if made else float("nan")
+            r["alone_standing_km3"] = float(a[alone, 7].sum() / 1000.0 * cell_km2)
+        out[t] = r
+    return out
+
+
+def main(args):
+    for arg in args:
+        runs = th.runs_of(arg)
+        stats = [run_stats(r) for r in runs]
+        print(f"== {arg} ({len(runs)} runs), medians, shares of the planet; LINK {LINK} x the start's spacing")
+        for t in TIMES:
+            rows = [s[t] for s in stats if t in s]
+            if not rows:
+                continue
+            keys = [k for k in rows[0]]
+            cells = []
+            for k in keys:
+                xs = [r[k] for r in rows if k in r and np.isfinite(r[k])]
+                if xs:
+                    v = statistics.median(xs)
+                    cells.append(f"{k} {v:.4g}")
+            print(f"  t{t}: " + "  ".join(cells))
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
