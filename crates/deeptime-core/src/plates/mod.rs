@@ -399,7 +399,19 @@ impl PlatesStage {
         let overlaps = subduction::overlaps(st, &cache.geo, &pos, &tree, &env);
         book(st, gap_budget::Part::Other);
         lap(&mut clock, "detect");
-        let resolved = subduction::resolve(st, world, &cache.geo, &overlaps, &pos, &env)?;
+        let resolved = subduction::resolve(st, world, &cache.geo, &overlaps, &pos, &tree, &env)?;
+        if let Some(d) = st.dynamics.as_mut() {
+            d.onset_reversed.clone_from(&resolved.reversed);
+            d.onset_crossed.clone_from(&resolved.crossed);
+        }
+        // Measurement only (the overlap trace): the contacts begun this step, their plates'
+        // motion across their overlaps, for the step's record.
+        if st.dynamics.is_some() {
+            let begun = dynamics::onset_overlaps(st, &overlaps, &pos, &tree, &env);
+            if let Some(d) = st.dynamics.as_mut() {
+                d.onset_overlap = begun;
+            }
+        }
         book(st, gap_budget::Part::Subduction);
         lap(&mut clock, "resolve");
         cut_trace::mark(st, &cache.geo, "resolve");
@@ -863,6 +875,18 @@ impl PlatesStage {
                 .entry(UNSOLVED_GLOBAL.to_owned())
                 .or_insert(0.0) += 1.0;
         }
+        // The live plates a solved balance left out (no visible sample: they keep their
+        // rotation), for the dynamics record.
+        let out_of_balance: Vec<u32> = if balance.solved {
+            (0..st.plates.len())
+                .filter(|&p| {
+                    st.plates[p].alive && balance.omega.get(p).copied().flatten().is_none()
+                })
+                .map(|p| p as u32)
+                .collect()
+        } else {
+            Vec::new()
+        };
         lap(&mut clock, "forces");
         cut_trace::mark(st, &cache.geo, "forces");
         let mut causes: BTreeMap<u32, EventId> = BTreeMap::new();
@@ -1073,8 +1097,16 @@ impl PlatesStage {
             cut_trace::mark(st, &cache.geo, "resample");
         }
         rate::end(st);
-        // Crust made continental after `finish_samples` set the heat flow (ledger: PLT-469).
-        thermal::refresh_heat_flow(st, env.k, env.t_myr);
+        // Crust made continental after `finish_samples` set the heat flow (ledger: PLT-469), and
+        // how often the columns' ceiling binds (measurement, PLT-824).
+        let clamped = thermal::refresh_heat_flow(st, env.k, env.t_myr) as f64;
+        *world
+            .globals
+            .entry(thermal::CLAMPED_GLOBAL.to_owned())
+            .or_insert(0.0) += clamped;
+        world
+            .globals
+            .insert(thermal::CLAMPED_LAST_GLOBAL.to_owned(), clamped);
 
         book(st, gap_budget::Part::Other);
         if tracing {
@@ -1139,6 +1171,7 @@ impl PlatesStage {
                 forces: balance.recorded.as_ref(),
                 guarded: &guarded,
                 sea_m: sea,
+                out_of_balance: &out_of_balance,
             },
         );
         lap(&mut clock, "record");
@@ -1800,7 +1833,6 @@ fn finish_samples(st: &mut PlateState, geo: &Geo, z0: &[f32], env: &Env<'_>) {
     // stand above sea level that step; most intra-oceanic arcs are submarine (Stern 2010).
     let mature_m = subduction::mature_arc_m(env.k);
     let thermal_heat = env.k.thermal_state;
-    let thermal_reference = env.k.thermal_reference_km as f32;
     st.samples.par_iter_mut().enumerate().for_each(|(i, s)| {
         if s.kind == OCEANIC
             && !s.is_hidden()
@@ -1823,7 +1855,7 @@ fn finish_samples(st: &mut PlateState, geo: &Geo, z0: &[f32], env: &Env<'_>) {
             ocean_heat_flow(s.age_myr(t)) as f32
         } else {
             // An arc matured this step carries its floor's lithosphere.
-            continental_heat_flow(s, t, thermal_heat, thermal_reference)
+            continental_heat_flow(s, t, thermal_heat)
         };
         s.regime = if s.is_hidden() {
             regime::TRENCH
@@ -1864,25 +1896,16 @@ fn finish_samples(st: &mut PlateState, geo: &Geo, z0: &[f32], env: &Env<'_>) {
 }
 
 /// A continental sample's heat flow, mW/m², by its law at `t_myr`: with `thermal` (the
-/// lithosphere's state) from its lithosphere's depth, the frame's `reference_km` where it has none,
-/// and its arc and hotspot terms (ledger: PLT-467, PLT-468); else the old proxy, which decays after
-/// the last orogeny and adds an arc's, a hotspot's and a divergent margin's terms (ledger:
-/// PLT-137). `finish_samples` sets it on every continental sample; the heat flow's final pass
-/// ([`thermal::refresh_heat_flow`], PLT-469) on crust made continental after that.
-pub(crate) fn continental_heat_flow(
-    s: &state::Sample,
-    t_myr: f64,
-    thermal: bool,
-    reference_km: f32,
-) -> f32 {
+/// lithosphere's state) from its lithosphere's depth, never above its lid's floor under the Moho
+/// (PLT-820), its floor's where it has none (PLT-821), and its arc and hotspot terms (ledger:
+/// PLT-467, PLT-468); else the old proxy, which decays after the last orogeny and adds an arc's, a
+/// hotspot's and a divergent margin's terms (ledger: PLT-137). `finish_samples` sets it on every
+/// continental sample; the heat flow's final pass ([`thermal::refresh_heat_flow`], PLT-469) on
+/// crust made continental after that.
+pub(crate) fn continental_heat_flow(s: &state::Sample, t_myr: f64, thermal: bool) -> f32 {
     let f = s.flags;
     if thermal {
-        let l = if s.lithosphere_km > 0.0 {
-            s.lithosphere_km
-        } else {
-            reference_km
-        };
-        return thermal::sample_heat_flow(l, f);
+        return thermal::sample_heat_flow(thermal::sample_l_km(s, t_myr) as f32, f);
     }
     let since = (t_myr - f64::from(s.orogeny_myr)).max(0.0);
     let mut q = 55.0 + 35.0 * (-since / 60.0).exp(); // ledger: PLT-137

@@ -41,7 +41,7 @@ use rayon::prelude::*;
 use super::belts::{self, REGIMES};
 use super::ebm::smoothstep;
 use super::percell::DARK_W_M2;
-use super::snapshot::{Cells, CellsDevice, CellsInput, CellsStats};
+use super::snapshot::{Cells, CellsDevice, CellsInput, CellsStats, MonthsKept};
 
 /// Cells in a chunk of rows (whole rows, a multiple of 16): 1 MiB a plane.
 pub const CHUNK_CELLS: usize = 1 << 18;
@@ -50,8 +50,6 @@ pub const CHUNK_CELLS: usize = 1 << 18;
 const CELL_PLANES: usize = 14;
 /// t_mean, t_warm, t_cold, precip, aridity, ela, the three sea-ice covers, the class.
 const OUT_PLANES: usize = 10;
-/// The twelve months' sea-level temperatures and precipitation rates.
-const MONTH_PLANES: usize = 24;
 const ROW_W: usize = 46;
 const COL_W: usize = 16;
 /// The coarse tables: land tile, sea tile and sea ice of each month, then the flags.
@@ -499,9 +497,14 @@ fn cells(@builtin(global_invocation_id) id: vec3<u32>) {
     res[7u * s + cl] = im.y;
     res[8u * s + cl] = im.z;
     res[9u * s + cl] = f32(cls);
-    if (p.monthly != 0u) {
+    // The months kept: 1 their temperatures, 2 their rain too (`MonthsKept::planes` / 12).
+    if (p.monthly >= 1u) {
         for (var m = 0u; m < 12u; m++) {
             mon[m * s + cl] = tsl_m[m];
+        }
+    }
+    if (p.monthly >= 2u) {
+        for (var m = 0u; m < 12u; m++) {
             mon[(12u + m) * s + cl] = pm[m] * 12.0;
         }
     }
@@ -577,7 +580,7 @@ fn params(ci: &CellsInput<'_>, stride: usize, row0: usize, oro_mask: u32) -> [u3
         stride as u32,
         row0 as u32,
         oro_mask,
-        u32::from(ci.monthly),
+        (ci.monthly.planes() / 12) as u32,
         u32::from(ci.gamma > 1e-9),
         u32::from(k > 1.0),
         0,
@@ -738,8 +741,10 @@ fn unpack(res: &[f32], mon: &[f32], m: usize, at: usize, out: &mut Cells) {
         out.koppen[at + c] = (v & 31) as u8;
         out.glacier[at + c] = (v >> 5) as u8;
     }
-    for (k, (t, p)) in out.t_sl_month.iter_mut().zip(&mut out.p_month).enumerate() {
+    for (k, t) in out.t_sl_month.iter_mut().enumerate() {
         t[at..at + m].copy_from_slice(plane(mon, k, m));
+    }
+    for (k, p) in out.p_month.iter_mut().enumerate() {
         p[at..at + m].copy_from_slice(plane(mon, 12 + k, m));
     }
 }
@@ -749,10 +754,10 @@ impl CellsDevice for CellsGpu {
         self.gpu.describe()
     }
 
-    fn host_bytes(&self, w: usize, h: usize, monthly: bool) -> u64 {
+    fn host_bytes(&self, w: usize, h: usize, monthly: MonthsKept) -> u64 {
         let planes = CELL_PLANES + REGIMES;
         let cap = (self.chunk_rows(w, h, planes) * w) as u64;
-        let back = (OUT_PLANES + if monthly { MONTH_PLANES } else { 0 }) as u64 * cap * 4;
+        let back = (OUT_PLANES + monthly.planes()) as u64 * cap * 4;
         let chunk = planes as u64 * cap * 4 + back;
         // The packed inputs and read-back copies, the download's staging, and on a device
         // sharing the host's memory its buffers.
@@ -781,7 +786,7 @@ impl CellsDevice for CellsGpu {
         }
         let oro_mask = slots.iter().fold(0u32, |m, &r| m | (1 << r));
         let planes = CELL_PLANES + slots.len();
-        let month_planes = if ci.monthly { MONTH_PLANES } else { 0 };
+        let month_planes = ci.monthly.planes();
         let rows_per = self.chunk_rows(w, h, planes);
         let cap = rows_per * w;
 
@@ -813,8 +818,8 @@ impl CellsDevice for CellsGpu {
                 &b_params, &b_in, &b_rows, &b_cols, &b_coarse, &b_res, &b_mon,
             ],
         );
-        let month_out = || -> Vec<Vec<f32>> {
-            if ci.monthly {
+        let month_out = |kept: bool| -> Vec<Vec<f32>> {
+            if kept {
                 (0..12).map(|_| vec![0.0; n]).collect()
             } else {
                 Vec::new()
@@ -832,8 +837,8 @@ impl CellsDevice for CellsGpu {
             sea_ice: vec![0.0; n],
             sea_ice_max: vec![0.0; n],
             sea_ice_min: vec![0.0; n],
-            t_sl_month: month_out(),
-            p_month: month_out(),
+            t_sl_month: month_out(ci.monthly.temperatures()),
+            p_month: month_out(ci.monthly.rain()),
         };
         let mut packed = vec![0.0f32; planes * cap];
         let mut res = vec![0.0f32; OUT_PLANES * cap];

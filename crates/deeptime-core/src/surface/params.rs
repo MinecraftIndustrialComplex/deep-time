@@ -131,6 +131,19 @@ pub struct SurfaceParams {
     /// clean, K's calibration regions within 2 %, 0.13 of the land internally drained). `false`:
     /// every lake passes all of its inflow, as before (ERO-080). ledger: ERO-217, ERO-218
     pub closed_basins: bool,
+    /// The stream power's runoff from the bake's water budget (`HydroParams::budget`, the lake
+    /// balance's): rain only in the thawed share of the year, snow melted by its degree-days,
+    /// evapotranspiration on the liquid water with PET from the biotemperature, on the climate
+    /// stage's twelve months (its warmest and coldest month, else the mean +/- 8 C, where they are
+    /// missing); the young stage and the amplifier take the same weight. On by default since
+    /// 2026-10-31 (the coordinator's call, under Ben's rule of 2026-10-23: physics goes on by
+    /// default once built and correct; decisions log 2026-10-31 and 2026-11-01; the arm rb3
+    /// against base35-s4 after the law's third review: the guard the base's, K's regions inside
+    /// Montgomery & Brandon's lines, the flat high ground wearing a quarter less).
+    /// `false`: PET is 60 mm/°C x the mean annual temperature, 0 below 0 °C, and all of the
+    /// precipitation of a land below freezing runs off, as before (ERO-010). ledger: ERO-221,
+    /// ERO-222
+    pub runoff_budget: bool,
     /// How the stage's solvers run (P1-19): numerics that change no law.
     pub numerics: Numerics,
 }
@@ -265,6 +278,7 @@ impl Default for SurfaceParams {
             flexure: super::flexure::FlexureParams::default(),
             held_offsets: true,  // ledger: ISO-125
             closed_basins: true, // ledger: ERO-217, ERO-218 (on since 2026-10-31)
+            runoff_budget: true, // ledger: ERO-221, ERO-222 (on since 2026-10-31)
             numerics: Numerics::default(),
         }
     }

@@ -124,6 +124,21 @@ def main():
                   f"km3/yr (Earth-normalized, medians)")
         if closed["closed_lake_steps"]:
             print("  " + ", ".join(f"{k} {med(v):.4g}" for k, v in closed.items() if v) + " (medians)")
+        # The stream power's mean runoff weight used and the snapshot's own (`surface.runoff_budget`, ERO-221).
+        rw = {"runoff_weight_land_used/own": [], "runoff_weight_high_used/own": []}
+        for r, _ in runs:
+            for line in open(Path(arm) / r / "summary.txt", errors="replace"):
+                if "surface_final=" in line:
+                    kv = dict(t.split("=", 1) for t in line.split() if "=" in t)
+                    for k in rw:
+                        if k in kv:
+                            u, o = (float(x) for x in kv[k].split("/"))
+                            rw[k].append((u, o))
+                    break
+        for k, v in rw.items():
+            if v:
+                print(f"  {k} {med([x[0] for x in v]):.4f}/{med([x[1] for x in v]):.4f} (medians; per run "
+                      + ", ".join(f"{u:.3f}/{o:.3f}" for u, o in v) + ")")
 
 
 if __name__ == "__main__":
