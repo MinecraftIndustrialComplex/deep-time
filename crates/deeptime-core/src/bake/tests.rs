@@ -323,6 +323,21 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
             .get("structure")
             .map_or(String::new(), |v| v["plutons"].to_string())
     );
+    // The biomes and the water of the test planet, printed so two builds can be compared (the
+    // runoff law's re-review, 2026-10-31: how much a change to the year's thaw moves them).
+    let (cl, wa) = (&bake["climate"], &bake["water"]);
+    eprintln!(
+        "bake test biomes: land_cells_l2 {} wetland {} cold_wetland {} land_shares {} koppen {}",
+        cl["land_cells_l2"],
+        cl["wetland_cells"],
+        cl["cold_wetland_cells"],
+        cl["land_shares"],
+        cl["koppen_bands"]
+    );
+    eprintln!(
+        "bake test water: seasons {} playa {} stats {}",
+        wa["seasons"], wa["playa"], wa["stats"]
+    );
     std::fs::remove_dir_all(&dir).unwrap();
 }
 

@@ -83,9 +83,11 @@ pub struct Input<'a> {
     pub sea: f64,
     pub p: &'a ClimateParams,
     pub planet: Planet,
-    /// Keep every cell's twelve months ([`Snapshot::t_sl_month`], [`Snapshot::p_month`]); the
-    /// stage asks for them at its last snapshot, which the bake stores (P1-25).
-    pub monthly: bool,
+    /// Which of every cell's twelve months to keep ([`Snapshot::t_sl_month`],
+    /// [`Snapshot::p_month`]): the stage asks for the temperatures at every snapshot (the
+    /// surface's year at every step, HYD-033) and for their rain too at its last, which the bake
+    /// stores with them (P1-25).
+    pub monthly: MonthsKept,
     /// The previous step's land ice (thickness, m) and Köppen classes, for the per-cell
     /// climate's ice-sheet and desert albedo (`None`: the band shares, no desert).
     pub ice_prev: Option<&'a [f32]>,
@@ -95,6 +97,30 @@ pub struct Input<'a> {
     pub correction: &'a super::percell::Correction,
 }
 
+/// Which of a cell's twelve months a snapshot keeps ([`Input::monthly`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MonthsKept {
+    #[default]
+    None,
+    /// The twelve sea-level temperatures.
+    Temperatures,
+    /// The temperatures and the twelve precipitation rates.
+    TemperaturesAndRain,
+}
+
+impl MonthsKept {
+    pub fn temperatures(self) -> bool {
+        self != MonthsKept::None
+    }
+    pub fn rain(self) -> bool {
+        self == MonthsKept::TemperaturesAndRain
+    }
+    /// The per-cell month planes kept: 0, 12 or 24.
+    pub fn planes(self) -> usize {
+        12 * usize::from(self.temperatures()) + 12 * usize::from(self.rain())
+    }
+}
+
 /// Per-row zonal references the geographic anomalies are measured from (sea-level °C; ln mm/yr).
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Refs {
@@ -102,6 +128,8 @@ pub struct Refs {
     pub t_warm: Vec<f64>,
     pub t_cold: Vec<f64>,
     pub ln_precip: Vec<f64>,
+    /// Each row's twelve months, which the carried months depart from (`field::t_sl_month`).
+    pub t_month: Vec<[f64; 12]>,
 }
 
 /// A snapshot's results, per cell unless stated.
@@ -120,8 +148,8 @@ pub struct Snapshot {
     pub glacier: Vec<u8>,
     /// Each month's sea-level temperature, °C (the lapse rate not applied; on land the ground's
     /// temperature brought to sea level, the plateau's warmth included), and precipitation
-    /// rate, mm/yr (a month's share is the rate / 12): twelve per-cell fields, only when
-    /// `Input::monthly` (empty otherwise).
+    /// rate, mm/yr (a month's share is the rate / 12): twelve per-cell fields each, as
+    /// `Input::monthly` keeps them (empty otherwise).
     pub t_sl_month: Vec<Vec<f32>>,
     pub p_month: Vec<Vec<f32>>,
     /// Sea-level anomalies from `refs` (moved with the plates between snapshots).
@@ -198,7 +226,7 @@ pub struct CellsInput<'a> {
     /// e^ln_hydro, the hydrological cycle's scaling.
     pub hydro: f64,
     pub sharp: super::percell::Sharpen,
-    pub monthly: bool,
+    pub monthly: MonthsKept,
 }
 
 /// The cells loop's results, per cell: [`Snapshot`]'s fields of the same names.
@@ -254,7 +282,7 @@ pub trait CellsDevice: Send + Sync + std::fmt::Debug {
     fn name(&self) -> String;
     /// Host bytes a call on a `w × h` grid holds beyond the CPU loop's (its packed arrays and
     /// read-back copies, and on a device sharing the host's memory its buffers).
-    fn host_bytes(&self, w: usize, h: usize, monthly: bool) -> u64;
+    fn host_bytes(&self, w: usize, h: usize, monthly: MonthsKept) -> u64;
     /// The cells loop's results for `ci`; on `Err` the caller runs the CPU loop.
     fn cells(&self, ci: &CellsInput<'_>, stats: &mut CellsStats) -> Result<Cells, String>;
 }
@@ -952,8 +980,8 @@ pub fn compute_on(
                 ela: vec![0.0; w],
                 koppen: vec![koppen::SEA; w],
                 glacier: vec![0; w],
-                t_sl_month: Vec::with_capacity(if inp.monthly { w } else { 0 }),
-                p_month: Vec::with_capacity(if inp.monthly { w } else { 0 }),
+                t_sl_month: Vec::with_capacity(if inp.monthly.temperatures() { w } else { 0 }),
+                p_month: Vec::with_capacity(if inp.monthly.rain() { w } else { 0 }),
                 ice: vec![[0.0; 3]; w],
             };
             // The row's onshore share each month (P1-19, #14: found once per row, not per cell).
@@ -1058,8 +1086,10 @@ pub fn compute_on(
                         [er.sea_ice[b] as f32; 3]
                     };
                 }
-                if inp.monthly {
+                if inp.monthly.temperatures() {
                     row.t_sl_month.push(t_sl.map(|v| v as f32));
+                }
+                if inp.monthly.rain() {
                     row.p_month.push(pm.map(|v| (v * 12.0) as f32));
                 }
                 let annual: f64 = pm.iter().sum();
@@ -1131,13 +1161,19 @@ pub fn compute_on(
         s.sea_ice.extend(r.ice.iter().map(|x| x[0]));
         s.sea_ice_max.extend(r.ice.iter().map(|x| x[1]));
         s.sea_ice_min.extend(r.ice.iter().map(|x| x[2]));
-        if inp.monthly {
+        if inp.monthly.temperatures() {
             if s.t_sl_month.is_empty() {
                 s.t_sl_month = (0..12).map(|_| Vec::with_capacity(n)).collect();
-                s.p_month = (0..12).map(|_| Vec::with_capacity(n)).collect();
             }
             for m in 0..12 {
                 s.t_sl_month[m].extend(r.t_sl_month.iter().map(|v| v[m]));
+            }
+        }
+        if inp.monthly.rain() {
+            if s.p_month.is_empty() {
+                s.p_month = (0..12).map(|_| Vec::with_capacity(n)).collect();
+            }
+            for m in 0..12 {
                 s.p_month[m].extend(r.p_month.iter().map(|v| v[m]));
             }
         }
@@ -1349,6 +1385,7 @@ pub fn zonal_refs(lat: &[f64], er: &super::ebm::EbmResult, ln_hydro: f64) -> Ref
             .iter()
             .map(|&l| belts::belt_precip(l).ln() + ln_hydro)
             .collect(),
+        t_month: t_o,
     }
 }
 

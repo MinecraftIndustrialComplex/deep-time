@@ -346,7 +346,7 @@ pub struct StepRec {
     /// The live plates the step's solved balance left out (no visible sample when it was solved:
     /// `forces::Answer::omega` `None`), which keep their rotation; empty in almost every step.
     /// Always written: the checkpoint's postcard is positional, so a field skipped when empty
-    /// does not decode (`CHECKPOINT_SCHEMA` 14).
+    /// does not decode (`CHECKPOINT_SCHEMA` 16).
     #[serde(default)]
     pub out_of_balance: Vec<u32>,
 }
