@@ -102,6 +102,26 @@ def run_stats(run):
                 r[f"hyper_coast_le{k}"] = float((dh <= k).mean())
             r["hyper_inland_sedmargin"] = float(sedm[hyp & (do > 2.0)].sum() / max((hyp & (do > 2.0)).sum(), 1))
             r["cont_coast_rows1"] = float(coast.size / n0)
+            # The inland part (beyond two rows): raised by an orogeny, on another plate than the crust of 10 km and
+            # more of its own nearest it (a suture), its height over the sea, when its column formed (formed_myr).
+            inl = hyp & (do > 2.0)
+            core_k = cont & ~hyp
+            pf = run / "maps" / "plate" / th.name_of(t)
+            if inl.any():
+                r["inland_orogeny"] = float((a[inl, 5] > 0.5).mean())
+                r["inland_zs_p50"] = float(np.median(a[inl, 2] - th.sea_at(th.sea_series(run), t)))
+                r["inland_formed_p50"] = float(np.median(pp[inl, 8]))
+                r["inland_own_km"] = float(np.median(own_cr[inl]))
+                r["inland_T_km"] = float(np.median(a[inl, 3]) / 1000.0)
+                if pf.exists() and core_k.any():
+                    pl = np.fromfile(pf, "<u4")
+                    if len(pl) == len(a):
+                        _, ni = cKDTree(p[core_k]).query(p[inl])
+                        r["inland_other_plate"] = float((pl[inl] != pl[np.flatnonzero(core_k)[ni]]).mean())
+                        # And whether its own plate has crust of 10 km and more of its own at all.
+                        has_core = np.zeros(int(pl.max()) + 1, bool)
+                        has_core[np.unique(pl[core_k])] = True
+                        r["inland_plate_no_core"] = float((~has_core[pl[inl]]).mean())
         out[t] = r
     return out
 
