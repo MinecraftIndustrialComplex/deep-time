@@ -66,11 +66,11 @@ use super::pools::{
     accrete, floor_at, isostatic_change_m, ocean_heat_flow, oceanic_column, thickness,
 };
 use super::settle::{WATER_LOADED, equilibrium_m};
-use crate::params::TectonicParams;
 use super::state::{
     CONTINENTAL, FORELAND, Group, OCEANIC, Plate, PlateState, Ridge, Sample, pool, regime,
 };
 use crate::error::CoreError;
+use crate::params::TectonicParams;
 use crate::world::WorldState;
 
 /// What covers one new point: the group on top (if any) and the others.
