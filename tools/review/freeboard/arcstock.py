@@ -180,9 +180,18 @@ def run_stats(run):
             r["arc_o_kept"] = standing / made if made else float("nan")
             r["alone_standing_km3"] = float(a[alone, 7].sum() / 1000.0 * cell_km2)
         # The boundary's length at every snapshot (as at the end, below): the label against ocean floor.
+        pairs = cKDTree(p).query_pairs(th.chord(1.2 * spacing), output_type="ndarray")
+        diff = cont[pairs[:, 0]] != cont[pairs[:, 1]]
         if "coast_cont_km" not in r:
-            pairs = cKDTree(p).query_pairs(th.chord(1.2 * spacing), output_type="ndarray")
-            r["coast_cont_km"] = float((cont[pairs[:, 0]] != cont[pairs[:, 1]]).sum() * spacing / np.sqrt(3.0))
+            r["coast_cont_km"] = float(diff.sum() * spacing / np.sqrt(3.0))
+        # The same length split by the size of the continental piece it bounds (under 10^5 km2, the rest),
+        # and the count of pieces of any size: small pieces against ragged edges on large ones.
+        cell = 4.0 * np.pi * R_KM**2 / n0
+        size_of = np.bincount(np.maximum(lab, 0)) * cell
+        ci = np.where(cont[pairs[:, 0]], pairs[:, 0], pairs[:, 1])[diff]
+        small = size_of[lab[ci]] < 1.0e5
+        r["coast_small_km"] = float(small.sum() * spacing / np.sqrt(3.0))
+        r["parts_all"] = int(len(np.unique(lab[cont])))
         out[t] = r
     return out
 
