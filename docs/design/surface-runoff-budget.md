@@ -165,7 +165,7 @@ Unit tests in `surface/climate.rs` and `surface/plateau_check.rs` (mm/yr):
 | Tibetan lakes, P 230 to 420, MAAT 0 to -3 °C (months ± 8 °C, HYD-032) | ET 170 to 290, runoff ratio 0.26 to 0.31 (modelled) | ET 69 to 141, runoff ratio 0.46 to 0.83 (the shortfall printed, not asserted) | all of P |
 | Verkhoyansk, Holdridge's twelve months (13.3 and -50.0 °C at the ends) | biotemperature 3.05 °C (Holdridge, rough) | 3.05 °C by the twelve months; 2.80 by the two half-sines (2.70 by the year about the mean from its warmest month alone) | (none) |
 | a lopsided year: P 600, mean 4, warmest month 10 °C, coldest 0, +0.01, -0.01 or -6 °C | (none: the method's own property) | at a coldest month of 0 °C or more the mean, 4.00 °C, and runoff 380.7 mm; continuous either side of 0 °C; at -6 °C 5.08 °C and 332.9 mm (before the first re-review: 4.00 and 5.00 °C either side of 0 °C, 381 and 336 mm, and 3.63 °C at -6, under the mean; before the second: 4.35 °C and 364 mm whatever the coldest month) | runoff 381 |
-| a mean above 0 °C with a frosty month: P 600 at 5 ± 15, 900 at 8 ± 12, 400 at 2 ± 10 °C; lopsided, P 600 at 5 with months 9 and -3, P 500 at 10 with 13 and -1 | (none: the model's own arithmetic) | runoff 245, 456, 189; 321, 122 | runoff 336, 484, 287; 336, 123 (the budget -27, -6, -34, -5 and -0.4 %) |
+| a mean above 0 °C with a frosty month: P 600 at 5 ± 15, 900 at 8 ± 12, 400 at 2 ± 10 °C; lopsided, P 600 at 5 with months 9 and -3, P 500 at 10 with 13 and -1 | (none: the model's own arithmetic) | runoff 245, 456, 189; 321, 122 | runoff 336, 484, 287; 336, 123 (the budget -27, -6, -34, -5 and -0.5 %) |
 | the Dry Valleys' year as the stage gives it: P 7 and 11, mean -17, months -5 and -40 °C | (as above) | 0 | all of P; centred on the mean (+0.5 and -34.5 °C) the budget ran off 5.5 and 9.5 mm, 0.79 and 0.86 of P |
 
 The cold controlled plateau (`a_cold_plateau_runs_off_what_its_summer_leaves`) uses ERO-219's rimmed plateau with Tangra
@@ -494,6 +494,42 @@ current. The lakes' network keeps three values per lake cell (the mean, the warm
 A and B change planets, so rb2 and rb2-off (run on e01f6bfa's code) measure the old head; rb3 and rb3-off run on the
 fixed head after origin/master e65259fe, and the flip's numbers are restated from them ("The arms after the second
 re-review").
+
+## The third re-review and its fixes (2026-11-01, at 0da55f68)
+
+An Opus re-review of e01f6bfa..0da55f68 confirmed both code fixes (the carried months, the two half-sines: the closed
+form re-derived and every published number recomputed) and found what was left; the coordinator's calls, finished
+inline by the coordinator after the lane stopped on the account's rate limit:
+
+1. **Nothing tested the carry.** `the_climate_carries_its_twelve_months_between_snapshots` (climate/tests.rs): three
+   2-Myr steps with a snapshot every 6 Myr; after step 2 the world holds the twelve months alone (no departures, no
+   rain) and the surface reads them; each cell's departure of the months' mean from `D_MEAN` is its row's month mean (a
+   carry that left the snapshot's months where they were while the mean moved with the crust fails it); after step 3
+   the bake's 24 months are there and only two snapshots were taken.
+2. **The checkpoint schema.** `CHECKPOINT_SCHEMA` 14 (`snapshot::Refs::t_month` in the climate's saved state): an
+   older checkpoint is refused by name instead of failing to decode.
+3. **One set of months.** The world keeps the twelve months alone, not their departures as well: at an advect step each
+   month's departure from the previous step's row month is carried and the new row month added (`carry_month`), which
+   halves the months' cost in the world and in every epoch checkpoint (the re-review's arithmetic: about 32 MB a
+   checkpoint on quick 16k, 13 % of its body, to about 16). The same as carrying the departures, to f32 rounding
+   (`one_set_of_months_carries_as_the_departures_did`, over steps whose references change).
+4. **MOI-076** reworded: the temperatures at every snapshot, carried between them; the rain at the last only.
+5. **The water view** reads the twelve months into `Climate::of_months` (`water_view::climate_at`), so a frame's
+   lakes and playas take the history's thaw law; the two half-sines only without them.
+6. **HYD-031:** the half-sines read the warmest and coldest month as the curve's extremes, so a short summer
+   under-warms (eleven months at -5 °C and one at 10: 0.44 °C against the twelve months' 0.83); the fallback serves
+   only worlds without the stage's months, the ±8 °C stand-in (unchanged, its halves are six months) and a bake folder
+   without monthly layers.
+7. **The smaller items.** The snapshot keeps its months' temperatures at every snapshot and their rain at the last only
+   (`snapshot::MonthsKept`), so a snapshot that is not the last no longer computes, downloads (the device path) or
+   drops the rain's twelve planes, and the device's monthly read-back is reserved by what is kept (gpu-compute.md
+   updated); `BYTES_PER_CELL`'s wording (24 resident at the last snapshot, twelve between snapshots; the assembly's
+   brief rows copy noted); "frosty exactly when the coldest month is below 0 °C" holds with the warmest above the mean
+   (a year whose warmest month is its mean has no cold half); the continuity test takes each half's month to the mean;
+   the table's -0.4 % is -0.5 %.
+
+rb3 and rb3-off run on this head against base35-s4; the flip's numbers are restated from them ("The arms after the
+second re-review").
 
 ## The continents' export: the erosion law or the plates' uplift (2026-10-31, a diagnosis)
 
