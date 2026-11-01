@@ -532,8 +532,8 @@ pub struct Climate {
     pub t_warm_c: f64,
     pub t_cold_c: f64,
     /// The twelve monthly means, °C, where the climate stage wrote them ([`Climate::of_months`]:
-    /// the bake's monthly layers, the stage's last step); None: the year is drawn from the mean
-    /// and the warmest month ([`Climate::thaw`]).
+    /// the bake's monthly layers, the stage's every step); None: the year is drawn from the mean
+    /// and the warmest and coldest month ([`Climate::thaw`]'s two half-sines).
     pub months_c: Option<[f64; 12]>,
 }
 
@@ -596,46 +596,32 @@ impl Climate {
     /// The year's mean of the temperature above freezing, °C (Holdridge's biotemperature), and
     /// the share of the year above freezing.
     ///
-    /// - With the twelve months ([`Climate::months_c`]): Holdridge's own method, the mean of the
-    ///   twelve monthly means with each one below freezing counted as 0 °C (Holdridge 1967; his
-    ///   Verkhoyansk gives his 3.05 °C exactly); the share above freezing on the year drawn
-    ///   straight between the months' middles.
-    /// - Else a sinusoidal year about the mean, its amplitude the warmest month's departure from
-    ///   it, T = mean + (warm − mean) cos θ: no frost when 2 mean − warm ≥ 0 (the mean and 1), no
-    ///   thaw when warm ≤ 0. The coldest month does not enter: a year's months need not be
-    ///   symmetric about their mean (the climate stage's winter inversion), and a sinusoid
-    ///   through the two months, centred between them, drops the mean (until 2026-10-31: the
-    ///   biotemperature fell below the mean and jumped where the coldest month crossed 0 °C; the
-    ///   runoff law's re-review).
+    /// - With the twelve months ([`Climate::months_c`], the climate stage's at every step):
+    ///   Holdridge's monthly method without his 30 °C cut (HYD-030), the mean of the twelve monthly
+    ///   means with each one below freezing counted as 0 °C (his Verkhoyansk gives his 3.05 °C);
+    ///   the share above freezing on the year drawn straight between the months' middles
+    ///   ([`months_thaw`]). The two are different shapes of one year: the biotemperature (and so
+    ///   the PET and the snow's degree-days) is the stepped monthly year's, the share the linear
+    ///   one's.
+    /// - Else (a world without the stage's months) a year of two half-sines ([`half_sines_thaw`],
+    ///   the runoff law's second re-review): a warm half of amplitude warm − mean and a cold half
+    ///   of amplitude mean − cold, the warm half lasting (mean − cold) / (warm − cold) of the year
+    ///   so that the year's mean is the mean; frosty exactly when the coldest month is below 0 °C,
+    ///   no thaw when the warmest is at or below it. Until 2026-10-31 a sinusoid centred between
+    ///   the two months, which dropped the mean on a lopsided year; then for a day a sinusoid
+    ///   about the mean that ignored the coldest month.
     ///
     /// Either way the biotemperature is continuous in the months and never below max(mean, 0),
-    /// the mean of a year's warmth above freezing being at least that of its mean (its rounding
-    /// is held to that).
+    /// the mean of a year's warmth above freezing being at least that of its mean (Jensen); the
+    /// value is held to that only against rounding.
     // ledger: HYD-030, HYD-031
     pub fn thaw(&self) -> (f64, f64) {
         let floor = self.t_mean_c.max(0.0);
-        if let Some(months) = &self.months_c {
-            let above = months.iter().map(|t| t.max(0.0)).sum::<f64>() / 12.0;
-            let share = (0..12)
-                .map(|m| thawed_share(months[m], months[(m + 1) % 12]))
-                .sum::<f64>()
-                / 12.0;
-            return (above.max(floor), share);
-        }
-        let mean = self.t_mean_c;
-        let a = (self.t_warm_c - mean).max(0.0);
-        if mean - a >= 0.0 {
-            (floor, 1.0)
-        } else if mean + a <= 0.0 {
-            (0.0, 0.0)
-        } else {
-            // T = mean + a·cos θ is above 0 for |θ| < θ0.
-            let th = (-mean / a).clamp(-1.0, 1.0).acos();
-            (
-                ((mean * th + a * th.sin()) / std::f64::consts::PI).max(floor),
-                th / std::f64::consts::PI,
-            )
-        }
+        let (above, share) = match &self.months_c {
+            Some(months) => months_thaw(months),
+            None => half_sines_thaw(self.t_mean_c, self.t_warm_c, self.t_cold_c),
+        };
+        (above.max(floor), share)
     }
 
     /// The aridity index P / PET (PET from the temperature above freezing), capped at 10.
@@ -649,8 +635,68 @@ impl Climate {
     }
 }
 
+/// The twelve months' biotemperature and thawed share ([`Climate::thaw`]), unclamped: the mean
+/// of max(T_i, 0), and the mean over the twelve month-to-month spans of each one's share above
+/// freezing on the year drawn straight between the months' middles.
+// ledger: HYD-030, HYD-031
+pub fn months_thaw(months: &[f64; 12]) -> (f64, f64) {
+    let above = months.iter().map(|t| t.max(0.0)).sum::<f64>() / 12.0;
+    let share = (0..12)
+        .map(|m| thawed_share(months[m], months[(m + 1) % 12]))
+        .sum::<f64>()
+        / 12.0;
+    (above, share)
+}
+
+/// The biotemperature and thawed share of a year of two half-sines about `mean` (°C), unclamped
+/// ([`Climate::thaw`]): T = mean + A_w sin φ over the warm half, mean − A_c sin φ over the cold
+/// half (φ from 0 to π in each), A_w = warm − mean and A_c = mean − cold, the warm half lasting
+/// τ_w = A_c / (A_w + A_c) of the year, so that A_w τ_w = A_c τ_c and the year's mean is `mean`.
+/// Each half's mean of max(T, 0) and share above 0 is closed-form (asin); a year with no range
+/// is the mean all year.
+// ledger: HYD-031
+pub fn half_sines_thaw(mean: f64, warm: f64, cold: f64) -> (f64, f64) {
+    use std::f64::consts::PI;
+    let a_w = (warm - mean).max(0.0);
+    let a_c = (mean - cold).max(0.0);
+    if a_w + a_c <= 0.0 {
+        return if mean >= 0.0 { (mean, 1.0) } else { (0.0, 0.0) };
+    }
+    let tau_w = a_c / (a_w + a_c);
+    // The warm half, T = mean + a_w sin φ: never under the mean.
+    let (b_w, s_w) = if mean >= 0.0 {
+        (mean + 2.0 * a_w / PI, 1.0)
+    } else if mean + a_w <= 0.0 {
+        (0.0, 0.0)
+    } else {
+        let p1 = (-mean / a_w).asin();
+        (
+            (mean * (PI - 2.0 * p1) + 2.0 * a_w * p1.cos()) / PI,
+            (PI - 2.0 * p1) / PI,
+        )
+    };
+    // The cold half, T = mean − a_c sin φ: never over the mean.
+    let (b_c, s_c) = if mean <= 0.0 {
+        (0.0, 0.0)
+    } else if mean - a_c >= 0.0 {
+        (mean - 2.0 * a_c / PI, 1.0)
+    } else {
+        let p2 = (mean / a_c).asin();
+        (
+            2.0 * (mean * p2 - a_c * (1.0 - p2.cos())) / PI,
+            2.0 * p2 / PI,
+        )
+    };
+    (
+        tau_w * b_w + (1.0 - tau_w) * b_c,
+        tau_w * s_w + (1.0 - tau_w) * s_c,
+    )
+}
+
 /// The share of a month's span above freezing on a year drawn straight from month temperature
-/// `from` to the next month's `to`, °C.
+/// `from` to the next month's `to`, °C. Continuous but where two months in a row are both exactly
+/// 0 °C (then 0, where a month at +ε gives 1: a jump of 1/12 in the year's share no climate is
+/// likely to reach).
 // ledger: HYD-031
 fn thawed_share(from: f64, to: f64) -> f64 {
     match (from > 0.0, to > 0.0) {

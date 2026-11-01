@@ -1358,12 +1358,15 @@ docs/design/surface-runoff-budget.md; this is the summary.
 from `HydroParams::budget`, the same budget the lakes' balance uses. Precipitation is rain in the thawed share of the
 year (HYD-036) and the snow melts by its degree-days (HYD-037: 4 mm per °C per day, a choice inside Hock 2003's 2.5 to
 5.5 for snow at non-glaciated sites). PET is Holdridge's 58.93, here 60, x the biotemperature (HYD-029, HYD-030), and
-Fu's curve acts on the liquid water (HYD-034, HYD-035). The months are the climate stage's warmest and coldest month as
-it wrote them, and the year's thaw is Holdridge's own method on its twelve months where it wrote them, else a
-sinusoid about the mean from the warmest month (HYD-030, HYD-031; since the re-review of 2026-10-31, when the
-sinusoid centred between the two months was found to drop the mean on a lopsided year). With no frost it is the old
-runoff to 1e-12. Land with a mean above freezing and a frosty spell runs off less (its biotemperature is never under
-its mean: P 600 mm at 5 ± 15 °C, 336 against 245 mm), and so does land below cold headwaters. Ground that never thaws runs off nothing, so its weight sits at ERO-011's floor, which is then
+Fu's curve acts on the liquid water (HYD-034, HYD-035). The months are the climate stage's twelve months, which it
+writes every step (between snapshots each row's month plus the month's departure carried with the plates, MOI-052),
+and the year's thaw is Holdridge's monthly method without his 30 °C cut on them, one law through the history, the
+young stage and the bake; where the months are missing, a year of two half-sines that keeps the mean (HYD-030,
+HYD-031; since the re-reviews of 2026-10-31: the sinusoid centred between the two months dropped the mean on a
+lopsided year, and the history took the twelve months at its last step only). With no month below freezing it is the
+old runoff to 1e-12, on lopsided years too. Land with a mean above freezing and a frosty month runs off less (its
+biotemperature is never under its mean: P 600 mm at 5 ± 15 °C, 336 against 245 mm), and so does land below cold
+headwaters. Ground that never thaws runs off nothing, so its weight sits at ERO-011's floor, which is then
 load-bearing (25 mm a year where the lakes count 0). The young landscape and the amplifier take the same weight
 (YNG-011).
 
@@ -1377,10 +1380,11 @@ load-bearing (25 mm a year where the lakes count 0). The young landscape and the
 - **A polar year's months as given:** a mean of -17 °C with months of -5 and -40 °C runs off nothing. Centred on the
   mean, the same range put the warmest month at +0.5 °C and ran some of it off (corrected 2026-10-31; this changes the
   closed basins' and the flexure's lakes on cold ground too).
-- **Verkhoyansk's biotemperature:** 3.05 °C by its twelve months, Holdridge's own method and value; 2.70 by the
-  sinusoid about the mean from its warmest month.
-- **A lopsided year** (P 600, mean 4, warmest month 10 °C): 4.35 °C and 364 mm whatever the coldest month; the
-  sinusoid between the two months gave 4.00 and 5.00 °C either side of a coldest month of 0 °C.
+- **Verkhoyansk's biotemperature:** 3.05 °C by its twelve months, Holdridge's monthly method and his value; 2.80 by
+  the two half-sines from its mean, warmest and coldest month.
+- **A lopsided year** (P 600, mean 4, warmest month 10 °C): with a coldest month at or above 0 °C, the mean itself and
+  the old runoff (380.7 mm); LOPSIDED_LINE. The sinusoid between the two months gave 4.00 and 5.00 °C either side of a
+  coldest month of 0 °C, and the sinusoid about the mean 4.35 °C (364.5 mm) whatever the coldest month.
 - **The cold controlled plateau:** the interior wears 88.0 against 118.0 m/Myr; never thawing, 3.8.
 
 **Left as it is.**
