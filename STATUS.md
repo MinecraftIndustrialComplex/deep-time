@@ -153,6 +153,29 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 
 ## Build log
 
+### 2026-11-01: Why PLT-661's margins cover so much (the coordinator, inline; branch `arc-stock`; measurement only, nothing in the model changed; Ben's answer of 2026-11-01, "Keep on, find why")
+
+- **Measured** (`arcstock.py`, `ratchet.py`, `seased.py` in tools/review/freeboard/, on the cached arms arc-lith, the
+  switch on, and msc-off, off; 8 runs each; docs/design/arc-stock.md "Where the margins' area is"): the ring per km of
+  coast is Earth's within the lattice: one row of 71 km (100,000 samples), against Chenin et al. 2017's 50 km average
+  hyper-extended domain and Brune et al. 2014's 70 to 200 km wide sides. It does not ratchet: almost nothing stands
+  just over the 10 km line (0.0019 of the planet between 10 and 14 km), and the converted crust lies within three rows
+  of its source crust. It covers 0.73 of the coast row against Earth's about 0.65 passive share (Harris et al. 2014).
+- **Where the area comes from:** the continental boundary is 602,000 km (416,000 smoothed over two spacings), near the
+  same with the switch off, against Earth's 105,000 km of passive margins (Bradley 2008) and about 159,000 km of all
+  margins (our back-calculation from Mercier de Lepinay et al. 2016). It grows from 84,000 km to about 310,000 in the
+  first 100 Myr in both arms (one run's record: 35 plates born in that time, the continents split across them). Beyond
+  the coast row, 0.020 of the planet sits in a second row and 0.020 further inland: sediment margins (88 %) a collision
+  carried in and welded, 22.5 km columns 2.4 km under the sea that the taper still holds as its ocean side. The rings
+  also seal straits (ocean floor enclosed by continental crust 0.095 of the planet against 0.013 without them).
+- **The sediment:** the ocean floor's is near GlobSed's (3.78 against 3.37 x 10⁸ km³), but the converted margins hold
+  another 6.7 x 10⁸ km³ of cover, so the sediment under the sea is about three times Earth's.
+- **Subduction erosion** (0.31 against 1.4 km³/yr): 9,100 km of the 52,800 km of fronts erode (85 % intra-oceanic);
+  they ask 0.82 km³/yr at PLT-441's rate and find 0.27 (intra-oceanic forearcs hold little crust beyond 7 km). A third of
+  the trench samples hold 1 km or more of sediment, so the sediment gate is not the main stop.
+- **Next:** what lengthens the continental boundary (the early splits, the island-arc strips, the lattice
+  raggedness), then the welded margins inland and which gate stops subduction erosion on most fronts.
+
 ### 2026-11-01: The arc-stock lane, measurement only: where the converted crust comes from (the coordinator, inline; branch `arc-stock`; nothing in the model changed)
 
 - **Built (measurement):** the crust budget's maps gain `lith/t<Myr>.bin` (the stored L and keel, the L the laws read,
