@@ -13,7 +13,10 @@ budget of PR #53, the hotspot cone budget of PR #54). With `surface.runoff_budge
 one correction: the climate stage's year is taken as it gives it (its warmest month as written, and its twelve months
 where it wrote them; "The two rules"), which changes master's closed basins, the flexure's lakes and the bake's water
 where the year reaches below freezing. The re-review (an Opus reviewer at 5e04e9f4) found the thaw dropped the mean
-on a lopsided year; fixed with the arms again ("The re-review and its fixes").
+on a lopsided year; fixed with the arms again ("The re-review and its fixes"). The second re-review (at e01f6bfa)
+found the history switched thaw law at its last step and the stand-in year ignored the coldest month: now one law
+everywhere, the climate stage carrying its twelve months at every step, and two half-sines where they are missing
+("The second re-review and its fixes"); armed again as rb3 and rb3-off.
 
 ## Why
 
@@ -48,28 +51,36 @@ listed it as a simplification: "two runoffs that differ on frozen ground".
 | no frost | P less Fu's ET at PET 60 T | the same, to 1e-12 (a test) |
 | land of either kind below cold headwaters | its drainage area counts the headwaters' weights | less area where the headwaters run off less, so a frost-free valley below cold ground erodes less too |
 
-The months are the climate stage's warmest and coldest month as it wrote them (`climate/t_warm_c`, `climate/t_cold_c`).
-The stage writes the mean and both months from the same twelve months with the same lapse rate, and the surface's
-temperature is that mean, so they are HYD-033's departures about the surface's mean exactly. Until the review they
+The months are the climate stage's twelve months (`climate/month/t_sl_c_*`), which it writes at every step since the
+second re-review: a snapshot's own, and between snapshots each row's month of the clock's year plus the month's
+departure carried with the plates, as it carries the warmest and coldest month (MOI-052). The stage writes the mean and
+the months from the same twelve months with the same lapse rate, and the surface's temperature is that mean, so their
+departures from their mean are HYD-033's about the surface's mean exactly. Where the twelve are missing, the warmest
+and coldest month as written (`climate/t_warm_c`, `climate/t_cold_c`). Until the review they
 were centred on the mean instead (the half-range on either side), which a polar year does not keep: at a mean of
 -17 °C with months of -5 and -40 °C it put the warmest month at +0.5 °C ("The review and its fixes"). Without the stage
 they are the mean ± 8 °C (HYD-032).
 
 The year's warmth above freezing (the biotemperature, HYD-030) and its thawed share (HYD-031) come from those months
-in one of two ways (`hydro::Climate::thaw`, since the re-review):
-- **the twelve months**, where the stage wrote them (its last step: the history's last surface step, the young
-  stage, and the bake's monthly layers): Holdridge's own method, the mean of the twelve monthly means with those
-  below freezing counted as 0 °C, and the thawed share on the year drawn straight between the months' middles;
-- **else a sinusoidal year about the mean**, its amplitude the warmest month's departure from it: frosty where
-  2 x mean - warmest < 0, no thaw where the warmest month is at or below 0 °C.
+in one of two ways (`hydro::Climate::thaw`, since the second re-review):
+- **the twelve months**, which the stage writes at every step (so every step of the history, the young stage and the
+  bake's monthly layers take the same law): Holdridge's monthly method without his 30 °C cut, the mean of the twelve
+  monthly means with those below freezing counted as 0 °C, and the thawed share on the year drawn straight between
+  the months' middles. These are two shapes of one year (the biotemperature, so the PET and the melt's degree-days,
+  the stepped year's; the share the linear one's), which part only on marginal cold ground: one month at 2 °C between
+  months at -10 has about 61 degree-days on the stepped year and about 10 on the linear one;
+- **else a year of two half-sines** (a world without the stage's months: the stand-in climate, the mean ± 8 °C of
+  HYD-032, or a folder without the monthly layers): a warm half of amplitude warmest - mean and a cold half of
+  amplitude mean - coldest, the warm half lasting (mean - coldest) / (warmest - coldest) of the year so that the
+  year's mean is the mean. Each half's thaw is closed-form; the year is frosty exactly when the coldest month is below
+  0 °C and thaws only when the warmest is above it.
 
-The coldest month does not enter the second. A sinusoid through both months, centred between them, drops the mean
-when the year is lopsided, and the stage's years are (its winter inversion): the biotemperature then fell under the
-mean and jumped where the coldest month crossed 0 °C. Either way it is now continuous in the months and never under
-max(mean, 0). Verkhoyansk's biotemperature is 3.05 °C by the twelve months, Holdridge's own value, and 2.70 by the
-sinusoid. The sinusoid's cost: a year whose warmest month stands further above its mean than the mean stands above
-0 °C is given a frosty spell even when its coldest month is above freezing (mean 4 °C, warmest month 10: a
-biotemperature of 4.35 °C whatever its coldest month).
+Either way the biotemperature is continuous in the months and never under max(mean, 0) (Jensen). Verkhoyansk's is
+3.05 °C by the twelve months, Holdridge's own value, and 2.80 by the two half-sines. Before them the stand-in was a
+sinusoid through both months, centred between them, which dropped the mean on a lopsided year and jumped where the
+coldest month crossed 0 °C (the re-review), then for a day a sinusoid about the mean from the warmest month alone,
+which gave a year with no frost a frosty spell (mean 4 °C, months 10 and 2: 4.35 °C) and an inversion year none (mean
+5, months 9 and -3; the second re-review).
 
 ## What cold lands do (sources read)
 
@@ -133,7 +144,8 @@ cycle's runoff. The year's thaw ("The two rules") is the bake's too: its lakes' 
 lakes' aridity index (`hydro::Climate::aridity`, in the water's stats) take it.
 
 What follows from the budget:
-- land with no month below freezing is unchanged (`without_frost_the_budget_is_the_surface_s_runoff`);
+- land with no month below freezing is unchanged, on lopsided years too, by the twelve months and by the two
+  half-sines (`without_frost_the_budget_is_the_surface_s_runoff`);
 - land with a mean above freezing and a frosty month runs off less (`a_warm_mean_with_a_frosty_month_runs_off_less`),
   and so does the land below cold headwaters, whose drainage area counts their smaller weights. K's calibration of
   2026-10-18 was made with the snapshot's rule on all of it, so the regions' table is read again on the arm;
@@ -403,7 +415,7 @@ Its findings, most severe first, and what was done:
    (P 600, mean 4, months 10 and -6 °C: 3.63 °C) and jumped where the coldest month crossed 0 °C (4.00 against 5.00 °C,
    -12 % runoff for 0.01 °C); Verkhoyansk gave 2.65 against Holdridge's 3.05. The bake had done the same since
    2026-10-01. Fixed in this PR, bake included (the coordinator's call: the history's stream power, closed basins and
-   flexure lakes take it by default): Holdridge's own method on the twelve months where the stage wrote them, else the
+   flexure lakes take it by default): Holdridge's monthly method (without his 30 °C cut) on the twelve months where the stage wrote them, else the
    sinusoid about the mean from the warmest month ("The two rules"). Tests: Verkhoyansk 3.05 °C by the twelve months
    (to 1e-9) and 2.70 by the sinusoid; lopsided years both sides of a coldest month of 0 °C by both methods; a sweep
    never under max(mean, 0) (`the_biotemperature_is_continuous_and_never_under_the_mean`).
@@ -439,6 +451,49 @@ lakes and flexure read the thaw at every step, and a 100-Myr history parts at an
 against 24,635, Köppen classes moved on 0.09 of the land cells, lakes 0 against 16 (30,321 km²), playas 69 against
 507 km² (the bake test's print of its biomes and water, before and after). These are not the thaw's own effect on the
 biomes.
+
+## The second re-review and its fixes (2026-10-31, at e01f6bfa)
+
+An Opus re-review of 5e04e9f4..e01f6bfa confirmed the first re-review's code fixes and found two new problems; the
+coordinator's calls:
+
+A. **The history switched thaw law at its last step.** The twelve months (`climate/month/t_sl_c_*`) were written at
+   the stage's last snapshot only, so the history's steps 1 to N-1 took the stand-in year and step N, the young stage
+   and the bake took the twelve months: on Verkhoyansk's year at P 135 mm, the weight fell 15 % between step N-1 and
+   step N for the same climate. The call (option b, one law everywhere): the climate stage keeps its twelve months at
+   every snapshot and carries each month's departure from its row's month between snapshots, as it does the warmest
+   month's (`field::d_month`, `snapshot::Refs::t_month`, MOI-052), and writes the twelve every step. The months' rain
+   stays at the last step (the bake's; nothing in the history reads it), and the departures are not kept after the
+   last step (nothing is carried after it). Memory (the call's bound: about 5 % of a stage's budget): the snapshot
+   drops the world's months and departures before it makes its own, so the stage holds 24 monthly fields at any time,
+   the 96 B per L1 cell `BYTES_PER_CELL` already counted for the last snapshot's (twelve months and twelve
+   departures between snapshots, twelve months of temperature and of rain at a snapshot), plus two fields while the
+   advection carries a month (8 B). Measured with the honest-estimate test (`tests/memory_estimate.rs`, the bake test
+   planet through every stage): MEMORY_LINE. The time: twelve more bilinear carries a step between snapshots.
+B. **The stand-in year ignored the coldest month.** Replaced by the reviewer's two half-sines ("The two rules"), now
+   the path only for worlds without the stage's months. "No month below freezing: the same runoff" holds on it to
+   1e-12 on lopsided years (the sinusoid about the mean gave months 10 and 2 °C at a mean of 4 a frosty spell, 364.5
+   against 380.7 mm), and an inversion year (mean 5, months 9 and -3) now runs off less, tested both ways.
+C. **ERO-221's value column** said K's regions lie inside Montgomery & Brandon's lines: now "inside at 500 m of relief
+   and more, above both under it, as on the base".
+D. **Tests that could not fail.** The bounds the clamp in `thaw` guarantees are now asserted on the unclamped values
+   (`hydro::months_thaw`, `hydro::half_sines_thaw`): the two half-sines against a numerical integral of the year they
+   draw over 300 random lopsided years, with the year's mean, the bounds and "frosty exactly when the coldest month is
+   below 0" (`the_two_half_sines_are_the_year_they_draw`); continuity in all three months
+   (`the_two_half_sines_are_continuous_in_the_three_months`); 500 random twelve-month years for the bounds and
+   continuity in each month; the first re-review's lopsided year kept as a labelled regression guard.
+
+The smaller items: "Holdridge's own method" is "Holdridge's monthly method without his 30 °C cut (HYD-030)"; the two
+year shapes of the twelve-month path are noted in HYD-031 and HYD-037; `thawed_share`'s jump at two months of exactly
+0 °C (1/12 of the share) is documented; YNG-011's formula, HYD-033 (the twelve months every step, `Months::climate` in
+its code column), ERO-221's code column (`cell_water_of`, `cell_climate`, `Months`) and young.rs's comments are
+current. The lakes' network keeps three values per lake cell (the mean, the warmest month, the aridity) instead of a
+`Climate` of 136 B, and the bake's water part counts its seasons' 40 B more per L1 cell
+(`WATER_BYTES_PER_L1_CELL` 120: about 54 MB on full 32k).
+
+A and B change planets, so rb2 and rb2-off (run on e01f6bfa's code) measure the old head; rb3 and rb3-off run on the
+fixed head after origin/master e65259fe, and the flip's numbers are restated from them ("The arms after the second
+re-review").
 
 ## The continents' export: the erosion law or the plates' uplift (2026-10-31, a diagnosis)
 

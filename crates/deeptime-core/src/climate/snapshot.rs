@@ -84,7 +84,8 @@ pub struct Input<'a> {
     pub p: &'a ClimateParams,
     pub planet: Planet,
     /// Keep every cell's twelve months ([`Snapshot::t_sl_month`], [`Snapshot::p_month`]); the
-    /// stage asks for them at its last snapshot, which the bake stores (P1-25).
+    /// stage asks for them at every snapshot: their temperatures are the surface's year at every
+    /// step (HYD-033), and the last snapshot's months are what the bake stores (P1-25).
     pub monthly: bool,
     /// The previous step's land ice (thickness, m) and Köppen classes, for the per-cell
     /// climate's ice-sheet and desert albedo (`None`: the band shares, no desert).
@@ -102,6 +103,8 @@ pub struct Refs {
     pub t_warm: Vec<f64>,
     pub t_cold: Vec<f64>,
     pub ln_precip: Vec<f64>,
+    /// Each row's twelve months (the stage's carried months, `field::d_month`).
+    pub t_month: Vec<[f64; 12]>,
 }
 
 /// A snapshot's results, per cell unless stated.
@@ -1349,6 +1352,7 @@ pub fn zonal_refs(lat: &[f64], er: &super::ebm::EbmResult, ln_hydro: f64) -> Ref
             .iter()
             .map(|&l| belts::belt_precip(l).ln() + ln_hydro)
             .collect(),
+        t_month: t_o,
     }
 }
 

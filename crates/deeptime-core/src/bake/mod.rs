@@ -325,8 +325,11 @@ pub const DELTA_BYTES_PER_L3_CELL: u64 = 14;
 
 /// Bytes per L1 cell of the climate the water part loads whole beside the network (the mean
 /// temperature and precipitation, the 12 monthly sea-level temperatures and their seasons, the
-/// temperature layer). A figure of the memory model, see [`WATER_BYTES_PER_CELL`].
-pub const WATER_BYTES_PER_L1_CELL: u64 = 80;
+/// temperature layer). A figure of the memory model, see [`WATER_BYTES_PER_CELL`]: 80 as fitted,
+/// plus 40 counted for the seasons (`water::Seasons`) since they keep the twelve months'
+/// departures, 48 B a cell, in place of the warmest and coldest month's, 8 B (the runoff law's
+/// re-review, 2026-10-31; about 54 MB on full 32k's 1.34 M L1 cells; not re-measured).
+pub const WATER_BYTES_PER_L1_CELL: u64 = 120;
 
 /// The memory the bake holds beyond the finished world at its peak, `(bytes, projection)`: the
 /// largest of its parts' (they run one after another, each freeing what it held): the strata on

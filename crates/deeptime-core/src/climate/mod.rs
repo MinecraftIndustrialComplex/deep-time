@@ -153,16 +153,28 @@ pub mod field {
     /// the published ELA is this plus its band's shift since.
     pub const ELA_ALL: &str = "climate/anomaly/ela_m";
 
+    /// Month `m`'s (0–11) sea-level departure from its row's month (`snapshot::Refs::t_month`),
+    /// °C, carried with the plates between snapshots like [`D_WARM`] (MOI-052): every step but
+    /// the last, which writes the months themselves and has nothing to carry them to. The twelve
+    /// average to [`D_MEAN`] to rounding (both are linear in the months and carried by the same
+    /// weights).
+    pub fn d_month(m: usize) -> String {
+        format!("climate/anomaly/t_sl_c_{:02}", m + 1)
+    }
+
     /// Month `m`'s (0–11) sea-level temperature, °C (the lapse rate not applied; on land the
-    /// ground's temperature brought to sea level, the plateau's warmth included), written at the
-    /// last step only (the bake stores it, P1-25). Month 0 starts at solar longitude 280°
+    /// ground's temperature brought to sea level, the plateau's warmth included), written every
+    /// step: a snapshot's own, between snapshots the row's month of the clock's year plus the
+    /// carried departure ([`d_month`]), as the warmest and coldest month are. The surface's year
+    /// at every step (HYD-033: one thaw law through the history, the runoff law's second
+    /// re-review); the last step's is the bake's (P1-25). Month 0 starts at solar longitude 280°
     /// (`insolation::YEAR_START_RAD`, about 1 January on Earth).
     pub fn t_sl_month(m: usize) -> String {
         format!("climate/month/t_sl_c_{:02}", m + 1)
     }
 
     /// Month `m`'s (0–11) precipitation rate, mm/yr (the month's share is the rate / 12), written
-    /// at the last step only.
+    /// at the last step only (the bake's; nothing in the history reads it).
     pub fn p_month(m: usize) -> String {
         format!("climate/month/p_mm_{:02}", m + 1)
     }
@@ -202,7 +214,10 @@ pub mod history {
     pub const ICE_COVER: &str = "deeptime:ice_cover";
 }
 
-/// Bytes the stage holds per L1 cell (`estimate`).
+/// Bytes the stage holds per L1 cell (`estimate`): 154 for its fields and working arrays, 96 for
+/// 24 monthly fields (between snapshots the twelve months and their twelve carried departures, at
+/// a snapshot its twelve months of temperature and of precipitation, the world's months dropped
+/// first; after the last step the bake's 24 months).
 const BYTES_PER_CELL: u64 = 154 + 96;
 
 /// Keyframe layers (with the group's plates and surface layers).
@@ -553,8 +568,9 @@ fn cells_accel(ctx: &StageContext<'_>) -> Option<Arc<dyn snapshot::CellsDevice>>
 }
 
 /// Memory and time estimate: the group's (surface or plates) plus ~150 B per L1 cell (18 fields,
-/// eight orographic rasters, an FFT band), ~96 B more for the last snapshot's 24 monthly fields
-/// (P1-25), and ~2 µs per cell per snapshot plus 0.3 µs per cell per step (the advection between
+/// eight orographic rasters, an FFT band), ~96 B more for 24 monthly fields ([`BYTES_PER_CELL`]:
+/// the months and their carried departures, or a snapshot's months of temperature and rain;
+/// P1-25), and ~2 µs per cell per snapshot plus 0.3 µs per cell per step (the advection between
 /// snapshots and the ice), plus ~5 ms per fine-clock step and, in the ice-age window, ~0.05 µs per
 /// cell per clock step.
 pub fn estimate(p: &PlanetPreset) -> StageEstimate {
@@ -1317,6 +1333,7 @@ impl ClimateStage {
         let k = self.s.done + 1;
         let last = k >= self.total;
         let every = ((p.snapshot_every_myr / dt_myr).round() as u64).max(1);
+        let have = |f: &str| world.fields.get(f).is_some_and(|x| x.data.len() == n);
         let have_anomalies = [
             field::D_MEAN,
             field::D_WARM,
@@ -1327,13 +1344,15 @@ impl ClimateStage {
             field::ARIDITY,
         ]
         .iter()
-        .all(|f| world.fields.get(*f).is_some_and(|x| x.data.len() == n));
+        .all(|f| have(f))
+            && (0..12).all(|m| have(&field::d_month(m)));
         let mut snap = k == 1
             || last
             || k.is_multiple_of(every)
             || src.is_none()
             || !have_anomalies
-            || self.s.refs.t_mean.len() != hgt;
+            || self.s.refs.t_mean.len() != hgt
+            || self.s.refs.t_month.len() != hgt;
         let put = |world: &mut WorldState, name: &str, data: Vec<f32>| {
             world.fields.insert(
                 name.to_owned(),
@@ -1874,6 +1893,12 @@ impl ClimateStage {
         }
         if snap {
             let started = Instant::now();
+            // The snapshot writes the months anew: the world's (and their departures) go first,
+            // so its 24 monthly fields take their place (`BYTES_PER_CELL`).
+            for m in 0..12 {
+                world.fields.remove(&field::t_sl_month(m));
+                world.fields.remove(&field::d_month(m));
+            }
             let inp = snapshot::Input {
                 grid: &grid,
                 d,
@@ -1882,7 +1907,8 @@ impl ClimateStage {
                 sea,
                 p: &p,
                 planet: self.planet(ppm, t1),
-                monthly: last,
+                // The months at every snapshot: the surface's year (HYD-033).
+                monthly: true,
                 ice_prev: ice_prev.as_deref(),
                 koppen_prev: world
                     .fields
@@ -1894,7 +1920,7 @@ impl ClimateStage {
             let mut ebm = std::mem::take(&mut self.s.ebm);
             let mut cell = std::mem::take(&mut self.s.cell);
             let sinking_before = cell.sinking;
-            let dev = self.cells.get(ctx, &p, w, hgt, last);
+            let dev = self.cells.get(ctx, &p, w, hgt, true);
             let s = snapshot::compute_on(
                 &inp,
                 &mut ebm,
@@ -1973,11 +1999,28 @@ impl ClimateStage {
             put(world, field::D_WARM, s.d_warm);
             put(world, field::D_COLD, s.d_cold);
             put(world, field::D_LN_PRECIP, s.d_ln_precip);
-            let monthly = s.t_sl_month.len() == 12 && s.p_month.len() == 12;
-            for (m, (t, p)) in s.t_sl_month.into_iter().zip(s.p_month).enumerate() {
-                if monthly && t.len() == n && p.len() == n {
+            // The months' rain at the last step only (the bake's), dropped before the departures
+            // are made; the months' temperatures every step, with their departures from the rows'
+            // months to carry until the next snapshot (none after the last).
+            if last && s.p_month.len() == 12 && s.p_month.iter().all(|v| v.len() == n) {
+                for (m, pm) in s.p_month.into_iter().enumerate() {
+                    put(world, &field::p_month(m), pm);
+                }
+            } else {
+                drop(s.p_month);
+            }
+            if s.t_sl_month.len() == 12 && s.t_sl_month.iter().all(|v| v.len() == n) {
+                for (m, t) in s.t_sl_month.into_iter().enumerate() {
+                    if !last {
+                        let refs = &self.s.refs.t_month;
+                        let dm: Vec<f32> = t
+                            .par_iter()
+                            .enumerate()
+                            .map(|(c, &v)| (f64::from(v) - refs[c / w][m]) as f32)
+                            .collect();
+                        put(world, &field::d_month(m), dm);
+                    }
                     put(world, &field::t_sl_month(m), t);
-                    put(world, &field::p_month(m), p);
                 }
             }
             er_end = Some(er);
@@ -2077,6 +2120,18 @@ impl ClimateStage {
             put(world, field::D_WARM, d_warm);
             put(world, field::D_COLD, d_cold);
             put(world, field::D_LN_PRECIP, d_lnp);
+            // The twelve months the same way, one at a time: the row's month of the clock's year
+            // plus the departure carried with the plates (sea level, as the snapshot's).
+            for m in 0..12 {
+                let dm = carry_now(world, &field::d_month(m));
+                let t: Vec<f32> = dm
+                    .par_iter()
+                    .enumerate()
+                    .map(|(c, &x)| (refs.t_month[c / w][m] + f64::from(x)) as f32)
+                    .collect();
+                put(world, &field::d_month(m), dm);
+                put(world, &field::t_sl_month(m), t);
+            }
             er_end = out.last.clone();
             self.time("advect", started);
         }

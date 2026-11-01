@@ -323,8 +323,8 @@ pub fn fail_sea_floor(d: &Dims, open: &[bool], sea: f64, slope_deg: f64, z: &mut
 
 /// The lakes' water on L2 for the closed basins (`closed.rs`, ERO-217): what each cell runs off
 /// and what open water over it loses, m/yr, from L1's climate fields as the deep-time surface takes
-/// them (`climate::cell_water` on the climate stage's mean temperature, precipitation and seasons),
-/// upsampled `k` times (bilinear). None without the stage's temperature and precipitation on L1
+/// them (`climate::cell_water_of` on `climate::cell_climate`: the climate stage's mean temperature,
+/// precipitation and twelve months, `climate::Months`), upsampled `k` times (bilinear). None without the stage's temperature and precipitation on L1
 /// (`w1` × `h1` cells).
 fn lake_water(
     world: &WorldState,
@@ -365,8 +365,8 @@ fn lake_water(
 /// runoff over `surface.runoff_ref_m_yr`, at least 0.05 (ERO-011). The runoff is the snapshot's
 /// own (PET = 60 mm/°C x the mean temperature, 0 below 0 °C: `climate::mean_t_runoff_m_yr`,
 /// MOI-067) or, with `surface.runoff_budget`, the bake's budget on the climate stage's mean,
-/// precipitation and months (`climate::cell_water`, ERO-221), the one the young lakes take
-/// ([`lake_water`]). 1 everywhere without the stage's temperature and precipitation.
+/// precipitation and twelve months (`climate::cell_water_of` on `climate::cell_climate`, ERO-221),
+/// the one the young lakes take ([`lake_water`]). 1 everywhere without the stage's temperature and precipitation.
 ///
 /// Until 2026-10-31 the stage kept the snapshot's rule with the switch on, so a plateau that
 /// never thaws weighed 0.6 here at P 300 mm where L1 weighed it 0.05, and the amplifier's

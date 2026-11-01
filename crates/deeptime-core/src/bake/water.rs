@@ -11,10 +11,11 @@
 //!   twelve months from the monthly layers (`climate/month/t_sl_c_*`: the months' departures
 //!   from their mean are the same at any height, so they are added to the cell's mean; a folder
 //!   without them takes ± 8 °C). [`hydro::HydroParams::budget`] turns them into runoff, rain on a
-//!   lake and its evaporation, the biotemperature by Holdridge's own method on the twelve months
-//!   (`hydro::Climate::thaw`; until 2026-10-31 a sinusoid between the warmest and the coldest
-//!   month, which dropped the mean). Without a climate stage the surface stage's zonal stand-in
-//!   at sea level.
+//!   lake and its evaporation, the biotemperature by Holdridge's monthly method without his 30 °C
+//!   cut on the twelve months (`hydro::Climate::thaw`, HYD-030; until 2026-10-31 a sinusoid
+//!   between the warmest and the coldest month, which dropped the mean), as the deep-time surface
+//!   takes it at every step. Without a climate stage the surface stage's zonal stand-in at sea
+//!   level.
 //! - **water_level.** Each lake's cells hold its level (1/16 block), nodata elsewhere; the game's
 //!   shore rule carries it a noise cell past the last wet cell. A full lake's level is its rim's
 //!   height, a terminal lake's the level of its water balance, below the rim. The layer means what
