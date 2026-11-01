@@ -337,10 +337,9 @@ fn onsets_carry_their_plates_motion_across_the_overlap() {
     );
     let mut held = 0usize;
     let world = run_stage(&p, |_, _, st| {
-        held += st
-            .dynamics
-            .as_ref()
-            .map_or(0, |d| d.onset_overlap.len() + d.onset_reversed.len());
+        held += st.dynamics.as_ref().map_or(0, |d| {
+            d.onset_overlap.len() + d.onset_reversed.len() + d.onset_crossed.len()
+        });
     });
     assert_eq!(held, 0, "a step's overlap measure outlived its record");
     let d = world.plates.as_ref().unwrap().dynamics.as_ref().unwrap();
@@ -357,7 +356,7 @@ fn onsets_carry_their_plates_motion_across_the_overlap() {
             assert_eq!((v.lo, v.hi), (o.under.min(o.over), o.under.max(o.over)));
             assert!(v.n >= subduction::MIN_CONTACT, "{v:?}");
             assert!(usize::from(v.pair_class) <= subduction::OVERLAP_NO_NORMAL);
-            if o.route != 1 {
+            if o.route != 1 && o.setting < 2 {
                 assert_eq!(
                     usize::from(v.pair_class),
                     subduction::OVERLAP_CONVERGING,
@@ -365,6 +364,17 @@ fn onsets_carry_their_plates_motion_across_the_overlap() {
                 );
             }
         }
+    }
+    // The gate's crossing: a new contact the gate held carries the steps that added to its sum
+    // and a sum of at least half a spacing; a reversal and continental crust on both sides are
+    // not held.
+    let env = PlatesStage::new(p.clone()).env(&p.tectonics, 1);
+    let need_km = subduction::CONTACT_CONVERGENCE_SPACINGS * env.norm.km(env.norm.spacing_rad());
+    let crossed: Vec<&dynamics::OnsetRec> = d.onsets.iter().filter(|o| o.cross_steps > 0).collect();
+    assert!(!crossed.is_empty(), "no onset crossed the gate");
+    for o in crossed {
+        assert!(o.route != 1 && o.setting < 2, "{o:?}");
+        assert!(o.cross_km >= need_km, "{} < {need_km}", o.cross_km);
     }
 }
 
@@ -1733,8 +1743,9 @@ fn resolve_turned(
         .filter(|&k| st.plates[k].omega == [0.0; 3])
         .collect();
     let speed = env.norm.omega_of_speed(50.0);
-    // The turn is the fixture's history: each pair has converged as far as the gate asks
-    // (PLT-810, half a spacing), so this step's motion decides.
+    // The turn is the fixture's history: each pair has converged just short of what the gate asks
+    // (PLT-810, half a spacing), so this step's motion decides: a pair converging now crosses, one
+    // with no normal or parting does not (PR #55's third re-review).
     let need_km = subduction::CONTACT_CONVERGENCE_SPACINGS * env.norm.km(env.norm.spacing_rad());
     let alive: Vec<u32> = (0..st.plates.len() as u32)
         .filter(|&k| st.plates[k as usize].alive)
@@ -1748,7 +1759,8 @@ fn resolve_turned(
                 .map(move |&hi| state::PairConvergence {
                     lo,
                     hi,
-                    km: need_km,
+                    km: need_km * (1.0 - 1e-9),
+                    steps: 1,
                 })
         })
         .collect();
@@ -1954,6 +1966,12 @@ fn a_contact_begins_only_where_its_plates_converge() {
     for motion in [DVec3::Z, along(-10.0), -DVec3::X] {
         let (begun, class, c) = run(true, motion);
         assert_eq!(begun, None, "a contact on {motion}: {class} {c}");
+        if motion == DVec3::Z {
+            // Pure strike-slip reads under what 30 steps would need to cross half a spacing (79.8
+            // km at 20k samples over 60 Myr: 1.33 mm/yr), so the gate's refusal here is the sum's,
+            // not the fixture's luck (PR #55's third re-review).
+            assert!(c.abs() < 1.33, "strike-slip reads {c} mm/yr");
+        }
         assert_eq!(run(false, motion).0, Some(1), "off: {motion}");
     }
     assert_eq!(run(false, along(10.0)).0, Some(1));
@@ -2014,12 +2032,14 @@ fn plates_sliding_past_along_their_boundary_begin_no_contact() {
     }
 }
 
-/// The consumer of last resort (PLT-810; PR #55's re-review): an overlap the gate refuses goes to
-/// the resampling, which takes the lower plate's visible crust as a contact would. Two
-/// continental plates of `gate_fixture` overlapping where y > 0, sliding past (refused) or
-/// converging 10 degrees off the boundary (a contact once they have converged half a spacing),
-/// held for up to 30 steps, then resampled: no continental crust dropped either way, and the
-/// refused pair's taken by the last resort.
+/// The consumer of last resort (PLT-812; PR #55's re-reviews) and the collision's exemption
+/// (PLT-810): `gate_fixture`'s pair overlapping where y > 0, held for up to 30 steps, then
+/// resampled. Ocean floor carrying 500 m of sediment, sliding past: the gate refuses it, and the
+/// resampling takes the lower plate's visible floor as a contact would (its ocean crust and its
+/// sediment booked by the last resort); converging 10 degrees off the boundary: a contact once
+/// the pair has converged half a spacing, and nothing for the last resort. Continental crust on
+/// both sides, sliding past: a collision's setting needs no subduction start, so its contact
+/// begins on the first step. Nothing is dropped in any case.
 #[test]
 fn a_refused_overlap_is_taken_at_the_resampling() {
     let mut p = preset(20_000, 20.0, "supercontinent", 5);
@@ -2029,25 +2049,49 @@ fn a_refused_overlap_is_taken_at_the_resampling() {
         let r = deg.to_radians();
         r.cos() * DVec3::Z + r.sin() * DVec3::X
     };
-    for (motion, contact) in [(DVec3::Z, false), (along(10.0), true)] {
+    let turn = glam::DQuat::from_rotation_x(0.1);
+    for (motion, kind, begins) in [
+        (DVec3::Z, OCEANIC, None),
+        (along(10.0), OCEANIC, Some(false)),
+        (DVec3::Z, CONTINENTAL, Some(true)),
+    ] {
         let env = stage.env(&p.tectonics, 1);
-        let turn = glam::DQuat::from_rotation_x(0.1);
-        let mut f = gate_fixture(&p, &env, turn, motion, CONTINENTAL);
+        let mut f = gate_fixture(&p, &env, turn, motion, kind);
+        if kind == OCEANIC {
+            for s in f.st.samples.iter_mut() {
+                s.pools[state::pool::SEDIMENT] = 500.0;
+                s.thickness_m = pools::thickness(&s.pools);
+            }
+        }
         let conv = f.conv;
-        assert_eq!(
-            gate_steps(&p, &mut f, 30).is_some(),
-            contact,
-            "{motion}: {conv} mm/yr"
-        );
-        let env = stage.env(&p.tectonics, 9);
+        let step = gate_steps(&p, &mut f, 30);
+        match begins {
+            None => assert!(step.is_none(), "{motion}: {conv} mm/yr"),
+            Some(first) => {
+                let step = step.unwrap_or_else(|| panic!("{motion}: no contact"));
+                assert_eq!(step == 1, first, "{motion} {kind}: step {step}");
+            }
+        }
+        let env = stage.env(&p.tectonics, 31);
         let mut world = WorldState::new(1, 16_384, p.t_start_years());
         ridges::resample(&mut f.st, &mut world, &f.pos, &f.tree, &f.geo, &env).unwrap();
         let g = |k: &str| world.globals.get(k).copied().unwrap_or(0.0);
-        assert_eq!(g(ridges::DROPPED_GLOBAL), 0.0, "{motion}");
+        assert_eq!(g(ridges::DROPPED_GLOBAL), 0.0, "{motion} {kind}");
+        let refused = begins.is_none();
         assert_eq!(
-            g(ridges::LAST_RESORT_CONTINENT_GLOBAL) > 0.0,
-            !contact,
-            "{motion}"
+            g(ridges::LAST_RESORT_OCEAN_GLOBAL) > 0.0,
+            refused,
+            "{motion} {kind}"
+        );
+        assert_eq!(
+            g(ridges::LAST_RESORT_SEDIMENT_GLOBAL) > 0.0,
+            refused,
+            "{motion} {kind}"
+        );
+        assert_eq!(
+            g(ridges::LAST_RESORT_CONTINENT_GLOBAL),
+            0.0,
+            "{motion} {kind}"
         );
     }
 }
@@ -2056,8 +2100,9 @@ fn a_refused_overlap_is_taken_at_the_resampling() {
 /// converges; the next step it parts, and the contact goes on (seen again, its polarity kept);
 /// with continental crust come into the overlap on the subducting side, the contact reverses
 /// (PLT-056, PLT-371) though its plates part, its onset is the new polarity's (the old
-/// overriding plate's floor going under, the plates' convergence now: parting, negative), and the
-/// step's resolve names it reversed (the onset trace's route).
+/// overriding plate's floor going under: 30 Myr old where the first polarity's was 80; the plates'
+/// relative speed now, 20 mm/yr parting where it was 50 converging), and the step's resolve names
+/// it reversed (the onset trace's route).
 #[test]
 fn a_contact_goes_on_and_reverses_whatever_its_plates_do() {
     let mut p = preset(20_000, 20.0, "supercontinent", 5);
@@ -2068,6 +2113,14 @@ fn a_contact_goes_on_and_reverses_whatever_its_plates_do() {
     let mut f = gate_fixture(&p, &env1, turn, DVec3::X, OCEANIC);
     let begun = gate_steps(&p, &mut f, 30).expect("a contact");
     let (under, over) = (f.st.contacts[0].under, f.st.contacts[0].over);
+    let first_age = f.st.contacts[0].onset_slab_age_myr;
+    let first_speed = f.st.contacts[0].onset_convergence_mm_yr;
+    assert!((80.0..100.0).contains(&first_age), "{first_age}");
+    // The overriding plate's floor younger, 30 Myr at step 1, so the new polarity's onset reads it.
+    let t1 = env1.t_myr;
+    for s in f.st.samples.iter_mut().filter(|s| s.group == over) {
+        s.formed_myr = (t1 - 30.0) as f32;
+    }
     let mut world = WorldState::new(1, 16_384, p.t_start_years());
     let mut resolve = |f: &mut GateFixture, step: u64| {
         let env = stage.env(&p.tectonics, step);
@@ -2082,8 +2135,8 @@ fn a_contact_goes_on_and_reverses_whatever_its_plates_do() {
         )
         .unwrap()
     };
-    // The next step, parting: the contact is seen again.
-    f.st.plates[1].omega = (-env1.norm.omega_of_speed(50.0) * DVec3::X).to_array();
+    // The next step, parting at 20 mm/yr: the contact is seen again.
+    f.st.plates[1].omega = (-env1.norm.omega_of_speed(20.0) * DVec3::X).to_array();
     let r = resolve(&mut f, begun + 1);
     let c = &f.st.contacts[0];
     assert_eq!(
@@ -2107,11 +2160,17 @@ fn a_contact_goes_on_and_reverses_whatever_its_plates_do() {
     );
     assert_eq!(r.reversed, vec![(0, 1)]);
     assert!(
-        (80.0..100.0).contains(&c.onset_slab_age_myr),
-        "{}",
+        (30.0..50.0).contains(&c.onset_slab_age_myr),
+        "the new polarity's floor: {}",
         c.onset_slab_age_myr
     );
-    assert!(c.onset_convergence_mm_yr != 0.0);
+    // The same overlap read at 20 mm/yr where the first polarity's read 50.
+    let ratio = c.onset_convergence_mm_yr / first_speed;
+    assert!(
+        (ratio - 0.4).abs() < 0.04,
+        "the plates' speed now: {} against {first_speed}",
+        c.onset_convergence_mm_yr
+    );
 }
 
 /// A subduction initiation's contact takes the polarity of the slab planted under its fracture

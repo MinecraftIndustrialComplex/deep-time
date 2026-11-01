@@ -203,6 +203,11 @@ pub struct Dynamics {
     /// as `onset_overlap` is.
     #[serde(skip)]
     pub onset_reversed: Vec<(u32, u32)>,
+    /// Measurement only: the pairs whose new contact crossed the gate this step, with the steps
+    /// that added to the sum and the sum, km (`Resolved::crossed`), emptied by the step's record
+    /// as `onset_overlap` is.
+    #[serde(skip)]
+    pub onset_crossed: Vec<((u32, u32), u32, f64)>,
 }
 
 /// Measurement only (the resampling trace, 2026-10-31): how a resampling made each new sample
@@ -1302,6 +1307,14 @@ pub struct OnsetRec {
     /// ([`OnsetOverlap`]; the default for a contact begun with no overlap).
     #[serde(default)]
     pub overlap: OnsetOverlap,
+    /// The gate's crossing (PLT-810; PR #55's third review): the steps that added to the pair's
+    /// cumulative convergence before its contact began and the sum then, km (Earth-normalized; its
+    /// mean rate is the sum over the steps' Myr). 0 and 0 for a contact the gate did not hold (the
+    /// switch off, a reversal, continental crust on both sides).
+    #[serde(default)]
+    pub cross_steps: u32,
+    #[serde(default)]
+    pub cross_km: f64,
 }
 
 impl OnsetRec {
@@ -2155,6 +2168,10 @@ fn record_onsets(
         .into_iter()
         .map(|o| ((o.lo, o.hi), o))
         .collect();
+    let crossed: BTreeMap<(u32, u32), (u32, f64)> = std::mem::take(&mut d.onset_crossed)
+        .into_iter()
+        .map(|(key, steps, km)| (key, (steps, km)))
+        .collect();
     let mut new = Vec::new();
     for c in st.contacts.iter().filter(|c| c.onset_step == env.step) {
         let key = (c.under.min(c.over), c.under.max(c.over));
@@ -2198,6 +2215,8 @@ fn record_onsets(
             front_km_myr: [0.0; 2],
             overlap: overlap.get(&key).cloned().unwrap_or_default(),
             last_myr: t,
+            cross_steps: crossed.get(&key).map_or(0, |c| c.0),
+            cross_km: crossed.get(&key).map_or(0.0, |c| c.1),
         });
     }
     d.onsets.extend(new);

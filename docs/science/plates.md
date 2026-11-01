@@ -14014,6 +14014,32 @@ lattices at a random offset (`a_mixed_neighbourhood_gives_no_normal`). **Smaller
 links a split's copy through the plates' lineage (rec.json `parent`) and reads the run's step;
 dropped.py takes the run's start from rec.json.
 
+### The third re-review's fixes (PR #55, 2026-11-01)
+
+A third Opus re-review (of 125b8c4e) confirmed the cumulative sum (stored, serialized, reset and keyed right; its
+units model km against model km), the reversal's route and the consumer's books, and found what was left; the
+coordinator finished the fixes inline after the lane stopped on the account's rate limit (decisions log 2026-11-01):
+
+- **Off is not master's.** The consumer of last resort (now its own row, PLT-812) and a reversal's onset values (the
+  new polarity's slab age and the plates' speed now) act in both settings of `contact_needs_convergence`: both are
+  corrections, so no control arm; `CHECKPOINT_SCHEMA` is bumped for `PlateState::converging`.
+- **Continental crust on both sides is not gated** (each side's overlapping samples at least half continental). A
+  collision needs no subduction start (Bird [126] defines the subduction zone), so collisions, docking (PLT-770,
+  PLT-771) and welds keep the timing they had before the gate, and the consumer meets continental crust only in a
+  mixed overlap: it no longer stacks a refused continental band's whole columns onto the top plate (the lump PLT-292
+  removed for collisions).
+- **The sum.** It never falls below 0 (a pair that parted owes nothing), a pair whose overlap falls under a contact's
+  size keeps it, one with no overlap at all starts again, and a split's pieces each inherit their parent's sums
+  (`inherit`). Each onset the gate held records the steps that added to its sum and the sum
+  (`OnsetRec::cross_steps`, `cross_km`), so a slow crossing by noise shows on the arm; a leaky sum waits on that record.
+- **Tests.** `a_refused_overlap_is_taken_at_the_resampling` now holds ocean floor with sediment (refused while sliding
+  past: the consumer books its ocean crust and sediment; converging 10 degrees off: a contact and nothing for the
+  consumer) and continental crust on both sides (a contact on the first step); `a_contact_goes_on_and_reverses_whatever_its_plates_do`
+  gives the overriding plate 30 Myr floor and the plates 20 mm/yr parting, so the reversal's onset must read the new
+  polarity's values (the old test's could not tell them apart); `resolve_turned` seeds each pair just under the
+  threshold, so a pair with no normal or parting does not cross; the pure strike-slip case asserts its reading is
+  under the 1.33 mm/yr that 30 steps would need. `dropped.py` prints the consumer's sediment, samples and largest rise.
+
 ### The gap fill and the intra-oceanic front (2026-10-31, a read)
 
 The coordinator's lead, from the arm oo-gate: the intra-oceanic excess is plates that converge

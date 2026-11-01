@@ -279,6 +279,14 @@ struct Agg {
     near: [u32; 2],
 }
 
+impl Agg {
+    /// Whether the overlap holds continental crust on both its sides (a contact's setting 2): the
+    /// share of each side's samples that are continental at least a half.
+    fn continental_both(&self) -> bool {
+        (0..2).all(|s| f64::from(self.cont[s]) / f64::from(self.seen[s].max(1)) >= 0.5)
+    }
+}
+
 /// What `resolve` found this step.
 pub struct Resolved {
     /// Per contact (by index): the subducting plate's continental samples in the overlap that are
@@ -287,6 +295,10 @@ pub struct Resolved {
     pub seeds: BTreeMap<usize, Vec<u32>>,
     /// The pairs (lower id first) whose contact reversed this step (the onset trace's route).
     pub reversed: Vec<(u32, u32)>,
+    /// The pairs (lower id first) whose new contact crossed the gate this step (PLT-810): the
+    /// steps that added to the pair's cumulative convergence and the sum, km (the onset trace's
+    /// crossing; measurement only).
+    pub crossed: Vec<((u32, u32), u32, f64)>,
 }
 
 /// Two plates' motion across their overlap ([`overlap_motion`]; ledger: PLT-810, PLT-811): their
@@ -645,36 +657,46 @@ pub fn resolve(
     }
     // A new contact only where its plates have converged across their overlap by half a lattice
     // spacing (ledger: PLT-810, PLT-811): the pairs with no contact and an overlap of a contact's
-    // size, read once, each adding its overlap's mean convergence times the step to its sum; a
-    // pair that stops overlapping starts again from nothing. A contact that exists (active,
-    // carried through a resampling or dormant until `contact_timeout_myr`, PLT-059) goes on
-    // whatever its plates do, as a reversal does: the gate is on a new contact only.
+    // size, read once, each adding its overlap's mean convergence times the step to its sum, which
+    // never falls below 0 (a pair that parted owes nothing). A pair whose overlap is smaller keeps
+    // its sum as it is; one with no overlap at all starts again from nothing. An overlap with
+    // continental crust on both sides needs no subduction to begin (Bird 2003 [126] defines the
+    // subduction zone; a collision is the continental convergent boundary): its contact begins as
+    // before the gate, so collisions, docking and welds keep their timing. A contact that exists
+    // (active, carried through a resampling or dormant until `contact_timeout_myr`, PLT-059) goes
+    // on whatever its plates do, as a reversal does: the gate is on a new contact only.
+    let gated = |key: (u32, u32), a: &Agg| !index.contains_key(&key) && !a.continental_both();
     let motion = env.k.contact_needs_convergence.then(|| {
         let st: &PlateState = state;
         overlap_motion(st, overlaps, pos, tree, env, |key| {
-            !index.contains_key(&key) && aggs.get(&key).is_some_and(|a| a.count >= MIN_CONTACT)
+            aggs.get(&key)
+                .is_some_and(|a| gated(key, a) && a.count >= MIN_CONTACT)
         })
     });
-    let converged: BTreeMap<(u32, u32), f64> = match &motion {
+    let converged: BTreeMap<(u32, u32), (f64, u32)> = match &motion {
         Some(m) => {
-            let before: BTreeMap<(u32, u32), f64> = state
+            let before: BTreeMap<(u32, u32), (f64, u32)> = state
                 .converging
                 .iter()
-                .map(|c| ((c.lo, c.hi), c.km))
+                .map(|c| ((c.lo, c.hi), (c.km, c.steps)))
                 .collect();
-            m.iter()
-                .map(|(&key, r)| {
-                    let add = if usize::from(r.pair_class) == OVERLAP_NO_NORMAL {
-                        0.0
-                    } else {
-                        r.conv_mm_yr * env.dt_myr
+            aggs.iter()
+                .filter(|&(&key, a)| gated(key, a))
+                .map(|(&key, _)| {
+                    let (km, steps) = before.get(&key).copied().unwrap_or((0.0, 0));
+                    let now = match m.get(&key) {
+                        Some(r) if usize::from(r.pair_class) != OVERLAP_NO_NORMAL => {
+                            ((km + r.conv_mm_yr * env.dt_myr).max(0.0), steps + 1)
+                        }
+                        _ => (km, steps),
                     };
-                    (key, before.get(&key).copied().unwrap_or(0.0) + add)
+                    (key, now)
                 })
                 .collect()
         }
         None => BTreeMap::new(),
     };
+    let mut crossed = Vec::new();
     let need_km = CONTACT_CONVERGENCE_SPACINGS * env.norm.km(env.norm.spacing_rad());
     for (&(lo, hi), agg) in &aggs {
         let centroid = agg.sum.normalize_or(DVec3::Z);
@@ -721,9 +743,13 @@ pub fn resolve(
                     continue;
                 }
                 // Plates that have not converged across the overlap by half a spacing (sliding
-                // past, parting, or not yet) make no subduction zone (ledger: PLT-810).
-                if motion.is_some() && converged.get(&(lo, hi)).is_none_or(|&km| km < need_km) {
-                    continue;
+                // past, parting, or not yet) make no subduction zone (ledger: PLT-810); continental
+                // crust on both sides is a collision's and needs none.
+                if motion.is_some() && !agg.continental_both() {
+                    match converged.get(&(lo, hi)) {
+                        Some(&(km, steps)) if km >= need_km => crossed.push(((lo, hi), steps, km)),
+                        _ => continue,
+                    }
                 }
                 let mean_age = |s: usize| {
                     let oceanic = agg.seen[s] - agg.cont[s];
@@ -901,11 +927,12 @@ pub fn resolve(
     state.converging = converged
         .into_iter()
         .filter(|(key, _)| !index.contains_key(key))
-        .map(|((lo, hi), km)| super::state::PairConvergence { lo, hi, km })
+        .map(|((lo, hi), (km, steps))| super::state::PairConvergence { lo, hi, km, steps })
         .collect();
     Ok(Resolved {
         seeds,
         reversed: reversed_now,
+        crossed,
     })
 }
 

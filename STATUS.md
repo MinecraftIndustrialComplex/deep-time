@@ -153,6 +153,13 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 
 ## Build log
 
+### 2026-11-01: PR #55's third re-review answered on oceanic-fronts: continental pairs not gated, the sum's rules, the consumer of last resort as PLT-812, the tests (the coordinator, session 88bb1af2-7722-4f74-9e04-4e8b8af667a9, inline, finishing the crust-budget lane's work after it stopped on the account's rate limit)
+
+- oo-gate3 (125b8c4e, 8 runs against base35-s4): no V1 measure moves (land 0.215, p 0.57; continental crust under the sea 0.612, p 0.57; criteria median 5.5 against 5); guard clean (worst 10,688 m). The code it measured changes again below, so oo-gate4 follows.
+- An overlap with continental crust on both sides is not gated (collisions, docking and welds keep their timing; the consumer meets continental crust only in mixed overlaps); the sum never below 0, kept under a contact's size, reset with no overlap, inherited by a split's pieces; each held onset records its crossing. The consumer of last resort is PLT-812 (`game-choice`, conservation). Off is not master's (said in the PR, the params doc, PLT-810); `CHECKPOINT_SCHEMA` bumped.
+- Tests: the last-resort test on ocean floor with sediment and on continental pairs; the reversal test reading the new polarity's slab age and speed; `resolve_turned` seeded just under the threshold; the strike-slip reading bounded. `dropped.py` prints the consumer's sediment, samples and largest rise.
+- Next: the gate, oo-gate4 against base35-s4 (the crossing record read for slow crossings), the PR body.
+
 ### 2026-10-31: Hotspot lane: the cone budget's review fixes (an Opus review of 4d9ea6f5) (lane agent, worktree .claude/worktrees/agent-abc417f512034b877, branch hotspot-lip; sub-agent of session 88bb1af2-7722-4f74-9e04-4e8b8af667a9; not merged)
 
 - **Netted twice (must fix)**: `fronts_finish` runs before the hotspots and nets every felsic cone within `subduction_distance_km` of a front (800 km in every shipped preset, 1,800 the Rust default; an oceanic slab's front or a suture's), so a continental hotspot's silicic centres and ignimbrites near a front were netted by the arc and by their tail under the budget. The budgeted hotspots' cones now go to their own fields (`surface/volcanic_hotspot_felsic_m`, `..._mafic_m`; `L1.hot_rock`); `apply_surface_feedback` adds them to the pools as any cone's rock but returns them among none of the cones the arcs and kernels count, and under the budget the kernel no longer reads the cones at all (`plates/hotspot_cones_km3` stays 0). With the budget off nothing changes, bit for bit (the fields are never written, the kernel and the calderas run the same arithmetic).
