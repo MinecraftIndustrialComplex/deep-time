@@ -13956,7 +13956,7 @@ gate on any angle of convergence, 26 (13 and 13: scattered 2, 3, 5 to 7, 10 to 1
 These counts are within the sweep's chaos: a 48-run count spreads by about 3.5, a difference of
 two by about 5, and each switch reshuffles which seeds weld (between the two gates scattered shares
 6 of 11 seeds, supercontinent 6 of 9). The sweep shows no cause. The weld, recording and sutures
-tests keep their seeds (scattered 3, supercontinent 2).
+tests kept their seeds (scattered 3, supercontinent 2).
 
 **The arm oo-gate2** (4583ad7e, the first fix, 8 runs against base35-s4, the crust-budget envs).
 Guard clean (0 steps beyond two Earth reliefs). No V1 check beyond the seeds' spread: land 0.216
@@ -14002,7 +14002,10 @@ active the step before, so a dormant contact's reversal read as plates that came
 that. A reversal's onset now carries the new polarity's slab age and convergence (the old
 polarity's stayed before).
 
-**D. The weld sweep** is within its chaos (above). **E. The two young-floor fronts.** gapfronts.py
+**D. The weld sweep** is within its chaos (above). With the gate on cumulative convergence it
+finds welding seeds in 20 of 48 runs (scattered 3, 8, 11, 13, 14, 16 to 18, 21 and 23;
+supercontinent 1, 3, 4, 8, 13, 14, 16, 17, 19 and 20; the guard binding on none); supercontinent 2
+welds no more, so the sutures test takes supercontinent 1. **E. The two young-floor fronts.** gapfronts.py
 counted the snapshots taken at a resampling, which carry no front flags, so its km at a snapshot
 read low by 131 to 152; it leaves them out now, as oofronts.py does: 10,141 km of young-floor
 intra-oceanic front on oo-gate, against oofronts.py's 10,151 (0.520 of 19,512 and 19,521). The
