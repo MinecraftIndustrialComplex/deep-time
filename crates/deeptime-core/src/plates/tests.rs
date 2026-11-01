@@ -6600,6 +6600,7 @@ fn thick_ocean_crust_cools_towards_the_floor_it_holds_up() {
 fn the_final_heat_flow_pass_lifts_only_low_continental_samples() {
     let mut p = preset(2_000, 20.0, "supercontinent", 5);
     p.tectonics.thermal_state = false;
+    p.tectonics.column_buoyancy = false; // it reads the state (PLT-836)
     let stage = PlatesStage::new(p.clone());
     let env = stage.env(&p.tectonics, 1);
     let (mut st, _geo) = init::initial_state(&p, &env).unwrap();
@@ -6666,6 +6667,7 @@ fn the_final_heat_flow_pass_lifts_only_low_continental_samples() {
 fn young_floor_made_continental_after_the_step_takes_the_continental_law() {
     let mut p = preset(2_000, 20.0, "supercontinent", 5);
     p.tectonics.thermal_state = false;
+    p.tectonics.column_buoyancy = false; // it reads the state (PLT-836)
     let stage = PlatesStage::new(p.clone());
     let env = stage.env(&p.tectonics, 1);
     let (mut st, _geo) = init::initial_state(&p, &env).unwrap();

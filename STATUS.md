@@ -153,6 +153,20 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 
 ## Build log
 
+### 2026-11-01: The whole column's buoyancy on by default after its arm cb-on (the coordinator, inline; branch `continental-buoyancy`; origin/continental-heat-ceiling merged: master f785ed6f and PR #58)
+
+- **The arm cb-on** (1b85d0d0 with the switch on, 8 runs, against base35-s4 and hc-on; `pool.sh table`,
+  `lowcont.sh` into /data/ban/deeptime-runs/lowcont-cbon/): the guard clean (10,289 against 10,304 m); land 0.186 (p
+  0.021), continental crust under the sea 0.650, land above 2 km 0.034, the coast with high ground 0.152 (p 0.010), the
+  sea at the end 122 m. Against hc-on: the start class 37.4 km thick at the end against 33.9; the 36 to 42 km bands 17
+  to 136 m over the sea (Earth 340 to 430, the line 370 to 1,154); island-arc crust on ocean floor 493 m under the sea
+  against 226. The design's "The arm cb-on and the default".
+- **The default:** on (decisions log 2026-11-01). Tests that turn the thermal state off or set ISO-110 turn the law off
+  with it (the bake's release-pace and thermal-isostasy tests, the final heat-flow pass's two plate tests).
+- **The merge** with origin/continental-heat-ceiling: the final-frame test (PR #58) beside the buoyant start's test,
+  PLT.md's header and rows (PLT-830 to PLT-836 after PLT-824), the science README's row.
+- **Next:** the gate with the weld sweep; cb-on2 against the base after PR #58 lands; the PR.
+
 ### 2026-10-31: Continental buoyancy lane: a continental column's height from its whole buoyancy, built behind `tectonics.column_buoyancy` (off), gated; the start's column under it (lane agent, worktree .claude/worktrees/agent-ab00c28a7afc2ee27, branch continental-buoyancy on origin/continental-heat-ceiling a8e898f4 and origin/master e65259fe; sub-agent of session 88bb1af2-7722-4f74-9e04-4e8b8af667a9; not merged)
 ### 2026-11-01: PR #58's re-review answered on continental-heat-ceiling: a resampled column's own heat flow, Newton's floor, the plates' skip, the docs (the coordinator, session 88bb1af2-7722-4f74-9e04-4e8b8af667a9, inline, finishing the hotspot lane's work after it stopped on the account's rate limit)
 

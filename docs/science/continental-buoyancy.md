@@ -1,7 +1,8 @@
 # A continental column's height from its whole buoyancy
 
 Status of this page: `stage 2 (constants checked against sources on 2026-10-31)`. Built behind
-`tectonics.column_buoyancy`, off by default; not yet run on the pool.
+`tectonics.column_buoyancy`, on by default since 2026-11-01 (the coordinator's call, decisions log
+2026-11-01; the arm cb-on: the design's "The arm cb-on and the default").
 
 Ledger ids on this page: `PLT-830` to `PLT-836` (see [claims.md](claims.md)); it replaces, where it
 is on, PLT-281's line and ISO-110's term.
@@ -114,7 +115,8 @@ not a hot back-arc).
   start's area stays the preset's (`ocean_fraction` and `continental_shelf_share`). Ben chose what
   `ocean_fraction` means (decisions log 2026-09-29), not the start's column or the values; the agent
   of the continental-buoyancy lane chose this (build log 2026-10-31).
-- Off by default until the pool has run it (the rule: physics goes on once built and correct).
+- On by default since 2026-11-01, once the pool ran it with the guard clean (Ben's rule of
+  2026-10-23: physics goes on once built and correct; the V1 numbers are realism checks).
 
 ## Open questions
 
