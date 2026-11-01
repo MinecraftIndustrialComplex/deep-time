@@ -14135,8 +14135,10 @@ under 20 mm/yr, against 0.29 on Earth's).
 **And the ridge is the pair's own.** Where the subducting plate's ridge is within 1,000 km of the
 young-floor front, the plate across it is the overriding plate itself for 0.75 of it (oo-gate 0.76,
 oo-overlap 0.77; of the old-floor front 0.51): the two plates spread along one stretch of their
-boundary and converge along another, a few hundred km apart, slowly on both. That is a pair whose
-relative pole lies on or near their shared boundary.
+boundary and converge along another, a few hundred km apart, slowly on both. (This read first took
+that for a pair whose relative pole lies on or near their shared boundary, a guess; the next read
+measured the poles and found them no nearer than Earth's: the boundary's shape does it, see "Where
+the pairs' relative poles lie" below.)
 
 **Over a contact's life the floor does not age.** On oo-gate the share of the floor going under
 that is younger than 55 Myr is 0.48 at contacts under 10 Myr old, 0.57 to 0.62 from 10 to 55 Myr,
@@ -14154,9 +14156,81 @@ and 0.53 of 10,141 on oo-gate (about 5,340); the old-floor front's, 0.15 of 9,56
 So such pairs hold about 3,100 to 4,350 km more young-floor intra-oceanic front than Earth's, about
 half of the young-floor excess (6,300 to 7,900 km). **Is a law wrong?** Not yet named: the young
 floor at the model's intra-oceanic trenches comes, for half the excess, from ridges of the same two
-plates a few hundred km along their boundary, at slow rates near their relative pole. Whether the model makes such pairs more often than Earth (its plate
+plates a few hundred km along their boundary, at slow rates (the guess "near their relative pole" is
+overturned by the next read). Whether the model makes such pairs more often than Earth (its plate
 motions from the force balance, `forces.rs`, and the contacts begun where the pair's boundary
 spread, the onset trace's 0.33 of the intra-oceanic front) is the next read.
+
+### Where the pairs' relative poles lie (2026-10-31, a read)
+
+The question the slab-floor read left: does the model make plate pairs whose relative rotation pole
+lies on or near their common boundary more often than Earth (such a pair opens along one stretch of
+the boundary and closes along another)? Nothing is built.
+
+**Tools.** `tools/review/crustcycle/polenear.py` (no simulation). The model at each run's end, the
+only time the record holds the plates' rotations (rec.json's `prev_omega`, after the last step),
+with the final map (maps/t0000.bin and maps/plate/t0000.bin); base35-s4 and oo-gate2, 8 runs each.
+A boundary sample's normal is the chord from its own plate's samples to the other plate's within
+2.5 spacings (about five spacings of boundary, as `shortening::boundary_normal` takes it, PLT-310),
+the relative velocity is the other plate's less its own, and the sample stands for half a spacing.
+As a check of the frame, each pair's mean velocity across agrees in sign with the record's own
+(`PairBound::normal_mm_yr` after the last step, oo-gate2) for 0.92 of 241 pairs (correlation 0.92).
+Earth from Bird 2003's PB2002_steps.dat: each pair's relative rotation vector fitted by least
+squares to its steps' velocity vectors (worst residual 1.93 mm/yr, so one pole a pair as Bird
+computed them; the fit is my own derivation from his file), classed per step by the step's own
+azimuth (Bird's classes) and by a chord 446 km either side of the step along its digitized run (the
+model's 2.5 spacings at 16k). Both are classed as Bird classes (paragraph [127], PLT-311): divergent
+or convergent where the motion is more than 20 degrees off the boundary's strike, strike-slip
+between. A pair is "mixed" with at least 400 km of each.
+
+| | Earth (steps) | Earth (446 km chord) | base35-s4 | oo-gate2 |
+|---|---|---|---|---|
+| plates on a boundary, pairs | 52, 161 | 52, 161 | 14.4, 34.5 | 16.8, 39.5 |
+| boundary a pair, km | 1,618 | 1,618 | 5,909 | 6,053 |
+| median pole distance to the pair's boundary, km (length-weighted) | 3,177 | 3,177 | 3,180 | 3,688 |
+| the same, convergent boundary | 2,509 | 2,501 | 2,919 | 4,192 |
+| boundary of pairs whose pole is within 500 km of it | 0.118 | 0.118 | 0.074 | 0.106 |
+| within 1,000 km | 0.245 | 0.245 | 0.182 | 0.181 |
+| boundary on mixed pairs | 0.135 | 0.091 | 0.645 | 0.628 |
+| convergent within 1,000 km of the same pair's divergent | 0.272 | 0.125 | 0.432 | 0.464 |
+| mixed pairs' convergent with the pole over 2,000 km away | 0.29 | 0.32 | 0.62 | 0.73 |
+| boundary on pairs over 4,000 km long | 0.360 | 0.360 | 0.855 | 0.847 |
+| of which mixed (4,000 to 8,000 km; over 8,000) | 0.28; 0.00 | 0.13; 0.00 | 0.56; 0.82 | 0.63; 0.74 |
+| plates with half their outline on one neighbour; that pair mixed | 10/52; 4 | 10/52; 1 | 40/115; 27 | 52/134; 44 |
+
+With the chord at 5 spacings (893 km either side on Earth) the model's mixed boundary is 0.608 and
+0.571 and its convergent near the same pair's divergent 0.266 and 0.301; Earth's 0.091 and 0.104.
+The mixing holds at every relation of the two plates (parent and child 0.59 to 0.64, siblings 0.66
+to 0.74, unrelated 0.62 to 0.64) and every origin of the younger plate (rift 0.63 to 0.66,
+initiation 0.56 to 0.69, margin propagation 0.72 to 0.75, fission 0.60 to 0.62; back-arc 0.23 and
+0.62).
+
+**The pole is not it.** The model's relative poles lie as far from their pairs' boundaries as
+Earth's (median 3,180 and 3,688 km against 3,177; slightly fewer within 1,000 km). The guess the
+slab-floor read wrote down is wrong.
+
+**The boundary's shape is.** The model's pairs share boundaries 3.7 times as long as Earth's (14 to
+17 plates on a boundary against Bird's 52, whose small plates cut Earth's boundaries short), and its
+long boundaries turn against the motion: of the boundary on pairs over 4,000 km long, 0.56 to 0.82
+is on pairs that both open and close, against 0.00 to 0.13 on Earth at the same chord (Earth's five
+pairs over 8,000 km keep one class each). Two thirds of the mixed pairs' convergent boundary have
+the pole over 2,000 km away: with a far pole the motion has nearly one direction along the
+boundary, so a pair opens and closes only where its boundary turns through more than 40 degrees
+against it, as a plate's outline does round its end. A third of the model's plates have half their
+outline on one neighbour (Earth 0.19), and that pair is mixed for two thirds to five sixths of them
+(Earth 1 to 4 of 10): the plate wrapped by another opens at its trailing edge and closes at its
+leading edge.
+
+**Is a law wrong?** Not named yet. The model's boundaries keep the outline they were made with
+while the plates' motion changes under them; Earth's long boundaries keep one class over thousands
+of km. Two readings to test against sources before any law (my own, not read in a source yet):
+Earth's spreading boundaries organize to the relative motion (ridge segments across it, transforms
+along it, so a long ridge stays divergent along its length), and Earth's plates seldom share half
+their outline with one neighbour because a boundary that changes class ends at a triple junction or
+a microplate (Bird's small plates). The model's boundaries come from the rift's line and the
+resampling's gap fill and have no such reorganization. Fewer, longer boundaries do not explain the
+mixing alone: at the same pair length the model's boundaries mix more than four times as often as
+Earth's (4,000 to 8,000 km: 0.56 to 0.63 against 0.13), and over 8,000 km Earth's never do.
 
 ## Hotspots, plume heads and volcanic margins from sources (2026-10-31)
 
