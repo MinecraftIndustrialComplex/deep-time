@@ -37,9 +37,9 @@ pub fn env_dir() -> Option<PathBuf> {
 }
 
 /// A side's columns in a `steps.tsv` row, after the prefix `a_` or `b_`.
-const SIDE_FIELDS: [&str; 13] = [
+const SIDE_FIELDS: [&str; 17] = [
     "mode", "edges", "crust_km", "lith_km", "moho_c", "reach_km", "found", "weighted", "thinned",
-    "at_limit", "far_km", "mean_km", "given_m",
+    "at_limit", "far_km", "mean_km", "given_m", "belt", "lip", "parent", "born_myr",
 ];
 
 /// `steps.tsv`'s columns before the two sides'.
@@ -84,7 +84,7 @@ pub fn step_header() -> String {
     f.join("\t")
 }
 
-fn side_cells(s: &SideRecord) -> [String; 13] {
+fn side_cells(s: &SideRecord) -> [String; 17] {
     [
         s.mode.to_string(),
         s.edges.to_string(),
@@ -99,6 +99,10 @@ fn side_cells(s: &SideRecord) -> [String; 13] {
         format!("{:.1}", s.far_km),
         format!("{:.1}", s.mean_km),
         format!("{:.1}", s.given_m),
+        format!("{:.3}", s.belt),
+        s.lip.to_string(),
+        s.parent.to_string(),
+        format!("{:.1}", s.born_myr),
     ]
 }
 

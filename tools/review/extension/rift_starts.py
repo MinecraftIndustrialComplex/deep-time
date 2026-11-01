@@ -109,3 +109,39 @@ for folder in sys.argv[1:]:
     )
     lives = sorted(count.values())
     print("steps per pair p10/p50/p90", [quant(lives, x) for x in (0.1, 0.5, 0.9)], "| one-step pairs", sum(1 for x in lives if x == 1))
+    # What the cold starts start on (traces with the origin columns, since 2026-10-31): a split (one side's plate the
+    # other's parent, or both one parent's, born within 10 Myr of the start), an old suture or belt at the edge (a
+    # collision stamp on any edge column), magma (a large igneous province boosting either plate), or none of these.
+    if rows and "a_belt" in rows[0]:
+        def kinds(r):
+            t = float(r["t_myr"])
+            a, b = r["a"], r["b"]
+            out = set()
+            pa, pb = r["a_parent"], r["b_parent"]
+            ba, bb = float(r["a_born_myr"]), float(r["b_born_myr"])
+            if (pa == b or pb == a or (pa == pb and pa != "-1")) and min(t - ba, t - bb) <= 10.0:
+                out.add("split")
+            if any(int(r[f"{s}_mode"]) > 0 and float(r[f"{s}_belt"]) > 0.0 for s in "ab"):
+                out.add("belt")
+            if any(int(r[f"{s}_lip"]) > 0 for s in "ab"):
+                out.add("magma")
+            return out
+        for label, keys in (("all", list(first)), ("cold normal", cold_keys)):
+            tally = defaultdict(int)
+            weak = 0
+            for key in keys:
+                ks = kinds(first[key])
+                for k in ks:
+                    tally[k] += 1
+                weak += bool(ks - {"split"})
+            m = max(len(keys), 1)
+            share = {k: round(v / m, 2) for k, v in sorted(tally.items())}
+            print(
+                f"{label} starts ({len(keys)}): {share}; with a belt or magma {weak / m:.2f}; "
+                f"stretched {sum(stretched[k] for k in keys) / max(total, 1e-9):.2f} of the crust"
+            )
+        none_keys = [k for k in cold_keys if not (kinds(first[k]) - {"split"})]
+        print(
+            f"cold normal starts with no belt and no magma: {len(none_keys)} ({len(none_keys) / max(len(first), 1):.2f} "
+            f"of the pairs), stretched {sum(stretched[k] for k in none_keys) / max(total, 1e-9):.2f} of the crust"
+        )

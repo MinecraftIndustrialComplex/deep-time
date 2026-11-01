@@ -197,6 +197,15 @@ pub struct SideRecord {
     pub mean_km: f64,
     /// Crust this side gave, m summed over samples.
     pub given_m: f64,
+    /// What Earth's rifts start on (docs/design/continental-extension.md, "The rifting rule
+    /// against Earth's rifts"), for the trace: the share of the edge columns that a collision
+    /// ever stamped (`Sample::collision_onset`, an old suture or belt: an inherited weakness),
+    /// whether its plate's large igneous province still boosts its rifting (magma), and the
+    /// plate's parent (-1: none) and birth, Myr (a split's two sides).
+    pub belt: f64,
+    pub lip: u8,
+    pub parent: i64,
+    pub born_myr: f64,
 }
 
 /// One fill at one resampling (the rift trace's row; measurement only).
@@ -467,6 +476,7 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Exte
                 }
             });
             let crust = mean(&|s| f64::from(s.thickness_m) / 1000.0);
+            let belt = mean(&|s| f64::from(u8::from(s.collision_onset != 0)));
             let wide = thermal_on && in_wide_band(crust, lith);
             // A narrow side reaches half its lithosphere from the rift; a wide one its whole
             // region in the band, through the band (PLT-786, PLT-787).
@@ -478,6 +488,12 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Exte
             rec.lith_km = lith;
             rec.moho_c = edge_moho;
             rec.reach_km = reach_km;
+            rec.belt = belt;
+            if let Some(plate) = state.plates.get(p as usize) {
+                rec.lip = u8::from(env.t_myr < plate.lip_until_myr);
+                rec.parent = plate.parent.map_or(-1, i64::from);
+                rec.born_myr = plate.born_myr;
+            }
             let src: Vec<(u32, f64, u32)> = side.iter().map(|&v| (v, 0.0, v)).collect();
             let on = |u: u32| {
                 let s = &samples[u as usize];
