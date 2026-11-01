@@ -161,11 +161,11 @@ Unit tests in `surface/climate.rs` and `surface/plateau_check.rs` (mm/yr):
 | site | source | the budget | the snapshot's rule |
 |---|---|---|---|
 | Mackenzie basin, P 410, months 15 and -25 °C | runoff 169, ET 237 (measured) | runoff 204, ET 206: within Fu's 54 mm | runoff 410, ET 0 |
-| Dry Valleys, P 7 to 11, mean -17, coldest -40 °C | "most of which is lost to sublimation" | 0 with the warmest month below 0 °C; under half of P at 2 or 3 °C; 0.29 to 0.87 of P at 0.5 to 1.5 °C (the gap) | all of P |
+| Dry Valleys, P 7 to 11, mean -17, coldest -40 °C | "most of which is lost to sublimation" | 0 with the warmest month below 0 °C; under half of P at 2 or 3 °C; 0.24 to 0.85 of P at 0.5 to 1.5 °C (the gap; 0.29 to 0.87 by the sinusoid about the mean) | all of P |
 | Tibetan lakes, P 230 to 420, MAAT 0 to -3 °C (months ± 8 °C, HYD-032) | ET 170 to 290, runoff ratio 0.26 to 0.31 (modelled) | ET 69 to 141, runoff ratio 0.46 to 0.83 (the shortfall printed, not asserted) | all of P |
-| Verkhoyansk, Holdridge's twelve months (13.3 and -50.0 °C at the ends) | biotemperature 3.05 °C (Holdridge, rough) | 3.05 °C by the twelve months; 2.70 by the year about the mean from its warmest month | (none) |
-| a lopsided year: P 600, mean 4, warmest month 10 °C, coldest 0, +0.01, -0.01 or -6 °C | (none: the method's own property) | biotemperature 4.35 °C, runoff 364 mm, whatever the coldest month (before the re-review: 4.00 and 5.00 °C either side of 0 °C, 381 and 336 mm; months 10 and -6: 3.63 °C, under the mean) | runoff 381 |
-| a mean above 0 °C with a frosty month: P 600 at 5 ± 15, 900 at 8 ± 12, 400 at 2 ± 10 °C | (none: the model's own arithmetic) | runoff 245, 456, 189 | runoff 336, 484, 287 (the budget -27, -6 and -34 %) |
+| Verkhoyansk, Holdridge's twelve months (13.3 and -50.0 °C at the ends) | biotemperature 3.05 °C (Holdridge, rough) | 3.05 °C by the twelve months; 2.80 by the two half-sines (2.70 by the year about the mean from its warmest month alone) | (none) |
+| a lopsided year: P 600, mean 4, warmest month 10 °C, coldest 0, +0.01, -0.01 or -6 °C | (none: the method's own property) | at a coldest month of 0 °C or more the mean, 4.00 °C, and runoff 380.7 mm; continuous either side of 0 °C; at -6 °C 5.08 °C and 332.9 mm (before the first re-review: 4.00 and 5.00 °C either side of 0 °C, 381 and 336 mm, and 3.63 °C at -6, under the mean; before the second: 4.35 °C and 364 mm whatever the coldest month) | runoff 381 |
+| a mean above 0 °C with a frosty month: P 600 at 5 ± 15, 900 at 8 ± 12, 400 at 2 ± 10 °C; lopsided, P 600 at 5 with months 9 and -3, P 500 at 10 with 13 and -1 | (none: the model's own arithmetic) | runoff 245, 456, 189; 321, 122 | runoff 336, 484, 287; 336, 123 (the budget -27, -6, -34, -5 and -0.4 %) |
 | the Dry Valleys' year as the stage gives it: P 7 and 11, mean -17, months -5 and -40 °C | (as above) | 0 | all of P; centred on the mean (+0.5 and -34.5 °C) the budget ran off 5.5 and 9.5 mm, 0.79 and 0.86 of P |
 
 The cold controlled plateau (`a_cold_plateau_runs_off_what_its_summer_leaves`) uses ERO-219's rimmed plateau with Tangra
@@ -469,7 +469,7 @@ A. **The history switched thaw law at its last step.** The twelve months (`clima
    the 96 B per L1 cell `BYTES_PER_CELL` already counted for the last snapshot's (twelve months and twelve
    departures between snapshots, twelve months of temperature and of rain at a snapshot), plus two fields while the
    advection carries a month (8 B). Measured with the honest-estimate test (`tests/memory_estimate.rs`, the bake test
-   planet through every stage): MEMORY_LINE. The time: twelve more bilinear carries a step between snapshots.
+   planet through every stage): the climate phase held 61.3 MiB before and after (its estimate 74.9 MiB); the plates, volcanoes and impacts phases, which run between the climate's steps, 2.0 MiB more (51.7 to 53.7, 47.4 to 49.4 and 46.7 to 48.7 MiB), the 96 B per L1 cell of months and departures now held between steps (1.9 MiB on the planet's 20,992 L1 cells): 2.7 % of the coupled stages' estimate and inside it, since `BYTES_PER_CELL` counted those fields for the last snapshot; the later stages 0.1 to 0.5 MiB more, the run's peak 103.2 against 103.3 MiB (its estimate 111.0). The time: twelve more bilinear carries a step between snapshots.
 B. **The stand-in year ignored the coldest month.** Replaced by the reviewer's two half-sines ("The two rules"), now
    the path only for worlds without the stage's months. "No month below freezing: the same runoff" holds on it to
    1e-12 on lopsided years (the sinusoid about the mean gave months 10 and 2 °C at a mean of 4 a frosty spell, 364.5

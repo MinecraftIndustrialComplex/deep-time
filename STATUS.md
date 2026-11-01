@@ -153,6 +153,28 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 
 ## Build log
 
+### 2026-10-31: The runoff law's second re-review fixes: one thaw law everywhere (the climate stage carries its twelve months every step), two half-sines where the months are missing (the runoff lane, worktree agent-a4e92fd13092b08b0, branch `surface-runoff-budget`, PR #57; origin/master e65259fe merged)
+
+- **The second re-review** (an Opus reviewer at e01f6bfa): the first re-review's code fixes right; two new problems.
+  The coordinator's calls: A option (b), B the reviewer's two half-sines, C, D and the smaller items; rb2 and rb2-off
+  (near done) finished on the old head, rb3 and rb3-off on the fixed one; the flip waits for them. Design:
+  docs/design/surface-runoff-budget.md, "The second re-review and its fixes".
+- **A, one law** (`climate/mod.rs`, `climate/snapshot.rs`): the stage keeps its twelve months at every snapshot,
+  carries each month's departure from its row's month between snapshots (`field::d_month`, `Refs::t_month`, MOI-052)
+  and writes the twelve every step; the months' rain at the last step only, no departures after it. The snapshot drops
+  the world's months and departures first, so the stage holds 24 monthly fields at any time (`BYTES_PER_CELL`
+  unchanged, 154 + 96). Memory (`tests/memory_estimate.rs`, release, the bake test planet): the climate phase 61.3 MiB before and after; the plates, volcanoes and impacts phases 2.0 MiB more (the 96 B a cell of months and departures held between steps, 2.7 % of the coupled stages' 74.9 MiB estimate, inside it); the run's peak 103.2 against 103.3 MiB.
+- **B, two half-sines** (`hydro::Climate::thaw`, `half_sines_thaw`): warm half amplitude warm - mean, cold half
+  mean - cold, the warm half lasting (mean - cold) / (warm - cold); frosty exactly when cold < 0. Verkhoyansk 2.80 C
+  (3.05 by the twelve months). Without frost the old runoff to 1e-12 on lopsided years; an inversion year runs off less.
+- **C, D and the rest:** ERO-221's regions wording; tests on the unclamped values (a numerical integral over 300 random
+  lopsided years, continuity in the three months, 500 random twelve-month years, the first re-review's case as a
+  labelled regression guard); "Holdridge's monthly method without his 30 C cut"; HYD-031 and HYD-037's two year shapes;
+  thawed_share's (0, 0) jump; YNG-011, HYD-033, ERO-217, ERO-221's code column, young.rs, bake/water.rs, FORMAT.md;
+  the lakes' network keeps three values a lake cell; `WATER_BYTES_PER_L1_CELL` 120 (the seasons' twelve departures).
+- **Gate** (VM): `gate.sh prints` on d77b552b: 67 passed (the prints in ERO-222 and the design's checks); `gate.sh full` on d77b552b: workspace clippy clean, `cargo test --workspace` 1,487 passed, 0 failed, 13 ignored; fmt then failed on the new tests in surface/climate.rs only, formatted after (`cargo fmt --all -- --check` on the VM then clean).
+- **Next:** rb3 and rb3-off (8 runs each, base35-s4's seeds), `arm_rb3.sh`, the PR body's numbers from them.
+
 ### 2026-10-31: The runoff law's re-review fixes: the year's thaw continuous and never under the mean (Holdridge's twelve months where the climate stage wrote them, else a year about the mean from its warmest month; the bake too), both months or neither, a one-step wiring test, the regions claim corrected (the runoff lane, worktree agent-a4e92fd13092b08b0, branch `surface-runoff-budget`, PR #57; not merged)
 
 - **The re-review** (an Opus reviewer at 5e04e9f4, PR #57's comment): no wiring or determinism bug; seven findings. The

@@ -1374,7 +1374,7 @@ load-bearing (25 mm a year where the lakes count 0). The young landscape and the
 - **The Mackenzie:** budget runoff 204 mm and ET 206, against 169 and 237 measured: within the 54 mm mean absolute
   error of Fu's curve (Zhang et al. 2004). The old rule gives 410 and 0.
 - **The Dry Valleys:** nothing runs off when the warmest month stays below freezing. But a warmest month just above
-  0 °C melts all the snow and evaporates little, so 0.29 to 0.87 of P runs off: the budget has no sublimation.
+  0 °C melts all the snow and evaporates little, so 0.24 to 0.85 of P runs off: the budget has no sublimation.
 - **The Tibetan lakes:** the budget evaporates 69 to 141 mm against their modelled 170 to 290. It still runs off 0.46
   to 0.83 of P, against all of it under the old rule. The shortfall is printed, not asserted.
 - **A polar year's months as given:** a mean of -17 °C with months of -5 and -40 °C runs off nothing. Centred on the
@@ -1383,7 +1383,7 @@ load-bearing (25 mm a year where the lakes count 0). The young landscape and the
 - **Verkhoyansk's biotemperature:** 3.05 °C by its twelve months, Holdridge's monthly method and his value; 2.80 by
   the two half-sines from its mean, warmest and coldest month.
 - **A lopsided year** (P 600, mean 4, warmest month 10 °C): with a coldest month at or above 0 °C, the mean itself and
-  the old runoff (380.7 mm); LOPSIDED_LINE. The sinusoid between the two months gave 4.00 and 5.00 °C either side of a
+  the old runoff (380.7 mm); at a coldest month of -6 °C, 5.08 °C and 332.9 mm. The sinusoid between the two months gave 4.00 and 5.00 °C either side of a
   coldest month of 0 °C, and the sinusoid about the mean 4.35 °C (364.5 mm) whatever the coldest month.
 - **The cold controlled plateau:** the interior wears 88.0 against 118.0 m/Myr; never thawing, 3.8.
 
