@@ -2625,6 +2625,80 @@ fn how_resamplings_roughen_a_boundary() {
     }
 }
 
+/// A margin inside one plate through resamplings (the arc-stock lane, 2026-11-01): a resampled
+/// sample's kind is its nearest old corner's (PLT-664), the rule the level set replaced for the
+/// plates' outlines (PLT-536), so a passive margin (continental crust and ocean floor of one
+/// plate) could walk as a plate's outline did without it. One plate, continental north of the
+/// equator and oceanic south of it, resampled 40 times with nothing else in the step: after each,
+/// the margin's continental samples (visible, with a visible oceanic neighbour), their offset from
+/// the equator and spread about it in lattice spacings, and the margin's lattice edges per spacing
+/// of its length.
+#[test]
+fn how_resamplings_roughen_a_margin() {
+    let p = preset(40_000, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let spacing = env.norm.spacing_rad();
+    let (mut st, mut geo) = plates_unresolved(&p, &env, glam::DQuat::IDENTITY, |q| q.z > 0.0);
+    for s in &mut st.samples {
+        s.group = 0;
+    }
+    st.groups.truncate(1);
+    st.plates[1].alive = false;
+    let mut pos = geometry::positions(&st, &geo);
+    st.recount(&pos);
+    let mut seen: Vec<(f64, f64, f64)> = Vec::new();
+    for k in 1..=40 {
+        let mut world = WorldState::new(1, 16_384, p.t_start_years());
+        let tree = Tree::over(&pos, |_| true);
+        geo = ridges::resample(&mut st, &mut world, &pos, &tree, &geo, &env).unwrap();
+        level_set::reinit(&mut st, &geo, spacing);
+        let pts = geo.points();
+        let mut lat: Vec<f64> = Vec::new();
+        let mut edges = 0usize;
+        for (i, q) in pts.iter().enumerate() {
+            let s = &st.samples[i];
+            if s.is_hidden() || s.kind != CONTINENTAL {
+                continue;
+            }
+            let n = geo
+                .edges(i as u32)
+                .filter(|&(j, _)| {
+                    let o = &st.samples[j as usize];
+                    !o.is_hidden() && o.kind != CONTINENTAL
+                })
+                .count();
+            if n == 0 {
+                continue;
+            }
+            lat.push(q.z.asin() / spacing);
+            edges += n;
+        }
+        let len = lat.len().max(1) as f64;
+        let mean = lat.iter().sum::<f64>() / len;
+        let rms = (lat.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / len).sqrt();
+        let per = edges as f64 / (std::f64::consts::TAU / spacing);
+        if [1, 2, 5, 10, 20, 30, 40].contains(&k) {
+            eprintln!(
+                "margin after {k} resamplings: {} samples, offset {mean:+.2} spacings, spread \
+                 {rms:.2}, edges per spacing {per:.2}",
+                lat.len()
+            );
+        }
+        seen.push((rms, per, mean));
+        pos = geometry::positions(&st, &geo);
+        st.recount(&pos);
+    }
+    let (s1, e1, o1) = seen[0];
+    for k in [10, 20, 30, 40] {
+        let (s, e, o) = seen[k - 1];
+        assert!(
+            s < s1 + SPREAD_SLACK && e < e1 * EDGE_SLACK && (o - o1).abs() < OFFSET_SLACK,
+            "after {k}: spread {s1} → {s}, edges per spacing {e1} → {e}, offset {o1} → {o}"
+        );
+    }
+}
+
 /// The level set's cost (PLT-536; the front lane, 2026-10-24): the interpolated distance is exact
 /// for a great circle only. A curved outline's distance is not linear in the position, and its
 /// linear interpolation (and the reinitialisation's chords) moves the outline towards its centre
