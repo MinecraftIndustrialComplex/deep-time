@@ -1507,6 +1507,7 @@ pub(in crate::plates) mod tests {
             one_way: None,
             propagations: Vec::new(),
             backarcs: Vec::new(),
+            converging: Vec::new(),
             level_set: None,
         };
         let pos = positions(&st, geo);

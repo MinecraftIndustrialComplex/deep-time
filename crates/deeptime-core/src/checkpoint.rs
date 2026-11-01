@@ -44,9 +44,10 @@ pub const MAGIC: [u8; 4] = *b"DTCP";
 /// climate; 8: the world's volcano catalogue, P1-21; 9: the world's crater catalogue, P2-08; 10: the
 /// climate's ice sheet, weathering supply and snowball list, 2026-09-30; 11: the per-cell climate's
 /// state, P1-26; 12: its flux correction and triggered snapshots, P1-26 T6; 13: the climate's
-/// steering controllers, docs/design/playability-steering.md; 14: the plates' dynamics record's
-/// plates out of the balance, PR #58's re-review).
-pub const CHECKPOINT_SCHEMA: u32 = 14;
+/// steering controllers, docs/design/playability-steering.md; 14: the plates' cumulative
+/// convergence of each pair without a contact, `PlateState::converging`, PLT-810; 15: the plates'
+/// dynamics record's plates out of the balance, PR #58's re-review).
+pub const CHECKPOINT_SCHEMA: u32 = 15;
 const FIXED_BYTES: usize = 8;
 /// The sections before the history's frames.
 const HEAD_SECTIONS: usize = 2;
