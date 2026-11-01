@@ -37,7 +37,7 @@ import cbread  # noqa: E402
 
 R_KM = 6370.0
 T_MIN = 20.0
-TIMES = [int(x) for x in os.environ.get("TIMES", "-900,-500,-200,0").split(",")]
+TIMES = [int(x) for x in os.environ.get("TIMES", "-1000,-900,-700,-500,-300,-100,0").split(",")]
 LINK = float(os.environ.get("LINK", "1.6"))
 
 
@@ -94,8 +94,46 @@ def run_stats(run):
             "alone_dry": float((a[alone, 2] > sea).mean()) if alone.any() else float("nan"),
             "alone_parts": int(len(np.unique(lab[alone]))),
             "start": start.sum() / n0,
+            # The start's own samples by their age (a continental sample keeps its nearest corner's formed_myr
+            # through a resampling, and the start's carry 0): how much of the start's crust still stands, and how
+            # much of it the basement rule now reads as converted.
+            "formed0": (cont & (pp[:, 8] == 0.0)).sum() / n0,
+            "formed0_conv": (cont & ~start & (pp[:, 8] == 0.0)).sum() / n0,
+            "formed0_island": (island & (pp[:, 8] == 0.0)).sum() / n0,
+            # Their volume (km of crust over the planet's mean: thickness summed over the start's visible count) and
+            # mean thickness: an area lost to shortening keeps its volume, one destroyed does not.
+            "formed0_vol": float(T[cont & (pp[:, 8] == 0.0)].sum() / n0),
+            "formed0_T": float(T[cont & (pp[:, 8] == 0.0)].mean()) if (cont & (pp[:, 8] == 0.0)).any() else float("nan"),
+            "cont_vol": float(T[cont].sum() / n0),
+            "arc_vol": float(T[island].sum() / n0),
         }
         if t == 0:
+            # Each class's rock at the end: the shares of its column in cover (sediment and sedimentary rock),
+            # felsic and metamorphic rock and mafic rock, its ocean basement (km) and its height over the sea (p50).
+            # The start column (PLT-834, Rudnick & Gao's layers as Hacker et al. 2015 print them) is 0.05, 0.61, 0.34.
+            # The lithosphere file (crust_budget.rs LITH_FIELDS: stored L, keel, the L the laws read, heat
+            # flow), on runs made since the arc-stock lane added it.
+            lf = run / "maps" / "lith" / th.name_of(t)
+            lith = np.fromfile(lf, "<f4").reshape(-1, 4).astype(np.float64) if lf.exists() else None
+            conv = cont & ~start
+            belt = conv & ~island & (a[:, 5] > 1.5)
+            col = pp[:, 0:7].sum(1)
+            classes_end = {"start": start, "taken": taken, "alone": alone, "belt": belt,
+                           "otherconv": conv & ~island & ~belt}
+            for k, m in classes_end.items():
+                if not m.any():
+                    continue
+                c_sum = col[m].sum()
+                r[f"{k}_cover"] = float(pp[m, 0:2].sum() / c_sum)
+                r[f"{k}_felsic"] = float(pp[m, 2:5].sum() / c_sum)
+                r[f"{k}_mafic"] = float(pp[m, 5:7].sum() / c_sum)
+                r[f"{k}_base_km"] = float(np.clip(pp[m, 7], 0.0, None).mean() / 1000.0)
+                r[f"{k}_T"] = float(T[m].mean())
+                r[f"{k}_zs"] = float(np.median(a[m, 2] - sea))
+                if lith is not None:
+                    r[f"{k}_L"] = float(np.median(lith[m, 2]))
+                    r[f"{k}_keel"] = float(np.median(lith[m, 1]))
+                    r[f"{k}_q"] = float(np.median(lith[m, 3]))
             cell_km2 = 4.0 * np.pi * R_KM**2 / n0
             standing = float(a[:, 7].sum() / 1000.0 * cell_km2)
             g = cbread.last_globals(run / "summary.txt") or {}

@@ -153,6 +153,25 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 
 ## Build log
 
+### 2026-11-01: The arc-stock lane, measurement only: where the converted crust comes from (the coordinator, inline; branch `arc-stock`; nothing in the model changed)
+
+- **Built (measurement):** the crust budget's maps gain `lith/t<Myr>.bin` (the stored L and keel, the L the laws read,
+  the heat flow; `crust_budget::LITH_FIELDS`); `tools/review/freeboard/arcstock.py` reads each class's area, volume, rock
+  and lithosphere. The arm arc-lith (base37-s4's code and seeds with the new file) matches base37-s4 in every census
+  column.
+- **Read** (docs/design/arc-stock.md): the arcs standing alone are Earth's (0.0098 of the planet against about 0.006 to
+  0.010); the arcs' magma is Earth's (2.30 km³/yr against Stern & Scholl's 2.5; the continental arcs' low rate per km is a
+  mismatch of the two measures); the explicit losses are Earth's (about 3.4 against 3.2). Collisions underthrust about 12
+  km³/yr of continental crust that the overriding belts take back as thickening; the start crust is stacked under
+  overriding plates more than destroyed. The converted crust is half felsic, thin (25 to 33 km) and on a cold,
+  keelless lithosphere about 135 km deep (Earth's older-than-300-Ma regions 150 to 300 km). The continental volume is
+  17 % over Earth's on 24 % more area. One run's area by part: the transition (PLT-661's margins) +0.41, the rate +0.25,
+  finish +0.16 against subduction -0.74.
+- **Ruled out as the first lever:** back-arc heating (already over the whole 800 km band), the continental arcs' rate.
+- **Next:** what spreads the continental crust thin: the margins PLT-661 turns continental (Ben's decision of PR #49,
+  so a question for him with numbers, not a change), the collapse to the normal column, erosion and redeposition; then
+  whether the arcs' rates are net or gross before any foundering law.
+
 ### 2026-11-01 (nineteenth entry): PRs #55 to #60 landed; base36 and base37; the gate and the instances on 550682e5; the next lane, the converted crust's stock (the coordinator, session 88bb1af2-7722-4f74-9e04-4e8b8af667a9, inline with Sonnet helpers for lookups, Ben's instruction of 2026-11-01)
 
 - **Landed** (each after its arms and the coordinator's review; Graphide's app skipped #57 to #60 and `gr check` is
