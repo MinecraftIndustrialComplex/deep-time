@@ -8,12 +8,15 @@ as km^3 a year over the run:
 
   dropped         visible continental crust of another plate under a resampling's top cover that neither accretes
                   nor is consumed (no contact puts it under the top's plate): dropped with its pools
-                  (plates/resample_dropped_km3, ridges.rs; 0 since the consumer of last resort, PLT-810)
-  last_resort_c   the consumer of last resort (PLT-810, ridges.rs): visible continental crust of a pair with no
+                  (plates/resample_dropped_km3, ridges.rs; 0 since the consumer of last resort, PLT-812)
+  last_resort_c   the consumer of last resort (PLT-812, ridges.rs): visible continental crust of a pair with no
                   contact under the other plate's top cover, accreted as a contact would
                   (plates/resample_last_resort_continent_km3)
   last_resort_o   the same for visible ocean floor, subducted with its sediment booked
                   (plates/resample_last_resort_ocean_km3)
+  last_resort_sed of that floor, its sediment and sedimentary rock (plates/resample_last_resort_sediment_km3)
+  last_resort_n   the new samples that took such a cover, a year (plates/resample_last_resort_samples; a count)
+  last_resort_rise the largest rise the last resort's accretion gave one sample over the run, m (not a rate)
   mafic_dropped   the mafic pools of continental crust that accretes (plates/resample_mafic_dropped_km3)
   accreted        what accretes at resamplings (plates/resample_accreted_km3), visible crust of it (accreted_visible)
   sed_subducted   sediment that goes down with the slab at resamplings (plates/sediment_subducted_km3)
@@ -67,6 +70,9 @@ def run_row(run):
         "dropped": g.get("dropped", 0.0) / years,
         "last_resort_c": g.get("last_resort_c", 0.0) / years,
         "last_resort_o": g.get("last_resort_o", 0.0) / years,
+        "last_resort_sed": g.get("last_resort_sed", 0.0) / years,
+        "last_resort_n": g.get("last_resort_n", 0.0) / years,
+        "last_resort_rise": g.get("last_resort_rise", 0.0),
         "mafic_dropped": g.get("mafic_dropped", 0.0) / years,
         "accreted": g.get("accreted", 0.0) / years,
         "accreted_visible": g.get("accreted_visible", 0.0) / years,

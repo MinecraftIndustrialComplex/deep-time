@@ -402,6 +402,7 @@ impl PlatesStage {
         let resolved = subduction::resolve(st, world, &cache.geo, &overlaps, &pos, &tree, &env)?;
         if let Some(d) = st.dynamics.as_mut() {
             d.onset_reversed.clone_from(&resolved.reversed);
+            d.onset_crossed.clone_from(&resolved.crossed);
         }
         // Measurement only (the overlap trace): the contacts begun this step, their plates'
         // motion across their overlaps, for the step's record.

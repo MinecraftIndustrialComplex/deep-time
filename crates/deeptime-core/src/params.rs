@@ -1002,16 +1002,20 @@ pub struct TectonicParams {
     /// Ben's rule of 2026-10-23, decisions log): `subduction::resolve` makes a new contact from an
     /// overlap of `MIN_CONTACT` samples or more only once the pair's cumulative convergence across
     /// it (the overlapping samples' mean convergence across the boundary's normal times each
-    /// step's Myr, summed while the pair overlaps, from nothing when it stops) reaches half a
+    /// step's Myr, never below 0, kept while the overlap is under a contact's size, from nothing
+    /// when there is no overlap, inherited by a split's pieces) reaches half a
     /// lattice spacing (`subduction::CONTACT_CONVERGENCE_SPACINGS`, a resolution threshold, PLT-811),
     /// at any angle to the boundary. Bird 2003 [126]: a subduction zone is a step "with a
     /// convergent (component of) velocity"; Gurnis et al. 2004: "Cumulative convergence, not the
     /// rate of convergence, is the dominant control"; Puysegur began as a strike-slip boundary
     /// "with a component of convergence" (their [25]). Transpression adds up; a reading whose
     /// sign is the lattice's noise does not. An overlap refused at the next resampling is taken
-    /// there as a contact would take it (`ridges::resample`, the consumer of last resort). The 20
+    /// there as a contact would take it (`ridges::resample`, the consumer of last resort, PLT-812).
+    /// An overlap with continental crust on both sides is not gated: a collision needs no
+    /// subduction start, so collisions, docking and welds keep their timing. The 20
     /// degrees of PLT-311 stay with the arcs' fronts (PLT-330). Off, any overlap of `MIN_CONTACT`
-    /// samples makes a contact. Polarity reversals and existing contacts (active, carried through
+    /// samples makes a contact; off is not master's of before the gate, since the consumer of
+    /// last resort and a reversal's onset values (the new polarity's) act in both settings. Polarity reversals and existing contacts (active, carried through
     /// a resampling, or dormant until `contact_timeout_myr`, PLT-059) are not gated. History: the
     /// gate as built took PLT-311's 20 degrees (a transpressive overlap grew until the resampling
     /// dropped its crust); the first review's fix read each step's mean alone, with no dead band.
