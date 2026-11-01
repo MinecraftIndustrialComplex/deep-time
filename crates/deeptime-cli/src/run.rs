@@ -484,7 +484,7 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
     let global = |k: &str| world.globals.get(k).copied().unwrap_or(0.0);
     let cap_share = global(deeptime_core::plates::CAP_BOUND_GLOBAL)
         / global(deeptime_core::plates::CONTINENTAL_GLOBAL).max(1.0);
-    Some(format!(
+    let line = format!(
         "surface_final={} land_frac={:.3} max_elevation_m={:.0} sea_level_m={:.1} sediment_km3={:.3e} \
          eroded_km3={:.3e} fluvial_km3={:.3e} lake_km3={:.3e} marine_km3={:.3e} carbonate_km3={:.3e} \
          evaporite_km3={:.3e} pelagic_km3={:.3e} periplatform_km3={:.3e} periplatform_source_km3={:.3e} photic_km2_myr={:.3e} photic_warm_km2_myr={:.3e} photic_warm_clear_km2_myr={:.3e} \
@@ -562,7 +562,29 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
         t.partial_lakes,
         t.closed_km2_myr,
         t.filled_lakes,
-    ))
+    );
+    Some(line + &runoff_weight_words(&t.runoff_weight_km2_myr))
+}
+
+/// The stream power's mean runoff weight used and the climate snapshot's own, on land and on
+/// land above 2 km (`surface.runoff_budget`; nothing without it).
+fn runoff_weight_words(w: &[f64; 6]) -> String {
+    let pair = |a: f64, u: f64, o: f64| {
+        if a > 0.0 {
+            format!("{:.4}/{:.4}", u / a, o / a)
+        } else {
+            "NaN/NaN".into()
+        }
+    };
+    if w[0] > 0.0 {
+        format!(
+            " runoff_weight_land_used/own={} runoff_weight_high_used/own={}",
+            pair(w[0], w[1], w[2]),
+            pair(w[3], w[4], w[5])
+        )
+    } else {
+        String::new()
+    }
 }
 
 /// The planet's hypsometry at the end of the surface (P1-17 calibration), true-area weighted

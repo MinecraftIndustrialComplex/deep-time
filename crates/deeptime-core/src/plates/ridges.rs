@@ -68,7 +68,9 @@ use super::pools::{
 use super::state::{
     CONTINENTAL, FORELAND, Group, OCEANIC, Plate, PlateState, Ridge, Sample, pool, regime,
 };
+use super::thermal::{ARC_HEAT_MW_M2, HOTSPOT_HEAT_MW_M2, conductive_mw_m2, sample_l_km};
 use crate::error::CoreError;
+use crate::params::TectonicParams;
 use crate::world::WorldState;
 
 /// What covers one new point: the group on top (if any) and the others.
@@ -171,11 +173,18 @@ fn nearest_corner(geo: &Geo, c: &Cover, rot: DQuat, q: DVec3) -> u32 {
     best
 }
 
+/// What a resampling's interpolation reads of the step: the tectonics and the time.
+#[derive(Clone, Copy)]
+struct At<'a> {
+    k: &'a TectonicParams,
+    t_myr: f64,
+}
+
 /// Interpolates a sample from a cover of the old crust; vectors come out in the mantle frame,
 /// which is the new lattice's frame (every group starts unrotated). `m` is the old sample nearest
 /// the new point (`nearest_corner`): the sample's kind, its class and every other categorical
 /// label are `m`'s, and the blends below run over the corners of `m`'s class (ledger: PLT-664).
-fn interpolate(src: &[Sample], c: &Cover, rot: DQuat, m: u32) -> Sample {
+fn interpolate(src: &[Sample], c: &Cover, rot: DQuat, m: u32, at: At) -> Sample {
     let mut s = src[m as usize];
     let corners = c.tri.map(|v| &src[v as usize]);
     let w = c.w;
@@ -183,11 +192,6 @@ fn interpolate(src: &[Sample], c: &Cover, rot: DQuat, m: u32) -> Sample {
         (0..3).map(|k| w[k] * f64::from(f(corners[k]))).sum::<f64>() as f32
     };
     s.elevation_m = lerp(&|x| x.elevation_m);
-    // The corners of the sample's own kind and their weight (the nearest corner is one of them).
-    let same_kind: f64 = (0..3)
-        .filter(|&k| corners[k].kind == s.kind)
-        .map(|k| w[k])
-        .sum();
     // The corners of the sample's own class, the kind and, on continental crust, whether it is
     // hyper-extended (under 10 km of its own crystalline crust, Brune et al. 2014), and their
     // weight; the nearest corner is one of them, so the weight is never 0. A blend over a class is
@@ -248,17 +252,32 @@ fn interpolate(src: &[Sample], c: &Cover, rot: DQuat, m: u32) -> Sample {
     s.oxidation = lerp(&|x| x.oxidation);
     s.uplift_mm_yr = lerp(&|x| x.uplift_mm_yr);
     s.crust_uplift_mm_yr = lerp(&|x| x.crust_uplift_mm_yr);
-    // Heat flow belongs to the kind of crust (the sea floor's age law against the continental
-    // sum), so only the corners of the sample's own kind are blended: a continental sample on the
-    // coast must not take the young ridge crust's 300 mW/m² from an oceanic corner. (The next
-    // step sets every sample's heat flow again; this only matters for what is read right after
-    // a resampling, the final snapshot among them: the bake's `meta/heat_flow_mw_m2`.)
-    if same_kind > 0.0 {
+    // Heat flow belongs to the column (the sea floor's age law against the continental sum over
+    // the column's own lithosphere and crust). Under the thermal state a continental sample takes
+    // its own law over its own lithosphere (the nearest corner's L, floored for the crust it now
+    // has, `thermal::sample_l_km`) and the nearest corner's magmatic excess over that corner's
+    // law, between 0 and an arc's and a hotspot's terms: no other corner's heat flow enters, a
+    // hotter column of the same class (crust with no state on young floor, PLT-821, or a
+    // magmatic corner) included (PR #58's re-review). Without the state it is blended over the
+    // corners of its class, as the pools are: a continental sample on the coast must not take
+    // the young ridge crust's 300 mW/m² from an oceanic corner, nor a thick column a
+    // hyper-extended margin's (until 2026-10-31 over the kind's corners). The final pass then
+    // holds each continental column to its column's ceiling (`thermal::refresh_heat_flow`). (The
+    // next step sets every sample's heat flow again; this only matters for what is read right
+    // after a resampling, the final snapshot among them: the bake's `meta/heat_flow_mw_m2`.)
+    // ledger: PLT-824
+    if s.kind == CONTINENTAL && at.k.thermal_state {
+        let near = &src[m as usize];
+        let excess = (f64::from(near.heat_flow_mw_m2)
+            - conductive_mw_m2(sample_l_km(near, at.t_myr)))
+        .clamp(0.0, ARC_HEAT_MW_M2 + HOTSPOT_HEAT_MW_M2);
+        s.heat_flow_mw_m2 = (conductive_mw_m2(sample_l_km(&s, at.t_myr)) + excess) as f32;
+    } else if class_w > 0.0 {
         let blend: f64 = (0..3)
-            .filter(|&k| corners[k].kind == s.kind)
+            .filter(|&k| same_class(corners[k]))
             .map(|k| w[k] * f64::from(corners[k].heat_flow_mw_m2))
             .sum();
-        s.heat_flow_mw_m2 = (blend / same_kind) as f32;
+        s.heat_flow_mw_m2 = (blend / class_w) as f32;
     }
     if s.kind == OCEANIC {
         let (mut sw, mut sf) = (0.0, 0.0);
@@ -391,8 +410,9 @@ pub const ACCRETED_GLOBAL: &str = "plates/resample_accreted_km3";
 /// stacked into the belt or went down with the slab; ledger PLT-276, PLT-292), km³
 /// (Earth-normalized).
 pub const STACKED_CONSUMED_GLOBAL: &str = "plates/resample_stacked_km3";
-/// Of the crust accreted: hidden continental crust (not a collision's) and visible crust of the
-/// same or a subducting plate, km³ (the rest is the sediment of hidden ocean floor).
+/// Of the crust accreted: hidden continental crust (not a collision's) and visible crust under
+/// the top (of the same plate, a plate the top overrides, or a plate with no contact under the
+/// top, the consumer of last resort's), km³ (the rest is the sediment of hidden ocean floor).
 pub const ACCRETED_HIDDEN_CONTINENT_GLOBAL: &str = "plates/resample_accreted_continent_km3";
 pub const ACCRETED_VISIBLE_GLOBAL: &str = "plates/resample_accreted_visible_km3";
 /// World global: the surface accretion raised at resamplings, km² × m / 1000 (km³ of rise,
@@ -400,8 +420,25 @@ pub const ACCRETED_VISIBLE_GLOBAL: &str = "plates/resample_accreted_visible_km3"
 pub const ACCRETED_RISE_GLOBAL: &str = "plates/resample_accreted_rise_km3";
 /// World global (measurement, the crust budget `crust_budget.rs`): visible continental crust of
 /// another plate under the top cover that neither accretes nor is consumed (no subduction
-/// contact puts it under the top's plate), dropped with all its pools, km³ (Earth-normalized) …
+/// contact puts it under the top's plate), dropped with all its pools, km³ (Earth-normalized).
+/// None since the consumer of last resort (PR #55's re-review, 2026-10-31,
+/// [`LAST_RESORT_CONTINENT_GLOBAL`]): kept so the books read 0 where they read the drop …
 pub const DROPPED_GLOBAL: &str = "plates/resample_dropped_km3";
+/// World globals (measurement only): the conserved pools of visible crust of another plate under
+/// the top cover with no contact between them, which the resampling takes as a contact would
+/// (the consumer of last resort, ledger PLT-812): continental crust, accreted …
+pub const LAST_RESORT_CONTINENT_GLOBAL: &str = "plates/resample_last_resort_continent_km3";
+/// … and ocean floor, under with its sediment's share (the rest accreted), km³ (Earth-normalized).
+/// Both are parts of the other globals already (`ACCRETED_GLOBAL`, `ACCRETED_VISIBLE_GLOBAL`,
+/// `MAFIC_DROPPED_GLOBAL`, `SEDIMENT_SUBDUCTED_GLOBAL`, `SEDIMENT_REACHING_TRENCH*`): no tool adds
+/// them to those. Of the ocean floor's: its sediment and sedimentary rock before the slab's share
+/// (in `SEDIMENT_REACHING_TRENCH*` too, though it reached no trench) …
+pub const LAST_RESORT_OCEAN_GLOBAL: &str = "plates/resample_last_resort_ocean_km3";
+pub const LAST_RESORT_SEDIMENT_GLOBAL: &str = "plates/resample_last_resort_sediment_km3";
+/// … the new samples that took a last-resort cover, summed over the resamplings …
+pub const LAST_RESORT_SAMPLES_GLOBAL: &str = "plates/resample_last_resort_samples";
+/// … and the largest rise the accretion gave one of them, m (the largest over the run).
+pub const LAST_RESORT_RISE_MAX_GLOBAL: &str = "plates/resample_last_resort_rise_max_m";
 /// … and the mafic pools of the continental crust that accretes, which `pools::accrete` does not
 /// carry (only the conserved pools join the column on top), km³.
 pub const MAFIC_DROPPED_GLOBAL: &str = "plates/resample_mafic_dropped_km3";
@@ -420,7 +457,9 @@ pub const SEDIMENT_SUBDUCTED_GLOBAL: &str = "plates/sediment_subducted_km3";
 /// sediment and sedimentary rock of ocean floor that goes under at resamplings, before the share
 /// the slab takes (PLT-440, PLT-660) is applied, slab path included, km³ (Earth-normalized),
 /// whether or not sediment subduction is on. It separates what reaches the trenches from what
-/// they keep. Split by the crust type of the sample on top: continental …
+/// they keep. It holds the consumer of last resort's ocean floor too, whose sediment reached no
+/// trench (`LAST_RESORT_SEDIMENT_GLOBAL` is that part: less it for the trenches' own). Split by
+/// the crust type of the sample on top: continental …
 pub const SEDIMENT_REACHING_TRENCH_GLOBAL: &str = "plates/sediment_reaching_trench_km3";
 pub const SEDIMENT_REACHING_TRENCH_CONTINENTAL_GLOBAL: &str =
     "plates/sediment_reaching_trench_continental_km3";
@@ -858,7 +897,11 @@ pub fn resample(
     // one-way slab's (measurement only); 12 and 13: the new continental samples whose island-arc
     // class, carried from the nearest corner, the blend of their columns would have lost or given
     // (measurement only, PLT-760: the old reading of the class).
-    let mut tally: Vec<[f64; 14]> = vec![[0.0; 14]; n];
+    // 14 and 15: the conserved pools of visible continental crust and ocean floor of a plate with
+    // no contact under the top, taken as a contact would take them (the consumer of last resort);
+    // 16 the ocean floor's sediment and sedimentary rock there, 17 one for a sample that took such
+    // a cover and 18 its accretion's rise, m (measurement only).
+    let mut tally: Vec<[f64; 19]> = vec![[0.0; 19]; n];
     let mature_m = super::subduction::mature_arc_m(k);
     let sediment_share = k.sediment_subduction_share as f32; // ledger: PLT-440
     // By margin type instead of one share (ledger: PLT-660).
@@ -873,9 +916,10 @@ pub fn resample(
     let mut limits: Vec<[f32; 3]> = vec![[f32::INFINITY, 0.0, f32::INFINITY]; n];
     // A cover of group `g` interpolated at the new point `q`, its labels from the old sample
     // nearest `q` (ledger: PLT-664).
+    let at = At { k, t_myr: t };
     let interp = |g: u32, c: &Cover, q: DVec3| {
         let rot = rots[g as usize];
-        interpolate(src, c, rot, nearest_corner(old, c, rot, q))
+        interpolate(src, c, rot, nearest_corner(old, c, rot, q), at)
     };
     let mut samples: Vec<Sample> = found
         .par_iter()
@@ -933,12 +977,28 @@ pub fn resample(
                 for (g2, c2) in rest {
                     let under = &src[c2.major() as usize];
                     let p2 = group_plate[*g2 as usize];
-                    if under.is_hidden() || p2 == *pl || overrides(*pl, p2) {
+                    // Every cover under the top is taken: hidden crust, the same plate's, a plate
+                    // the top overrides, and, as the consumer of last resort, visible crust of a
+                    // plate with no contact under the top, as a contact would take it (ledger
+                    // PLT-812; PR #55's re-review: the gate decides where contacts begin, never
+                    // the books). Until then that continental crust was dropped
+                    // (`DROPPED_GLOBAL`) and that ocean floor went with its sediment untallied.
+                    let no_contact = !under.is_hidden() && p2 != *pl && !overrides(*pl, p2);
+                    {
                         let mut u = interp(*g2, c2, q);
                         let conserved: f64 = u.pools[..pool::CONSERVED]
                             .iter()
                             .map(|&x| f64::from(x))
                             .sum();
+                        if no_contact {
+                            let slot = if under.kind == CONTINENTAL { 14 } else { 15 };
+                            tally[slot] += conserved;
+                            tally[17] = 1.0;
+                            if under.kind != CONTINENTAL {
+                                tally[16] += f64::from(u.pools[pool::SEDIMENT].max(0.0))
+                                    + f64::from(u.pools[pool::SEDIMENTARY].max(0.0));
+                            }
+                        }
                         // Crust a collision took across its front is consumed, hidden or
                         // not: the belt stacked its share and the rest went down with the slab.
                         if (under.is_hidden() && under.stacked())
@@ -955,8 +1015,8 @@ pub fn resample(
                             // accretes. ledger: PLT-440; with `sediment_subduction_sourced`
                             // the share follows the margin's type (PLT-660).
                             let mut subducted = 0.0_f64;
-                            let going_under = under.kind != CONTINENTAL
-                                && (under.is_hidden() || (p2 != *pl && overrides(*pl, p2)));
+                            let going_under =
+                                under.kind != CONTINENTAL && (under.is_hidden() || p2 != *pl);
                             if going_under {
                                 // Measurement only: what reaches the trench, before the share.
                                 let pile = f64::from(u.pools[pool::SEDIMENT].max(0.0))
@@ -985,7 +1045,8 @@ pub fn resample(
                             tally[7] += subducted;
                             let kept = conserved - subducted;
                             // What accretes: hidden continental crust, hidden ocean floor's
-                            // sediment, or visible crust of the same or a subducting plate.
+                            // sediment, or visible crust under the top (the same plate's, a
+                            // subducting plate's, or the consumer of last resort's).
                             tally[0] += kept;
                             if !under.is_hidden() {
                                 tally[3] += kept;
@@ -1000,9 +1061,6 @@ pub fn resample(
                             }
                             accrete(&mut s.pools, &u.pools);
                         }
-                    } else if under.kind == CONTINENTAL {
-                        let u = interp(*g2, c2, q);
-                        tally[5] += f64::from(u.thickness_m);
                     }
                 }
                 // Accreted crust stands up by its Airy height, capped at the column's, and the
@@ -1019,6 +1077,9 @@ pub fn resample(
                         s.elevation_m = (z + rise) as f32;
                         s.uplift_mm_yr += (rise / env.dt_yr * 1.0e3) as f32;
                         tally[4] += rise;
+                        if tally[17] > 0.0 {
+                            tally[18] = rise;
+                        }
                     }
                 }
                 // The accreted crust is crust uplift, whatever its rise (ledger: ISO-091).
@@ -1037,10 +1098,25 @@ pub fn resample(
         (ACCRETED_VISIBLE_GLOBAL, 3),
         (ACCRETED_RISE_GLOBAL, 4),
         (DROPPED_GLOBAL, 5),
+        (LAST_RESORT_CONTINENT_GLOBAL, 14),
+        (LAST_RESORT_OCEAN_GLOBAL, 15),
+        (LAST_RESORT_SEDIMENT_GLOBAL, 16),
         (MAFIC_DROPPED_GLOBAL, 6),
     ] {
         *world.globals.entry(name.to_owned()).or_insert(0.0) += sum(k);
     }
+    // Measurement only: how many new samples the consumer of last resort touched, and its
+    // largest rise.
+    *world
+        .globals
+        .entry(LAST_RESORT_SAMPLES_GLOBAL.to_owned())
+        .or_insert(0.0) += tally.iter().map(|t| t[17]).sum::<f64>();
+    let rise_max = tally.iter().map(|t| t[18]).fold(0.0_f64, f64::max);
+    let e = world
+        .globals
+        .entry(LAST_RESORT_RISE_MAX_GLOBAL.to_owned())
+        .or_insert(0.0);
+    *e = e.max(rise_max);
     // Only with the rule on, so a run with it off keeps the state it had before it existed.
     if sourced || sediment_share > 0.0 {
         *world
@@ -1244,6 +1320,46 @@ pub fn resample(
             (VOLCANIC_MARGIN_SAMPLES_GLOBAL, margin_n as f64),
         ] {
             *world.globals.entry(name.to_owned()).or_insert(0.0) += v;
+        }
+    }
+    // Measurement only (the resampling trace, 2026-10-31): how each new sample was made, and the
+    // resampling's counts, in the dynamics record.
+    if state.dynamics.is_some() {
+        let mut prov: Vec<u8> = found
+            .iter()
+            .map(|(top, rest)| match top {
+                None if rest.is_empty() => super::dynamics::PROV_GAP,
+                None => super::dynamics::PROV_SLAB_GAP,
+                Some(_) if !rest.is_empty() => super::dynamics::PROV_CONTESTED,
+                Some(_) => 0,
+            })
+            .collect();
+        for &i in &orphans {
+            prov[i] |= super::dynamics::PROV_ORPHAN;
+        }
+        // The plate the new sample took, against the old sample nearest it (orphans take
+        // theirs below, and the same test).
+        for (i, x) in prov.iter_mut().enumerate() {
+            let (j, _) = tree.nearest(new_pts[i]).unwrap_or((0, 0.0));
+            let near = group_plate[src[j as usize].group as usize];
+            if plate_new[i] != u32::MAX && plate_new[i] != near {
+                *x |= super::dynamics::PROV_MOVED;
+            }
+        }
+        let mut bits = [0u32; super::dynamics::PROV_BITS];
+        for &x in &prov {
+            for (b, c) in bits.iter_mut().enumerate() {
+                *c += u32::from(x & (1 << b) != 0);
+            }
+        }
+        if let Some(d) = state.dynamics.as_mut() {
+            d.resamples.push(super::dynamics::ResampleRec {
+                t,
+                step: env.step,
+                samples: n as u32,
+                bits,
+            });
+            d.prov = prov;
         }
     }
     for i in orphans {
@@ -1653,6 +1769,7 @@ mod tests {
     fn the_island_arc_class_survives_a_resampling_from_the_nearest_corner() {
         let k = &crate::params::TectonicParams::default();
         let mature = super::super::subduction::mature_arc_m(k);
+        let at = At { k, t_myr: 0.0 };
         let arc = |crust_m: f32| {
             let mut s = Sample::blank(0);
             s.pools = oceanic_column();
@@ -1682,7 +1799,7 @@ mod tests {
         for w0 in [0.4, 0.6, 0.8] {
             let w1 = 0.5 * (1.0 - w0);
             let src = [edge, floor, floor];
-            let s = interpolate(&src, &cover([w0, w1, w1]), DQuat::IDENTITY, 0);
+            let s = interpolate(&src, &cover([w0, w1, w1]), DQuat::IDENTITY, 0, at);
             assert_eq!(s.kind, CONTINENTAL);
             assert!(
                 s.basement() > 0.0 && s.arc_oceanic_m < mature,
@@ -1692,7 +1809,7 @@ mod tests {
         }
         // Leak A.
         let src = [continent, arc(40_000.0), continent];
-        let s = interpolate(&src, &cover([0.6, 0.2, 0.2]), DQuat::IDENTITY, 0);
+        let s = interpolate(&src, &cover([0.6, 0.2, 0.2]), DQuat::IDENTITY, 0, at);
         assert_eq!(s.kind, CONTINENTAL);
         assert!(s.basement() > 0.0 && s.arc_oceanic_m >= mature, "{s:?}");
         assert!(!island(&s), "the continent took the accreted arc's class");
@@ -1700,6 +1817,72 @@ mod tests {
         let mut back = edge;
         back.make_oceanic();
         assert!(!back.island_arc_marked());
+    }
+
+    /// PLT-824 through a resampling, before the final pass (PR #58's re-review): under the thermal
+    /// state a thick continental sample takes its own law over its own lithosphere and the nearest
+    /// corner's magmatic excess, so neither a hot hyper-extended corner nor a hot corner of its
+    /// own class enters its heat flow; without the state it is the blend over its class's corners,
+    /// the hyper-extended corner left out.
+    #[test]
+    fn a_resampled_column_takes_its_own_heat_flow() {
+        use super::super::thermal::{
+            ARC_HEAT_MW_M2, HOTSPOT_HEAT_MW_M2, conductive_mw_m2, sample_l_km,
+        };
+        use super::super::transition::hyper_extended;
+        let t = 500.0;
+        let column = |scale: f32, l_km: f32, q: f32| {
+            let mut s = Sample::blank(0);
+            s.kind = CONTINENTAL;
+            s.pools = super::super::pools::continental_column().map(|v| v * scale);
+            s.thickness_m = thickness(&s.pools);
+            s.lithosphere_km = l_km;
+            s.heat_flow_mw_m2 = q;
+            s
+        };
+        let near_l = 150.0;
+        let thick = column(1.0, near_l, 0.0);
+        // The nearest corner: its law over its own L plus 30 mW/m² of an arc's heat.
+        let near_q = (conductive_mw_m2(sample_l_km(&thick, t)) + 30.0) as f32;
+        let near = column(1.0, near_l, near_q);
+        let hyper = column(0.2, 20.0, 300.0);
+        let hot = column(1.0, 25.0, 230.0);
+        assert!(hyper_extended(&hyper) && !hyper_extended(&near) && !hyper_extended(&hot));
+        let cover = Cover {
+            t: 0,
+            tri: [0, 1, 2],
+            w: [0.5, 0.3, 0.2],
+        };
+        let src = [near, hyper, hot];
+        let on = crate::params::TectonicParams {
+            thermal_state: true,
+            ..Default::default()
+        };
+        let s = interpolate(&src, &cover, DQuat::IDENTITY, 0, At { k: &on, t_myr: t });
+        let excess = (f64::from(near_q) - conductive_mw_m2(sample_l_km(&near, t)))
+            .clamp(0.0, ARC_HEAT_MW_M2 + HOTSPOT_HEAT_MW_M2);
+        let want = conductive_mw_m2(sample_l_km(&s, t)) + excess;
+        assert!(
+            (f64::from(s.heat_flow_mw_m2) - want).abs() < 1e-3,
+            "{} against its own law's {want}",
+            s.heat_flow_mw_m2
+        );
+        // The other corners' heat flow does not enter.
+        let colder = [near, column(0.2, 20.0, 60.0), column(1.0, 25.0, 50.0)];
+        let s2 = interpolate(&colder, &cover, DQuat::IDENTITY, 0, At { k: &on, t_myr: t });
+        assert_eq!(s.heat_flow_mw_m2, s2.heat_flow_mw_m2);
+        // Without the state: the class's blend, the hyper-extended corner out.
+        let off = crate::params::TectonicParams {
+            thermal_state: false,
+            ..Default::default()
+        };
+        let s = interpolate(&src, &cover, DQuat::IDENTITY, 0, At { k: &off, t_myr: t });
+        let want = (0.5 * f64::from(near_q) + 0.2 * 230.0) / 0.7;
+        assert!(
+            (f64::from(s.heat_flow_mw_m2) - want).abs() < 1e-3,
+            "{} against the class blend's {want}",
+            s.heat_flow_mw_m2
+        );
     }
 
     /// PLT-660, Clift & Vannucchi (2004): an accretionary margin (a pile over 1 km, convergence

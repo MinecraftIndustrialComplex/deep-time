@@ -323,6 +323,21 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
             .get("structure")
             .map_or(String::new(), |v| v["plutons"].to_string())
     );
+    // The biomes and the water of the test planet, printed so two builds can be compared (the
+    // runoff law's re-review, 2026-10-31: how much a change to the year's thaw moves them).
+    let (cl, wa) = (&bake["climate"], &bake["water"]);
+    eprintln!(
+        "bake test biomes: land_cells_l2 {} wetland {} cold_wetland {} land_shares {} koppen {}",
+        cl["land_cells_l2"],
+        cl["wetland_cells"],
+        cl["cold_wetland_cells"],
+        cl["land_shares"],
+        cl["koppen_bands"]
+    );
+    eprintln!(
+        "bake test water: seasons {} playa {} stats {}",
+        wa["seasons"], wa["playa"], wa["stats"]
+    );
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
@@ -330,15 +345,13 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
 /// layer's rounding): its law (PLT-467, PLT-468) at the lid's floor (PLT-820) of the thinnest crust
 /// the model makes continental, the ocean's 7 km column (floor made continental starts from it; a
 /// stretch leaves a source at least its target crust, the ocean's, PLT-261), with an arc's and a
-/// hotspot's terms: 26 + 2,700 / 7 + 80 = 491.7. Before the floor (2026-10-31) the law had no
+/// hotspot's terms: 26 + 3,375 / 8.78 + 80 = 490.4 (491.7 on the first build's linear floor,
+/// before PR #58's review; `thermal::column_ceiling_mw_m2`). Before the floor (2026-10-31) the law had no
 /// ceiling but the 1 km clamp's 3,401 (+80), and the tests held the state to the proxy's 200.1,
 /// which held for their planets, not for the law (lithosphere-thermal-state.md "The lid's floor").
 fn state_heat_flow_ceiling() -> f64 {
-    use crate::plates::thermal::{
-        ARC_HEAT_MW_M2, HOTSPOT_HEAT_MW_M2, conductive_mw_m2, lid_floor_km,
-    };
     let ocean_km = f64::from(crate::plates::pools::oceanic_column().iter().sum::<f32>()) / 1000.0;
-    conductive_mw_m2(lid_floor_km(ocean_km)) + ARC_HEAT_MW_M2 + HOTSPOT_HEAT_MW_M2 + 0.1
+    crate::plates::thermal::column_ceiling_mw_m2(ocean_km) + 0.1
 }
 
 /// The bake's heat flow: continental cells only, every one in [`lo`, `hi`] mW/m², and nodata on
@@ -405,8 +418,8 @@ fn the_release_pace_bakes_continental_heat_flow_with_the_final_pass() {
 /// The lithosphere's thermal state (PLT-460 to PLT-469, ISO-112; on by default since 2026-10-23)
 /// with thermal isostasy (ISO-110, off by default) and the release pace: the bake's continental
 /// heat flow is the state's, at least an old craton's 41 mW/m² and at most its law's ceiling over
-/// the ocean's 7 km column at its lid's floor, 491.7 (PLT-820). Since the floor the planet bakes
-/// 259.8 at (21, 279), its one sample over 200.1 in the run: crust with no state at the final
+/// the ocean's 7 km column at its lid's floor, 490.4 (PLT-820). On the floor's first build the
+/// planet baked 259.8 at (21, 279), its one sample over 200.1 in the run: crust with no state at the final
 /// frame, a 7.3 km column on 1.54 Myr floor, under its floor's 2.32 √(κt) of 14.4 km (PLT-821),
 /// where it took the frame's 225 km and 41 before (a temporary trace, 2026-10-31).
 #[test]
@@ -422,7 +435,7 @@ fn the_thermal_state_bakes_its_own_heat_flow() {
     run_to_folder(&v.to_string(), &dir);
     let floor = crate::plates::thermal::conductive_mw_m2(crate::plates::thermal::L_COLD_KM);
     let ceiling = state_heat_flow_ceiling();
-    assert!((ceiling - 491.8).abs() < 0.1, "{ceiling}");
+    assert!((ceiling - 490.5).abs() < 0.1, "{ceiling}");
     check_heat_flow(&dir, floor - 0.1, ceiling);
     let _ = std::fs::remove_dir_all(&dir);
 }

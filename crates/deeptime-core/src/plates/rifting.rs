@@ -212,13 +212,20 @@ pub fn rift(
     // lithosphere's depth (`thermal.rs`), so the fragments meet where it is thin. Off (m = 0, or
     // no thermal state), the distance is the great circle's. ledger: PLT-506
     let grown: Option<Vec<Vec<f64>>> = (k.rift_weakness > 0.0 && k.thermal_state).then(|| {
+        // A sample with no state yet reads its floor's lithosphere: continental crust's from its
+        // floor's age, at least its lid's floor (PLT-821), the ocean floor's from its age (until
+        // 2026-10-31 an old craton's L_cold for both; PR #58's review).
         let depth = |i: u32| {
-            let l = f64::from(state.samples[i as usize].lithosphere_km);
-            if l > 0.0 {
-                l.clamp(WEAK_MIN_KM, super::thermal::L_COLD_KM)
+            let s = &state.samples[i as usize];
+            let l = f64::from(s.lithosphere_km);
+            let l = if l > 0.0 {
+                l
+            } else if s.kind == super::state::CONTINENTAL {
+                super::thermal::unset_continental_l_km(s, t)
             } else {
-                super::thermal::L_COLD_KM
-            }
+                super::thermal::ocean_km(s.age_myr(t))
+            };
+            l.clamp(WEAK_MIN_KM, super::thermal::L_COLD_KM)
         };
         let factor = |v: u32, u: u32| {
             (super::thermal::L_COLD_KM / (0.5 * (depth(v) + depth(u)))).powf(k.rift_weakness)
@@ -1500,6 +1507,7 @@ pub(in crate::plates) mod tests {
             one_way: None,
             propagations: Vec::new(),
             backarcs: Vec::new(),
+            converging: Vec::new(),
             level_set: None,
         };
         let pos = positions(&st, geo);

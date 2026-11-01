@@ -157,12 +157,12 @@ pub fn snapshot(
                         (t0 - LAPSE_C_PER_M * z, p0 * orographic(z) * cont)
                     }
                 };
-                let e = (60.0 * tc).max(0.0);
+                let e = (60.0 * tc).max(0.0); // ledger: MOI-067
                 t[i] = tc as f32;
                 sst[i] = if out.from_stage { tc } else { t0 } as f32;
                 p[i] = pc as f32;
                 pet[i] = e as f32;
-                ro[i] = ((pc - fu_et(pc, e)).max(0.0) / 1000.0) as f32;
+                ro[i] = mean_t_runoff_m_yr(pc, tc) as f32;
                 ar[i] = if e > 0.0 {
                     (pc / e).min(10.0) as f32
                 } else {
@@ -173,45 +173,137 @@ pub fn snapshot(
     out
 }
 
+/// The snapshot's own runoff, m/yr, for precipitation `precip_mm` (mm/yr) and the mean annual
+/// temperature `t_c` (°C): P less Fu's evapotranspiration with PET = 60 mm/°C x T, 0 below 0 °C
+/// (MOI-067, HYD-034), so a land below freezing sends all of P to its rivers. The stream power's
+/// runoff unless `surface.runoff_budget` (ERO-010).
+pub fn mean_t_runoff_m_yr(precip_mm: f64, t_c: f64) -> f64 {
+    let e = (60.0 * t_c).max(0.0); // ledger: MOI-067
+    (precip_mm - fu_et(precip_mm, e)).max(0.0) / 1000.0
+}
+
 /// One cell's water a year under the bake's budget (`HydroParams::budget`, HYD-035 to HYD-038):
-/// precipitation `precip_mm` (mm/yr), the mean annual temperature `t_c` (°C) and half the range
-/// between the warmest and the coldest month `half_c` (°C; not finite: the ±8 °C of HYD-032).
-/// Its runoff is what the lakes are fed with (ISO-126, ERO-217).
-pub fn cell_water(hydro: &HydroParams, precip_mm: f64, t_c: f64, half_c: f64) -> CellWater {
-    let cl = Climate::of(precip_mm, t_c, t_c + half_c, t_c - half_c);
-    let b = hydro.budget(&cl);
+/// precipitation `precip_mm` (mm/yr), the mean annual temperature `t_c` (°C) and the mean
+/// temperatures of the warmest and the coldest month `warm_c`, `cold_c` (°C; not finite: the
+/// mean ± 8 °C of HYD-032). Its runoff is what the lakes are fed with (ISO-126, ERO-217) and,
+/// with `surface.runoff_budget`, what the stream power's area counts (ERO-221).
+///
+/// The months are taken as given, not centred on the mean: the climate stage's year is twelve
+/// months of its energy balance, and their mean, warmest and coldest need not be symmetric
+/// (a polar desert at a mean of −17 °C has its warmest month at −5 and its coldest at −40). Until
+/// 2026-10-31 the half-range about the mean was passed instead, which put that warmest month at
+/// +0.5 °C, so its snow melted and ran off where the bake, keeping the months' departures
+/// (HYD-033), runs off nothing (the runoff law's review; `a_year_s_months_are_taken_as_given`).
+/// The year's warmth above freezing is taken by Holdridge's monthly method from the twelve
+/// months where the climate stage writes them (every step: [`cell_water_of`] with
+/// [`Months::climate`]), else from the three months on a year of two half-sines that keeps the
+/// mean (`Climate::thaw`).
+// ledger: ERO-221
+pub fn cell_water(
+    hydro: &HydroParams,
+    precip_mm: f64,
+    t_c: f64,
+    warm_c: f64,
+    cold_c: f64,
+) -> CellWater {
+    cell_water_of(hydro, &Climate::of(precip_mm, t_c, warm_c, cold_c))
+}
+
+/// [`cell_water`] for a cell's climate `cl` (with its twelve months where the stage wrote them:
+/// [`Months::climate`]).
+// ledger: ERO-221
+pub fn cell_water_of(hydro: &HydroParams, cl: &Climate) -> CellWater {
+    let b = hydro.budget(cl);
     CellWater {
         runoff_m_yr: b.runoff_mm / 1000.0,
         loss_m_yr: (b.evaporation_mm - b.rain_mm) / 1000.0,
     }
 }
 
-/// [`cell_water`] for every cell of the step's climate `clim`: the climate stage's seasons
-/// (`climate/t_warm_c`, `climate/t_cold_c`) as departures about the surface's own mean
-/// temperature (HYD-033), none without the stage.
-pub fn water_budget(world: &WorldState, clim: &Snapshot, hydro: &HydroParams) -> Vec<CellWater> {
-    let n = clim.t_c.len();
-    let season = |name: &str| {
+/// The climate stage's year on a grid of its cells: its warmest and coldest month
+/// (`climate/t_warm_c`, `climate/t_cold_c`) and its twelve months' sea-level temperatures
+/// (`climate/month/t_sl_c_*`, which the stage writes every step: a snapshot's, or the rows'
+/// months plus the departures carried with the plates).
+pub struct Months<'a> {
+    pub warm: &'a [f32],
+    pub cold: &'a [f32],
+    pub twelve: Option<Vec<&'a [f32]>>,
+}
+
+impl Months<'_> {
+    /// Cell `c`'s climate at precipitation `precip_mm` (mm/yr) and mean temperature `t_c` (°C):
+    /// the twelve months' departures from their mean added to it where the stage wrote them
+    /// (HYD-033: a month's departure is the same at any height; Holdridge's monthly method,
+    /// `Climate::thaw`), else its warmest and coldest month as written (a world from before the
+    /// stage wrote its months every step: the two half-sines).
+    // ledger: HYD-030, HYD-033
+    pub fn climate(&self, precip_mm: f64, t_c: f64, c: usize) -> Climate {
+        if let Some(twelve) = &self.twelve {
+            let sl: [f64; 12] = std::array::from_fn(|m| f64::from(twelve[m][c]));
+            let mean = sl.iter().sum::<f64>() / 12.0;
+            if mean.is_finite() {
+                return Climate::of_months(precip_mm, t_c, &std::array::from_fn(|m| sl[m] - mean));
+            }
+        }
+        Climate::of(
+            precip_mm,
+            t_c,
+            f64::from(self.warm[c]),
+            f64::from(self.cold[c]),
+        )
+    }
+}
+
+/// The climate stage's year ([`Months`]) on a grid of `n` cells: None unless the world holds
+/// both its warmest and its coldest month there, so every reader takes both or neither; the
+/// twelve months only when all twelve are there.
+pub fn months(world: &WorldState, n: usize) -> Option<Months<'_>> {
+    let get = |name: &str| {
         world
             .fields
             .get(name)
             .filter(|f| f.data.len() == n)
             .map(|f| &f.data[..])
     };
-    let warm = season(crate::climate::field::T_WARM);
-    let cold = season(crate::climate::field::T_COLD);
+    let warm = get(crate::climate::field::T_WARM)?;
+    let cold = get(crate::climate::field::T_COLD)?;
+    let twelve: Option<Vec<&[f32]>> = (0..12)
+        .map(|m| get(&crate::climate::field::t_sl_month(m)))
+        .collect();
+    Some(Months { warm, cold, twelve })
+}
+
+/// A cell's climate under the stage's year `months` (None: the mean ± 8 °C of HYD-032).
+pub fn cell_climate(months: Option<&Months>, precip_mm: f64, t_c: f64, c: usize) -> Climate {
+    match months {
+        Some(m) => m.climate(precip_mm, t_c, c),
+        None => Climate::of(precip_mm, t_c, f64::NAN, f64::NAN),
+    }
+}
+
+/// [`cell_water`] for every cell of the step's climate `clim`. From the climate stage, its own
+/// year ([`months`]): the snapshot's temperature is the stage's mean (`T_FIELD`), and the stage
+/// writes its twelve months (and its warmest and coldest) every step from the same months and
+/// lapse rate, so they are HYD-033's departures about the surface's mean exactly.
+/// Without the stage, none (HYD-032).
+pub fn water_budget(world: &WorldState, clim: &Snapshot, hydro: &HydroParams) -> Vec<CellWater> {
+    let n = clim.t_c.len();
+    let year = if clim.from_stage {
+        months(world, n)
+    } else {
+        None
+    };
     (0..n)
         .into_par_iter()
         .map(|c| {
-            let half = match (warm, cold) {
-                (Some(w), Some(k)) => 0.5 * f64::from(w[c] - k[c]),
-                _ => f64::NAN,
-            };
-            cell_water(
+            cell_water_of(
                 hydro,
-                f64::from(clim.precip_mm[c]),
-                f64::from(clim.t_c[c]),
-                half,
+                &cell_climate(
+                    year.as_ref(),
+                    f64::from(clim.precip_mm[c]),
+                    f64::from(clim.t_c[c]),
+                    c,
+                ),
             )
         })
         .collect()
@@ -233,5 +325,454 @@ mod tests {
             assert!(et <= p.min(e) + 1e-9 && et > 0.0);
         }
         assert!((fu_et(100.0, 1e6) - 100.0).abs() < 1.0);
+    }
+
+    // ledger: ERO-221
+    /// Where no month freezes (the coldest month at or above 0 °C), the bake's budget is the
+    /// surface's own runoff: biotemperature is the mean temperature, all of P is rain, and PET is
+    /// the same 60 mm/°C (HYD-029); on lopsided years too, by the two half-sines and by the twelve
+    /// months. The sinusoid about the mean that ignored the coldest month gave a frosty spell to a
+    /// year with none (the runoff law's second re-review: P 600 at a mean of 4 °C, months 10 and
+    /// 2, 364.5 mm against 380.7) and none to an inversion year (mean 5, months 9 and −3), which
+    /// now runs off less (`a_warm_mean_with_a_frosty_month_runs_off_less`).
+    #[test]
+    fn without_frost_the_budget_is_the_surface_s_runoff() {
+        let hydro = HydroParams::default();
+        for (p, t, warm, cold) in [
+            (2000.0, 26.0, 28.0, 24.0),
+            (800.0, 15.0, 25.0, 5.0),
+            (300.0, 21.0, 35.0, 7.0),
+            (1200.0, 8.0, 16.0, 0.0),
+            (50.0, 30.0, 35.0, 25.0),
+            // Lopsided: a short warm summer, a long mild winter, and the reverse.
+            (600.0, 4.0, 10.0, 2.0),
+            (900.0, 12.0, 14.0, 0.5),
+            (400.0, 6.0, 20.0, 0.0),
+        ] {
+            let budget = cell_water(&hydro, p, t, warm, cold).runoff_m_yr;
+            let own = mean_t_runoff_m_yr(p, t);
+            assert!(
+                (budget - own).abs() < 1.0e-12,
+                "P {p} T {t} months {warm} {cold}: budget {budget}, own {own}"
+            );
+        }
+        for months in [
+            [2.0, 2.0, 2.0, 2.0, 3.0, 5.0, 9.0, 10.0, 6.0, 3.0, 2.0, 2.0],
+            [
+                0.0, 0.5, 4.0, 9.0, 14.0, 18.0, 20.0, 19.0, 15.0, 9.0, 4.0, 1.0,
+            ],
+        ] {
+            let mean = months.iter().sum::<f64>() / 12.0;
+            let cl = Climate::of_months(600.0, mean, &months.map(|t| t - mean));
+            let budget = cell_water_of(&hydro, &cl).runoff_m_yr;
+            let own = mean_t_runoff_m_yr(600.0, mean);
+            assert!((budget - own).abs() < 1.0e-12, "{months:?}: {budget} {own}");
+        }
+        // A frosty month on a mean above freezing: not the surface's runoff any more.
+        let inversion = cell_water(&hydro, 600.0, 5.0, 9.0, -3.0).runoff_m_yr;
+        assert!(inversion < mean_t_runoff_m_yr(600.0, 5.0) - 1.0e-3);
+    }
+
+    // ledger: ERO-221, HYD-036, HYD-038
+    /// Ground whose warmest month is below freezing sends nothing to its rivers under the
+    /// budget (its snow stays, the glaciers' to move), and all of P under the surface's own rule.
+    #[test]
+    fn ground_that_never_thaws_runs_off_nothing() {
+        let hydro = HydroParams::default();
+        for (p, t, half) in [
+            (300.0, -20.0, 10.0),
+            (100.0, -30.0, 15.0),
+            (800.0, -8.0, 6.0),
+        ] {
+            assert_eq!(
+                cell_water(&hydro, p, t, t + half, t - half).runoff_m_yr,
+                0.0
+            );
+            assert!((mean_t_runoff_m_yr(p, t) - p / 1000.0).abs() < 1.0e-12);
+        }
+    }
+
+    /// The bake's budget's runoff, mm/yr, for a climate given by its months.
+    fn budget_runoff_mm(p: f64, t_mean: f64, warm: f64, cold: f64) -> f64 {
+        HydroParams::default()
+            .budget(&Climate {
+                precip_mm: p,
+                t_mean_c: t_mean,
+                t_warm_c: warm,
+                t_cold_c: cold,
+                months_c: None,
+            })
+            .runoff_mm
+    }
+
+    // ledger: ERO-222
+    /// The Mackenzie basin, a permafrost basin of 1.8 million km² (MAGS Water and Energy Budget
+    /// Synthesis, Table 2.1: "Mean annual precipitation: 410mm", "Mean annual
+    /// evapotranspiration: 237mm", "Average monthly temperature: 15 C in the summer and -25 C in
+    /// the winter"; Woo & Thorne 2003, Table 2: mean runoff 169 mm at Arctic Red River). The
+    /// budget's evapotranspiration and runoff are within the 54 mm mean absolute error of Fu's
+    /// curve over 470 catchments (Zhang et al. 2004, abstract); the snapshot's own rule (a mean
+    /// below 0 °C) evaporates nothing and runs off all 410 mm.
+    #[test]
+    fn the_mackenzie_basin_evaporates_as_measured() {
+        let (p, warm, cold) = (410.0, 15.0, -25.0);
+        // The source gives no annual mean: a symmetric year's, the summer's and the winter's
+        // midpoint.
+        let t = 0.5 * (warm + cold);
+        let q = budget_runoff_mm(p, t, warm, cold);
+        let et = p - q;
+        eprintln!("Mackenzie: budget runoff {q:.0} mm, ET {et:.0} mm (measured 169 and 237)");
+        assert!((et - 237.0).abs() <= 54.0, "budget ET {et:.0} against 237");
+        assert!(
+            (q - 169.0).abs() <= 54.0,
+            "budget runoff {q:.0} against 169"
+        );
+        assert!((1000.0 * mean_t_runoff_m_yr(p, t) - p).abs() < 1.0e-9);
+    }
+
+    // ledger: ERO-222
+    /// The McMurdo Dry Valleys, a polar desert (Fountain et al., "Snow in the McMurdo Dry
+    /// Valleys, Antarctica": "Air temperatures average about –17oC with the winter minimum about
+    /// -40oC and the summer maximum a few degrees above freezing"; "In Wright Valley, annual values
+    /// of snowfall have ranged 7 – 11 mm water equivalent ..., most of which is lost to
+    /// sublimation"). A warmest month below freezing (its mean under the summer's maximum): the
+    /// budget sends none of the snowfall to the rivers. A warmest month of 2 or 3 °C: under half.
+    /// The snapshot's own rule sends all of it. The budget's gap, printed: a warmest month just
+    /// above freezing melts all of the snow by its degree-days and evaporates little (PET from a
+    /// biotemperature of a few hundredths of a degree), so at 1 °C most of the snowfall runs off;
+    /// the budget has no sublimation of the cold season's snow.
+    #[test]
+    fn the_dry_valleys_lose_their_snowfall() {
+        for p in [7.0, 11.0] {
+            assert!((1000.0 * mean_t_runoff_m_yr(p, -17.0) - p).abs() < 1.0e-9);
+            for warm in [-5.0, -1.0, 0.0] {
+                let q = budget_runoff_mm(p, -17.0, warm, -40.0);
+                assert_eq!(q, 0.0, "warm month {warm} °C, P {p} mm");
+            }
+            for warm in [2.0, 3.0] {
+                let q = budget_runoff_mm(p, -17.0, warm, -40.0);
+                assert!(
+                    q < 0.5 * p,
+                    "warm month {warm} °C, P {p} mm: runoff {q:.2} mm"
+                );
+            }
+            for warm in [0.5, 1.0, 1.5] {
+                let q = budget_runoff_mm(p, -17.0, warm, -40.0);
+                eprintln!("Dry Valleys P {p} mm, warmest month {warm} °C: runoff {q:.1} mm");
+            }
+        }
+    }
+
+    // ledger: ERO-222, HYD-032
+    /// The Tibetan Plateau's lakes (Biskop et al. 2016, Table 4, the J2000g model on the HAR
+    /// reanalysis, land components, mm/yr: Mapam Yumco P 230, AET 170, runoff 60; Paiku Co 250,
+    /// 180, 70; Tangra Yumco 300, 210, 90; Nam Co 420, 290, 130; §2.1: "The mean annual air
+    /// temperature (MAAT) lies between 0 and −3 ◦C"). The source gives no months, so they are the
+    /// mean ± 8 °C of HYD-032. The budget evaporates in the plateau's summer, where the snapshot's
+    /// own rule (MAAT below 0 °C) evaporates nothing, and no more than the precipitation. The
+    /// budget's shortfall against Biskop's AET is printed, not asserted: Holdridge's PET has no
+    /// term for the plateau's sun and wind, and a better PET would close it (ERO-222's gap).
+    #[test]
+    fn the_tibetan_lakes_evaporate_under_the_budget() {
+        for (p, aet) in [
+            (230.0, 170.0),
+            (250.0, 180.0),
+            (300.0, 210.0),
+            (420.0, 290.0),
+        ] {
+            for t in [0.0, -1.5, -3.0] {
+                let et = p - budget_runoff_mm(p, t, t + 8.0, t - 8.0);
+                eprintln!(
+                    "Tibet P {p} MAAT {t}: budget ET {et:.0} mm (Biskop {aet}, shortfall {:.0})",
+                    aet - et
+                );
+                assert!(et > 0.0 && et <= p, "P {p}, MAAT {t}: budget ET {et:.0}");
+                if t < 0.0 {
+                    assert!((1000.0 * mean_t_runoff_m_yr(p, t) - p).abs() < 1.0e-9);
+                }
+            }
+        }
+    }
+
+    // ledger: ERO-222, HYD-030, HYD-031
+    /// Holdridge's worked example (Life Zone Ecology, p. 24 of the scan: Verkhoyansk's monthly
+    /// means "-50.0, -44.4, -32.2, -15.5, 0, + 12.2, + 13.3, +9.4, + 1.7, -15.5, -37.2 and -47.8",
+    /// "3.050 as a rough mean annual biotemperature", "mean annual precipitation 135 mm"). With
+    /// the twelve months, Holdridge's monthly method gives his 3.05 °C (36.6 / 12). With only the
+    /// mean and the warmest and coldest month, the two half-sines give 2.80 °C, 0.25 under it (the
+    /// three months' gap on a year this lopsided: its summer is short and its winter long and
+    /// flat); the sinusoid about the mean from the warmest month alone gave 2.70.
+    #[test]
+    fn verkhoyansk_s_biotemperature_is_holdridge_s() {
+        let months = [
+            -50.0, -44.4, -32.2, -15.5, 0.0, 12.2, 13.3, 9.4, 1.7, -15.5, -37.2, -47.8,
+        ];
+        let mean = months.iter().sum::<f64>() / 12.0;
+        let departures: [f64; 12] = std::array::from_fn(|m| months[m] - mean);
+        let twelve = Climate::of_months(135.0, mean, &departures);
+        assert!((twelve.t_warm_c - 13.3).abs() < 1.0e-9 && (twelve.t_cold_c + 50.0).abs() < 1.0e-9);
+        let (t_plus, share) = twelve.thaw();
+        let (halves, halves_share) = Climate::of(135.0, mean, 13.3, -50.0).thaw();
+        eprintln!(
+            "Verkhoyansk: biotemperature {t_plus:.3} °C by the twelve months, {halves:.3} by the two half-sines (Holdridge 3.05); thawed {share:.2} and {halves_share:.2} of the year"
+        );
+        assert!((t_plus - 3.05).abs() < 1.0e-9, "biotemperature {t_plus}");
+        assert!((halves - 2.80).abs() < 0.005, "two half-sines {halves}");
+        // Five months at or above 0 °C, May's at 0: the year drawn straight between the months'
+        // middles thaws from May's middle into September's.
+        assert!(share > 3.0 / 12.0 && share < 5.0 / 12.0, "{share}");
+    }
+
+    /// The two half-sines' year at day share `x` of 0 to 1 (the warm half first), °C: the
+    /// numerical integral's of `half_sines_thaw`.
+    fn half_sines_at(mean: f64, warm: f64, cold: f64, x: f64) -> f64 {
+        use std::f64::consts::PI;
+        let (a_w, a_c) = (warm - mean, mean - cold);
+        let tau_w = a_c / (a_w + a_c);
+        if x < tau_w {
+            mean + a_w * (PI * x / tau_w).sin()
+        } else {
+            mean - a_c * (PI * (x - tau_w) / (1.0 - tau_w)).sin()
+        }
+    }
+
+    /// A small deterministic generator for the sweeps (xorshift64*), uniform on [0, 1).
+    fn uniform(state: &mut u64) -> f64 {
+        *state ^= *state >> 12;
+        *state ^= *state << 25;
+        *state ^= *state >> 27;
+        (state.wrapping_mul(0x2545_f491_4f6c_dd1d) >> 11) as f64 / (1u64 << 53) as f64
+    }
+
+    // ledger: HYD-030, HYD-031
+    /// The two half-sines' closed form (unclamped, `half_sines_thaw`) is the year it draws: its
+    /// biotemperature and thawed share match a numerical integral of that year over random
+    /// lopsided years; the year's mean is the mean; and the unclamped value is never under
+    /// max(mean, 0) (Jensen) nor over the warmest month. The closed form is checked, not the
+    /// clamp in `Climate::thaw`.
+    #[test]
+    fn the_two_half_sines_are_the_year_they_draw() {
+        let mut rng = 0x9e37_79b9_7f4a_7c15u64;
+        const STEPS: usize = 20_000;
+        for _ in 0..300 {
+            let mean = -30.0 + 60.0 * uniform(&mut rng);
+            let warm = mean + 0.5 + 25.0 * uniform(&mut rng);
+            let cold = mean - 0.5 - 35.0 * uniform(&mut rng);
+            let (b, s) = crate::hydro::half_sines_thaw(mean, warm, cold);
+            let (mut above, mut thawed, mut sum) = (0.0, 0.0, 0.0);
+            for k in 0..STEPS {
+                let t = half_sines_at(mean, warm, cold, (k as f64 + 0.5) / STEPS as f64);
+                above += t.max(0.0);
+                thawed += f64::from(u8::from(t > 0.0));
+                sum += t;
+            }
+            let k = STEPS as f64;
+            let (above, thawed, sum) = (above / k, thawed / k, sum / k);
+            assert!(
+                (sum - mean).abs() < 1.0e-5,
+                "{mean} {warm} {cold}: the year's mean {sum}"
+            );
+            assert!(
+                (b - above).abs() < 1.0e-4 && (s - thawed).abs() < 2.0e-4,
+                "{mean} {warm} {cold}: closed form ({b}, {s}), integral ({above}, {thawed})"
+            );
+            assert!(
+                b >= mean.max(0.0) - 1.0e-9 && b <= warm.max(0.0) + 1.0e-9,
+                "{mean} {warm} {cold}: {b}"
+            );
+            // Frosty exactly when the coldest month is below 0 °C; thawed only when the warmest
+            // is above it.
+            assert_eq!(s < 1.0, cold < 0.0, "{mean} {warm} {cold}: share {s}");
+            assert_eq!(s > 0.0, warm > 0.0, "{mean} {warm} {cold}: share {s}");
+        }
+    }
+
+    // ledger: HYD-030, HYD-031
+    /// The biotemperature and the thawed share are continuous in all three months (unclamped):
+    /// either side of the coldest month at 0 °C, of the warmest at 0 °C and of the mean at 0 °C,
+    /// and as the warmest or the coldest month reaches the mean, the values differ by little (the
+    /// share by up to a square root of the step, where a half's minimum or maximum touches
+    /// freezing).
+    #[test]
+    fn the_two_half_sines_are_continuous_in_the_three_months() {
+        let f = crate::hydro::half_sines_thaw;
+        let eps = 1.0e-7;
+        let close = |a: (f64, f64), b: (f64, f64), what: &str| {
+            assert!(
+                (a.0 - b.0).abs() < 1.0e-5 && (a.1 - b.1).abs() < 2.0e-3,
+                "{what}: {a:?} against {b:?}"
+            );
+        };
+        for (mean, warm) in [(4.0, 10.0), (12.0, 30.0), (0.5, 3.0)] {
+            close(
+                f(mean, warm, eps),
+                f(mean, warm, -eps),
+                "coldest month at 0",
+            );
+        }
+        for (mean, cold) in [(-4.0, -10.0), (-12.0, -30.0), (-0.5, -3.0)] {
+            close(
+                f(mean, eps, cold),
+                f(mean, -eps, cold),
+                "warmest month at 0",
+            );
+        }
+        for (warm, cold) in [(10.0, -10.0), (3.0, -30.0), (25.0, -2.0)] {
+            close(f(eps, warm, cold), f(-eps, warm, cold), "mean at 0");
+        }
+        // A half that vanishes as its month reaches the mean (its weight goes to 0), and the
+        // degenerate year (no range): each meets its neighbours.
+        for (mean, cold) in [(4.0, -6.0), (-3.0, -20.0), (0.5, -1.0)] {
+            close(
+                f(mean, mean + eps, cold),
+                f(mean, mean, cold),
+                "warmest month at the mean",
+            );
+        }
+        for (mean, warm) in [(-3.0, 5.0), (4.0, 20.0), (-0.5, 1.0)] {
+            close(
+                f(mean, warm, mean - eps),
+                f(mean, warm, mean),
+                "coldest month at the mean",
+            );
+        }
+        close(f(5.0, 5.0 + eps, 5.0 - eps), f(5.0, 5.0, 5.0), "no range");
+    }
+
+    // ledger: HYD-030, HYD-031
+    /// The twelve months' biotemperature (unclamped, `months_thaw`) is never under max(mean, 0)
+    /// nor over the warmest month, its share is in 0 to 1, and both are continuous in each month,
+    /// over random twelve-month years (the (0, 0) jump of `thawed_share` aside, which these never
+    /// reach). And the regression guard for the first re-review's jump: a sinusoid centred between
+    /// the two months gave 4.00 °C at a coldest month of 0 °C and 5.00 at −0.01 (P 600, mean 4,
+    /// warmest 10: −12 % runoff for 0.01 °C) and 3.63 at −6, under the mean.
+    #[test]
+    fn the_biotemperature_is_continuous_and_never_under_the_mean() {
+        let mut rng = 0x2545_f491_4f6c_dd1du64;
+        for _ in 0..500 {
+            let base = -30.0 + 55.0 * uniform(&mut rng);
+            let amp = 30.0 * uniform(&mut rng);
+            let months: [f64; 12] = std::array::from_fn(|m| {
+                let phase = 2.0 * std::f64::consts::PI * m as f64 / 12.0;
+                base + amp * phase.cos() + 6.0 * (uniform(&mut rng) - 0.5)
+            });
+            let mean = months.iter().sum::<f64>() / 12.0;
+            let warm = months.iter().cloned().fold(f64::MIN, f64::max);
+            let (b, s) = crate::hydro::months_thaw(&months);
+            assert!(
+                b >= mean.max(0.0) - 1.0e-12 && b <= warm.max(0.0) + 1.0e-12,
+                "{months:?}: {b}"
+            );
+            assert!((0.0..=1.0).contains(&s), "{months:?}: share {s}");
+            for m in 0..12 {
+                for d in [1.0e-6, -1.0e-6] {
+                    let mut moved = months;
+                    moved[m] += d;
+                    let (b2, s2) = crate::hydro::months_thaw(&moved);
+                    assert!(
+                        (b2 - b).abs() <= 1.0e-6 && (s2 - s).abs() < 1.0e-4,
+                        "{months:?} month {m} by {d}: ({b}, {s}) to ({b2}, {s2})"
+                    );
+                }
+            }
+        }
+        // The regression guard: both sides of a coldest month of 0 °C nothing jumps, and the
+        // biotemperature is not under the mean.
+        let hydro = HydroParams::default();
+        let at = |cold: f64| {
+            let cl = Climate::of(600.0, 4.0, 10.0, cold);
+            (cl.thaw().0, cell_water_of(&hydro, &cl).runoff_m_yr * 1000.0)
+        };
+        let (b0, q0) = at(0.0);
+        for cold in [0.01, -0.01] {
+            let (b, q) = at(cold);
+            assert!(
+                (b - b0).abs() < 1.0e-3 && (q - q0).abs() < 0.5,
+                "{cold}: {b} {q}"
+            );
+        }
+        let (b6, q6) = at(-6.0);
+        let unclamped = crate::hydro::half_sines_thaw(4.0, 10.0, -6.0).0;
+        assert!(unclamped > 4.0 && b6 == unclamped, "{unclamped} {b6}");
+        eprintln!(
+            "P 600, mean 4, warmest month 10 °C: biotemperature {b0:.3} °C, runoff {q0:.1} mm at a coldest month of 0; {b6:.3} °C, {q6:.1} mm at −6"
+        );
+    }
+
+    // ledger: ERO-221, HYD-035
+    /// A land below freezing on the year with a thawed summer evaporates in it: it runs off
+    /// less than all of P, and more than nothing.
+    #[test]
+    fn a_cold_land_with_a_summer_evaporates_in_it() {
+        let hydro = HydroParams::default();
+        for (p, t, half) in [(400.0, -2.0, 12.0), (250.0, -8.0, 18.0), (600.0, -1.0, 8.0)] {
+            let budget = cell_water(&hydro, p, t, t + half, t - half).runoff_m_yr;
+            let own = mean_t_runoff_m_yr(p, t);
+            assert!((own - p / 1000.0).abs() < 1.0e-12);
+            assert!(
+                budget > 0.0 && budget < 0.9 * own,
+                "P {p} T {t} ±{half}: budget {budget}, own {own}"
+            );
+        }
+    }
+
+    // ledger: ERO-221, HYD-030
+    /// Land with a mean above freezing and a month below it is not frost-free: its
+    /// biotemperature counts the frozen months as 0 °C, so it is above the mean (Holdridge), the
+    /// budget's PET is higher than the snapshot's 60 T, and it runs off less (the runoff law's
+    /// review: P 600 mm at 5 ± 15 °C, 336 against 245 mm). With no month below freezing the two
+    /// are the same (`without_frost_the_budget_is_the_surface_s_runoff`). Lopsided years too: a
+    /// short frosty winter under a long warm year (an inversion year, mean 5, months 9 and −3),
+    /// which the sinusoid about the mean from the warmest month left frost-free.
+    #[test]
+    fn a_warm_mean_with_a_frosty_month_runs_off_less() {
+        let hydro = HydroParams::default();
+        for (p, t, warm, cold) in [
+            (600.0, 5.0, 20.0, -10.0),
+            (900.0, 8.0, 20.0, -4.0),
+            (400.0, 2.0, 12.0, -8.0),
+            (600.0, 5.0, 9.0, -3.0),
+            (500.0, 10.0, 13.0, -1.0),
+        ] {
+            let budget = 1000.0 * cell_water(&hydro, p, t, warm, cold).runoff_m_yr;
+            let own = 1000.0 * mean_t_runoff_m_yr(p, t);
+            eprintln!(
+                "P {p} at {t} °C, months {warm} and {cold}: runoff {own:.0} mm by the snapshot's rule, {budget:.0} by the budget ({:+.0} %)",
+                100.0 * (budget / own - 1.0)
+            );
+            assert!(
+                budget > 0.0 && budget < own,
+                "P {p} at {t}, months {warm} {cold}: budget {budget}, own {own}"
+            );
+        }
+    }
+
+    // ledger: ERO-221, HYD-033
+    /// The months are taken as the climate stage gives them, not centred on the mean (the runoff
+    /// law's review): the Dry Valleys' year (Fountain et al.: a mean of about −17 °C, a winter
+    /// minimum of about −40), with its warmest month at −5 °C, never thaws and runs off nothing.
+    /// Centred on the mean, the same range put the warmest month at +0.5 °C: what that ran off is
+    /// printed. (The two half-sines take the warm half's amplitude from the warmest month and the
+    /// cold half's from the coldest, as given.)
+    #[test]
+    fn a_year_s_months_are_taken_as_given() {
+        let hydro = HydroParams::default();
+        let (t, warm, cold) = (-17.0, -5.0, -40.0);
+        let half = 0.5 * (warm - cold);
+        for p in [7.0, 11.0, 300.0] {
+            assert_eq!(cell_water(&hydro, p, t, warm, cold).runoff_m_yr, 0.0);
+            let centred = 1000.0 * cell_water(&hydro, p, t, t + half, t - half).runoff_m_yr;
+            eprintln!(
+                "P {p} mm, mean {t}, months {warm} and {cold} °C: runoff 0; centred (+{:.1} and {:.1}): {centred:.1} mm, {:.2} of P",
+                t + half,
+                t - half,
+                centred / p
+            );
+            assert!(centred > 0.0);
+        }
+        // Without the months, the mean ± 8 °C (HYD-032).
+        let none = cell_water(&hydro, 300.0, -1.0, f64::NAN, f64::NAN).runoff_m_yr;
+        let eight = cell_water(&hydro, 300.0, -1.0, 7.0, -9.0).runoff_m_yr;
+        assert_eq!(none, eight);
     }
 }

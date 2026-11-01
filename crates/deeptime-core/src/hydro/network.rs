@@ -883,25 +883,27 @@ pub fn run(inp: &Input<'_>) -> Output {
     let ri = i64::from(inp.grid.r);
     let mut lake_cells: Vec<(u32, u32)> = lake_of.iter().map(|(&c, &l)| (c, l)).collect();
     lake_cells.par_sort_unstable();
-    let climates: Vec<Climate> = lake_cells
+    // Only the three values the lakes keep (a `Climate` with its twelve months is 136 B).
+    let climates: Vec<[f64; 3]> = lake_cells
         .par_iter()
         .map(|&(c, _)| {
             let cu = c as usize;
-            (inp.climate)(ox + (cu % g.w) as i64 * ri, oz + (cu / g.w) as i64 * ri)
+            let cl = (inp.climate)(ox + (cu % g.w) as i64 * ri, oz + (cu / g.w) as i64 * ri);
+            [cl.t_mean_c, cl.t_warm_c, cl.aridity()]
         })
         .collect();
     let mut water_level = vec![NODATA; n];
     let mut kinds = vec![kind::NONE; n];
     let mut sums = vec![(0f64, 0f64, 0f64, 0u32, u32::MAX); lakes.len()];
-    for (&(c, l), cl) in lake_cells.iter().zip(&climates) {
+    for (&(c, l), &[t_mean, t_warm, aridity]) in lake_cells.iter().zip(&climates) {
         let s = &mut sums[l as usize];
-        s.0 += cl.t_mean_c;
-        s.1 += cl.t_warm_c;
-        s.2 += cl.aridity();
+        s.0 += t_mean;
+        s.1 += t_warm;
+        s.2 += aridity;
         s.3 += 1;
         s.4 = s.4.min(c);
         water_level[c as usize] = lakes[l as usize].level;
-        kinds[c as usize] = if p.frozen(cl.t_mean_c) {
+        kinds[c as usize] = if p.frozen(t_mean) {
             kind::FROZEN
         } else {
             kind::LAKE

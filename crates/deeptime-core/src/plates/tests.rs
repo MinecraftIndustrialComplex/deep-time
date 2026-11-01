@@ -321,6 +321,63 @@ fn finish(s: &Session) {
     panic!("the run never finished");
 }
 
+/// The overlap trace (measurement only, 2026-10-31): every contact `subduction::resolve` begins
+/// carries its plates' motion across its overlap (its overlapping samples, at least
+/// `MIN_CONTACT`, each in one class, for the pair of plates that met), and the step's record
+/// empties the measure, so no state between steps holds one. With the gate on (PLT-810, the
+/// default), every new contact of plates that came to converge or of an initiation's pair reads
+/// converging (a reversal's is not gated); the trace reads the gate's own function on its own
+/// inputs, so this is the gate's run-long regression test, not a measure of it.
+#[test]
+fn onsets_carry_their_plates_motion_across_the_overlap() {
+    let p = preset(8000, 100.0, "scattered_continents", 3);
+    assert!(
+        p.tectonics.contact_needs_convergence,
+        "the gate is on by default"
+    );
+    let mut held = 0usize;
+    let world = run_stage(&p, |_, _, st| {
+        held += st.dynamics.as_ref().map_or(0, |d| {
+            d.onset_overlap.len() + d.onset_reversed.len() + d.onset_crossed.len()
+        });
+    });
+    assert_eq!(held, 0, "a step's overlap measure outlived its record");
+    let d = world.plates.as_ref().unwrap().dynamics.as_ref().unwrap();
+    let read = d.onsets.iter().filter(|o| o.overlap.n > 0).count();
+    assert!(read > 0, "no onset of {} with its overlap", d.onsets.len());
+    for o in &d.onsets {
+        let v = &o.overlap;
+        assert_eq!(
+            v.converging + v.transform + v.parting + v.no_normal,
+            v.n,
+            "{v:?}"
+        );
+        if v.n > 0 {
+            assert_eq!((v.lo, v.hi), (o.under.min(o.over), o.under.max(o.over)));
+            assert!(v.n >= subduction::MIN_CONTACT, "{v:?}");
+            assert!(usize::from(v.pair_class) <= subduction::OVERLAP_NO_NORMAL);
+            if o.route != 1 && o.setting < 2 {
+                assert_eq!(
+                    usize::from(v.pair_class),
+                    subduction::OVERLAP_CONVERGING,
+                    "a new contact begun on a pair not converging: {o:?}"
+                );
+            }
+        }
+    }
+    // The gate's crossing: a new contact the gate held carries the steps that added to its sum
+    // and a sum of at least half a spacing; a reversal and continental crust on both sides are
+    // not held.
+    let env = PlatesStage::new(p.clone()).env(&p.tectonics, 1);
+    let need_km = subduction::CONTACT_CONVERGENCE_SPACINGS * env.norm.km(env.norm.spacing_rad());
+    let crossed: Vec<&dynamics::OnsetRec> = d.onsets.iter().filter(|o| o.cross_steps > 0).collect();
+    assert!(!crossed.is_empty(), "no onset crossed the gate");
+    for o in crossed {
+        assert!(o.route != 1 && o.setting < 2, "{o:?}");
+        assert!(o.cross_km >= need_km, "{} < {need_km}", o.cross_km);
+    }
+}
+
 /// A run checkpointed mid-stage through bytes and resumed ends in exactly the straight run's world.
 #[test]
 fn resumed_run_is_identical() {
@@ -544,12 +601,16 @@ fn sutures_and_initiations_keep_continents_whole() {
     // 5, 6, 8, 9, 11 to 13, 16 to 22 and 24, so supercontinent 2 and scattered 8 still; both
     // still weld with the island-arc class carried through the resamplings and no suture magma on
     // a terrane going down, PR #53's re-review, the same day: supercontinent 1 to 4, 10, 12, 14,
-    // 18 and 21 to 24, scattered 1, 3 to 6, 8 to 10, 12, 13, 15 to 17 and 21 to 23; with the
-    // continental lid's floor, PLT-820 and PLT-821, 2026-10-31, supercontinent 2 still welds and
-    // scattered 8 no more, the sweep's welding seeds supercontinent 1, 2, 4 to 6, 8 to 12, 14, 16,
-    // 21 and 24 and scattered 1, 2, 4, 5, 9, 12 to 19 and 21 to 24, so supercontinent 2 and
-    // scattered 1).
-    for (start, seed) in [("supercontinent", 2), ("scattered_continents", 1)] {
+    // 18 and 21 to 24, scattered 1, 3 to 6, 8 to 10, 12, 13, 15 to 17 and 21 to 23; with a
+    // contact only where its plates converge on by default, PLT-810, the same day, scattered 8 no
+    // more, the sweep's welding seeds supercontinent 1, 2, 8, 9, 12, 13, 16, 17 and 19 and
+    // scattered 3, 5, 7, 9, 11, 13 to 16, 18 and 22, so supercontinent 2 and scattered 3; with the
+    // gate on any angle of convergence, PR #55's review, supercontinent 1, 2, 4, 5, 7, 8, 10, 12, 13,
+    // 17, 20, 21 and 24 and scattered 2, 3, 5 to 7, 10 to 13, 17, 19, 22 and 24, the same two;
+    // with the gate on cumulative convergence, PR #55's re-review, supercontinent 1, 3, 4, 8, 13,
+    // 14, 16, 17, 19 and 20 and scattered 3, 8, 11, 13, 14, 16 to 18, 21 and 23, supercontinent 2 no
+    // more, so supercontinent 1 and scattered 3).
+    for (start, seed) in [("supercontinent", 1), ("scattered_continents", 3)] {
         let mut p = preset(8000, 300.0, start, seed);
         // The old law (PLT-585 off, PLT-540 on): under Forsyth & Uyeda's balance on this small
         // planet, whose ridge push is several times Earth's (`plates_quick_16k`, ridge -1,000 m,
@@ -903,11 +964,15 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // the supercontinent 2, 5, 7, 9, 13 to 15, 17, 20, 21 and 23; 16 of seeds 1 to 24 with the
     // island-arc class carried through the resamplings and no suture magma on a terrane going
     // down, PR #53's re-review, the same day: 1, 3 to 6, 8 to 10, 12, 13, 15 to 17 and 21 to 23,
-    // seed 3 still welds; from the supercontinent 1 to 4, 10, 12, 14, 18 and 21 to 24; 17 of seeds
-    // 1 to 24 with the continental lid's floor, PLT-820 and PLT-821, 2026-10-31, the sweep
-    // `weld_seed_sweep`: 1, 2, 4, 5, 9, 12 to 19 and 21 to 24, seed 3 no more, so seed 1; from the
-    // supercontinent 1, 2, 4 to 6, 8 to 12, 14, 16, 21 and 24).
-    let mut p = preset(8000, 300.0, "scattered_continents", 1);
+    // seed 3 still welds; from the supercontinent 1 to 4, 10, 12, 14, 18 and 21 to 24; 11 of
+    // seeds 1 to 24 with a contact only where its plates converge on by default, PLT-810, the same
+    // day: 3, 5, 7, 9, 11, 13 to 16, 18 and 22, seed 3 still welds; from the supercontinent 1, 2,
+    // 8, 9, 12, 13, 16, 17 and 19; 13 of 24 with the gate on any angle of convergence, PR #55's
+    // review: 2, 3, 5 to 7, 10 to 13, 17, 19, 22 and 24, seed 3 still welds; from the
+    // supercontinent 1, 2, 4, 5, 7, 8, 10, 12, 13, 17, 20, 21 and 24; 10 of 24 with the gate on
+    // cumulative convergence, PR #55's re-review: 3, 8, 11, 13, 14, 16 to 18, 21 and 23, seed 3
+    // still welds; from the supercontinent 1, 3, 4, 8, 13, 14, 16, 17, 19 and 20).
+    let mut p = preset(8000, 300.0, "scattered_continents", 3);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: under Forsyth & Uyeda's
     // balance on this small planet, whose ridge push is several times Earth's
     // (`plates_quick_16k`, ridge -1,000 m, floor -10,000 m), the speed guard bound on every
@@ -1120,11 +1185,12 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // 2026-10-31: it still welds (the sweep's welding seeds 1, 3, 5, 6, 8, 9, 11 to 13, 16 to 22
     // and 24, the guard binding on none), so the two tests still share this planet; and after PR
     // #53's re-review, the same day (the sweep's welding seeds 1, 3 to 6, 8 to 10, 12, 13, 15 to 17
-    // and 21 to 23, the guard binding on none); seed 1 since the continental lid's floor, PLT-820
-    // and PLT-821, 2026-10-31, when seed 3 no longer welds: the sweep's welding seeds 1, 2, 4, 5,
-    // 9, 12 to 19 and 21 to 24, the guard binding on none, seed 1 the first, and the weld test
-    // above takes seed 1 too, so the two tests still share this planet).
-    let mut p = preset(8000, 300.0, "scattered_continents", 1);
+    // and 21 to 23, the guard binding on none)), and with PLT-810 on by default, the same day
+    // (the sweep's welding seeds 3, 5, 7, 9, 11, 13 to 16, 18 and 22, the guard binding on none), and
+    // with the gate on any angle of convergence (PR #55's review: 2, 3, 5 to 7, 10 to 13, 17, 19, 22
+    // and 24, the guard binding on none), and with the gate on cumulative convergence (PR #55's
+    // re-review: 3, 8, 11, 13, 14, 16 to 18, 21 and 23, the guard binding on none).
+    let mut p = preset(8000, 300.0, "scattered_continents", 3);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: the guard asserted below
     // bound under Forsyth & Uyeda's balance on every welding seed of 1 to 24 of this small planet
     // but supercontinent 11, whose ridge push is several times Earth's (`plates_quick_16k`, ridge
@@ -1658,6 +1724,63 @@ fn two_plates(p: &PlanetPreset, env: &Env<'_>, turn: f64) -> (PlateState, Geo, V
     plates_split(p, env, turn, |q| q.z > 0.0)
 }
 
+/// `subduction::resolve` on a fixture whose plates were turned but left at rest (`omega` 0): each
+/// such plate moves, while its overlaps are resolved, about its group's turn at 50 mm/yr, and
+/// each pair of plates has converged half a spacing before (the turn), so a contact begins where
+/// the turn converges, as PLT-810 asks (`contact_needs_convergence`); the plates are at rest
+/// again after, as the fixture built them. A plate the test set moving keeps its motion.
+#[allow(clippy::too_many_arguments)]
+fn resolve_turned(
+    st: &mut PlateState,
+    world: &mut WorldState,
+    geo: &Geo,
+    overlaps: &[subduction::Overlap],
+    pos: &[DVec3],
+    tree: &Tree,
+    env: &Env<'_>,
+) -> Result<subduction::Resolved, crate::error::CoreError> {
+    let rest: Vec<usize> = (0..st.plates.len())
+        .filter(|&k| st.plates[k].omega == [0.0; 3])
+        .collect();
+    let speed = env.norm.omega_of_speed(50.0);
+    // The turn is the fixture's history: each pair has converged just short of what the gate asks
+    // (PLT-810, half a spacing), so this step's motion decides: a pair converging now crosses, one
+    // with no normal or parting does not (PR #55's third re-review).
+    let need_km = subduction::CONTACT_CONVERGENCE_SPACINGS * env.norm.km(env.norm.spacing_rad());
+    let alive: Vec<u32> = (0..st.plates.len() as u32)
+        .filter(|&k| st.plates[k as usize].alive)
+        .collect();
+    st.converging = alive
+        .iter()
+        .flat_map(|&lo| {
+            alive
+                .iter()
+                .filter(move |&&hi| hi > lo)
+                .map(move |&hi| state::PairConvergence {
+                    lo,
+                    hi,
+                    km: need_km * (1.0 - 1e-9),
+                    steps: 1,
+                })
+        })
+        .collect();
+    for g in st.groups.clone() {
+        let pl = g.plate as usize;
+        if !rest.contains(&pl) {
+            continue;
+        }
+        let (axis, angle) = glam::DQuat::from_array(g.rot).to_axis_angle();
+        if angle.abs() > 1e-12 {
+            st.plates[pl].omega = (axis * angle.signum() * speed).to_array();
+        }
+    }
+    let out = subduction::resolve(st, world, geo, overlaps, pos, tree, env);
+    for k in rest {
+        st.plates[k].omega = [0.0; 3];
+    }
+    out
+}
+
 /// The planet of `two_plates` with plate 0, the continent, where `north` holds.
 fn plates_split(
     p: &PlanetPreset,
@@ -1671,7 +1794,7 @@ fn plates_split(
     let tree = Tree::over(&pos, |_| true);
     let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, env);
     let mut world = WorldState::new(1, 16_384, p.t_start_years());
-    subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, env).unwrap();
+    resolve_turned(&mut st, &mut world, &geo, &overlaps, &pos, &tree, env).unwrap();
     (st, geo, pos)
 }
 
@@ -1718,6 +1841,338 @@ fn plates_unresolved(
     (st, geo)
 }
 
+/// The gate's fixture (PLT-810): two oceanic plates of 80-Myr floor split at the equator, the
+/// southern (plate 1) turned by `turn` (about the x axis it overlaps the northern where y > 0;
+/// about the z axis it slides along their shared lattice boundary), and moving at 50 mm/yr about
+/// `motion`. Returns the state, what a step needs to resolve it, and the pair's reading of its
+/// overlap.
+struct GateFixture {
+    st: PlateState,
+    geo: Geo,
+    pos: Vec<DVec3>,
+    tree: Tree,
+    overlaps: Vec<subduction::Overlap>,
+    class: u8,
+    /// The overlap's mean convergence across, mm/yr.
+    conv: f64,
+}
+
+fn gate_fixture(
+    p: &PlanetPreset,
+    env: &Env<'_>,
+    turn: glam::DQuat,
+    motion: DVec3,
+    kind: u8,
+) -> GateFixture {
+    let (mut st, geo) = plates_unresolved(p, env, turn, |q| q.z > 0.0);
+    for s in st.samples.iter_mut() {
+        if kind == CONTINENTAL {
+            s.kind = CONTINENTAL;
+            s.pools = pools::continental_column();
+            s.elevation_m = 400.0;
+        } else {
+            s.kind = OCEANIC;
+            s.pools = pools::oceanic_column();
+            s.elevation_m = -4500.0;
+            s.formed_myr = (env.t_myr - 80.0) as f32;
+        }
+        s.thickness_m = pools::thickness(&s.pools);
+    }
+    st.plates[1].omega = (env.norm.omega_of_speed(50.0) * motion).to_array();
+    let pos = geometry::positions(&st, &geo);
+    st.recount(&pos);
+    let tree = Tree::over(&pos, |_| true);
+    let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, env);
+    assert!(overlaps.len() >= subduction::MIN_CONTACT as usize);
+    let read = subduction::overlap_motion(&st, &overlaps, &pos, &tree, env, |_| true);
+    let (class, conv) = read
+        .get(&(0, 1))
+        .map_or((u8::MAX, f64::NAN), |r| (r.pair_class, r.conv_mm_yr));
+    GateFixture {
+        st,
+        geo,
+        pos,
+        tree,
+        overlaps,
+        class,
+        conv,
+    }
+}
+
+/// `subduction::resolve` on the fixture step after step (the plates held where they are, so its
+/// overlap and its reading stay), from step 1 to `steps`: the step its first contact begins.
+fn gate_steps(p: &PlanetPreset, f: &mut GateFixture, steps: u64) -> Option<u64> {
+    let stage = PlatesStage::new(p.clone());
+    let mut world = WorldState::new(1, 16_384, p.t_start_years());
+    for step in 1..=steps {
+        let env = stage.env(&p.tectonics, step);
+        subduction::resolve(
+            &mut f.st,
+            &mut world,
+            &f.geo,
+            &f.overlaps,
+            &f.pos,
+            &f.tree,
+            &env,
+        )
+        .unwrap();
+        if !f.st.contacts.is_empty() {
+            return Some(step);
+        }
+    }
+    None
+}
+
+/// A contact begins only where its plates have converged across their overlap by half a lattice
+/// spacing (PLT-810, PLT-811, `tectonics.contact_needs_convergence`; Bird 2003 [126]: a
+/// subduction zone converges at all; Gurnis et al. 2004: "Cumulative convergence, not the rate of
+/// convergence, is the dominant control"): `gate_fixture`'s overlap, held for up to 30 steps of 2
+/// Myr. Moving across the boundary into the northern plate, or along it 10 degrees towards it
+/// (transpression, inside PLT-311's 20 degrees: Puysegur's "fully strike-slip with a component of
+/// convergence", Gurnis et al. 2004 [25]), the southern plate runs under it: a contact, later
+/// the slower it converges. Moving along the boundary (strike-slip about the z axis), 10 degrees
+/// away from it, or away across it: none with the switch on. Off, every overlap makes a contact
+/// on the first step. Its overlap's reading (`subduction::overlap_motion`) says which.
+#[test]
+fn a_contact_begins_only_where_its_plates_converge() {
+    let p0 = preset(20_000, 20.0, "supercontinent", 5);
+    let run = |on: bool, motion: DVec3| -> (Option<u64>, u8, f64) {
+        let mut p = p0.clone();
+        p.tectonics.contact_needs_convergence = on;
+        let env = PlatesStage::new(p.clone()).env(&p.tectonics, 1);
+        let turn = glam::DQuat::from_rotation_x(0.1);
+        let mut f = gate_fixture(&p, &env, turn, motion, OCEANIC);
+        (gate_steps(&p, &mut f, 30), f.class, f.conv)
+    };
+    // The southern plate's motion about the x axis runs it across the boundary into the
+    // northern; about the z axis along it.
+    let along = |deg: f64| {
+        let r = deg.to_radians();
+        r.cos() * DVec3::Z + r.sin() * DVec3::X
+    };
+    let converging = subduction::OVERLAP_CONVERGING as u8;
+    let (head_on, class, c1) = run(true, DVec3::X);
+    assert_eq!(class, converging, "{c1}");
+    let (oblique, class, c2) = run(true, along(10.0));
+    assert_eq!(class, converging, "{c2}");
+    let (head_on, oblique) = (
+        head_on.unwrap_or_else(|| panic!("head-on {c1}")),
+        oblique.unwrap_or_else(|| panic!("transpression {c2}")),
+    );
+    assert!(
+        head_on <= 3 && oblique > head_on,
+        "{head_on} {oblique} {c1} {c2}"
+    );
+    for motion in [DVec3::Z, along(-10.0), -DVec3::X] {
+        let (begun, class, c) = run(true, motion);
+        assert_eq!(begun, None, "a contact on {motion}: {class} {c}");
+        if motion == DVec3::Z {
+            // Pure strike-slip reads under what 30 steps would need to cross half a spacing (79.8
+            // km at 20k samples over 60 Myr: 1.33 mm/yr), so the gate's refusal here is the sum's,
+            // not the fixture's luck (PR #55's third re-review).
+            assert!(c.abs() < 1.33, "strike-slip reads {c} mm/yr");
+        }
+        assert_eq!(run(false, motion).0, Some(1), "off: {motion}");
+    }
+    assert_eq!(run(false, along(10.0)).0, Some(1));
+}
+
+/// Plates sliding past each other (PLT-810). Along their shared lattice boundary, a great circle
+/// about the motion's pole (the southern plate of `plates_unresolved` turned about the z axis by
+/// a third of a spacing), they do not overlap at all, whether the footprint is the level set's
+/// outline (PLT-553, the default) or the lattice's triangles. Where the reading is noise, its sign
+/// flipping from step to step (`gate_fixture`'s overlap, the southern plate moving 5 degrees off
+/// the boundary towards the northern one step and away from it the next), each step on its own
+/// reads converging or not, and the strict reading of the first fix would have begun a contact on
+/// the first step; the cumulative convergence begins none in 30 steps.
+#[test]
+fn plates_sliding_past_along_their_boundary_begin_no_contact() {
+    let p0 = preset(20_000, 20.0, "supercontinent", 5);
+    for outline in [true, false] {
+        let mut p = p0.clone();
+        p.tectonics.outline_cover = outline;
+        let env = PlatesStage::new(p.clone()).env(&p.tectonics, 1);
+        let turn = glam::DQuat::from_rotation_z(env.norm.spacing_rad() / 3.0);
+        let (mut st, geo) = plates_unresolved(&p, &env, turn, |q| q.z > 0.0);
+        st.plates[1].omega = (env.norm.omega_of_speed(50.0) * DVec3::Z).to_array();
+        let pos = geometry::positions(&st, &geo);
+        let tree = Tree::over(&pos, |_| true);
+        assert!(
+            subduction::overlaps(&st, &geo, &pos, &tree, &env).is_empty(),
+            "outline {outline}"
+        );
+    }
+    let mut p = p0.clone();
+    p.tectonics.contact_needs_convergence = true;
+    let stage = PlatesStage::new(p.clone());
+    let along = |deg: f64| {
+        let r = deg.to_radians();
+        r.cos() * DVec3::Z + r.sin() * DVec3::X
+    };
+    let env1 = stage.env(&p.tectonics, 1);
+    let turn = glam::DQuat::from_rotation_x(0.1);
+    let mut f = gate_fixture(&p, &env1, turn, along(5.0), OCEANIC);
+    assert_eq!(f.class, subduction::OVERLAP_CONVERGING as u8, "{}", f.conv);
+    let mut world = WorldState::new(1, 16_384, p.t_start_years());
+    for step in 1..=30 {
+        let env = stage.env(&p.tectonics, step);
+        let deg = if step % 2 == 1 { 5.0 } else { -5.0 };
+        f.st.plates[1].omega = (env.norm.omega_of_speed(50.0) * along(deg)).to_array();
+        subduction::resolve(
+            &mut f.st,
+            &mut world,
+            &f.geo,
+            &f.overlaps,
+            &f.pos,
+            &f.tree,
+            &env,
+        )
+        .unwrap();
+        assert!(f.st.contacts.is_empty(), "a contact on step {step}");
+    }
+}
+
+/// The consumer of last resort (PLT-812; PR #55's re-reviews) and the collision's exemption
+/// (PLT-810): `gate_fixture`'s pair overlapping where y > 0, held for up to 30 steps, then
+/// resampled. Ocean floor carrying 500 m of sediment, sliding past: the gate refuses it, and the
+/// resampling takes the lower plate's visible floor as a contact would (its ocean crust and its
+/// sediment booked by the last resort); converging 10 degrees off the boundary: a contact once
+/// the pair has converged half a spacing, and nothing for the last resort. Continental crust on
+/// both sides, sliding past: a collision's setting needs no subduction start, so its contact
+/// begins on the first step. Nothing is dropped in any case.
+#[test]
+fn a_refused_overlap_is_taken_at_the_resampling() {
+    let mut p = preset(20_000, 20.0, "supercontinent", 5);
+    p.tectonics.contact_needs_convergence = true;
+    let stage = PlatesStage::new(p.clone());
+    let along = |deg: f64| {
+        let r = deg.to_radians();
+        r.cos() * DVec3::Z + r.sin() * DVec3::X
+    };
+    let turn = glam::DQuat::from_rotation_x(0.1);
+    for (motion, kind, begins) in [
+        (DVec3::Z, OCEANIC, None),
+        (along(10.0), OCEANIC, Some(false)),
+        (DVec3::Z, CONTINENTAL, Some(true)),
+    ] {
+        let env = stage.env(&p.tectonics, 1);
+        let mut f = gate_fixture(&p, &env, turn, motion, kind);
+        if kind == OCEANIC {
+            for s in f.st.samples.iter_mut() {
+                s.pools[state::pool::SEDIMENT] = 500.0;
+                s.thickness_m = pools::thickness(&s.pools);
+            }
+        }
+        let conv = f.conv;
+        let step = gate_steps(&p, &mut f, 30);
+        match begins {
+            None => assert!(step.is_none(), "{motion}: {conv} mm/yr"),
+            Some(first) => {
+                let step = step.unwrap_or_else(|| panic!("{motion}: no contact"));
+                assert_eq!(step == 1, first, "{motion} {kind}: step {step}");
+            }
+        }
+        let env = stage.env(&p.tectonics, 31);
+        let mut world = WorldState::new(1, 16_384, p.t_start_years());
+        ridges::resample(&mut f.st, &mut world, &f.pos, &f.tree, &f.geo, &env).unwrap();
+        let g = |k: &str| world.globals.get(k).copied().unwrap_or(0.0);
+        assert_eq!(g(ridges::DROPPED_GLOBAL), 0.0, "{motion} {kind}");
+        let refused = begins.is_none();
+        assert_eq!(
+            g(ridges::LAST_RESORT_OCEAN_GLOBAL) > 0.0,
+            refused,
+            "{motion} {kind}"
+        );
+        assert_eq!(
+            g(ridges::LAST_RESORT_SEDIMENT_GLOBAL) > 0.0,
+            refused,
+            "{motion} {kind}"
+        );
+        assert_eq!(
+            g(ridges::LAST_RESORT_CONTINENT_GLOBAL),
+            0.0,
+            "{motion} {kind}"
+        );
+    }
+}
+
+/// The gate is on a new contact only (PLT-810): `gate_fixture`'s pair begins a contact while it
+/// converges; the next step it parts, and the contact goes on (seen again, its polarity kept);
+/// with continental crust come into the overlap on the subducting side, the contact reverses
+/// (PLT-056, PLT-371) though its plates part, its onset is the new polarity's (the old
+/// overriding plate's floor going under: 30 Myr old where the first polarity's was 80; the plates'
+/// relative speed now, 20 mm/yr parting where it was 50 converging), and the step's resolve names
+/// it reversed (the onset trace's route).
+#[test]
+fn a_contact_goes_on_and_reverses_whatever_its_plates_do() {
+    let mut p = preset(20_000, 20.0, "supercontinent", 5);
+    p.tectonics.contact_needs_convergence = true;
+    let stage = PlatesStage::new(p.clone());
+    let env1 = stage.env(&p.tectonics, 1);
+    let turn = glam::DQuat::from_rotation_x(0.1);
+    let mut f = gate_fixture(&p, &env1, turn, DVec3::X, OCEANIC);
+    let begun = gate_steps(&p, &mut f, 30).expect("a contact");
+    let (under, over) = (f.st.contacts[0].under, f.st.contacts[0].over);
+    let first_age = f.st.contacts[0].onset_slab_age_myr;
+    let first_speed = f.st.contacts[0].onset_convergence_mm_yr;
+    assert!((80.0..100.0).contains(&first_age), "{first_age}");
+    // The overriding plate's floor younger, 30 Myr at step 1, so the new polarity's onset reads it.
+    let t1 = env1.t_myr;
+    for s in f.st.samples.iter_mut().filter(|s| s.group == over) {
+        s.formed_myr = (t1 - 30.0) as f32;
+    }
+    let mut world = WorldState::new(1, 16_384, p.t_start_years());
+    let mut resolve = |f: &mut GateFixture, step: u64| {
+        let env = stage.env(&p.tectonics, step);
+        subduction::resolve(
+            &mut f.st,
+            &mut world,
+            &f.geo,
+            &f.overlaps,
+            &f.pos,
+            &f.tree,
+            &env,
+        )
+        .unwrap()
+    };
+    // The next step, parting at 20 mm/yr: the contact is seen again.
+    f.st.plates[1].omega = (-env1.norm.omega_of_speed(20.0) * DVec3::X).to_array();
+    let r = resolve(&mut f, begun + 1);
+    let c = &f.st.contacts[0];
+    assert_eq!(
+        (f.st.contacts.len(), c.under, c.over, c.last_step),
+        (1, under, over, begun + 1)
+    );
+    assert!(r.reversed.is_empty());
+    // The step after, the subducting plate's crust is continental: the contact reverses.
+    for s in f.st.samples.iter_mut().filter(|s| s.group == under) {
+        s.kind = CONTINENTAL;
+        s.pools = pools::continental_column();
+        s.thickness_m = pools::thickness(&s.pools);
+        s.elevation_m = 400.0;
+    }
+    let r = resolve(&mut f, begun + 2);
+    let c = &f.st.contacts[0];
+    assert_eq!(
+        (f.st.contacts.len(), c.under, c.over, c.onset_step),
+        (1, over, under, begun + 2),
+        "no reversal while the plates part"
+    );
+    assert_eq!(r.reversed, vec![(0, 1)]);
+    assert!(
+        (30.0..50.0).contains(&c.onset_slab_age_myr),
+        "the new polarity's floor: {}",
+        c.onset_slab_age_myr
+    );
+    // The same overlap read at 20 mm/yr where the first polarity's read 50.
+    let ratio = c.onset_convergence_mm_yr / first_speed;
+    assert!(
+        (ratio - 0.4).abs() < 0.04,
+        "the plates' speed now: {} against {first_speed}",
+        c.onset_convergence_mm_yr
+    );
+}
+
 /// A subduction initiation's contact takes the polarity of the slab planted under its fracture
 /// (ledger: PLT-655, PLT-270): two oceanic plates, the southern (plate 1) older, 200 Myr against
 /// 100, and turned under the northern where y > 0. By the rule of a new contact the older floor
@@ -1759,7 +2214,7 @@ fn an_initiations_contact_takes_its_planted_slab() {
         let tree = Tree::over(&pos, |_| true);
         let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env);
         let mut world = WorldState::new(1, 16_384, p.t_start_years());
-        subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env).unwrap();
+        resolve_turned(&mut st, &mut world, &geo, &overlaps, &pos, &tree, &env).unwrap();
         let c = st
             .contacts
             .iter()
@@ -2126,7 +2581,7 @@ fn how_resamplings_roughen_a_boundary() {
                 st.recount(&pos);
                 let tree = Tree::over(&pos, |_| true);
                 let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env);
-                subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env).unwrap();
+                resolve_turned(&mut st, &mut world, &geo, &overlaps, &pos, &tree, &env).unwrap();
             }
         }
     }
@@ -2470,7 +2925,7 @@ fn one_way_subduction_keeps_the_slab_down() {
         let env2 = stage.env(&p.tectonics, 2);
         let tree = Tree::over(&pos, |_| true);
         let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env2);
-        subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env2).unwrap();
+        resolve_turned(&mut st, &mut world, &geo, &overlaps, &pos, &tree, &env2).unwrap();
         let held = st
             .one_way
             .as_ref()
@@ -2480,7 +2935,7 @@ fn one_way_subduction_keeps_the_slab_down() {
         let env3 = stage.env(&p.tectonics, 3);
         let tree = Tree::over(&pos, |_| true);
         let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env3);
-        subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env3).unwrap();
+        resolve_turned(&mut st, &mut world, &geo, &overlaps, &pos, &tree, &env3).unwrap();
         let shown = under
             .iter()
             .filter(|&&i| !st.samples[i].is_hidden())
@@ -2566,7 +3021,7 @@ fn ocean_floor_as_thick_as_a_continent_turns_continental_at_a_contact() {
     let tree = Tree::over(&pos, |_| true);
     let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env);
     let mut world = WorldState::new(1, 16_384, p.t_start_years());
-    subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env).unwrap();
+    resolve_turned(&mut st, &mut world, &geo, &overlaps, &pos, &tree, &env).unwrap();
     for &(i, crust, turns) in &cases {
         let place = if i == far {
             "away from any contact"
@@ -2790,7 +3245,7 @@ fn a_front_of_known_length(
     let tree = Tree::over(&pos, |_| true);
     let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, env);
     let mut world = WorldState::new(1, 16_384, p.t_start_years());
-    subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, env).unwrap();
+    resolve_turned(&mut st, &mut world, &geo, &overlaps, &pos, &tree, env).unwrap();
     (st, geo, pos)
 }
 
@@ -3401,7 +3856,7 @@ fn a_reference_plate(
     let tree = Tree::over(&pos, |_| true);
     let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, env);
     let mut world = WorldState::new(1, 16_384, p.t_start_years());
-    subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, env).unwrap();
+    resolve_turned(&mut st, &mut world, &geo, &overlaps, &pos, &tree, env).unwrap();
     st.contacts.retain(|c| (c.under, c.over) == (1, 0));
     assert_eq!(st.contacts.len(), 1, "the reference trench's contact");
     st.slabs = vec![state::SlabTrack {
@@ -4242,7 +4697,7 @@ fn the_ocean_continent_front_through_a_resampling() {
     let env2 = stage.env(&p.tectonics, 2);
     let tree = Tree::over(&pos, |_| true);
     let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env2);
-    subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env2).unwrap();
+    resolve_turned(&mut st, &mut world, &geo, &overlaps, &pos, &tree, &env2).unwrap();
     let after = the_margin_as_the_mix_sees_it(&st, &geo, &pos, &env2);
     let c = &st.contacts[0];
     eprintln!(
@@ -4259,7 +4714,7 @@ fn the_ocean_continent_front_through_a_resampling() {
     let env3 = stage.env(&p.tectonics, 3);
     let tree = Tree::over(&pos, |_| true);
     let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env3);
-    subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env3).unwrap();
+    resolve_turned(&mut st, &mut world, &geo, &overlaps, &pos, &tree, &env3).unwrap();
     let on = the_margin_as_the_mix_sees_it(&st, &geo, &pos, &env3);
     let c = &st.contacts[0];
     eprintln!(
@@ -4336,7 +4791,7 @@ fn move_and_resolve(
     st.recount(&pos);
     let tree = Tree::over(&pos, |_| true);
     let overlaps = subduction::overlaps(st, geo, &pos, &tree, env);
-    subduction::resolve(st, world, geo, &overlaps, &pos, env).unwrap();
+    resolve_turned(st, world, geo, &overlaps, &pos, &tree, env).unwrap();
     pos
 }
 
@@ -4401,7 +4856,7 @@ fn an_oblique_promontory_through_a_resampling() {
     let env = stage.env(&p.tectonics, steps + 1);
     let tree = Tree::over(&pos, |_| true);
     let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env);
-    subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env).unwrap();
+    resolve_turned(&mut st, &mut world, &geo, &overlaps, &pos, &tree, &env).unwrap();
     seen.push(fronts_off_on(
         &st,
         &geo,
@@ -4701,7 +5156,7 @@ fn a_subduction_zone_goes_on_through_a_resampling() {
         let env2 = stage.env(&p.tectonics, 2);
         let tree = Tree::over(&pos, |_| true);
         let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env2);
-        subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env2).unwrap();
+        resolve_turned(&mut st, &mut world, &geo, &overlaps, &pos, &tree, &env2).unwrap();
         let tree = Tree::over(&pos, |_| true);
         let after = subduction::fronts_begin(&st, &geo, &pos, &tree, &env2).front_count();
         (st, geo, pos, world, before, after)
@@ -4746,7 +5201,7 @@ fn a_subduction_zone_goes_on_through_a_resampling() {
     let pos3 = geometry::positions(&held, &geo);
     let tree = Tree::over(&pos3, |_| true);
     let overlaps = subduction::overlaps(&held, &geo, &pos3, &tree, &env3);
-    subduction::resolve(&mut held, &mut world, &geo, &overlaps, &pos3, &env3).unwrap();
+    resolve_turned(&mut held, &mut world, &geo, &overlaps, &pos3, &tree, &env3).unwrap();
     let c = &held.contacts[0];
     assert_eq!((c.last_step, c.carried), (3, false));
     assert!(c.active(3));
@@ -6295,27 +6750,29 @@ fn young_floor_made_continental_after_the_step_takes_the_continental_law() {
 }
 
 /// The continental lithosphere's floor (PLT-820 to PLT-823): a continental column's thermal
-/// lithosphere reaches no shallower than where the heat-flow law's conductive geotherm puts its
-/// Moho at the crust's basal solidus, 1080 °C (Lachenbruch, Sass & Galanis 1985), z_Moho × 1350 /
-/// 1080, so the law is bounded by the crust: 26 + 2,700 / z_Moho before the magmatic terms, 141
-/// mW/m² over the Salton Trough's 23.5 km crust against the Imperial Valley's ~140. A 70 km belt
-/// under an arc's heating stays at its 87.5 km floor (the heating's target is L_hot's 60); floor
-/// made continental keeps the floor's 2.32 √(κt) or its lid's floor, whichever is deeper; a
-/// stretch thins L with the crust down to the stretched column's floor, not to 1 km; crust with no
-/// state takes its floor's lithosphere at the floor's age (at least its lid's floor), not the
-/// frame's 225 km; and the law no longer reaches the 1 km clamp's 3,401 mW/m².
+/// lithosphere reaches no shallower than where the plate model's own geotherm (ISO-138) puts its
+/// Moho at the crust's basal solidus, 1080 °C (Lachenbruch, Sass & Galanis 1985), 1.254 to 1.274
+/// times its crust, so the law is bounded by the crust: 139.3 mW/m² over the Salton Trough's
+/// 23.5 km crust before the magmatic terms, against the Imperial Valley's ~140. A 70 km belt
+/// under an arc's heating e-folds towards its 89.2 km floor (the heating's target raised to it
+/// from L_hot's 60); floor made continental keeps the floor's 2.32 √(κt) or its lid's floor,
+/// whichever is deeper; a stretch thins L with the crust down to the stretched column's floor,
+/// not to 1 km; crust with no state takes its floor's lithosphere at the floor's age (at least its
+/// lid's floor), not the frame's 225 km; and the law no longer reaches the 1 km clamp's
+/// 3,401 mW/m².
 #[test]
 fn a_continental_lithosphere_reaches_down_to_at_least_its_moho() {
     use super::thermal::{
-        ARC_HEAT_MW_M2, CRUST_BASE_C, L_COLD_KM, MANTLE_C, conductive_mw_m2, continental_l_km,
-        cooling_myr, lid_floor_km, moho_km, ocean_km, stretch,
+        ARC_HEAT_MW_M2, CRUST_BASE_C, HEATING_MYR, L_COLD_KM, conductive_mw_m2, continental_l_km,
+        cooling_myr, isotherm_km, lid_floor_km, moho_km, ocean_km, stretch,
     };
     let p = preset(2_000, 20.0, "supercontinent", 5);
     assert!(p.tectonics.thermal_state, "the state is the default");
-    // The bound against the Salton Trough (PLT-823): 26 + 3,375 × 1080 / 1350 / 23.5.
+    // The bound against the Salton Trough (PLT-823): the law at the floor of a 23.5 km crust,
+    // whose 1080 °C isotherm is its Moho.
     let salton = conductive_mw_m2(lid_floor_km(23.5));
-    assert!((salton - 140.9).abs() < 0.1, "{salton}");
-    assert!((lid_floor_km(23.5) - 23.5 * MANTLE_C / CRUST_BASE_C).abs() < 1e-12);
+    assert!((salton - 139.3).abs() < 0.05, "{salton}");
+    assert!((isotherm_km(lid_floor_km(23.5), CRUST_BASE_C) - 23.5).abs() < 1e-6);
     let stage = PlatesStage::new(p.clone());
     let env = stage.env(&p.tectonics, 1);
     let (mut st, _geo) = init::initial_state(&p, &env).unwrap();
@@ -6343,8 +6800,10 @@ fn a_continental_lithosphere_reaches_down_to_at_least_its_moho() {
         s.flags = ARC;
         s.orogeny = state::OROGENY_ANDEAN;
     }
+    let belt_floor = lid_floor_km(70.0);
+    assert!((belt_floor - 89.21).abs() < 0.01, "{belt_floor}");
     // Floor 2.4 Myr old (L = 18 km) made continental under 5 km of rock (a 12 km column, its
-    // floor 15 km) and under 18 km (25 km, its floor 31.25 km).
+    // floor 15.1 km) and under 18 km (25 km, its floor 31.7 km).
     let age = 2.4;
     for (&i, extra) in sea[..2].iter().zip([5000.0f32, 18_000.0]) {
         let s = &mut st.samples[i];
@@ -6358,12 +6817,13 @@ fn a_continental_lithosphere_reaches_down_to_at_least_its_moho() {
     }
     let floor_l = ocean_km(age);
     assert!((floor_l - 18.0).abs() < 0.1, "{floor_l}");
+    assert!(lid_floor_km(12.0) < floor_l);
     assert!((f64::from(st.samples[sea[0]].lithosphere_km) - floor_l).abs() < 1e-4);
     let deep = lid_floor_km(moho_km(&st.samples[sea[1]]));
-    assert!((deep - 31.25).abs() < 1e-3, "{deep}");
+    assert!((deep - 31.71).abs() < 0.01, "{deep}");
     assert!((f64::from(st.samples[sea[1]].lithosphere_km) - deep).abs() < 1e-4);
     // Floor the last resampling made (no state), 0.5 Myr old, made continental under 2 km of
-    // rock: its floor's 2.32 √(κ 0.5) = 8.2 km against its 9 km column's 11.25 km floor.
+    // rock: its floor's 2.32 √(κ 0.5) = 8.2 km against its 9 km column's 11.3 km floor.
     let unset = sea[2];
     {
         let s = &mut st.samples[unset];
@@ -6376,34 +6836,38 @@ fn a_continental_lithosphere_reaches_down_to_at_least_its_moho() {
         s.make_continental();
     }
     assert_eq!(st.samples[unset].lithosphere_km, 0.0, "no state yet");
-    assert!(ocean_km(0.5) < 11.25);
+    let unset_floor = lid_floor_km(moho_km(&st.samples[unset]));
+    assert!((unset_floor - 11.31).abs() < 0.01, "{unset_floor}");
+    assert!(ocean_km(0.5) < unset_floor);
     let q_unset = f64::from(continental_heat_flow(&st.samples[unset], t, true));
     assert!(
-        (q_unset - conductive_mw_m2(11.25)).abs() < 1e-2,
+        (q_unset - conductive_mw_m2(unset_floor)).abs() < 1e-2,
         "{q_unset} against {}",
-        conductive_mw_m2(11.25)
+        conductive_mw_m2(unset_floor)
     );
     let before = st.clone();
     for _ in 0..30 {
         thermal::step(&mut st, &env);
     }
-    // The belt: at its floor, not at L_hot's 60 km; its heat flow 26 + 3,375 / 87.5 + the arc's 40.
+    // The belt: e-folding towards its floor, not to L_hot's 60 km and not clamped partway; its
+    // heat flow the law over its lithosphere with the arc's 40.
     let s = &st.samples[belt];
+    let want = belt_floor + (100.0 - belt_floor) * (-30.0 * env.dt_myr / HEATING_MYR).exp();
+    let got = f64::from(s.lithosphere_km);
     assert!(
-        (f64::from(s.lithosphere_km) - 87.5).abs() < 1e-3,
-        "{}",
-        s.lithosphere_km
+        (got - want).abs() < 1e-3 && got >= belt_floor,
+        "{got} against {want}"
     );
     let q = f64::from(continental_heat_flow(s, t, true));
     assert!(
-        (q - (26.0 + 3375.0 / 87.5 + ARC_HEAT_MW_M2)).abs() < 1e-2,
+        (q - (26.0 + 3375.0 / got + ARC_HEAT_MW_M2)).abs() < 1e-2,
         "{q}"
     );
     // The crust with no state: its floor's lithosphere at its lid's floor, then cooling towards
-    // L_cold (one step from 11.25 km).
+    // L_cold (one step from 11.3 km).
     let mut once = before.clone();
     thermal::step(&mut once, &env);
-    let want = L_COLD_KM + (11.25 - L_COLD_KM) * (-env.dt_myr / cooling_myr()).exp();
+    let want = L_COLD_KM + (unset_floor - L_COLD_KM) * (-env.dt_myr / cooling_myr()).exp();
     let got = f64::from(once.samples[unset].lithosphere_km);
     assert!((got - want).abs() < 1e-3, "{got} against {want}");
     // Every continental column's lithosphere at or below its floor after the steps.
@@ -6416,9 +6880,11 @@ fn a_continental_lithosphere_reaches_down_to_at_least_its_moho() {
         );
     }
     // A stretch thins L with the crust to the stretched column's floor: by β = 2 over 35 km of
-    // crust (17.5 km after, its floor 21.875 km), a 60 km lithosphere to 30 km and a 40 km one to
+    // crust (17.5 km after, its floor 22.1 km), a 60 km lithosphere to 30 km and a 40 km one to
     // the floor.
-    for (l, want) in [(60.0, 30.0), (40.0, 21.875)] {
+    let stretched_floor = lid_floor_km(17.5);
+    assert!((stretched_floor - 22.12).abs() < 0.01, "{stretched_floor}");
+    for (l, want) in [(60.0, 30.0), (40.0, stretched_floor)] {
         let mut s = state::Sample::blank(0);
         s.kind = CONTINENTAL;
         s.pools = column_of(35.0).map(|x| x * 0.5);
@@ -6432,13 +6898,15 @@ fn a_continental_lithosphere_reaches_down_to_at_least_its_moho() {
         );
     }
     // The 1 km clamp is out of reach: a lithosphere set at 0.5 km over a 7 km column reads its
-    // floor's 8.75 km.
+    // floor's 8.78 km.
     let mut thin = before.samples[unset];
     thin.pools = pools::oceanic_column();
     thin.lithosphere_km = 0.5;
-    assert!((continental_l_km(0.5, moho_km(&thin)) - 8.75).abs() < 1e-9);
+    let thin_floor = lid_floor_km(7.0);
+    assert!((continental_l_km(0.5, moho_km(&thin)) - thin_floor).abs() < 1e-9);
+    assert!((thin_floor - 8.78).abs() < 0.01, "{thin_floor}");
     let q = f64::from(continental_heat_flow(&thin, t, true));
-    assert!((q - conductive_mw_m2(8.75)).abs() < 1e-2, "{q}");
+    assert!((q - conductive_mw_m2(thin_floor)).abs() < 1e-2, "{q}");
     assert!(q < 420.0 && conductive_mw_m2(1.0) > 3400.0);
 }
 
@@ -6876,7 +7344,7 @@ fn a_slabs_length_survives_a_resampling() {
         let pos = geometry::positions(&st, &geo);
         let tree = Tree::over(&pos, |_| true);
         let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env2);
-        subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env2).unwrap();
+        resolve_turned(&mut st, &mut world, &geo, &overlaps, &pos, &tree, &env2).unwrap();
         let after = dynamics::boundary_mix(&st, &geo, &pos, &tree, &env2, None);
         let kept: Vec<f64> = st.slabs.iter().map(|s| s.km).collect();
         let ans = forces::step(&mut st, &geo, &pos, &env2, DVec3::Z, 0.0);
@@ -7439,6 +7907,17 @@ fn a_deferred_collision_leaves_both_plates_to_the_balance() {
                 .any(|&(u2, o2, on2, _)| (u, o, on) == (u2, o2, on2))
         };
         let alive: Vec<bool> = st.plates.iter().map(|q| q.alive).collect();
+        // A plate with no visible sample when the balance was solved is not in it
+        // (`forces::Answer::omega` is `None` for it: a terrane wholly under the other plate) and
+        // keeps its rotation by design (scattered seed 2 on the continental lid's floor branch,
+        // 2026-10-31: plate 27 under plate 1 at steps 77 and 78). Exactly the plates the step's
+        // balance left out are skipped, as the dynamics record has them (PR #58's re-review).
+        let out_of_balance: Vec<u32> = st
+            .dynamics
+            .as_ref()
+            .and_then(|d| d.steps.last())
+            .map(|r| r.out_of_balance.clone())
+            .unwrap_or_default();
         // A step that killed a plate (a weld or a healed rift) or left the balance unsolved is
         // not read; nor are the plates of a collision that ended (a transfer kills no plate).
         let died = prev_alive.iter().zip(&alive).any(|(&was, &is)| was && !is);
@@ -7455,6 +7934,7 @@ fn a_deferred_collision_leaves_both_plates_to_the_balance() {
                         || moved.contains(&q)
                         || qi >= prev_omega.len()
                         || !alive[qi]
+                        || out_of_balance.contains(&q)
                     {
                         continue;
                     }
@@ -8420,4 +8900,117 @@ fn the_buoyant_start_stands_where_it_starts() {
         }
     });
     assert!(steps >= 10, "{steps}");
+}
+
+/// PLT-820, PLT-821 and PLT-824 at the plate stage's final frame (PR #58's review): every visible
+/// continental sample of a 60 Myr run holds its lithosphere at or below its lid's floor (the 1080 °C
+/// isotherm of the plate model's own geotherm at or below its Moho, which the test reads from the
+/// geotherm itself, `isotherm_km`), its heat flow at least its law over that lithosphere and at
+/// most its column's ceiling (its law at its lid's floor with an arc's and a hotspot's terms), and
+/// crust with no state reads its floor's: at least the law over the deeper of 2.32 √(κt) at the
+/// floor's age and its lid's floor, not over the frame's 225 km. The planet (`pipeline_quick_16k`
+/// at 3,000 samples, scattered continents, seed 4) ends with columns at their floor (the final
+/// pass stores every column's L at its floor or below), so the run fails with PLT-820 reverted
+/// (checked 2026-10-31: a 57.9 km column at L 62.0, its isotherm at 48.7 km). Whether a run ends
+/// with crust with no state is the seed's (4 of 16 in the lane's sweep), so PLT-821 is checked on
+/// a constructed final pass as well (PR #58's re-review): continental crust spread onto floor
+/// made in the step, one column with no heat flow yet and one with a stale 41 mW/m², which fails
+/// with PLT-821 reverted (the frame's 225 km reads 41 mW/m² there).
+#[test]
+fn the_final_frame_holds_every_continental_column_to_its_lid_floor() {
+    use super::thermal::{
+        ARC_HEAT_MW_M2, CRUST_BASE_C, HOTSPOT_HEAT_MW_M2, conductive_mw_m2, isotherm_km,
+        lid_floor_km, moho_km, ocean_km,
+    };
+    let json = with_timeline(
+        crate::params::planet_builtin("pipeline_quick_16k").unwrap(),
+        Some("scattered_continents"),
+        Some(60.0),
+    )
+    .unwrap();
+    let mut v: serde_json::Value = serde_json::from_str(&json).unwrap();
+    v["resolution"]["l0_samples"] = serde_json::json!(3000);
+    v["resolution"]["l1_r"] = serde_json::json!(64);
+    v["keyframes"]["size"] = serde_json::json!([128, 64]);
+    v["keyframes"]["every_myr"] = serde_json::json!(20.0);
+    v["seed"] = serde_json::json!(4);
+    let PresetBody::Planet(p) = Preset::from_json(&v.to_string()).unwrap().body else {
+        panic!("not a planet preset")
+    };
+    assert!(p.tectonics.thermal_state, "the state is the default");
+    let world = run_stage(&p, |_, _, _| {});
+    let st = world.plates.as_ref().unwrap();
+    let t = st.t_myr;
+    let mut near = 0;
+    for s in st
+        .samples
+        .iter()
+        .filter(|s| s.kind == CONTINENTAL && !s.is_hidden())
+    {
+        let z = moho_km(s);
+        let l = f64::from(s.lithosphere_km);
+        let q = f64::from(s.heat_flow_mw_m2);
+        let ceiling = conductive_mw_m2(lid_floor_km(z)) + ARC_HEAT_MW_M2 + HOTSPOT_HEAT_MW_M2;
+        assert!(
+            q <= ceiling + 1e-2,
+            "{q} mW/m² over a {z} km column's {ceiling}"
+        );
+        if l > 0.0 {
+            let base = isotherm_km(l, CRUST_BASE_C);
+            assert!(
+                base >= z - 1e-3,
+                "{l} km: its 1080 °C isotherm at {base} km, above its {z} km Moho"
+            );
+            if base < 1.02 * z {
+                near += 1;
+            }
+            assert!(
+                q >= conductive_mw_m2(l) - 1e-2,
+                "{q} under its law at {l} km"
+            );
+        } else {
+            let age = (t - f64::from(s.formed_myr)).max(0.0);
+            let own = ocean_km(age).max(lid_floor_km(z));
+            assert!(
+                q >= conductive_mw_m2(own) - 1e-2,
+                "{q} mW/m² over crust with no state on {age} Myr floor, its floor's {own} km"
+            );
+        }
+    }
+    assert!(
+        near > 0,
+        "no column near its floor at the final frame: PLT-820 unseen"
+    );
+    // PLT-821 on a constructed final pass: 10 km of continental crust spread onto floor made in
+    // the step (the rate guard's spread, `collapse::spread`), with no state.
+    let mut st2 = st.clone();
+    let made: Vec<usize> = st2
+        .samples
+        .iter()
+        .enumerate()
+        .filter(|(_, s)| s.kind == state::OCEANIC && !s.is_hidden())
+        .map(|(i, _)| i)
+        .take(2)
+        .collect();
+    assert_eq!(made.len(), 2);
+    for (n, &i) in made.iter().enumerate() {
+        let s = &mut st2.samples[i];
+        s.formed_myr = t as f32;
+        s.pools = pools::oceanic_column();
+        s.pools[state::pool::FELSIC_PLUTONIC] += 10_000.0;
+        s.thickness_m = pools::thickness(&s.pools);
+        s.lithosphere_km = 0.0;
+        s.make_continental();
+        s.heat_flow_mw_m2 = if n == 0 { 0.0 } else { 41.0 };
+    }
+    thermal::refresh_heat_flow(&mut st2, &p.tectonics, t);
+    for &i in &made {
+        let s = &st2.samples[i];
+        let own = ocean_km(0.0).max(lid_floor_km(moho_km(s)));
+        let q = f64::from(s.heat_flow_mw_m2);
+        assert!(
+            q >= conductive_mw_m2(own) - 1e-2,
+            "{q} mW/m² over crust spread onto new floor, its floor's {own} km"
+        );
+    }
 }
