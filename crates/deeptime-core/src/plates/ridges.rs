@@ -1740,14 +1740,22 @@ mod tests {
         };
         let old = floor(80.0);
         let own = rock_height_m(&old, k, 9.81, t);
-        // Beside a continent: the floor's own height to rounding.
+        // Beside a continent: the height of its own rock to rounding. The loose sediment drapes
+        // across the margin (blended over all three corners, PLT-293), so that rock is the bare
+        // floor's plus a share of the continent's cover: metres over the bare floor, where the
+        // blend of heights lent it 30 % of the 5.5 km between them.
         let src = [old, continent, floor(80.0)];
         let s = interpolate(&src, &cover, DQuat::IDENTITY, 0, h);
         assert_eq!(s.kind, OCEANIC);
+        let rock = h.of(&s);
         assert!(
-            (f64::from(s.elevation_m) - own).abs() < 1.0,
-            "{} against its rock's {own}",
+            (f64::from(s.elevation_m) - rock).abs() < 1.0,
+            "{} against its rock's {rock}",
             s.elevation_m
+        );
+        assert!(
+            (rock - own).abs() < 50.0,
+            "its rock at {rock}, the bare floor's {own}"
         );
         // Beside an arc's thick ocean crust (the same class): the arc's departure from its own
         // rock is blended, not its height.
@@ -1766,10 +1774,15 @@ mod tests {
             let src = [z, continent, z];
             z = interpolate(&src, &cover, DQuat::IDENTITY, 0, h);
         }
+        let rock = h.of(&z);
         assert!(
-            (f64::from(z.elevation_m) - own).abs() < 1.0,
-            "{} after ten resamplings, its rock's {own}",
+            (f64::from(z.elevation_m) - rock).abs() < 1.0,
+            "{} after ten resamplings, its rock's {rock}",
             z.elevation_m
+        );
+        assert!(
+            (rock - own).abs() < 50.0,
+            "its rock at {rock} after ten resamplings, the bare floor's {own}"
         );
         // A trench's pull, 1 km under the law at all three corners, is kept.
         let mut pulled = old;
