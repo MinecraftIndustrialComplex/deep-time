@@ -202,6 +202,38 @@ def run_stats(run):
         r["coast_enclosed_km"] = float(enclosed.sum() * spacing / np.sqrt(3.0))
         r["enclosed_area"] = float(((~cont) & (olab != world)).sum() / n0)
         r["enclosed_parts"] = int(len(np.unique(olab[(~cont) & (olab != world)])))
+        # What the enclosed floor is: its floor age (age/t*.bin, NaN on continental crust) against the world
+        # ocean's, the share young (under 20 Myr) and old (over 100 Myr), the share at a divergent boundary or
+        # within the subduction distance of a front this step (the map's flags), the share on the plate of the
+        # continental sample nearest it (plate/t*.bin), and the share of its area in pieces of three samples or
+        # fewer (lattice-sized holes) against its median piece.
+        ocean_in = (~cont) & (olab != world)
+        ocean_w = (~cont) & (olab == world)
+        af = run / "maps" / "age" / th.name_of(t)
+        pf = run / "maps" / "plate" / th.name_of(t)
+        if ocean_in.any():
+            fl = a[:, 10].astype(np.int64)
+            r["encl_divergent"] = float(((fl[ocean_in] & 16) != 0).mean())
+            r["encl_subzone"] = float(((fl[ocean_in] & 64) != 0).mean())
+            r["world_divergent"] = float(((fl[ocean_w] & 16) != 0).mean())
+            psz = np.bincount(olab[ocean_in])
+            psz = psz[psz > 0]
+            r["encl_small_share"] = float(psz[psz <= 3].sum() / psz.sum())
+            r["encl_part_p50"] = float(np.median(psz))
+            if af.exists():
+                age = np.fromfile(af, "<f4").astype(np.float64)
+                if len(age) == len(a):
+                    r["encl_age_p50"] = float(np.nanmedian(age[ocean_in]))
+                    r["world_age_p50"] = float(np.nanmedian(age[ocean_w]))
+                    r["encl_young"] = float((age[ocean_in] < 20.0).mean())
+                    r["encl_old"] = float((age[ocean_in] > 100.0).mean())
+                    r["world_young"] = float((age[ocean_w] < 20.0).mean())
+            if pf.exists():
+                pl = np.fromfile(pf, "<u4")
+                if len(pl) == len(a):
+                    _, ni = cKDTree(p[cont]).query(p[ocean_in])
+                    r["encl_same_plate"] = float((pl[ocean_in] == pl[np.flatnonzero(cont)[ni]]).mean())
+                    r["encl_plates"] = int(len(np.unique(pl[ocean_in])))
         # The same length on the label smoothed by a majority over each sample's neighbours within 2 spacings:
         # what is lattice-scale raggedness falls away, what is the continents' shape stays.
         tree = cKDTree(p)
