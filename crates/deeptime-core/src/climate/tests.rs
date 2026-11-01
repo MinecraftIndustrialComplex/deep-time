@@ -98,7 +98,7 @@ fn idealised_zones(p: ClimateParams) {
         sea: 0.0,
         p: &p,
         planet: planet(),
-        monthly: true,
+        monthly: snapshot::MonthsKept::TemperaturesAndRain,
         ice_prev: None,
         koppen_prev: None,
         correction: &super::percell::Correction::default(),
@@ -237,7 +237,7 @@ fn a_narrow_inlet_past_the_sinking_latitude_keeps_the_climate_physical() {
             sea: 0.0,
             p: &p,
             planet: planet(),
-            monthly: true,
+            monthly: snapshot::MonthsKept::TemperaturesAndRain,
             ice_prev: None,
             koppen_prev: None,
             correction: &super::percell::Correction::default(),
@@ -811,7 +811,7 @@ impl snapshot::CellsDevice for Watched<'_> {
         self.dev.name()
     }
 
-    fn host_bytes(&self, w: usize, h: usize, monthly: bool) -> u64 {
+    fn host_bytes(&self, w: usize, h: usize, monthly: snapshot::MonthsKept) -> u64 {
         self.dev.host_bytes(w, h, monthly)
     }
 
@@ -902,7 +902,7 @@ fn the_gpu_cells_stay_within_their_error_budget_of_the_cpu() {
                 co2_ppm: co2,
                 ..planet()
             },
-            monthly: true,
+            monthly: snapshot::MonthsKept::TemperaturesAndRain,
             ice_prev: None,
             koppen_prev: None,
             correction: &super::percell::Correction::default(),
@@ -1071,6 +1071,176 @@ fn the_gpu_cells_stay_within_their_error_budget_of_the_cpu() {
             assert!(
                 cpu.glacier.contains(&1) && cpu.sea_ice_max.iter().any(|&x| x > 0.5),
                 "the cold climate has no ice to compare"
+            );
+        }
+    }
+}
+
+/// The months the climate stage carries between snapshots (the runoff law's second and third
+/// re-reviews): over three 2-Myr steps with a snapshot every 6 Myr, step 1 and step 3 are the
+/// snapshots and step 2 carries the twelve months. After step 2 the world holds the twelve
+/// months alone (no departures, no rain), the surface reads them (`surface::climate::months`),
+/// and they were carried with the plates as the mean is: each cell's departure of the months'
+/// mean from `D_MEAN` is its row's month mean, the same over the row (a carry that left the
+/// snapshot's months where they were, while the mean moved with the crust, fails this). After
+/// step 3 the bake's 24 months are there, and only two snapshots were taken (with the months
+/// written only at the last snapshot every step was one).
+// ledger: MOI-052, HYD-033
+#[test]
+fn the_climate_carries_its_twelve_months_between_snapshots() {
+    let mut v: serde_json::Value = serde_json::from_str(&pipeline_json(3000, 6.0, 7)).unwrap();
+    v["climate"]["snapshot_every_myr"] = serde_json::json!(6.0);
+    let dir = temp_dir("carried-months");
+    let s = session(&v.to_string(), &dir, 2);
+    let (w, n) = (256usize, 256usize * 82);
+    let month = |world: &WorldState, m: usize, rain: bool| -> Option<Vec<f32>> {
+        let name = if rain {
+            field::p_month(m)
+        } else {
+            field::t_sl_month(m)
+        };
+        world
+            .fields
+            .get(&name)
+            .filter(|f| f.data.len() == n)
+            .map(|f| f.data.clone())
+    };
+    let mut times = Vec::new();
+    for _ in 0..2 {
+        assert_eq!(s.advance(Duration::ZERO).unwrap(), AdvanceStatus::Running);
+        times.push(s.checkpoint().unwrap().world.t_years);
+    }
+    assert!((times[1] - times[0] - 2.0e6).abs() < 1.0, "{times:?}");
+    let world = s.checkpoint().unwrap().world;
+    let twelve: Vec<Vec<f32>> = (0..12)
+        .map(|m| month(&world, m, false).unwrap_or_else(|| panic!("month {m} after step 2")))
+        .collect();
+    assert!(
+        (0..12).all(|m| month(&world, m, true).is_none()),
+        "rain after step 2"
+    );
+    assert!(
+        !world
+            .fields
+            .keys()
+            .any(|k| k.starts_with("climate/anomaly/t_sl")),
+        "the months' departures are not kept"
+    );
+    assert!(
+        crate::surface::climate::months(&world, n)
+            .unwrap()
+            .twelve
+            .is_some()
+    );
+    let d_mean = &world.fields[field::D_MEAN].data;
+    let mut worst = 0.0f64;
+    let mut moved = 0.0f64;
+    for j in 0..82 {
+        let refs: Vec<f64> = (0..w)
+            .map(|i| {
+                let c = j * w + i;
+                twelve.iter().map(|t| f64::from(t[c])).sum::<f64>() / 12.0 - f64::from(d_mean[c])
+            })
+            .collect();
+        let (lo, hi) = refs
+            .iter()
+            .fold((f64::MAX, f64::MIN), |(a, b), &x| (a.min(x), b.max(x)));
+        worst = worst.max(hi - lo);
+        moved = moved.max(
+            (0..w)
+                .map(|i| f64::from(d_mean[j * w + i]))
+                .fold(f64::MIN, f64::max)
+                - (0..w)
+                    .map(|i| f64::from(d_mean[j * w + i]))
+                    .fold(f64::MAX, f64::min),
+        );
+    }
+    eprintln!(
+        "after step 2: the rows' month mean less D_MEAN spreads at most {worst:.2e} °C over a row (D_MEAN itself {moved:.1} °C)"
+    );
+    assert!(
+        moved > 1.0,
+        "a planet whose mean has no geography tests nothing"
+    );
+    assert!(worst < 1.0e-3, "{worst}");
+    finish(&s);
+    let world = s.checkpoint().unwrap().world;
+    assert!((0..12).all(|m| month(&world, m, false).is_some() && month(&world, m, true).is_some()));
+    assert!(
+        !world
+            .fields
+            .keys()
+            .any(|k| k.starts_with("climate/anomaly/t_sl"))
+    );
+    let note: serde_json::Value = serde_json::from_str(&world.notes[STAGE_NAME]).unwrap();
+    assert_eq!(
+        note["snapshots"].as_u64().unwrap(),
+        2 + note["triggered_snapshots"].as_u64().unwrap(),
+        "t = 2 and 6 Myr, and the triggered ones"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// One set of months (`carry_month`: the months' departures from the previous step's row months
+/// carried, the new row months added) carries as the two sets did (the departures kept from the
+/// snapshot and carried themselves, the months written from them), to f32 rounding, over steps
+/// whose references change: the third re-review's call, which halves the months' cost.
+// ledger: MOI-052
+#[test]
+fn one_set_of_months_carries_as_the_departures_did() {
+    let (w, h) = (16usize, 8usize);
+    let n = w * h;
+    let mut seed = 0x1234_5678_9abc_def0u64;
+    let mut next = || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        (seed >> 11) as f64 / (1u64 << 53) as f64
+    };
+    let refs: Vec<Vec<[f64; 12]>> = (0..6)
+        .map(|_| {
+            (0..h)
+                .map(|_| std::array::from_fn(|_| -30.0 + 60.0 * next()))
+                .collect()
+        })
+        .collect();
+    // A carry like the plates': each cell takes the bilinear value at a moved point.
+    let shift: Vec<[f64; 2]> = (0..n)
+        .map(|c| {
+            let (i, j) = ((c % w) as f64, (c / w) as f64);
+            [i + 0.37 + 0.2 * next(), (j + 0.21 * next() - 0.1).max(0.0)]
+        })
+        .collect();
+    let carry = |v: &[f32]| -> Vec<f32> {
+        shift
+            .iter()
+            .map(|&[fi, fj]| advect::bilinear(w, h, v, fi, fj))
+            .collect()
+    };
+    for m in [0usize, 5, 11] {
+        // The snapshot's months, and their departures from its references.
+        let snap: Vec<f32> = (0..n)
+            .map(|c| (refs[0][c / w][m] + 20.0 * (next() - 0.5)) as f32)
+            .collect();
+        let mut dep: Vec<f32> = (0..n)
+            .map(|c| (f64::from(snap[c]) - refs[0][c / w][m]) as f32)
+            .collect();
+        let mut one = snap.clone();
+        for k in 1..6 {
+            one = super::carry_month(&one, &refs[k - 1], &refs[k], m, w, carry);
+            dep = carry(&dep);
+            let two: Vec<f32> = (0..n)
+                .map(|c| (refs[k][c / w][m] + f64::from(dep[c])) as f32)
+                .collect();
+            let worst = one
+                .iter()
+                .zip(&two)
+                .map(|(a, b)| (a - b).abs())
+                .fold(0.0f32, f32::max);
+            assert!(worst < 1.0e-4, "month {m}, step {k}: {worst}");
+            assert!(
+                one.iter().zip(&snap).any(|(a, b)| (a - b).abs() > 0.1),
+                "the carry moved nothing"
             );
         }
     }

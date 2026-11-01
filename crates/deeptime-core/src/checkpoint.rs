@@ -45,9 +45,10 @@ pub const MAGIC: [u8; 4] = *b"DTCP";
 /// climate's ice sheet, weathering supply and snowball list, 2026-09-30; 11: the per-cell climate's
 /// state, P1-26; 12: its flux correction and triggered snapshots, P1-26 T6; 13: the climate's
 /// steering controllers, docs/design/playability-steering.md; 14: the plates' cumulative
-/// convergence of each pair without a contact, `PlateState::converging`, PLT-810; 15: the plates'
+/// convergence of each pair without a contact, `PlateState::converging`, PLT-810; 15: the climate's
+/// per-row months, `snapshot::Refs::t_month`, the runoff law's second re-review; 16: the plates'
 /// dynamics record's plates out of the balance, PR #58's re-review).
-pub const CHECKPOINT_SCHEMA: u32 = 15;
+pub const CHECKPOINT_SCHEMA: u32 = 16;
 const FIXED_BYTES: usize = 8;
 /// The sections before the history's frames.
 const HEAD_SECTIONS: usize = 2;
