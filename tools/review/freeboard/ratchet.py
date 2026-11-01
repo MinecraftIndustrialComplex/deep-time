@@ -86,6 +86,22 @@ def run_stats(run):
             r["rows_unreached"] = float((~fin).mean())
             for k in (1, 2, 3, 5):
                 r[f"rows_le{k}"] = float((dr <= k).mean())
+        # Where the hyper-extended crust lies (all continental crust under 10 km of its own crystalline crust): its
+        # graph steps through continental crust from the nearest ocean floor (1 = on the coast), and the share of
+        # it that is a sediment margin (on a basement, its own crust more cover than crystalline rock).
+        hyp = cont & (own_cr < 10.0)
+        sedm = hyp & (pp[:, 7] > 0.0) & (own_cr * 1000.0 < own[:, 0:2].sum(1))
+        r["hyper_area"] = float(hyp.sum() / n0)
+        r["hyper_sedmargin"] = float(sedm.sum() / max(hyp.sum(), 1))
+        pr_o = pairs[cont[pairs[:, 0]] != cont[pairs[:, 1]]]
+        coast = np.unique(np.where(cont[pr_o[:, 0]], pr_o[:, 0], pr_o[:, 1]))
+        if hyp.any() and coast.size:
+            do = dijkstra(g, directed=False, indices=coast, min_only=True, limit=40.0) + 1.0
+            dh = do[hyp]
+            for k in (1, 2, 3):
+                r[f"hyper_coast_le{k}"] = float((dh <= k).mean())
+            r["hyper_inland_sedmargin"] = float(sedm[hyp & (do > 2.0)].sum() / max((hyp & (do > 2.0)).sum(), 1))
+            r["cont_coast_rows1"] = float(coast.size / n0)
         out[t] = r
     return out
 
