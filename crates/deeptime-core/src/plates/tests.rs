@@ -1953,38 +1953,58 @@ fn a_contact_begins_only_where_its_plates_converge() {
     assert_eq!(run(false, along(10.0)).0, Some(1));
 }
 
-/// Plates sliding past each other along their shared lattice boundary (PLT-810): the southern
-/// plate of `gate_fixture` turned about the z axis by a third of a spacing and moving about it.
-/// With the outline as the level set holds it (PLT-553, the default) the boundary is the equator
-/// and stays one: no overlap at all. With the lattice's triangles as the footprint
-/// (`outline_cover` off) the two zigzags overlap where they cross; with the switch on, no contact
-/// in 30 steps; off, one on the first.
+/// Plates sliding past each other (PLT-810). Along their shared lattice boundary, a great circle
+/// about the motion's pole (the southern plate of `plates_unresolved` turned about the z axis by
+/// a third of a spacing), they do not overlap at all, whether the footprint is the level set's
+/// outline (PLT-553, the default) or the lattice's triangles. Where the reading is noise, its sign
+/// flipping from step to step (`gate_fixture`'s overlap, the southern plate moving 5 degrees off
+/// the boundary towards the northern one step and away from it the next), each step on its own
+/// reads converging or not, and the strict reading of the first fix would have begun a contact on
+/// the first step; the cumulative convergence begins none in 30 steps.
 #[test]
 fn plates_sliding_past_along_their_boundary_begin_no_contact() {
     let p0 = preset(20_000, 20.0, "supercontinent", 5);
-    {
-        let env = PlatesStage::new(p0.clone()).env(&p0.tectonics, 1);
-        let turn = glam::DQuat::from_rotation_z(env.norm.spacing_rad() / 3.0);
-        let (st, geo) = plates_unresolved(&p0, &env, turn, |q| q.z > 0.0);
-        let pos = geometry::positions(&st, &geo);
-        let tree = Tree::over(&pos, |_| true);
-        assert!(subduction::overlaps(&st, &geo, &pos, &tree, &env).is_empty());
-    }
-    for on in [true, false] {
+    for outline in [true, false] {
         let mut p = p0.clone();
-        p.tectonics.contact_needs_convergence = on;
-        p.tectonics.outline_cover = false;
+        p.tectonics.outline_cover = outline;
         let env = PlatesStage::new(p.clone()).env(&p.tectonics, 1);
         let turn = glam::DQuat::from_rotation_z(env.norm.spacing_rad() / 3.0);
-        let mut f = gate_fixture(&p, &env, turn, DVec3::Z, OCEANIC);
-        let begun = gate_steps(&p, &mut f, 30);
-        assert_eq!(
-            begun,
-            if on { None } else { Some(1) },
-            "on {on}: {} overlapping, {} mm/yr",
-            f.overlaps.len(),
-            f.conv
+        let (mut st, geo) = plates_unresolved(&p, &env, turn, |q| q.z > 0.0);
+        st.plates[1].omega = (env.norm.omega_of_speed(50.0) * DVec3::Z).to_array();
+        let pos = geometry::positions(&st, &geo);
+        let tree = Tree::over(&pos, |_| true);
+        assert!(
+            subduction::overlaps(&st, &geo, &pos, &tree, &env).is_empty(),
+            "outline {outline}"
         );
+    }
+    let mut p = p0.clone();
+    p.tectonics.contact_needs_convergence = true;
+    let stage = PlatesStage::new(p.clone());
+    let along = |deg: f64| {
+        let r = deg.to_radians();
+        r.cos() * DVec3::Z + r.sin() * DVec3::X
+    };
+    let env1 = stage.env(&p.tectonics, 1);
+    let turn = glam::DQuat::from_rotation_x(0.1);
+    let mut f = gate_fixture(&p, &env1, turn, along(5.0), OCEANIC);
+    assert_eq!(f.class, subduction::OVERLAP_CONVERGING as u8, "{}", f.conv);
+    let mut world = WorldState::new(1, 16_384, p.t_start_years());
+    for step in 1..=30 {
+        let env = stage.env(&p.tectonics, step);
+        let deg = if step % 2 == 1 { 5.0 } else { -5.0 };
+        f.st.plates[1].omega = (env.norm.omega_of_speed(50.0) * along(deg)).to_array();
+        subduction::resolve(
+            &mut f.st,
+            &mut world,
+            &f.geo,
+            &f.overlaps,
+            &f.pos,
+            &f.tree,
+            &env,
+        )
+        .unwrap();
+        assert!(f.st.contacts.is_empty(), "a contact on step {step}");
     }
 }
 
