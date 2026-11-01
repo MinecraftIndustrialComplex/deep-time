@@ -65,12 +65,12 @@ use super::normalise::Norm;
 use super::pools::{
     accrete, floor_at, isostatic_change_m, ocean_heat_flow, oceanic_column, thickness,
 };
-use super::thermal::{ARC_HEAT_MW_M2, HOTSPOT_HEAT_MW_M2, conductive_mw_m2, sample_l_km};
-use crate::params::TectonicParams;
 use super::state::{
     CONTINENTAL, FORELAND, Group, OCEANIC, Plate, PlateState, Ridge, Sample, pool, regime,
 };
+use super::thermal::{ARC_HEAT_MW_M2, HOTSPOT_HEAT_MW_M2, conductive_mw_m2, sample_l_km};
 use crate::error::CoreError;
+use crate::params::TectonicParams;
 use crate::world::WorldState;
 
 /// What covers one new point: the group on top (if any) and the others.
