@@ -8,7 +8,12 @@ as km^3 a year over the run:
 
   dropped         visible continental crust of another plate under a resampling's top cover that neither accretes
                   nor is consumed (no contact puts it under the top's plate): dropped with its pools
-                  (plates/resample_dropped_km3, ridges.rs)
+                  (plates/resample_dropped_km3, ridges.rs; 0 since the consumer of last resort, PLT-810)
+  last_resort_c   the consumer of last resort (PLT-810, ridges.rs): visible continental crust of a pair with no
+                  contact under the other plate's top cover, accreted as a contact would
+                  (plates/resample_last_resort_continent_km3)
+  last_resort_o   the same for visible ocean floor, subducted with its sediment booked
+                  (plates/resample_last_resort_ocean_km3)
   mafic_dropped   the mafic pools of continental crust that accretes (plates/resample_mafic_dropped_km3)
   accreted        what accretes at resamplings (plates/resample_accreted_km3), visible crust of it (accreted_visible)
   sed_subducted   sediment that goes down with the slab at resamplings (plates/sediment_subducted_km3)
@@ -17,8 +22,9 @@ as km^3 a year over the run:
                   lost; tools/review/crustcycle/steps.py's "blend residual" over the whole run), and its ocean-floor
                   and continental sides
 
-and the medians of each arm with the two-sided Mann-Whitney p (scipy). Visible ocean floor of another plate under the
-top cover with no contact vanishes with its sediment and is in no global: its sediment shows in the residual only.
+and the medians of each arm with the two-sided Mann-Whitney p (scipy). Before the consumer of last resort, visible
+ocean floor of another plate under the top cover with no contact vanished with its sediment and was in no global: its
+sediment shows in the residual only (runs without the last-resort globals read 0 for them).
 """
 import json
 import re
@@ -59,6 +65,8 @@ def run_row(run):
     sub = g.get("sed_subducted", 0.0)
     return {
         "dropped": g.get("dropped", 0.0) / years,
+        "last_resort_c": g.get("last_resort_c", 0.0) / years,
+        "last_resort_o": g.get("last_resort_o", 0.0) / years,
         "mafic_dropped": g.get("mafic_dropped", 0.0) / years,
         "accreted": g.get("accreted", 0.0) / years,
         "accreted_visible": g.get("accreted_visible", 0.0) / years,
