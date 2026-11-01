@@ -86,6 +86,134 @@ margin's sediment counted continental, PLT-661, "the rest converted" carries 18 
 redeposition), and the second the extra volume; arc foundering (Jagoutz & Kelemen 2015) would remove volume but is
 not shown to be missing until the arcs' net rates are read as net or gross.
 
+**Foundering would count twice.** The arcs' rates (PLT-045, PLT-285) are Stern & Scholl 2010's crustal growth rates,
+the arc crust standing today over its age (p. 12: "adopted as a useful long-term rate estimate for continental margin
+arc productivity"; Izu-Bonin-Mariana's 130 to 135 from its crust's volume): net of whatever foundered. A foundering
+law on top of them would remove rock the rates already left out, so it is not a missing law at these rates.
+
+**The arm msc-off** (2026-11-01; master 2f6cd34c with `tectonics.margin_sediment_continental=false`, PLT-661's margins
+off, 8 runs against base37-s4; a measurement, the switch stays on: it is Ben's decision of PR #49): land 0.202 against
+0.171 (p 0.13), continental crust under the sea 0.385 against 0.686 (p < 0.001), land above 2 km 0.055, coast with
+high ground 0.180 (p 0.038), collisions per 100 Myr 3.45 against 5.15 (p 0.001), the continental crust's net change
+over the run -0.136 against +0.115 (p < 0.001), the criteria a median of 5.5 against 5 (mean 5.38 against 4.62, p
+0.046), the sea at the end -224 against 124 m; the guard clean (11,016 against 10,210 m, p 0.23). The census counts
+the continental label (RLC-030: Earth 0.29 to 0.31 by Marcilly et al.'s continental polygons, which take the margins
+to the continent-ocean boundary), so the margins belong in it on both sides; by our arithmetic (land over one less
+the drowned share) the model's continental crust covers about 0.545 of the planet with PLT-661 on, 0.33 with it off,
+against Earth's 0.41 (210.49 x 10⁶ km² of 510). So PLT-661's margins are most of the drowned share: on, the
+continents' area is too large and thin; off, the continents lose 14 % of their crust over the run.
+
+**Why PLT-661's margins cover so much** (Ben, 2026-11-01: "Keep on, find why"; `arcstock.py` on arc-lith, the
+switch on, and msc-off, off; final frames, medians of 8):
+
+| class | on: area, thickness, height over the sea | off |
+|---|---|---|
+| the start's crust | 0.111, 37.4 km, +49 m | 0.067, 37.7 km, +257 m |
+| island-arc crust taken in | 0.153, 30.3 km, -620 m | 0.108, 33.4 km, +67 m |
+| belts on ocean floor | 0.101, 32.0 km, -255 m | 0.044, 36.4 km, +119 m |
+| the rest converted | 0.159, 25.6 km, -1,506 m | 0.044, 34.0 km, +116 m |
+| hyper-extended (under 10 km of its own crystalline crust) | 0.102, 17.7 km, -3,102 m | 0.005, 13.0 km, -2,623 m |
+| all continental crust | 0.537, 30.4 km, -327 m | 0.286, 34.2 km, +180 m |
+
+- The rule's reach is Earth's: the hyper-extended crust lies a median 70 km (p90 104 km) from the continental crust
+  that is not hyper-extended, a ring of 0.8 lattice rows (the ocean side of the 200 km taper, PLT-262; Brune et al.
+  2014's thinned domains 70 to 200 km wide).
+- What it runs along is long: the non-hyper continental crust's edge, measured as its samples within 1.6 spacings of
+  ocean floor or hyper-extended crust times the spacing, is about 896,000 km with the switch on and 587,000 off (a band
+  on the lattice, so over the true perimeter by perhaps two to three times). The ring is 19 % of the continental
+  area.
+- The rule links the crust rather than breaking it up: 13.5 parts over 10⁵ km² with the largest seven holding 0.99 of
+  the area, against 33 parts and 0.93 off.
+- So the margins' area is one Earth-wide ring along every edge of continental crust, the converted crust's included,
+  wherever the floor beside it holds continental rock. Earth's thinned domains are the product of rifting (Brune et al.
+  2014 on rifted margins); PLT-661 stands in for rifting by the sediment on the floor, which comes down from any land
+  beside any margin (sheared, transform, old active ones); a converted ring turns back only outside the zone's ocean
+  side (PLT-667).
+
+**Earth's margins** (sources read by a Sonnet lookup, 2026-11-01, texts extracted from the PDFs):
+- Bradley 2008 (Earth-Sci. Rev. 91, 1-26): "The present-day passive margins have an aggregate length of 105,000 km";
+  lengths "taken as the great-circle distance between endpoints"; sheared margins and back-arc basins' continental
+  sides included.
+- Mercier de Lepinay et al. 2016 (Tectonophysics 693, 96-115): "With an aggregated length of 25500 km, transform
+  margins represents 16% of the length of continental margins, and 31% of that of non-convergent continental
+  margins." Our back-calculation: about 159,000 km of continental margins in all.
+- Chenin et al. 2017 as Manatschal & Chenin 2023 (Geol. Field Trips and Maps 15) quote it: necking domains "between
+  ca. 10 and 100 km with an average of 55 km; hyperextended domains between ca. 20 and 70 km with an average of 50
+  km", the hyper-extended domain being where "the crust is thinned from ca. 10 km to 0 km".
+- Harris et al. 2014 (Mar. Geol. 352, 4-24): "the Earth's margins are approximately 35% active and 65% passive".
+- Marcilly et al. 2022 (Gondwana Res. 110): continental crust 210.5 x 10⁶ km², flooded 61.5 x 10⁶ km², which
+  "includes areas of for example stretched continental crust (pre-breakup extension) along passive margins".
+- No global area of hyper-extended crust was found. Our arithmetic: 105,000 km x 50 km is about 5.3 x 10⁶ km², 0.010
+  of the planet.
+
+**Where the margins' area is** (2026-11-01; `arcstock.py` and `ratchet.py` on arc-lith, the switch on, and msc-off,
+off; medians of 8; the lattice is 100,000 samples, a spacing of 71 km; lengths are neighbour pairs across the line
+times a cell's edge, km):
+
+| final frame | on | off |
+|---|---|---|
+| hyper-extended crust (all) | 0.102 of the planet, 83 % sediment margins | 0.005 |
+| of it on the coast row / the second / three rows and more inland | 0.062 / 0.020 / 0.020 | 0.0046 / 0.0005 / 0 |
+| continental boundary, raw / smoothed over two spacings | 602,000 / 416,000 km | 592,000 / 341,000 km |
+| its share with hyper-extended crust on the land side | 0.75 | 0.08 |
+| ocean floor enclosed by continental crust | 0.095 (0.013 by crust of 10 km and more of its own) | 0.0095 |
+
+- The ring per km of coast is Earth's within the lattice: one row (71 km, the hyper-extended crust a median 70 km
+  from crust of 10 km and more of its own) against Chenin's 50 km average and Brune's 70 to 200 km wide sides.
+- No ratchet: the converted crust that is neither island arc nor belt has 0.074 of the planet under 10 km of its own
+  crystalline crust, 0.075 at 18 km and more, and 0.0019 between 10 and 14 km, so rings do not grow across the line
+  and step outward. It lies within one to three rows of island-arc crust, belts or the start class in both arms
+  (p90 3 rows).
+- The coast row's ring covers 0.73 of the continental coast row. Earth's share of rifted and sheared margins is about
+  0.65 (Harris et al. 2014), so the share is near Earth's.
+- The length is not Earth's. The model's continental boundary is 602,000 km (416,000 smoothed), against Earth's
+  105,000 km of passive margins (Bradley 2008) and about 159,000 km of all margins. That is 2.6 to 3.8 times
+  Earth's, though Bradley's endpoint lengths undercount curved margins. It is near the same with the switch off. So
+  the coast row's ring of 0.062, against Earth's 0.010 by our arithmetic, is the length about four times over and
+  the lattice's one row against 50 km.
+- The length grows early in both arms: 84,000 km at the start, about 205,000 at -950 and about 310,000 at -900. At
+  -900 Myr the island-arc crust's share of it is 0.20 (on) and 0.31 (off). One run's record (msc-off, seed 1) has 14
+  plates at the start and about 40 by -934 Myr; the continents split across new plates (plate 13's 10,149
+  continental samples lie on four plates by -966 Myr). At the end, lattice-scale raggedness (raw over smoothed) is
+  31 % of the length on and 42 % off.
+- The part three rows and more inland (0.020 of the planet; 88 % sediment margins) is no margin ring. It is columns of
+  22.5 km: about 7 km of ocean basement, 5.5 km of crystalline crust of its own and the rest cover. They stand 2.4 km
+  under the sea. Half were raised by an orogeny. They are on the plate of the crust beside them (99.8 %). They are
+  margins a collision carried in and welded, and they keep their sediment as cover. The taper still counts them as its
+  ocean side (any hyper-extended crust is), so it holds them at the margin's profile inland.
+- The rings close straits: the ocean floor enclosed by continental crust (an ocean component that is not the world
+  ocean, linked within 1.6 spacings) is 0.095 of the planet in 194 pieces. It is old (a median 134 Myr against the
+  world ocean's 63) and 88 % of it is on the plate of the continental crust nearest it. Counting hyper-extended crust
+  as the ocean side leaves 0.013, as the switch off does. The enclosed floor's rim is 0.75 hyper-extended crust.
+  This is a reading of the label (water crosses the drowned rings); it adds to the boundary's length.
+
+So the rule's reach per km is Earth's. Its area is the boundary's length (about four times Earth's, near the same with
+the switch off), a second row on part of it, and the welded margins inland. The fixes, in order of size: (1) what
+lengthens the continental boundary in the first 100 Myr (the continents split across new plates, the island-arc pieces,
+the lattice raggedness); (2) margins a collision welds inland, which Earth's orogens take in (Chenin et al. 2017's title
+reads the orogens closed narrow and wide oceans made from hyper-extended margins; not read beyond that) where the model
+keeps them as margins at 2.4 km under the sea; (3) the share of edges the rule rings (0.73 against about 0.65).
+
+**The sediment the margins hold** (`seased.py`, the same arms; GlobSed, Straume et al. 2019, Table 3 as bibliography.md
+quotes it: about 3.37 x 10⁸ km³ over about 3.63 x 10⁸ km², on the margins 1.43 x 10⁸ km³ over 4.69 x 10⁷ km², beyond
+200 km of the continent-ocean boundary 1.13 x 10⁸ km³ over 2.79 x 10⁸ km²):
+
+| final frame | on | off |
+|---|---|---|
+| sediment and sedimentary rock on the ocean floor | 3.78 x 10⁸ km³ (a mean of 1,554 m) | 5.26 x 10⁸ km³ (1,446 m) |
+| of it within 200 km of continental crust | 2.93 x 10⁸ km³ over 8.5 x 10⁷ km² (3,397 m) | 2.86 x 10⁸ km³ (3,378 m) |
+| beyond 200 km | 8.5 x 10⁷ km³ (559 m) | 2.45 x 10⁸ km³ (862 m) |
+| the cover of continental crust on an ocean basement | 6.68 x 10⁸ km³ | 1.84 x 10⁸ km³ |
+
+- With the switch on, the ocean floor's sediment is near GlobSed's, in total and near the margins (3.4 against 3.05
+  km). The converted margins hold another 6.7 x 10⁸ km³ of cover, twice GlobSed's whole ocean, and nearly all of it
+  under the sea. GlobSed's area is the ocean's, shelves and slopes included. So the sediment under the sea is about
+  three times Earth's, and the margins hold two thirds of it. With the switch off it lies on the far ocean floor (862
+  m against 405).
+- At the trenches (the ocean floor flagged at a trench at -500 and -100 Myr; the final frame carries no step flags), a
+  third of the samples hold 1 km or more (0.27 to 0.34 on, 0.34 to 0.39 off; near continental crust 0.44 to 0.56), a
+  median of 100 to 300 m. So PLT-442's sediment gate is not what keeps subduction erosion small (below).
+
 ## Earth's side (sources read by Sonnet lookups, 2026-11-01; bibliography entries to add when used)
 
 - Condie & Aster 2010 (Precambrian Res. 180:227-236): "only 14% during the last 400 My" (the body says 600 My).
@@ -101,7 +229,10 @@ not shown to be missing until the arcs' net rates are read as net or gross.
    crust's layers (Rudnick & Gao's as Hacker et al. 2015 print them, PLT-834), and their heights under the law.
 2. Whether the label (cb_origin's) or the rock is wrong: a column of start crust stacked under an arc is continental
    crust on Earth (an arc-continent collision, the arc accreted to the margin).
-3. Whether arc magma's dense cumulates should founder (Jagoutz & Kelemen 2015) where the model keeps them, with
-   Stern & Scholl's net growth rates read as net (the model's arc rate per km may already be a net rate: check its
-   calibration, PLT-760's rows, before adding a loss).
-4. Subduction erosion at 0.31 against Earth's 1.4 km³/yr.
+3. Answered: the arcs' rates are net (above), so no foundering law at these rates.
+4. Subduction erosion at 0.31 against Earth's 1.4 km³/yr. arc-lith's globals (two runs): the erosive fronts (PLT-442)
+   average 9,100 km of the fronts' 52,800 (straight, PLT-530), 85 % of them intra-oceanic. At PLT-441's 90 km³/km/Myr
+   they ask 0.82 km³/yr. The band gives 0.27; 0.55 (`plates/forearc_short_km3`) is not there, since an intra-oceanic
+   forearc holds little crust beyond a normal ocean floor's 7 km. So the gap is the length that erodes (17 % of the
+   fronts) and the forearcs' crust, not the rate. Next: which gate stops the rest (the 60 mm/yr normal convergence),
+   and Clift & Vannucchi 2004's share of erosive margins by length.

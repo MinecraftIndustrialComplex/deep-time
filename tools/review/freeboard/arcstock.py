@@ -120,7 +120,44 @@ def run_stats(run):
             col = pp[:, 0:7].sum(1)
             classes_end = {"start": start, "taken": taken, "alone": alone, "belt": belt,
                            "otherconv": conv & ~island & ~belt}
+            # Hyper-extended continental crust (under 10 km of its own crystalline crust, PLT-661's margins and
+            # the like: transition::hyper_extended, Brune et al. 2014's limit) and each class's area.
+            own_cryst = pp[:, 2:7].sum(1) - np.clip(np.minimum(pp[:, 7], pp[:, 5] + pp[:, 6]), 0.0, None)
+            classes_end["hyper"] = cont & (own_cryst < 10_000.0)
+            classes_end["cont"] = cont
+            # Where the hyper-extended crust lies: its distance to the nearest continental sample that is not
+            # hyper-extended (km, p50 and p90), and the length of that crust's boundary with ocean floor or
+            # hyper-extended crust (its samples within LINK spacings of one, times the spacing, km): the ring's
+            # rows are the hyper area over that length times the spacing.
+            hyper = classes_end["hyper"]
+            core = cont & ~hyper
+            if hyper.any() and core.any():
+                tree_core = cKDTree(p[core])
+                dist, _ = tree_core.query(p[hyper])
+                dist_km = 2.0 * np.arcsin(np.clip(dist / 2.0, 0.0, 1.0)) * R_KM
+                r["hyper_dist_p50_km"] = float(np.median(dist_km))
+                r["hyper_dist_p90_km"] = float(np.quantile(dist_km, 0.9))
+                outside = cKDTree(p[~core])
+                near = outside.query_ball_point(p[core], th.chord(LINK * spacing), return_length=True)
+                edge_km = float((near > 0).sum() * spacing)
+                r["core_edge_km"] = edge_km
+                r["hyper_rows"] = float(hyper.sum() * (4.0 * np.pi * R_KM**2 / n0) / (edge_km * spacing))
+            # How broken the continental crust is: its components (the continental samples linked within LINK
+            # spacings), the count over 10^5 km2, and the share of its area in the largest seven.
+            cell_km2_all = 4.0 * np.pi * R_KM**2 / n0
+            sizes = np.bincount(lab[cont]) * cell_km2_all
+            sizes = np.sort(sizes[sizes > 0])[::-1]
+            r["parts_over_1e5km2"] = int((sizes > 1.0e5).sum())
+            r["largest7_share"] = float(sizes[:7].sum() / sizes.sum()) if sizes.size else float("nan")
+            # The boundary's length, km: neighbour pairs (within 1.2 spacings, the lattice's six or so) with one
+            # sample on each side, times a cell edge (spacing / sqrt 3, a hexagonal cell's): the continental label
+            # against ocean floor, and the crust that is not hyper-extended against the rest.
+            pairs = cKDTree(p).query_pairs(th.chord(1.2 * spacing), output_type="ndarray")
+            edge = spacing / np.sqrt(3.0)
+            r["coast_cont_km"] = float((cont[pairs[:, 0]] != cont[pairs[:, 1]]).sum() * edge)
+            r["coast_core_km"] = float((core[pairs[:, 0]] != core[pairs[:, 1]]).sum() * edge) if hyper.any() else float("nan")
             for k, m in classes_end.items():
+                r[f"{k}_area"] = float(m.sum() / n0)
                 if not m.any():
                     continue
                 c_sum = col[m].sum()
@@ -142,6 +179,109 @@ def run_stats(run):
             r["arc_o_made_km3"] = made
             r["arc_o_kept"] = standing / made if made else float("nan")
             r["alone_standing_km3"] = float(a[alone, 7].sum() / 1000.0 * cell_km2)
+        # The boundary's length at every snapshot (as at the end, below): the label against ocean floor.
+        pairs = cKDTree(p).query_pairs(th.chord(1.2 * spacing), output_type="ndarray")
+        diff = cont[pairs[:, 0]] != cont[pairs[:, 1]]
+        if "coast_cont_km" not in r:
+            r["coast_cont_km"] = float(diff.sum() * spacing / np.sqrt(3.0))
+        # The same length split by the size of the continental piece it bounds (under 10^5 km2, the rest),
+        # and the count of pieces of any size: small pieces against ragged edges on large ones.
+        cell = 4.0 * np.pi * R_KM**2 / n0
+        size_of = np.bincount(np.maximum(lab, 0)) * cell
+        ci = np.where(cont[pairs[:, 0]], pairs[:, 0], pairs[:, 1])[diff]
+        small = size_of[lab[ci]] < 1.0e5
+        r["coast_small_km"] = float(small.sum() * spacing / np.sqrt(3.0))
+        r["parts_all"] = int(len(np.unique(lab[cont])))
+        # The boundary's length by the class on its continental side (shares): the start class, island-arc crust,
+        # collision belts, hyper-extended crust (the taper's test), the other converted crust.
+        own_a = pp[:, 0:7].sum(1) - np.clip(np.minimum(pp[:, 7], pp[:, 5] + pp[:, 6]), 0.0, None)
+        hyp_a = cont & (own_a - pp[:, 0:2].sum(1) < 10_000.0)
+        belt_a = cont & ~start & ~island & (a[:, 5] > 1.5)
+        side = {"start": start & ~hyp_a, "island": island & ~hyp_a, "belt": belt_a & ~hyp_a, "hyper": hyp_a}
+        side["otherconv"] = cont & ~side["start"] & ~side["island"] & ~side["belt"] & ~hyp_a
+        for k, m in side.items():
+            r[f"coast_by_{k}"] = float(m[ci].mean()) if ci.size else float("nan")
+        # Ocean floor enclosed by continental crust (an ocean component that is not the largest, the world
+        # ocean): the boundary's length against it, its area and its count.
+        olab = components(p, ~cont, LINK * spacing)
+        osz = np.bincount(np.maximum(olab, 0))
+        world = int(np.argmax(osz))
+        oi = np.where(cont[pairs[:, 0]], pairs[:, 1], pairs[:, 0])[diff]
+        enclosed = olab[oi] != world
+        r["coast_enclosed_km"] = float(enclosed.sum() * spacing / np.sqrt(3.0))
+        r["enclosed_area"] = float(((~cont) & (olab != world)).sum() / n0)
+        r["enclosed_parts"] = int(len(np.unique(olab[(~cont) & (olab != world)])))
+        # What the enclosed floor is: its floor age (age/t*.bin, NaN on continental crust) against the world
+        # ocean's, the share young (under 20 Myr) and old (over 100 Myr), the share at a divergent boundary or
+        # within the subduction distance of a front this step (the map's flags), the share on the plate of the
+        # continental sample nearest it (plate/t*.bin), and the share of its area in pieces of three samples or
+        # fewer (lattice-sized holes) against its median piece.
+        ocean_in = (~cont) & (olab != world)
+        ocean_w = (~cont) & (olab == world)
+        af = run / "maps" / "age" / th.name_of(t)
+        pf = run / "maps" / "plate" / th.name_of(t)
+        if ocean_in.any():
+            fl = a[:, 10].astype(np.int64)
+            r["encl_divergent"] = float(((fl[ocean_in] & 16) != 0).mean())
+            r["encl_subzone"] = float(((fl[ocean_in] & 64) != 0).mean())
+            r["world_divergent"] = float(((fl[ocean_w] & 16) != 0).mean())
+            psz = np.bincount(olab[ocean_in])
+            psz = psz[psz > 0]
+            r["encl_small_share"] = float(psz[psz <= 3].sum() / psz.sum())
+            r["encl_part_p50"] = float(np.median(psz))
+            if af.exists():
+                age = np.fromfile(af, "<f4").astype(np.float64)
+                if len(age) == len(a):
+                    r["encl_age_p50"] = float(np.nanmedian(age[ocean_in]))
+                    r["world_age_p50"] = float(np.nanmedian(age[ocean_w]))
+                    r["encl_young"] = float((age[ocean_in] < 20.0).mean())
+                    r["encl_old"] = float((age[ocean_in] > 100.0).mean())
+                    r["world_young"] = float((age[ocean_w] < 20.0).mean())
+            # The crust across that boundary: island-arc crust, the start class, collision belts (Himalayan
+            # orogeny) or other converted crust, shares of the boundary's length against enclosed floor.
+            ce = np.where(cont[pairs[:, 0]], pairs[:, 0], pairs[:, 1])[diff][enclosed]
+            if ce.size:
+                belt_c = cont & ~start & ~island & (a[:, 5] > 1.5)
+                r["encl_rim_island"] = float(island[ce].mean())
+                r["encl_rim_start"] = float(start[ce].mean())
+                r["encl_rim_belt"] = float(belt_c[ce].mean())
+                other_c = cont & ~start & ~island & ~belt_c
+                r["encl_rim_other"] = float(other_c[ce].mean())
+                # The rim by the taper's own tests (transition.rs): hyper-extended (under 10 km of crystalline crust
+                # of its own, the column less its basement) and, of it, sediment margins (PLT-667: on a basement,
+                # its own crust more cover than crystalline rock); continental-arc magma of 1,000 m or more.
+                own = pp[:, 0:7].sum(1) - np.clip(np.minimum(pp[:, 7], pp[:, 5] + pp[:, 6]), 0.0, None)
+                own_cr = own - pp[:, 0:2].sum(1)
+                hyp = cont & (own_cr < 10_000.0)
+                sedm = hyp & (pp[:, 7] > 0.0) & (own_cr < pp[:, 0:2].sum(1))
+                r["encl_rim_hyper"] = float(hyp[ce].mean())
+                r["encl_rim_sedmargin"] = float(sedm[ce].mean())
+                r["encl_rim_contarc"] = float((other_c & (a[:, 8] >= 1000.0))[ce].mean())
+                oc = ce[other_c[ce]]
+                if oc.size:
+                    r["encl_rim_other_T"] = float(T[oc].mean())
+                    r["encl_rim_other_own_km"] = float(own[oc].mean() / 1000.0)
+                    r["encl_rim_other_base_km"] = float(np.clip(pp[oc, 7], 0.0, None).mean() / 1000.0)
+                # The enclosed floor with hyper-extended crust counted as ocean side (the taper's own view): what is
+                # left enclosed by crust of 10 km and more of its own.
+                core_t = cont & ~hyp
+                olab2 = components(p, ~core_t, LINK * spacing)
+                w2 = int(np.argmax(np.bincount(np.maximum(olab2, 0))))
+                r["enclosed_by_core_area"] = float(((~cont) & (olab2 != w2)).sum() / n0)
+                r["hyper_area_all"] = float(hyp.sum() / n0)
+            if pf.exists():
+                pl = np.fromfile(pf, "<u4")
+                if len(pl) == len(a):
+                    _, ni = cKDTree(p[cont]).query(p[ocean_in])
+                    r["encl_same_plate"] = float((pl[ocean_in] == pl[np.flatnonzero(cont)[ni]]).mean())
+                    r["encl_plates"] = int(len(np.unique(pl[ocean_in])))
+        # The same length on the label smoothed by a majority over each sample's neighbours within 2 spacings:
+        # what is lattice-scale raggedness falls away, what is the continents' shape stays.
+        tree = cKDTree(p)
+        nb = tree.query_ball_point(p, th.chord(2.0 * spacing))
+        smooth = np.array([cont[j].mean() > 0.5 for j in nb])
+        r["coast_smooth_km"] = float((smooth[pairs[:, 0]] != smooth[pairs[:, 1]]).sum() * spacing / np.sqrt(3.0))
+        r["smooth_area"] = float(smooth.sum() / n0)
         out[t] = r
     return out
 
