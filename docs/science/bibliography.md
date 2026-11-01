@@ -10627,3 +10627,140 @@ The runoff lane's sources (docs/design/surface-runoff-budget.md, erosion-and-sed
 - Access: open.
 - Library: not kept.
 - Read so far (by the project): full text, 2026-10-31. Abstract: areal precipitation "548 mm/year in De Geerdalen, 486 mm/year in Endalen/Isdammen and 890 mm/year in Bayelva"; "the best estimates indicate an average annual evaporation of ca. 80 mm/year from glacier-free areas, and no net evaporation from glaciers"; "Annual runoff ranges from 545 mm in Endalen/Isdammen, 539 mm/year in De Geerdalen up to 1050 mm/year in Bayelva". The runoff includes the glaciers' mass loss.
+- Read so far (by the project): the abstract, 2026-10-31 (the orogen lane, by a Sonnet sub-agent): "observed east-west thinning of the upper crust"; "we report a minimum age of approximately 13.5 Myr for the onset of graben formation in central Tibet"; "Thinning of the upper crust is most plausibly the result of potential-energy increases resulting from spatially and temporally heterogeneous changes in thermal structure and density distribution within the crust and upper mantle beneath Tibet".
+- Reference check: as the agent printed it from the record.
+
+## The sources of the low-continents lane (2026-10-31)
+
+Why base35's continents stand low against Earth (sea-level.md, "Why base35's continents stand low, against Earth (2026-10-31)"; build log 2026-10-31, "Low continents lane"). No ledger value changed. Clift et al. 2009 was read by the lane agent in the source library's text (`Clift2009/Clift2009.txt`); the rest was fetched and read by one Sonnet research sub-agent, whose report is copied here: what it read, at what level, and its URLs. Where it had only a search summary or a fetch tool's paraphrase, that is said. Numbers marked "(the agent's arithmetic)" are its own.
+
+### Notes on entries above (2026-10-31, the low-continents lane)
+- Clift2009, the library text read by the lane agent (pp. 89 to 93, Table 4): p. 89, erosion will "thin the crust back to the equilibrium values of ca. 38 km, close to sealevel (Christensen and Mooney, 1995)" and "erosion will rapidly reduce mountains to altitudes of <1 km and then more slowly remove the remainder as the land surface is reduced to the stable freeboard value above the ocean surface (Harrison, 1994)"; p. 90, "mountains have a longevity of 100–200 million years, but likely not much longer", the modern 6.5 km3/a of Milliman (1997), and "there are reasons to believe that this is not a representative average rate for long periods of geologic time"; p. 91, "modern rivers are not in equilibrium, but still adjusting to climate change after the Last Glacial Maximum (ca. 20 ka)"; p. 92, the continents split into "elevated, orogenic" and "low lying, stable" land, "17% and 83% respectively of the currently exposed continental area"; p. 93, Table 4's Cenozoic erosion rates (cm/m.y.) for the ten basins draining stable continent: Congo 380, Niger 1090, Orange 98, Nile 145, St. Lawrence 884, Mississippi 1280, Parana 139, Lena 459, Amur 429, Murray-Darling 162 (0.98 to 12.8 m/Myr, a median of 4.0: the lane's arithmetic), and four orogenic systems: Himalaya–Tibet 7800, European Alps 670, Andes–Altiplano 16,900, Eastern Anatolia 16,600; p. 93, "The long-term average is ca. 1.77 km3/a. Although this value is much less than the modern 6.5 km3/a estimated by Milliman (1997), it is close to the 1.6 km3/a estimated for the sediment flux to the trenches".
+- SimpsonSimpson2018, read again by the research sub-agent (full text, p. 2, https://arxiv.org/pdf/1810.08658): the authors L. L. Simpson and D. G. Simpson, the title "Estimating Atmospheric Mass Using Air Density"; "Reported mean land elevations by date are 700m (1895), 840m (1921), 871m (1931), and 797m (2012)" (840 m is Kossinna 1921's and 797 m Eakins & Sharman 2012's ETOPO1, as the paper cites them).
+
+### Flowers2006
+- Reference: Flowers, R. M., Bowring, S. A. and Reiners, P. W. (2006). Low long-term erosion rates and extreme continental stability documented by ancient (U-Th)/He dates. Geology 34(11):925-928.
+- DOI or URL: 10.1130/G22670A.1 (the Arizona record); read at https://experts.arizona.edu/en/publications/low-long-term-erosion-rates-and-extreme-continental-stability-doc/
+- Cited as: "Flowers et al. 2006".
+- Ledger ids: none (sea-level.md, the low-continents section).
+- Access: the abstract only (the journal page returned 403).
+- Read so far (by the project): the abstract, 2026-10-31 (the research sub-agent): western Canadian shield, zircon dates "indicate that the rocks were at temperatures ≤180 °C and crustal depths ≤7-10 km since ca. 1.7 Ga"; apatite dates suggest "crustal depths ≤1.5-2 km for ∼1.0-0.6 b.y."; "Our analysis implies long-term integrated unroofing rates of ≤2.5 μm/yr since ca. 1.7 Ga"; "consistent with the extreme stability of this region since the Proterozoic" (≤2.5 m/Myr, the agent's arithmetic).
+
+### BeauvaisChardon2013
+- Reference: Beauvais, A. and Chardon, D. (2013). Modes, tempo, and spatial variability of Cenozoic cratonic denudation: The West African example. Geochemistry, Geophysics, Geosystems 14(5):1590-1608.
+- DOI or URL: 10.1002/ggge.20093; the abstract from https://api.crossref.org/works/10.1002/ggge.20093
+- Cited as: "Beauvais & Chardon 2013".
+- Ledger ids: none.
+- Access: the abstract only (Wiley 403).
+- Read so far (by the project): the abstract, 2026-10-31 (the research sub-agent): over three erosion periods (~45–24, ~24–11 and ~11–0 Ma) "the subregion underwent low and homogeneous denudation (~ 2–20 m Ma–1) over most of its surface whatever the considered time interval"; "a steady state cratonic denudation regime that is weathering‐limited, i.e., controlled by the thickness of the (lateritic) regolith available for stripping"; "lowering of base levels and their fossilization are primarily imposed by long‐term eustatic sea level fall and climate rather than by epeirogeny".
+
+### Willenbring2014
+- Reference: Willenbring, Codilean, Ferrier, McElroy and Kirchner (2014). Short Communication: Earth is (mostly) flat, but mountains dominate global denudation ... revisited (the title with the agent's ellipsis). Earth Surface Dynamics Discussions 2:1-17, a discussion paper. (The initials not recorded by the read.)
+- DOI or URL: 10.5194/esurfd-2-1-2014; https://esurf.copernicus.org/preprints/2/1/2014/esurfd-2-1-2014.pdf
+- Cited as: "Willenbring et al. 2014", and through it Willenbring, J. K., Codilean, A. T. and McElroy, B. (2013), Geology 41:343-346 (10.1130/G33918.1), which was not read (403, a bot wall).
+- Ledger ids: none.
+- Access: open (the discussion paper, full text read).
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent). Section 2, the 2013 fit to 990 basins' 10Be rates, "D = 11.9 exp(0.0065 · slope)" (mm kyr-1, slope in m km-1), rates "uncorrelated with hillslope gradients below slopes of 200 m km-1", landscapes under 20 m km-1 "67 % of the continental land surface and 54 % of the denudation flux". The revision: "the denudation flux from the steepest 10 % of continental topography nearly equals the flux from the other 90 % of the continental surface combined. This new analysis implies global denudation fluxes of ∼ 23 Gt yr-1, roughly five times the value reported in Willenbring et al. (2013)"; "D = 28.07*exp(0.00744*slope)" at 250 m resolution; "only 1 % of the available 10Be measurements come from drainage basins with average slopes shallower than 22 m km-1 (at 250 m DEM resolution), despite the fact that such landscapes comprise fully half of the continental land surface of the Earth"; "cosmogenic nuclides can measure mass loss rates but not mass accumulation rates, whereas many low-gradient areas are flat precisely because they are depositional". The 2013 headline is withdrawn by its authors here.
+
+### BiermanCaffee2001
+- Reference: Bierman, P. R. and Caffee, M. (2001). Slow rates of rock surface erosion and sediment production across the Namib Desert and escarpment, southern Africa. American Journal of Science 301:326-358 (the copy prints no DOI).
+- DOI or URL: http://geomorphology.sese.asu.edu/Papers/Bierman_and_Caffee_01.pdf
+- Cited as: "Bierman & Caffee 2001".
+- Ledger ids: none.
+- Access: open (full text read).
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent). Abstract (p. 326): bedrock rates inland of the escarpment "3.2 ± 1.5, n = 9", seaward "3.6 ± 1.9, n = 38"; a steep escarpment basin "16 m my-1", a highland basin "5 m my-1", a coastal plain basin "8 m my-1"; large rivers "between 3 and 9 m my-1"; "Namibian erosion rates have reached a steady state and are changing little over time". p. 353: "Slow, and in some cases differential, erosion is removing mass from outcrops and drainage basins at rates between 1 and 16 m my-1"; fission track "2-14 m my-1, Cockburn and others, 2000". pp. 354-355: fission tracks give "long-term (0-36 my) average erosion rates near the coast" of "several meters per million years rising to between 8 and 15 m my-1 in the highlands".
+
+### BiermanCaffee2002
+- Reference: Bierman, P. R. and Caffee, M. W. (2002). Cosmogenic exposure and erosion history of Australian bedrock landforms. GSA Bulletin 114(7):787-803 (the pages from a search summary, not the record).
+- DOI or URL: https://hero.epa.gov/reference/1283968/
+- Cited as: "Bierman & Caffee 2002".
+- Ledger ids: none.
+- Access: the abstract only.
+- Read so far (by the project): the abstract, 2026-10-31 (the research sub-agent): "Australian bedrock surfaces are some of the most stable in the world"; granite "has in some places eroded only decimeters over the past million years"; "maximum limiting, single-nuclide, model erosion rates of 0.3 ± 0.1 to 5.7 ± 1.0 m/m.y."
+
+### WilkinsonMcElroy2007
+- Reference: Wilkinson, B. H. and McElroy, B. J. (2007). The impact of humans on continental erosion and sedimentation. GSA Bulletin 119(1/2):140-156.
+- DOI or URL: 10.1130/B25899.1; https://www.rpgroup.caltech.edu/aph150_human_impacts/assets/pdfs/Wilkinson_2007.pdf
+- Cited as: "Wilkinson & McElroy 2007".
+- Ledger ids: none.
+- Access: open (full text read).
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent). Abstract (p. 140): "Phanerozoic rates of subaerial denudation inferred from preserved volumes of sedimentary rock require a mean continental erosion rate on the order of 16 m per million years (m/m.y.)"; "Erosion irregularly increased over the ~542 m.y. span of Phanerozoic time to a Pliocene value of 53 m/m.y."; "Current estimates of large river sediment loads ... require net denudation of ice-free land surfaces at a rate of ~62 m/m.y."; "~83% of the global river sediment flux is derived from the highest 10% of Earth's surface". About p. 141: the rates "range from ~4 m per million years (m/m.y.) during the Middle Triassic to ~53 m/m.y. during the Pliocene, with a mean of 16 (SD = 11) m/m.y.", from Ronov (1983)'s volumes over Scotese and Golonka (1992)'s areas, "a base-line rate of mean deep-time continental denudation". The river-load section: "the lowest rates of erosion (7.21 m/m.y.) occur over surfaces near sea level", "denudation rate (m/m.y.) = 7.21 × e^(0.0015 × elevation (m))" (after Summerfield and Hulton 1994). It prints Wise 1974's reference.
+
+### Moron2020
+- Reference: Morón, S., Kohn, B. P., Beucher, R., Mackintosh, V., Cawood, P. A., Moresi, L. and Gallagher, S. J. (2020). Denuding a craton: Thermochronology record of Phanerozoic unroofing from the Pilbara Craton, Australia. Tectonics 39:e2019TC005988.
+- DOI or URL: 10.1029/2019TC005988; https://minerva-access.unimelb.edu.au/server/api/core/bitstreams/ea2d3ca8-98ec-5382-9436-b6a3ebf4bca1/content
+- Cited as: "Morón et al. 2020".
+- Ledger ids: none.
+- Access: open (the repository copy; full text, not every section).
+- Read so far (by the project): 2026-10-31 (the research sub-agent): "~50-70°C cooling, which is interpreted as a response to the unroofing of erodible strata overlying basement", onset "~420-350 Ma" and "~350-300 Ma"; "between ~4.5 and 2.5 km of strata may have been unroofed from this region"; no rate stated (about 21 to 38 m/Myr over 120 Myr, the agent's arithmetic); the cover, not the basement.
+- Used: read and not cited (a cover's unroofing, not a craton's basement rate).
+
+### Kaban2003
+- Reference: Kaban, M. K., Schwintzer, P., Artemieva, I. M. and Mooney, W. D. (2003). Density of the continental roots: compositional and thermal contributions. Earth and Planetary Science Letters 209:53-69.
+- DOI or URL: 10.1016/S0012-821X(03)00072-4; https://escweb.wr.usgs.gov/share/mooney/2003_EPSL_ContinentalRoots.pdf
+- Cited as: "Kaban et al. 2003".
+- Ledger ids: none.
+- Access: open (the abstract, introduction, results and conclusions read).
+- Read so far (by the project): 2026-10-31 (the research sub-agent). p. 54: Jordan's isopycnic hypothesis; "the cratonic lithosphere is less dense than non-cratonic uppermost mantle under the same conditions by up to 1.5-2.5%". Abstract: "the average density decrease due to the chemical depletion within cratonic roots varies from 1.1% to 1.5%", the maxima "1.7-2.5%" in the Archean parts; "density variations in the roots due to temperature are larger than the variations due to chemical differences". Section 3: "the residual topography only slightly higher (0.4 km versus 0 km) compared with 'normal' ocean" (against a 180 Ma oceanic column; error "about 0.35 km", up to "0.8 km" for Africa and South America). Conclusions (pp. 66-67): "the density variations due to temperature are partly (about 40%) compensated by density variations due to compositional differences. This conclusion contradicts the classical isopycnic hypothesis of Jordan [11] that predicts a complete balance"; the southern cratons show "positive residual topography, with the most pronounced anomalies found for South Africa".
+
+### EatonPerry2013
+- Reference: Eaton, D. W. and Perry, H. K. C. (2013). Ephemeral isopycnicity of cratonic mantle keels. Nature Geoscience 6:967-970.
+- DOI or URL: https://www.nature.com/articles/ngeo1950
+- Cited as: "Eaton & Perry 2013".
+- Ledger ids: none.
+- Access: the abstract only.
+- Read so far (by the project): the abstract, 2026-10-31 (the research sub-agent): "the isopycnic state is inherently ephemeral: a cratonic keel that is approximately isopycnic under present conditions was more, or less, buoyant in the geologic past".
+
+### HoggardWhiteAlAttar2016
+- Reference: Hoggard, M. J., White, N. and Al-Attar, D. (2016). Global dynamic topography observations reveal limited influence of large-scale mantle flow. Nature Geoscience 9:456-463.
+- DOI or URL: https://www.nature.com/articles/ngeo2709
+- Cited as: "Hoggard, White & Al-Attar 2016" (also in physics-gap-audit.md, from its record and abstract).
+- Ledger ids: none.
+- Access: the abstract only.
+- Read so far (by the project): the abstract, 2026-10-31 (the research sub-agent): oceanic spot measurements with "typical peak amplitudes of ±1 km and wavelengths of approximately 10^3 km"; "At longer wavelengths (such as 10^4 km), observed dynamic topography has peak amplitudes of about ±500 m. At shorter wavelengths (such as 10^3 km), significant dynamic topography is still observed." No continental figure in the abstract.
+
+### Gurnis2000
+- Reference: Gurnis, M., Mitrovica, J. X., Ritsema, J. and van Heijst, H.-J. (2000). Constraining mantle density structure using geological evidence of surface uplift rates: The case of the African Superplume. Geochemistry, Geophysics, Geosystems 1(7).
+- DOI or URL: the abstract from the Crossref record (the DOI not printed in the agent's report).
+- Cited as: "Gurnis et al. 2000".
+- Ledger ids: none.
+- Access: the abstract only.
+- Read so far (by the project): the abstract, 2026-10-31 (the research sub-agent): "we estimate residual topography (i.e., the topography remaining after shallow sources of density are removed) and an average Cenozoic uplift rate to be 300-600 m and 5-30 m/Myr, respectively, for southern Africa".
+
+### NybladeRobinson1994
+- Reference: Nyblade, A. A. and Robinson, S. W. (1994). The African Superswell. Geophysical Research Letters 21(9):765-768.
+- DOI or URL: the abstract from the Crossref record.
+- Cited as: "Nyblade & Robinson 1994".
+- Ledger ids: none.
+- Access: the abstract only.
+- Read so far (by the project): the abstract, 2026-10-31 (the research sub-agent): "a broad bathymetric swell in the southeastern Atlantic Ocean with an amplitude of about 500m", which "together with the contiguous eastern and southern African plateaus, form a superswell", attributed "at least in part, to heating of the lithosphere". No height against other cratons in the abstract.
+- Used: read and not cited (no height against the other cratons).
+
+### Korenaga2017
+- Reference: Korenaga, J., Planavsky, N. J. and Evans, D. A. D. (2017). Global water cycle and the coevolution of the Earth's interior and surface environment. Philosophical Transactions of the Royal Society A 375:20150393.
+- DOI or URL: 10.1098/rsta.2015.0393; https://earth.yale.edu/sites/default/files/2024-09/Evans%20doc%206.pdf
+- Cited as: "Korenaga, Planavsky & Evans 2017".
+- Ledger ids: none.
+- Access: open (full text read).
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent). Section 3(a): "abundant sedimentary records on continents suggest that the freeboard must have been close to zero at least during the Phanerozoic [42]" (Wise 1974); "the constancy of the freeboard is equivalent to that the sea level remaining close to the present-day value (less than 200 m during the Phanerozoic [49])" (Algeo & Seslavinsky 1995). Section 4(a): "Several cratons, such as Laurentia, were episodically flooded and exposed repeatedly through the last 0.5 Gyr [97], indicating a remarkable stability in freeboard over that long interval" (Sloss 1963). Discussion: "the constancy is achieved by the competing processes of erosion and deposition [42]".
+
+### Galer1991
+- Reference: Galer, S. J. G. (1991). Interrelationships between continental freeboard, tectonics and mantle temperature. Earth and Planetary Science Letters 105(1-3).
+- DOI or URL: 10.1016/0012-821X(91)90132-2; the abstract from https://ntrs.nasa.gov/citations/19910066701
+- Cited as: "Galer 1991".
+- Ledger ids: none.
+- Access: the abstract only (the NASA record).
+- Read so far (by the project): the abstract, 2026-10-31 (the research sub-agent): "variation in TP far outweighs the other factors in importance, with freeboard decreasing by 1 km for every TP increase of about 80 C".
+- Used: read and not cited (the mantle's potential temperature, which the model holds fixed).
+
+### BaldwinWhippleTucker2003
+- Reference: Baldwin, Whipple and Tucker (2003). Journal of Geophysical Research: Solid Earth 108(B3). The initials and the title were not recorded by the read; the lane's brief to the agent named the paper by a title, which is not cited here as read.
+- DOI or URL: 10.1029/2001JB000550; the abstract from the Crossref record.
+- Cited as: "Baldwin, Whipple & Tucker 2003".
+- Ledger ids: none.
+- Access: the abstract only.
+- Read so far (by the project): the abstract, 2026-10-31 (the research sub-agent): the detachment-limited stream power model "predicts, for reasonable initial topographies, relatively short postorogenic decay times of 1–10 Myr"; "Pure Airy isostatic rebound of a thick crustal root results in decay times that are at most a factor of 6 longer than the detachment‐limited result"; transport-limited conditions "a factor of 2–3"; "including critical shear stress results increases decay time by approximately a factor of 20"; "a model combining isostasy, a transition to transport‐limited conditions, and a critical shear stress for erosion could account for the presence of residual topography for hundreds of million years".
+
+### Not read, or read and not used (the low-continents lane)
+- Read and not cited: Morón et al. 2020, Nyblade & Robinson 1994 and Galer 1991 (their entries above say why).
+- Jordan 1978 and 1988 (no abstract obtained); Poudjom Djomani et al. 2001 (not found); Wise 1974 (quoted through Korenaga 2017 and Wilkinson & McElroy 2007 only); Wilkinson 2005; Kohn et al. 2002 (its record gives no rates); Gunnell 2003 and Belton et al. 2004 (not fetched); Lachenbruch & Morgan 1990 (only a fetch tool's paraphrase of the USGS abstract page; the elevation formula not obtained); Harris et al. 2014's shelf area (blocked; the shelf share in sea-level.md is the lane's SRTM15+ measure); Peters 2006 and Algeo & Seslavinsky 1995 (no abstract); Tasistro-Hart & Macdonald 2023 (read in full by the research sub-agent, qualitative: "Five flooding events, each <50 My in duration, are well resolved"); Eakins & Sharman 2012 (the NOAA report read in full by the research sub-agent: no mean elevation printed in its text; "the continents, several hundred meters above sea level, and the oceanic abyssal plains, roughly 4,300 meters below sea level").
