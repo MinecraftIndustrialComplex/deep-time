@@ -149,6 +149,13 @@ def run_stats(run):
             sizes = np.sort(sizes[sizes > 0])[::-1]
             r["parts_over_1e5km2"] = int((sizes > 1.0e5).sum())
             r["largest7_share"] = float(sizes[:7].sum() / sizes.sum()) if sizes.size else float("nan")
+            # The boundary's length, km: neighbour pairs (within 1.2 spacings, the lattice's six or so) with one
+            # sample on each side, times a cell edge (spacing / sqrt 3, a hexagonal cell's): the continental label
+            # against ocean floor, and the crust that is not hyper-extended against the rest.
+            pairs = cKDTree(p).query_pairs(th.chord(1.2 * spacing), output_type="ndarray")
+            edge = spacing / np.sqrt(3.0)
+            r["coast_cont_km"] = float((cont[pairs[:, 0]] != cont[pairs[:, 1]]).sum() * edge)
+            r["coast_core_km"] = float((core[pairs[:, 0]] != core[pairs[:, 1]]).sum() * edge) if hyper.any() else float("nan")
             for k, m in classes_end.items():
                 r[f"{k}_area"] = float(m.sum() / n0)
                 if not m.any():
