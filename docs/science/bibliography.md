@@ -1184,7 +1184,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Stein, C. A. and Stein, S. (1992). A model for the global variation in oceanic depth and heat flow with lithospheric age. Nature 359(6391):123-129.
 - DOI or URL: (ERO, ISO, HYP) 10.1038/359123a0. (PLT) 10.1038/359123a0 (Nature page redirects to a login wall).
 - Cited as: "Stein & Stein 1992, Nature 359:123-129 (GDH1)".
-- Ledger ids: ISO-011 to ISO-013, ISO-016, ISO-017, PLT-204
+- Ledger ids: ISO-011 to ISO-013, ISO-016, ISO-017, PLT-204, PLT-830 (2026-10-31, PSM's α and mantle density)
 - Access: paywalled (abstract truncated at Nature). [other sections: paywalled (closed; no abstract in OpenAlex or Semantic Scholar).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -5825,7 +5825,7 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Reference: Angevine, C. L., Heller, P. L., Paola, C. (1990). Quantitative Sedimentary Basin Modeling, chapter 5, Flexure. AAPG Continuing Education Course Note Series 32 (the series from memory).
 - DOI or URL: chapter copy https://pages.uoregon.edu/rdorsey/BasinAnalysis/AngevineEtal1990/Chapt%205%20Flexure.pdf
 - Cited as: "Angevine et al. 1990 eq. 5.8" (surface/flexure.rs test a_line_load_on_a_broken_plate_gives_the_analytic_profile; flexure.md "Foreland basins")
-- Ledger ids: ISO-131
+- Ledger ids: ISO-131, PLT-833 (2026-10-31, chapter 3: shale's porosity)
 - Access: a course copy.
 - Library (the project's source library, not distributed): not filed; fetched to the gap 6 agent's build folder, 2026-10-24.
 - Read so far (by the project): chapter 5 by a Sonnet sub-agent of the gap 6 agent, 2026-10-24, eq. 5.8 checked by the gap 6 agent: the broken plate's deflection w = w0 e^(-x/alpha) cos(x/alpha) with w0 = V alpha^3 / 4D, the load V shared between the two broken ends; the whole load on one end gives V alpha^3 / 2D.
@@ -6519,7 +6519,7 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 
 ### ChristensenMooney1995
 - Reference: Christensen, N. I. and Mooney, W. D. (1995). Seismic velocity structure and composition of the continental crust: a global view. Journal of Geophysical Research 100(B6):9761-9788.
-- Ledger ids: RCK-033, PLT-256 (orogenic collapse, 2026-10-03: orogens 46.3 km, global 41.1 km, as comparison), PLT-281 (2026-10-06: the mean crustal density, 2830 kg/m3)
+- Ledger ids: RCK-033, PLT-256 (orogenic collapse, 2026-10-03: orogens 46.3 km, global 41.1 km, as comparison), PLT-281 (2026-10-06: the mean crustal density, 2830 kg/m3), PLT-832 (2026-10-31: Table 4's rock densities)
 - Library: `ChristensenMooney1995/abstract.json` (the USGS publications record).
 - Read: abstract only. Average crustal thickness 41.1 km (extended 30.5 km, orogens 46.3 km); "The mean crustal density calculated from our model is 2830 kg/m3".
 - Read again in the high-ground task (2026-10-22, PLT-412 and PLT-413): the abstract, from OpenAlex's record (doi 10.1029/95JB00259): "extended crust showing an average thickness of 30.5 km and orogens an average of 46.3 km. Shields and platforms have an average crustal thickness nearly equal to the global average"; "The weighted average crustal thickness based on these values is 41.1 km." Ledger ids added: PLT-412, PLT-413.
@@ -7157,7 +7157,7 @@ Read by a research sub-agent on 2026-10-05 for plate task 7 (Ben, 2026-10-06: "F
 - Reference: Hyndman, R. D. and Currie, C. A. (2011). Why is the North America Cordillera high? Hot backarcs, thermal isostasy, and mountain belts. Geology 39(8):783-786.
 - DOI or URL: http://web.uvic.ca/~rhyndman/PublicationPDFs/Hyndman&Currie2011WithFigs&Appendix.pdf
 - Cited as: "Hyndman & Currie 2011".
-- Ledger ids: PLT-281, PLT-282, ISO-110 and ISO-111 (2026-10-23, the lithosphere's thermal state: E = 1,600 m and the frame)
+- Ledger ids: PLT-281, PLT-282, ISO-110 and ISO-111 (2026-10-23, the lithosphere's thermal state: E = 1,600 m and the frame), PLT-836 (2026-10-31: the slopes and the 1,600 m as the law's checks)
 - Access: author's copy.
 - Read so far (by the project): full text, 2026-10-05: "The slopes between crustal thickness and elevation provide the crust-mantle density contrast, 131±12 m/km for the Cordillera and 141±27 m/km for stable areas"; the reference crust 2850 and mantle 3260 kg/m3 give 126 m/km; sea-level crustal thickness ~27 km (Cordillera) and ~38 km (craton); thermal state moves elevation by about 1,600 m at equal thickness; "the Himalaya-Tibet region of India-Asia collision where the crust reaches ~70 km and elevations ~5 km".
 
@@ -10791,7 +10791,7 @@ Why base35's continents stand low against Earth (sea-level.md, "Why base35's con
 - Reference: Kaban, M. K., Schwintzer, P., Artemieva, I. M. and Mooney, W. D. (2003). Density of the continental roots: compositional and thermal contributions. Earth and Planetary Science Letters 209:53-69.
 - DOI or URL: 10.1016/S0012-821X(03)00072-4; https://escweb.wr.usgs.gov/share/mooney/2003_EPSL_ContinentalRoots.pdf
 - Cited as: "Kaban et al. 2003".
-- Ledger ids: none.
+- Ledger ids: PLT-831 (2026-10-31, the keel's 40 % compensation).
 - Access: open (the abstract, introduction, results and conclusions read).
 - Read so far (by the project): 2026-10-31 (the research sub-agent). p. 54: Jordan's isopycnic hypothesis; "the cratonic lithosphere is less dense than non-cratonic uppermost mantle under the same conditions by up to 1.5-2.5%". Abstract: "the average density decrease due to the chemical depletion within cratonic roots varies from 1.1% to 1.5%", the maxima "1.7-2.5%" in the Archean parts; "density variations in the roots due to temperature are larger than the variations due to chemical differences". Section 3: "the residual topography only slightly higher (0.4 km versus 0 km) compared with 'normal' ocean" (against a 180 Ma oceanic column; error "about 0.35 km", up to "0.8 km" for Africa and South America). Conclusions (pp. 66-67): "the density variations due to temperature are partly (about 40%) compensated by density variations due to compositional differences. This conclusion contradicts the classical isopycnic hypothesis of Jordan [11] that predicts a complete balance"; the southern cratons show "positive residual topography, with the most pronounced anomalies found for South Africa".
 
@@ -10856,3 +10856,137 @@ Why base35's continents stand low against Earth (sea-level.md, "Why base35's con
 ### Not read, or read and not used (the low-continents lane)
 - Read and not cited: Morón et al. 2020, Nyblade & Robinson 1994 and Galer 1991 (their entries above say why).
 - Jordan 1978 and 1988 (no abstract obtained); Poudjom Djomani et al. 2001 (not found); Wise 1974 (quoted through Korenaga 2017 and Wilkinson & McElroy 2007 only); Wilkinson 2005; Kohn et al. 2002 (its record gives no rates); Gunnell 2003 and Belton et al. 2004 (not fetched); Lachenbruch & Morgan 1990 (only a fetch tool's paraphrase of the USGS abstract page; the elevation formula not obtained); Harris et al. 2014's shelf area (blocked; the shelf share in sea-level.md is the lane's SRTM15+ measure); Peters 2006 and Algeo & Seslavinsky 1995 (no abstract); Tasistro-Hart & Macdonald 2023 (read in full by the research sub-agent, qualitative: "Five flooding events, each <50 My in duration, are well resolved"); Eakins & Sharman 2012 (the NOAA report read in full by the research sub-agent: no mean elevation printed in its text; "the continents, several hundred meters above sea level, and the oceanic abyssal plains, roughly 4,300 meters below sea level").
+
+## The sources of the continental column's buoyancy (PLT-830 to PLT-836), added 2026-10-31
+
+A continental column's height from its whole buoyancy (`continental-buoyancy.md`; `docs/design/continental-buoyancy.md`). Fetched and read by one Sonnet research sub-agent of the continental-buoyancy lane on 2026-10-31; the quotes are as it printed them, from PDF text layers, or from OCR or page images where the PDF was a scan, as each entry says. What it had only from a search tool's answer or a fetch tool's summary is said; numbers marked "(the agent's arithmetic)" are its own. The CRUST1.0 pairs the tests use are m4cold.py's (Laske et al. 2013, entry above).
+
+### Notes on entries above (2026-10-31, the continental-buoyancy lane)
+- SteinStein1992, read by the research sub-agent from the author's scanned copy (https://sites.northwestern.edu/sethstein/files/2017/05/gdhnature-revui9.pdf, pp. 123 to 126 as page images at 110 and 220 dpi); ledger PLT-830. p. 124, the half-space depth d(t) = d_r + 2(κt/π)^(1/2) α ρm Tm/(ρm − ρw); the plate's d_s = α ρm Tm a / [2(ρm − ρw)]. pp. 124 to 125, PSM: "a 125-km-thick plate with a basal temperature of 1,350 °C, coefficient of thermal expansion 3.28 × 10−5 K−1, specific heat 1.171 kJ kg−1 K−1 (0.28 cal g−1 K−1), conductivity 3.138 W m−1 K−1 (7.5 × 10−3 cal K−1 cm−1 s−1), mantle density 3,330 kg m−3, water density 1,000 kg m−3 and ridge depth 2,500 m". p. 125, GDH1: "a 95-km-thick plate, with a basal temperature of 1,450 °C, coefficient of thermal expansion, 3.1 × 10−5 K−1, and all other parameters except the ridge depth the same as for PSM"; the asymptotic depth "5,651 m" for GDH1 against "6,400 m" for PSM. p. 126: GDH1's uncertainties "95 ± 15 km, ... 1,450 ± 250 °C and α as 3.1 ± 0.8 × 10−5 K−1"; PSM's own "(125 ± 10 km)", "(1,350 ± 275 °C)", "(3.2 ± 1.1 × 10−5 K−1)"; the depth law d(t) = 2,600 + 365 t^(1/2) for t < 20 Myr, 5,651 − 2,473 exp(−0.0278 t) after. The agent's arithmetic: κ = 3.138/(3330 × 1171) = 8.05 × 10⁻⁷ m²/s; the half-space coefficient 365 m/√Myr for GDH1's constants and 360 for PSM's. Parsons & Sclater 1977 itself not read.
+- ChristensenMooney1995, read by the research sub-agent (the scanned copy at https://escweb.wr.usgs.gov/share/mooney/1995_Seismic%20Velocity%20Structure%20Composition%20of%20the%20Continental%20Crust.pdf, 28 pages, OCR at 300 dpi; Tables 3 and 4 and Fig. 18 checked on page images); ledger PLT-832. Abstract: "The mean crustal density calculated from our model is 2830 kg/m3, and the average SiO2 content is 61.8%". Table 3, p. 9769, crustal thickness: orogens 46.3 ± 9.5 km, shields and platforms 41.5 ± 5.8, continental arcs 38.7 ± 9.6, rifts 36.2 ± 7.9, extended crust 30.5 ± 5.3, the weighted average 41.0 ± 6.2. Table 4, pp. 9771 to 9776, densities (kg/m³) at 5 / 10 / 15 / 20 / 25 km, corrected for compression (p. 9778): granite-granodiorite 2654 (5 km); diorite 2810 (5 km); gabbro-norite-troctolite 2966 (5 km); granite gneiss 2662, 2669, 2675, 2681, 2687; biotite (tonalite) gneiss 2746, 2753, 2759, 2766, 2772; mica quartz schist 2830 to 2856; amphibolite 2992 to 3011; felsic granulite 2755 to 2776; mafic granulite 2977, 2983, 2988, 2993, 2998 (3004 to 3024 for 30 to 50 km, OCR only); mafic garnet granulite 3121 to 3142 (3148 to 3168 for 30 to 50 km); mafic eclogite 3480 to 3495 (3499 to 3515); dunite 3309 to 3339; basalt 2878 and slate 2801 (5 km). Fig. 18, p. 9784, the average crust's petrology by depth (0 to 5 km granitic gneiss; 30 to 40 km half mafic granulite, half mafic garnet granulite); "The crustal density of this model increases from 2660 kg/m3 at the surface to 3100 kg/m3 at the base of the crust"; p. 9786, "Average crustal density is 2835 kg/m3".
+- Angevine1990, chapter 3 "Subsidence Analysis" read by the research sub-agent (https://pages.uoregon.edu/rdorsey/BasinAnalysis/AngevineEtal1990/Chapt%203%20Subsidence%20Analysis.pdf, Fig. 3.11, p. 24 of the scan, the page image); ledger PLT-833. "Idealized porosity versus depth curves for different lithologies", φ = φ0 e^(−cz): shale φ0 0.5, c 5.0 × 10−4 m−1, grain density 2.72; sandstone 0.4, 3.0 × 10−4 m−1, 2.65; limestone 0.5, 7.0 × 10−4 m−1, 2.71; "based on studies by Sclater and Christie (1980)" (not read).
+- Kaban2003, read again by the research sub-agent (the full text parsed, the p. 66 page image checked); ledger PLT-831. The compositional anomaly offsets about 40 % of the thermal one (the conclusions, quoted in sea-level.md: "partly (about 40%) compensated"); p. 66, the average density decrease over all cratons 1.3 %, "corresponding to a density of −49 kg/m3"; cratonic peridotites "up to 0.6–2.5% less dense", "1.5–2.7%" for Archean roots and "0.6–1.4%" for Proterozoic and cratonic margins; the reference column 6.4 km of water over a 7.2 km crust at 2,850 kg/m³ on a cooling-plate mantle.
+- HyndmanCurrie2011, read again by the research sub-agent (the author's preprint with figures and appendix, full text, pp. 1 to 20); ledger PLT-836. Abstract: "Most of the North American Cordillera has 30-35 km crust in contrast to 40-45 km for the lower elevation craton and other stable areas... From thermal constraints we predict a uniform ~1,600 m elevation support of the Cordillera by thermal expansion compared to stable areas". p. 6: "The average temperature difference between Cordillera and craton from the surface to ~200 km depth where the two geotherms converge, is about 250oC... Using these summary temperatures and a coefficient of thermal expansion of 3.2 x 10-5 oC-1 (Hasterok and Chapman, 2007) the Cordillera is predicted to be ~1,600 m higher than the craton for the same crustal thickness". pp. 7 to 8: "The reference density is 2850 kg m-3"; "the Cordillera backarc and stable area average crustal thicknesses are 33±5 km and 40±4 km respectively". p. 8: "131±12 m/km for the Cordillera and 141±27 m/km for stable areas. For the reference of Hasterok and Chapman (2007) with a 410 kg/m3 density contrast (crust 2850 kg/m3 and mantle 3260 kg/m3) the slope is 126 m/km... the sealevel crustal thickness is ~27 km for the Cordillera and ~38 km for the craton". SOM p. 16, "The average difference in elevation is 1,600m"; SOM p. 19, the thermal elevation is insensitive to lithosphere thickness below about 80 km. The agent's arithmetic: 3.2 × 10⁻⁵ × 250 K × 200 km = 1.6 km, the simple α ΔT z integral.
+- HasterokChapman2007, the abstracts read again (Crossref); not used: the mantle density is unresolved. A search tool's answer (not read) gave 3,340 kg/m³ "based on the xenolith derived estimate by Griffin et al. [1999]"; Hyndman & Currie (read) give their reference as crust 2,850 and mantle 3,260; the agent's reconstruction of the Wyoming correction in part 1's abstract (−131 m) fits 3,340, not 3,260. The full texts (Wiley, ResearchGate, the Adelaide repository) returned 403 or nothing. Kept out of the law until read.
+- HasterokChapman2011, read by the research sub-agent (https://moodle2.units.it/pluginfile.php/342322/mod_forum/attachment/29894/Hasterock.pdf, section 6.1 p. 64; the equation glyphs garbled): eq. (10), the thermal buoyancy as ∫ αV(z,T) T(z) − α′V(z,T) T′(z) dz to the depth where the coolest geotherm meets the adiabat; "there is a rough correlation between elevation and HF that accounts for approximately 2.5 km of elevation"; the constants in Supplement Table S.5, not obtained. Not used.
+
+### ZobackMooney2003
+- Reference: Zoback, M. L. and Mooney, W. D. (2003). Lithospheric buoyancy and continental intraplate stresses. International Geology Review 45:95-118.
+- DOI or URL: https://escweb.wr.usgs.gov/share/mooney/2003_IGR_LithoBuoyancy.pdf (the DOI not printed in the copy read)
+- Cited as: "Zoback & Mooney 2003" (the law's form and H_0, as Lachenbruch & Morgan 1990's relation).
+- Ledger ids: PLT-830, PLT-836
+- Access: full text (the USGS share).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent; the equations checked on page images). Eq. (1), p. 96: ε = [(ρa − ρL) × L / ρa] − H0, ε ≥ 0, "H0 is the buoyant height of sea level relative to the hypothetical free surface of the asthenosphere". Eq. (2a), the submerged lithosphere: ε = ρa/(ρa − ρw) × [(ρa − ρL)/ρa × L − H0]; eq. (2b) as printed, ε = (ρa − ρL)/(ρa − ρw) × L − H0 for ε < 0, lacks (2a)'s factor on H0 (the agent's arithmetic). Eq. (3), p. 97: H0 = 2.78 ± 0.35 km, the mean of Table 1 (five ridge columns, ρa 3,300 or 3,200; rows 4 and 5's H0 look swapped and the five printed values average 2.79: the agent's arithmetic). Predicted elevations use "ρa = 3300 kg/m3" (p. 100). Eqs. (8) and (9), p. 101: ρm = ρa[1 + α(Θa − Θm)], Θa = 1350 °C, α "taken here as 3.5 × 10-5 K–1 (Lachenbruch and Morgan, 1990)". p. 100: "2764 kg/m3 average density of 25 km thick crust, compared to a density of 2947 kg/m3 for 50 km crust"; crustal buoyancy alone overpredicts elevation by 1.73 ± 0.95 km on average. p. 103: "a negative petrologic density anomaly of ~1%" for Archean lids. p. 107, the Canadian Shield: crust 38 km at 2,940 kg/m³, observed 350 m. Table 3, p. 108: the Basin and Range's thermal-lid lithosphere 70 ± 33 km against the seismic 64 ± 20. p. 108: "the Moho is generally the largest density contrast within the lithosphere, typically 300–400 kg/m3".
+
+### LachenbruchMorgan1990
+- Reference: Lachenbruch, A. H. and Morgan, P. (1990). Continental extension, magmatism and elevation; formal relations and rules of thumb. Tectonophysics 174(1-2):39-62.
+- DOI or URL: 10.1016/0040-1951(90)90383-J (from the USGS record); https://pubs.usgs.gov/publication/70016328
+- Cited as: "Lachenbruch & Morgan 1990" (the relation, through Zoback & Mooney 2003).
+- Ledger ids: PLT-836 (through Zoback & Mooney)
+- Access: paywalled; the USGS record lists no PDF.
+- Library: not kept.
+- Read so far (by the project): the abstract only, as a fetch tool's paraphrase (2026-10-31, the research sub-agent): the lithosphere floats on asthenosphere of uniform density with no flexural strength; the Great Basin, about 100 % extension at about 1.75 km mean elevation; for an ocean ridge B (magma supply over extension rate) about 5 km. The equations are read in Zoback & Mooney 2003.
+
+### HackerKelemenBehn2015
+- Reference: Hacker, B. R., Kelemen, P. B. and Behn, M. D. (2015). Continental lower crust. Annual Review of Earth and Planetary Sciences 43:167-205.
+- DOI or URL: 10.1146/annurev-earth-050212-124117 (printed); read at https://hacker.faculty.geol.ucsb.edu/viz/Hacker15KelemenBehn_relamination_AREPS.pdf
+- Cited as: "Hacker, Kelemen & Behn 2015" (Rudnick & Gao's three layers; CRUST1.0's thickness by setting).
+- Ledger ids: PLT-834
+- Access: full text (the author's copy).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent; Fig. 1 from the page image). Fig. 1 caption (p. 169): "Rudnick & Gao's (2003, 2014) three-layer crustal model... lower crust is 80% mafic and 17 km thick"; the panel's upper crust 0-12 km, middle 12-23 km, lower 23-40 km, SiO2 67 / 64 / 53 wt%, heat production 1.6 / 1.0 / 0.2 μW/m³. Table 1 (p. 170), CRUST1.0's thickness, upper / middle / lower / entire (km): shields and platforms (49 %) 13.7 / 13 / 12.1 / 38.8; rifts (11 %) 11.4 / 10.6 / 10.6 / 32.6; Paleozoic-Mesozoic orogens (11 %) 15.8 / 13.9 / 10 / 39.7; the India-Asia collision zone (4 %) 26.2 / 12.2 / 13.3 / 51.7; continental shelf (10 %) 13.2 / 9.5 / 8.9 / 31.6. Abstract: "Most lower crust is less dense than the underlying mantle, but mafic lowermost crust could be unstable and likely delaminates beneath rifts and arcs". p. 194: "The average density of lower crust in most tectonic settings is ∼3.07 g/cm3; the average density of the lowermost crust is 3.27 g/cm3"; "Delamination of 1–10-km-thick layers that are ≤300 kg/m3 denser than mantle can occur at timescales of 1–10 Myr if the Moho temperature is ≥900°C".
+
+### MooneyVidale2003
+- Reference: Mooney, W. D. and Vidale, J. E. (2003). Thermal and chemical variations in subcrustal cratonic lithosphere: evidence from crustal isostasy. Lithos 71:185-193.
+- DOI or URL: 10.1016/j.lithos.2003.07.004 (printed); read at https://escweb.wr.usgs.gov/share/mooney/2003_Lithos_CratonLithosphere.pdf
+- Cited as: "Mooney & Vidale 2003" (cratons depressed against crustal isostasy).
+- Ledger ids: none (read, not used for a value).
+- Access: full text (the USGS share).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent). Abstract: "cratons are generally depressed by 300 to 1500 m in comparison with predictions from pure crustal isostasy". p. 187: "Airy compensation is assumed at the base of the crust, with a constant mantle density of 3350 kg/m3"; 150 Ma ocean floor at zero depth. p. 190: "Large parts of Eurasia, South America, and the cratonic part of North America are depressed by 600 to 1500 m. Australia and west Africa are only depressed by about 300 m".
+
+### Lee2014Chapter
+- Reference: Lee, C.-T. A. (2014). 4.12 Physics and chemistry of deep continental crust recycling. Elsevier (the volume not printed on the pages read), from p. 423.
+- DOI or URL: 10.1016/B978-0-08-095975-7.00314-4 (printed); read at https://cinty-lee.squarespace.com/s/90-TOGLeeLowerCrustalRecycling.pdf
+- Cited as: "Lee 2014" (eclogitization; depletion's buoyancy).
+- Ledger ids: none (read, not used for a value).
+- Access: full text (the author's copy).
+- Library: not kept.
+- Read so far (by the project): section 4.12.2.1.2 and the Fig. 6 caption, 2026-10-31 (the research sub-agent): "The highest densities occur when feldspar has completely reacted to form garnet and pyroxene ('eclogitization'), which occurs between 1 and 1.7 GPa (30–50 km), depending on bulk composition and temperature"; "Melt-depletion effects on the density of peridotite residues can impart 1–2% of positive buoyancy, and are thus of the right magnitude to counteract thermal contraction, resulting in isopycnic or neutral density conditions".
+
+### Hacker1996
+- Reference: Hacker, B. R. (1996). Eclogite formation and the rheology, buoyancy, seismicity, and H2O content of oceanic crust. In: Subduction: Top to Bottom, Geophysical Monograph 96, AGU, from p. 337.
+- DOI or URL: https://hacker.faculty.geol.ucsb.edu/viz/Hacker96_Eclogite_formation.pdf
+- Cited as: "Hacker 1996".
+- Ledger ids: none (read, not used for a value).
+- Access: full text (the author's copy; the text layer's spacing garbled).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent): "Eclogite facies conditions exist at temperatures >500°C and pressures >1.2 GPa... Eclogite facies rocks do not necessarily exist wherever such conditions prevail in the Earth because of sluggish kinetics"; "Omphacite and garnet have densities of 3.2–3.4 gm/cm3 and 3.6–4.0 gm/cm3, a marked elevation beyond the density of a typical basalt at 2.9 gm/cm3".
+
+### DurrheimMooney1994
+- Reference: Durrheim, R. J. and Mooney, W. D. (1994). Evolution of the Precambrian lithosphere: seismological and geochemical constraints. Journal of Geophysical Research 99(B8):15,359-15,374.
+- DOI or URL: https://escweb.wr.usgs.gov/share/mooney/1994_Evolution%20of%20the%20Precambrian%20lithosphere.pdf
+- Cited as: "Durrheim & Mooney 1994".
+- Ledger ids: none (read, not used for a value).
+- Access: full text (scanned; OCR at 300 dpi).
+- Library: not kept.
+- Read so far (by the project): 2026-10-31 (the research sub-agent). Abstract: "Proterozoic crust has a thickness of 40-55 km and a substantial high-velocity (>7 km/s) layer at its base, while Archean crust is only 27-40 km thick... The resultant lithospheric keel is intrinsically less dense than the surrounding mantle and thus not susceptible to delamination". Conclusion 3, p. 15,369: Archean crust "ranges in thickness from 27 to 40 km, with an average of about 35 km". p. 15,368: "compositionally caused density changes in the range 0.03-0.08 g/cm3 [Bickle, 1986]".
+
+### OReilly2001
+- Reference: O'Reilly, S. Y., Griffin, W. L., Poudjom Djomani, Y. H. and Morgan, P. (2001). Are lithospheres forever? Tracking changes in subcontinental lithospheric mantle through time. GSA Today 11(4):4-10.
+- DOI or URL: https://rock.geosociety.org/gsatoday/archive/11/4/pdf/gt0104.pdf
+- Cited as: "O'Reilly et al. 2001" (the companion of Poudjom Djomani et al. 2001, which was not fetched).
+- Ledger ids: none (read, not used for a value).
+- Access: full text.
+- Library: not kept.
+- Read so far (by the project): 2026-10-31 (the research sub-agent). p. 7: "Mean density (at standard temperature and pressure) increases significantly from Archean (3.31 ± 0.016 Mg m-3) to Proterozoic (3.34 ± 0.02 Mg m-3) to Phanerozoic (3.36 ± 0.02 Mg m-3)" (Fig. 7 reads 3.37 for the last); "a 200 km section [of Archean mantle] is 2.5% less dense than the asthenosphere at the lithosphere-asthenosphere boundary".
+
+### LeeLuffiChin2011
+- Reference: Lee, C.-T. A., Luffi, P. and Chin, E. J. (2011). Building and destroying continental mantle. Annual Review of Earth and Planetary Sciences 39:59-90.
+- DOI or URL: read at https://static1.squarespace.com/static/54b9bb6fe4b07b4a7d145b55/t/54bc8490e4b054d2824068be/1421640848178/63-2011LEE-Craton-AnnualReviews.pdf
+- Cited as: "Lee, Luffi & Chin 2011".
+- Ledger ids: none (read, not used for a value).
+- Access: full text.
+- Library: not kept.
+- Read so far (by the project): pp. 73 to 74, 2026-10-31 (the research sub-agent): "An increase in Mg# from 0.89 to 0.93 yields a ∼2% density decrease. Cratonic mantle is on average ∼500–700°C cooler than the ambient mantle (∼1,400°C), resulting in a ∼2% increase in density due to thermal contraction... Using the density-Mg# relationship of Lee (2003), ρ = −1.44Mg# + 4.66".
+
+### SchuttLesher2010
+- Reference: Schutt, D. L. and Lesher, C. E. (2010). Compositional trends among Kaapvaal Craton garnet peridotite xenoliths and their effects on seismic velocity and density. Earth and Planetary Science Letters 300:367-373.
+- DOI or URL: 10.1016/j.epsl.2010.10.018 (printed); read at https://derekschutt.wordpress.com/wp-content/uploads/2014/08/schutt_lesher_xenolith_epsl_2010.pdf
+- Cited as: "Schutt & Lesher 2010".
+- Ledger ids: none (read, not used for a value).
+- Access: full text.
+- Library: not kept.
+- Read so far (by the project): 2026-10-31 (the research sub-agent). Abstract: "We also find that the density effects of melt depletion are insufficient to produce cratonic mantle that is neutrally buoyant with respect to fertile convecting mantle"; the total effect of melt depletion on density "∼1.2%"; at 4.25 GPa "αvΔT = ∼1.8%".
+
+### SudholzCopley2025
+- Reference: Sudholz, Z. J., Copley, A. and Priestley, K. (2025). The buoyancy of cratonic lithospheric mantle. Geophysical Research Letters 52:e2025GL118856.
+- DOI or URL: 10.1029/2025GL118856 (printed); read at https://alexcopley.co.uk/papers/2025_zach_buoyancy.pdf
+- Cited as: "Sudholz, Copley & Priestley 2025".
+- Ledger ids: none (read, not used for a value).
+- Access: open access, full text.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-31 (the research sub-agent). Abstract: "Most of the CLM is either neutrally buoyant or slightly positively buoyant relative to the asthenosphere. The exception is where pyroxenite has accumulated due to melt infiltration". p. 4: peridotite xenoliths' densities at their equilibration P-T "from 3,284 to 3,423 kg/m3".
+
+### Not read, or read and not used (the continental-buoyancy lane)
+- Abstracts only: Lee 2003 (the intrinsic density of cratonic mantle "balances to within error its negative thermal buoyancy"), Schutt & Lesher 2006 (at 20 % melt removal the residue's density changes by −0.42 % to −1.14 % by pressure; α 4.91 to 3.47 × 10⁻⁵ /K from 1 to 7 GPa), Hasterok & Chapman 2007 (above).
+- Not fetched: Rudnick & Gao 2003 and 2014 for the layers (Hacker et al.'s Fig. 1 read instead; a search tool's weights 0.317 / 0.296 / 0.388 from Rudnick & Fountain 1995, not read), Rudnick & Fountain 1995, Sclater & Christie 1980, Parsons & Sclater 1977, McKenzie 1978 (primary), Poudjom Djomani et al. 2001, Ringwood & Green 1966, Ahrens & Schubert 1975, Austrheim 1998, Castellanos et al. 2022.
+
+### SternScholl2010
+- Reference: Stern, R. J. and Scholl, D. W. (2010). Yin and yang of continental crust creation and destruction by plate tectonic processes. International Geology Review 52(1):1-31.
+- DOI or URL: 10.1080/00206810903332322
+- Cited as: "Stern & Scholl 2010".
+- Ledger ids: none (a measurement's comparison, docs/design/continental-buoyancy.md "The arm cb-on and the default", tools/review/freeboard/arcstock.py).
+- Access: read through a copy found by a Sonnet research sub-agent, 2026-11-01; page numbers not recorded.
+- Library: not kept.
+- Read so far (by the project): "the present 14,500 km of intra-oceanic arcs"; "The combined length of continental margin arcs is approximately 27,500 km (Scholl and von Huene 2007)"; juvenile arcs "approximately 200-300 km across and up to 30 km thick"; Izu-Bonin-Mariana and the Aleutians "130-135 km3/km-million years" (range 90 to 180); intra-oceanic arcs about 1.5 km³/yr, continental arcs about 1.0, about 2.7 in all. The area 0.006 to 0.010 of the planet (length times width) is our arithmetic.
+
+### Gerya2011
+- Reference: Gerya, T. V. (2011). Intra-oceanic subduction zones. In Brown, D. and Ryan, P. D. (eds.), Arc-Continent Collision, Frontiers in Earth Sciences, Springer, chapter 2.
+- DOI or URL: 10.1007/978-3-540-88558-0_2; read at the author's PDF (jupiter.ethz.ch), 2026-11-01, by a Sonnet research sub-agent.
+- Cited as: "Gerya 2011".
+- Ledger ids: none (the same comparison as SternScholl2010).
+- Access: author copy, full text.
+- Library: not kept.
+- Read so far (by the project): "Intra-oceanic subduction zones comprise around 17,000 km, or nearly 40%, of the subduction margins of the Earth (Leat and Larter 2003)" (Leat & Larter 2003 itself not read); major parts of the arcs "often located below sea level" (not quantified).

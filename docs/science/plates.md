@@ -14486,7 +14486,8 @@ old floor), beside its own plate's thick ocean crust 83 m; under hs-lid, with it
 365 m, +96 m of that arm's +301 m sea.
 
 The rule now (PLT-850): a resampled sample stands at the height its own rock and age hold it at (`rock_height_m`:
-continental crust its pools' Airy height and ISO-110's thermal height, the dry height the settling holds it to; ocean
+continental crust its pools' Airy height and ISO-110's thermal height, or with `column_buoyancy` its whole
+column's buoyancy (PLT-836), the dry height the settling holds it to; ocean
 crust its age's floor plus the Airy change of its pools over the ocean's own 7 km column, water-loaded under the
 datum), plus its class corners' blended departures from theirs, which keep what flexure, a trench's pull, a margin's
 held floor or a step's lag held them at. And one rule for every field the resampling blends (PLT-851): a field of the

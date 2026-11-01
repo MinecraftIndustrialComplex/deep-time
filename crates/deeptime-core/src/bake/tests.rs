@@ -409,6 +409,8 @@ fn the_release_pace_bakes_continental_heat_flow_with_the_final_pass() {
     v["seed"] = json!(1);
     v["surface"]["flexure"]["te_weakening_myr"] = json!(62.8);
     v["tectonics"]["thermal_state"] = json!(false);
+    // The whole column's buoyancy reads the state (PLT-836).
+    v["tectonics"]["column_buoyancy"] = json!(false);
     run_to_folder(&v.to_string(), &dir);
     // The proxy's most: 55 + 35 + 40 + 40 + 30 = 200 (PLT-468's terms on its base).
     check_heat_flow(&dir, 54.9, 200.1);
@@ -431,6 +433,8 @@ fn the_thermal_state_bakes_its_own_heat_flow() {
     v["surface"]["flexure"]["te_weakening_myr"] = json!(62.8);
     v["tectonics"]["thermal_state"] = json!(true);
     v["tectonics"]["thermal_isostasy_m"] = json!(1600.0);
+    // ISO-110's term and the whole column's buoyancy exclude each other (PLT-836).
+    v["tectonics"]["column_buoyancy"] = json!(false);
     v["tectonics"]["thermal_strength"] = json!(true);
     run_to_folder(&v.to_string(), &dir);
     let floor = crate::plates::thermal::conductive_mw_m2(crate::plates::thermal::L_COLD_KM);
