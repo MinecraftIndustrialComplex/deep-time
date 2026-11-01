@@ -168,6 +168,17 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 - **Next:** the gate with the weld sweep; cb-on2 against the base after PR #58 lands; the PR.
 
 ### 2026-10-31: Continental buoyancy lane: a continental column's height from its whole buoyancy, built behind `tectonics.column_buoyancy` (off), gated; the start's column under it (lane agent, worktree .claude/worktrees/agent-ab00c28a7afc2ee27, branch continental-buoyancy on origin/continental-heat-ceiling a8e898f4 and origin/master e65259fe; sub-agent of session 88bb1af2-7722-4f74-9e04-4e8b8af667a9; not merged)
+### 2026-11-01: The height follows the rock: the arm rh2 and the landing (the coordinator, inline; branch `resample-height-follows-rock`, PR #59)
+
+- **rh2** (8 runs against base36-s4, key c4b450e13282): V1 neutral (no measure at p under 0.15; criteria median 5.5
+  against 4.5), the guard clean (10,165 against 9,960 m), the sea at the end 346 against 323 m. `bare_lift.py`: floor
+  beside its own plate's continents 201 m over GDH1 against 258, on old floor 563 against 611; the blend was a fifth of
+  that lift. plates.md "The height follows the rock", decisions log 2026-11-01.
+- **Gate** on b2d75dea (the merge with master's tree and PR #58): fmt, clippy, 1,504 passed, 0 failed; the weld seeds
+  still weld. Graphide: the app skipped the PR and `gr check` is retired (ROUTE_REMOVED).
+- **Next:** the remaining ~200 m lift of floor beside the continents (flexure, sediment, the trench release, the margins'
+  held floor); PR #60 on top.
+
 ### 2026-11-01: the height follows the rock at a resampling (PLT-850, PLT-851), built (the hotspot lane's diagnosis and code, finished by the coordinator inline after the lane stopped on the account's rate limit; branch resample-height-follows-rock)
 
 - A resampled sample's height is its own rock's and age's plus its class corners' blended departures, where it was blended over all three corners: ocean floor beside continents and arcs kept a share of their height and none of their rock (251 m over GDH1 beside its own plate's continents on base35's final frames, 668 m on 60 to 200 Myr floor; +96 m of hs-lid's +301 m sea). Every blended field follows the class's corners (PLT-851). A correction on master's default: it changes every planet, so it gets an arm against base35-s4 and then the next base.
