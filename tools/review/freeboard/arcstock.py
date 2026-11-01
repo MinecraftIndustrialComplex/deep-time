@@ -238,20 +238,28 @@ def run_stats(run):
                 r["encl_rim_belt"] = float(belt_c[ce].mean())
                 other_c = cont & ~start & ~island & ~belt_c
                 r["encl_rim_other"] = float(other_c[ce].mean())
-                # The other converted crust split: continental-arc magma of 1,000 m or more, a column that is mostly
-                # cover (sediment and sedimentary rock: PLT-661's margin sediment, accreted wedges), the rest; and
-                # its mean thickness (km).
-                col_all = np.maximum(pp[:, 0:7].sum(1), 1.0)
-                carc = other_c & (a[:, 8] >= 1000.0)
-                cover = other_c & ~carc & (pp[:, 0:2].sum(1) / col_all > 0.5)
-                r["encl_rim_contarc"] = float(carc[ce].mean())
-                r["encl_rim_cover"] = float(cover[ce].mean())
-                r["encl_rim_rest"] = float((other_c & ~carc & ~cover)[ce].mean())
+                # The rim by the taper's own tests (transition.rs): hyper-extended (under 10 km of crystalline crust
+                # of its own, the column less its basement) and, of it, sediment margins (PLT-667: on a basement,
+                # its own crust more cover than crystalline rock); continental-arc magma of 1,000 m or more.
+                own = pp[:, 0:7].sum(1) - np.clip(np.minimum(pp[:, 7], pp[:, 5] + pp[:, 6]), 0.0, None)
+                own_cr = own - pp[:, 0:2].sum(1)
+                hyp = cont & (own_cr < 10_000.0)
+                sedm = hyp & (pp[:, 7] > 0.0) & (own_cr < pp[:, 0:2].sum(1))
+                r["encl_rim_hyper"] = float(hyp[ce].mean())
+                r["encl_rim_sedmargin"] = float(sedm[ce].mean())
+                r["encl_rim_contarc"] = float((other_c & (a[:, 8] >= 1000.0))[ce].mean())
                 oc = ce[other_c[ce]]
                 if oc.size:
                     r["encl_rim_other_T"] = float(T[oc].mean())
+                    r["encl_rim_other_own_km"] = float(own[oc].mean() / 1000.0)
                     r["encl_rim_other_base_km"] = float(np.clip(pp[oc, 7], 0.0, None).mean() / 1000.0)
-                    r["encl_rim_other_felsic"] = float(pp[oc, 2:5].sum() / pp[oc, 0:7].sum())
+                # The enclosed floor with hyper-extended crust counted as ocean side (the taper's own view): what is
+                # left enclosed by crust of 10 km and more of its own.
+                core_t = cont & ~hyp
+                olab2 = components(p, ~core_t, LINK * spacing)
+                w2 = int(np.argmax(np.bincount(np.maximum(olab2, 0))))
+                r["enclosed_by_core_area"] = float(((~cont) & (olab2 != w2)).sum() / n0)
+                r["hyper_area_all"] = float(hyp.sum() / n0)
             if pf.exists():
                 pl = np.fromfile(pf, "<u4")
                 if len(pl) == len(a):
