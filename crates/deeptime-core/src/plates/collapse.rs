@@ -883,8 +883,9 @@ pub(in crate::plates) mod tests {
     impl Fx {
         /// The threshold law alone: the column from the sea, its cap and the sheet (PLT-412 to
         /// PLT-414), the lithosphere's thermal state and strength (PLT-460, ISO-112), all on by
-        /// default since 2026-10-23, and the sheet's thermal reading (PLT-581, on since
-        /// 2026-10-25) are off here, and each test turns on the law it tests.
+        /// default since 2026-10-23, the sheet's thermal reading (PLT-581, on since 2026-10-25)
+        /// and the whole column's buoyancy (PLT-836, on since 2026-11-01) are off here, and each
+        /// test turns on the law it tests.
         pub(in crate::plates) fn new() -> Fx {
             let k = TectonicParams {
                 collapse_myr: 25.0,
@@ -897,6 +898,7 @@ pub(in crate::plates) mod tests {
                 thermal_state: false,
                 thermal_strength: false,
                 collapse_sheet_thermal: false,
+                column_buoyancy: false,
                 ..TectonicParams::default()
             };
             Fx {
@@ -1352,6 +1354,16 @@ pub(in crate::plates) mod tests {
         let long = Sheet::new(&fx_long.k, &fx_long.env(0), t_n, 0.0).unwrap();
         s.orogeny_myr = 0.0;
         assert!((long.release(&s) - (t - t_n)).abs() < 1e-6);
+        // With the whole column's buoyancy (and the state it reads) the column's height is the
+        // law's (PLT-836): the young high column still thins, at the rate its own height gives.
+        fx.k.thermal_state = true;
+        fx.k.column_buoyancy = true;
+        let law = Sheet::new(&fx.k, &fx.env(0), t_n, 0.0).unwrap();
+        let z_law = super::super::buoyancy::Law::new(9.81).sample_m(&s, 0.0);
+        assert!(z_law > 2000.0, "{z_law}");
+        let e_law = law.rate_per_myr(&s);
+        assert!(e_law > 0.0 && e_law.is_finite(), "{e_law}");
+        assert_ne!(e_law, e, "the law's height, not the line's");
     }
 
     /// With the sheet on, a quiet belt raised by an orogeny thins past T_c towards the normal
