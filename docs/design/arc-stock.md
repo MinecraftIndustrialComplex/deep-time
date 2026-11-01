@@ -247,3 +247,12 @@ quotes it: about 3.37 x 10⁸ km³ over about 3.63 x 10⁸ km², on the margins 
    forearc holds little crust beyond a normal ocean floor's 7 km. So the gap is the length that erodes (17 % of the
    fronts) and the forearcs' crust, not the rate. Next: which gate stops the rest (the 60 mm/yr normal convergence),
    and Clift & Vannucchi 2004's share of erosive margins by length.
+   Earth's side (`tools/review/islfront/subgate.py` on Bird 2003's PB2002_steps.dat, 2026-11-01; it reproduces Table 3:
+   1,127 SUB steps, 51,309 km, a length-weighted mean of 53.2 mm/yr across the step): 0.441 of Earth's subduction
+   length converges at 60 mm/yr or more (0.537 at 50, 0.299 at 70). base38's fronts converge at a mean of 42.8 mm/yr
+   (intra-oceanic) and 55.7 (continental arcs) normal to the front (`cbread.py`), against Bird's 53.2. Our arithmetic:
+   if about two thirds of Earth's fast trench also carries under 1 km of sediment, about 0.29 of 51,309 km erodes,
+   about 15,000 km, and at PLT-441's 90 km³/km/Myr that is about 1.35 km³/yr, Stern & Scholl's 1.4. The model's
+   9,100 km is about 0.6 of that, and its forearcs give a third of what that length asks. The next read is the model's
+   own distribution of normal convergence at its fronts (the record's `front_bands`, `islrec.py`), against these
+   shares.
