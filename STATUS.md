@@ -168,6 +168,11 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 - **Next:** the gate with the weld sweep; cb-on2 against the base after PR #58 lands; the PR.
 
 ### 2026-10-31: Continental buoyancy lane: a continental column's height from its whole buoyancy, built behind `tectonics.column_buoyancy` (off), gated; the start's column under it (lane agent, worktree .claude/worktrees/agent-ab00c28a7afc2ee27, branch continental-buoyancy on origin/continental-heat-ceiling a8e898f4 and origin/master e65259fe; sub-agent of session 88bb1af2-7722-4f74-9e04-4e8b8af667a9; not merged)
+### 2026-11-01: the height follows the rock at a resampling (PLT-850, PLT-851), built (the hotspot lane's diagnosis and code, finished by the coordinator inline after the lane stopped on the account's rate limit; branch resample-height-follows-rock)
+
+- A resampled sample's height is its own rock's and age's plus its class corners' blended departures, where it was blended over all three corners: ocean floor beside continents and arcs kept a share of their height and none of their rock (251 m over GDH1 beside its own plate's continents on base35's final frames, 668 m on 60 to 200 Myr floor; +96 m of hs-lid's +301 m sea). Every blended field follows the class's corners (PLT-851). A correction on master's default: it changes every planet, so it gets an arm against base35-s4 and then the next base.
+- Next: merge PR #58 (the same function), the gate, the arm.
+
 ### 2026-11-01: PR #58's re-review answered on continental-heat-ceiling: a resampled column's own heat flow, Newton's floor, the plates' skip, the docs (the coordinator, session 88bb1af2-7722-4f74-9e04-4e8b8af667a9, inline, finishing the hotspot lane's work after it stopped on the account's rate limit)
 
 - A resampled continental column under the thermal state takes its own law over its own lithosphere plus the nearest corner's magmatic excess (0 to 80 mW/m²), so no hotter corner of its class enters (PLT-824); a count of how often the column ceiling binds (`plates/heat_flow_clamped`, `_last`); `a_resampled_column_takes_its_own_heat_flow` (ridges.rs) checks it before the final pass, and the class blend without the state.

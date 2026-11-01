@@ -65,6 +65,7 @@ use super::normalise::Norm;
 use super::pools::{
     accrete, floor_at, isostatic_change_m, ocean_heat_flow, oceanic_column, thickness,
 };
+use super::settle::{WATER_LOADED, equilibrium_m};
 use super::state::{
     CONTINENTAL, FORELAND, Group, OCEANIC, Plate, PlateState, Ridge, Sample, pool, regime,
 };
@@ -173,25 +174,69 @@ fn nearest_corner(geo: &Geo, c: &Cover, rot: DQuat, q: DVec3) -> u32 {
     best
 }
 
-/// What a resampling's interpolation reads of the step: the tectonics and the time.
+/// What a resampling measures a column's height from: the height its own rock and age hold it at,
+/// m (ledger: PLT-850). Continental crust: its pools' Airy height (`collapse::iso_height`, about
+/// the continents' reference height) and its lithosphere's thermal height (`thermal::uplift_m`,
+/// ISO-110; 0 when off), or with `column_buoyancy` its whole column's buoyancy
+/// (`buoyancy::Law::sample_m`, PLT-836): the dry height the settling holds it to (`settle.rs`,
+/// ISO-078) either way. Ocean
+/// crust: the floor its age's law makes (`pools::floor_at`, GDH1 by default, PLT-351) and the
+/// Airy change of its pools over the ocean's own 7 km column (`pools::isostatic_change_m`), water
+/// loaded under the datum as the hotspots' magma is (`hotspots::add_magma`; ISO-044): the floor
+/// law's depth is the datum's sea's, whatever the sea stands at. The step's settling then holds a
+/// continental column to its sea; ocean floor has no settling (the law sinks it by its age's
+/// increments, PLT-352, and the trench release lifts only floor under the curve, PLT-443), so a
+/// height the resampling gave it that its rock does not hold would stay.
+pub(crate) fn rock_height_m(s: &Sample, k: &TectonicParams, gravity: f64, t_myr: f64) -> f64 {
+    if s.kind == CONTINENTAL && k.column_buoyancy {
+        super::buoyancy::Law::new(gravity).sample_m(s, t_myr)
+    } else if s.kind == CONTINENTAL {
+        let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
+        iso_height(&s.pools, z_0, gravity) + super::thermal::uplift_m(k, s.lithosphere_km)
+    } else {
+        let dry = floor_at(k, s.age_myr(t_myr)) / WATER_LOADED
+            + isostatic_change_m(&oceanic_column(), &s.pools, gravity);
+        equilibrium_m(dry, 0.0)
+    }
+}
+
+/// The tectonics, gravity and time [`rock_height_m`] needs at a resampling.
 #[derive(Clone, Copy)]
-struct At<'a> {
+struct Heights<'a> {
     k: &'a TectonicParams,
+    gravity: f64,
     t_myr: f64,
+}
+
+impl Heights<'_> {
+    fn of(&self, s: &Sample) -> f64 {
+        rock_height_m(s, self.k, self.gravity, self.t_myr)
+    }
 }
 
 /// Interpolates a sample from a cover of the old crust; vectors come out in the mantle frame,
 /// which is the new lattice's frame (every group starts unrotated). `m` is the old sample nearest
 /// the new point (`nearest_corner`): the sample's kind, its class and every other categorical
 /// label are `m`'s, and the blends below run over the corners of `m`'s class (ledger: PLT-664).
-fn interpolate(src: &[Sample], c: &Cover, rot: DQuat, m: u32, at: At) -> Sample {
+///
+/// One rule for every field it blends (ledger: PLT-851): a field of the column (its rock, its
+/// records of that rock, its age, heat flow, rates and directions) is blended over the corners
+/// whose rock the sample takes, the corners of its class; a field that records rock taken from
+/// the nearest corner alone (the felsic and metamorphic pools on ocean crust, PLT-293) is that
+/// corner's. The height follows its rock (PLT-850): the sample stands at the height its own rock
+/// and age hold it at ([`rock_height_m`]) plus its class corners' blended departures from theirs
+/// (what flexure, a trench's pull, a margin's held floor or a step's lag held them at). Until
+/// 2026-10-31 the height was blended over all three corners: ocean floor beside a continent or an
+/// arc took a share of its height and none of its rock, the continent settled back within the
+/// step and the floor kept it, a lift that grew with each resampling (plates.md, "The height
+/// follows the rock").
+fn interpolate(src: &[Sample], c: &Cover, rot: DQuat, m: u32, h: Heights) -> Sample {
     let mut s = src[m as usize];
     let corners = c.tri.map(|v| &src[v as usize]);
     let w = c.w;
     let lerp = |f: &dyn Fn(&Sample) -> f32| -> f32 {
         (0..3).map(|k| w[k] * f64::from(f(corners[k]))).sum::<f64>() as f32
     };
-    s.elevation_m = lerp(&|x| x.elevation_m);
     // The corners of the sample's own class, the kind and, on continental crust, whether it is
     // hyper-extended (under 10 km of its own crystalline crust, Brune et al. 2014), and their
     // weight; the nearest corner is one of them, so the weight is never 0. A blend over a class is
@@ -210,6 +255,19 @@ fn interpolate(src: &[Sample], c: &Cover, rot: DQuat, m: u32, at: At) -> Sample 
         .filter(|&k| same_class(corners[k]))
         .map(|k| w[k])
         .sum();
+    // A field over the class's corners, normalised by their weight (over all three when none has
+    // a weight, which the nearest corner's own weight rules out).
+    let class_blend = |f: &dyn Fn(&Sample) -> f64| -> f64 {
+        if class_w > 0.0 {
+            (0..3)
+                .filter(|&k| same_class(corners[k]))
+                .map(|k| w[k] * f(corners[k]))
+                .sum::<f64>()
+                / class_w
+        } else {
+            (0..3).map(|k| w[k] * f(corners[k])).sum()
+        }
+    };
     // The crust's own rock belongs to its kind: the rock pools are blended over the corners of
     // the sample's class only, the loose sediment (which drapes across a margin) over all three.
     // Blending them all made every resampling put a share of a continent's granite, gneiss and
@@ -227,31 +285,30 @@ fn interpolate(src: &[Sample], c: &Cover, rot: DQuat, m: u32, at: At) -> Sample 
     for p in 0..pool::COUNT {
         s.pools[p] = if local(p) {
             src[m as usize].pools[p]
-        } else if p == pool::SEDIMENT || class_w <= 0.0 {
+        } else if p == pool::SEDIMENT {
             lerp(&|x| x.pools[p])
         } else {
-            ((0..3)
-                .filter(|&k| same_class(corners[k]))
-                .map(|k| w[k] * f64::from(corners[k].pools[p]))
-                .sum::<f64>()
-                / class_w) as f32
+            class_blend(&|x| f64::from(x.pools[p])) as f32
         };
     }
-    s.arc_continental_m = lerp(&|x| x.arc_continental_m);
-    s.arc_oceanic_m = lerp(&|x| x.arc_oceanic_m);
+    // The records of the arcs' magma and its oxidation follow the rock they record: on ocean crust
+    // the island arc's felsic rock is the nearest corner's (above), so its records are too (the
+    // sample's own, from `m`); on continental crust they are blended as its pools are. Over all
+    // three corners until 2026-10-31 (ledger: PLT-851).
+    if !oceanic {
+        s.arc_continental_m = class_blend(&|x| f64::from(x.arc_continental_m)) as f32;
+        s.arc_oceanic_m = class_blend(&|x| f64::from(x.arc_oceanic_m)) as f32;
+        s.oxidation = class_blend(&|x| f64::from(x.oxidation)) as f32;
+    }
     // A basement is the continental crust's own (ocean floor's is 0), blended as its pools are.
-    s.basement_m = if s.kind == CONTINENTAL && class_w > 0.0 {
-        ((0..3)
-            .filter(|&k| same_class(corners[k]))
-            .map(|k| w[k] * f64::from(corners[k].basement()))
-            .sum::<f64>()
-            / class_w) as f32
+    s.basement_m = if s.kind == CONTINENTAL {
+        class_blend(&|x| f64::from(x.basement())) as f32
     } else {
         0.0
     };
-    s.oxidation = lerp(&|x| x.oxidation);
-    s.uplift_mm_yr = lerp(&|x| x.uplift_mm_yr);
-    s.crust_uplift_mm_yr = lerp(&|x| x.crust_uplift_mm_yr);
+    // The column's rates and its age belong to its rock as well (ledger: PLT-851).
+    s.uplift_mm_yr = class_blend(&|x| f64::from(x.uplift_mm_yr)) as f32;
+    s.crust_uplift_mm_yr = class_blend(&|x| f64::from(x.crust_uplift_mm_yr)) as f32;
     // Heat flow belongs to the column (the sea floor's age law against the continental sum over
     // the column's own lithosphere and crust). Under the thermal state a continental sample takes
     // its own law over its own lithosphere (the nearest corner's L, floored for the crust it now
@@ -259,40 +316,31 @@ fn interpolate(src: &[Sample], c: &Cover, rot: DQuat, m: u32, at: At) -> Sample 
     // law, between 0 and an arc's and a hotspot's terms: no other corner's heat flow enters, a
     // hotter column of the same class (crust with no state on young floor, PLT-821, or a
     // magmatic corner) included (PR #58's re-review). Without the state it is blended over the
-    // corners of its class, as the pools are: a continental sample on the coast must not take
-    // the young ridge crust's 300 mW/m² from an oceanic corner, nor a thick column a
+    // corners of its class, as the pools are (PLT-851): a continental sample on the coast must
+    // not take the young ridge crust's 300 mW/m² from an oceanic corner, nor a thick column a
     // hyper-extended margin's (until 2026-10-31 over the kind's corners). The final pass then
     // holds each continental column to its column's ceiling (`thermal::refresh_heat_flow`). (The
     // next step sets every sample's heat flow again; this only matters for what is read right
     // after a resampling, the final snapshot among them: the bake's `meta/heat_flow_mw_m2`.)
     // ledger: PLT-824
-    if s.kind == CONTINENTAL && at.k.thermal_state {
+    if s.kind == CONTINENTAL && h.k.thermal_state {
         let near = &src[m as usize];
         let excess = (f64::from(near.heat_flow_mw_m2)
-            - conductive_mw_m2(sample_l_km(near, at.t_myr)))
+            - conductive_mw_m2(sample_l_km(near, h.t_myr)))
         .clamp(0.0, ARC_HEAT_MW_M2 + HOTSPOT_HEAT_MW_M2);
-        s.heat_flow_mw_m2 = (conductive_mw_m2(sample_l_km(&s, at.t_myr)) + excess) as f32;
-    } else if class_w > 0.0 {
-        let blend: f64 = (0..3)
-            .filter(|&k| same_class(corners[k]))
-            .map(|k| w[k] * f64::from(corners[k].heat_flow_mw_m2))
-            .sum();
-        s.heat_flow_mw_m2 = (blend / class_w) as f32;
+        s.heat_flow_mw_m2 = (conductive_mw_m2(sample_l_km(&s, h.t_myr)) + excess) as f32;
+    } else {
+        s.heat_flow_mw_m2 = class_blend(&|x| f64::from(x.heat_flow_mw_m2)) as f32;
     }
-    if s.kind == OCEANIC {
-        let (mut sw, mut sf) = (0.0, 0.0);
-        for k in 0..3 {
-            if corners[k].kind == OCEANIC {
-                sw += w[k];
-                sf += w[k] * f64::from(corners[k].formed_myr);
-            }
-        }
-        if sw > 0.0 {
-            s.formed_myr = (sf / sw) as f32;
-        }
+    if oceanic {
+        s.formed_myr = class_blend(&|x| f64::from(x.formed_myr)) as f32;
     }
     let vec = |f: &dyn Fn(&Sample) -> [f32; 3]| -> [f32; 3] {
-        let v: DVec3 = (0..3).map(|k| to_world(rot, f(corners[k])) * w[k]).sum();
+        let v: DVec3 = (0..3)
+            .filter(|&k| class_w <= 0.0 || same_class(corners[k]))
+            .map(|k| to_world(rot, f(corners[k])) * w[k])
+            .sum::<DVec3>()
+            / if class_w > 0.0 { class_w } else { 1.0 };
         [v.x as f32, v.y as f32, v.z as f32]
     };
     s.ridge = vec(&|x| x.ridge);
@@ -302,6 +350,14 @@ fn interpolate(src: &[Sample], c: &Cover, rot: DQuat, m: u32, at: At) -> Sample 
     // never sees the one without the other after a resampling.
     s.flags &= FORELAND;
     s.thickness_m = thickness(&s.pools);
+    // The height last, on the sample's own rock and age (ledger: PLT-850).
+    let departure = class_blend(&|x| f64::from(x.elevation_m) - h.of(x));
+    let z = h.of(&s) + departure;
+    s.elevation_m = if z.is_finite() {
+        z as f32
+    } else {
+        class_blend(&|x| f64::from(x.elevation_m)) as f32
+    };
     s
 }
 
@@ -916,10 +972,14 @@ pub fn resample(
     let mut limits: Vec<[f32; 3]> = vec![[f32::INFINITY, 0.0, f32::INFINITY]; n];
     // A cover of group `g` interpolated at the new point `q`, its labels from the old sample
     // nearest `q` (ledger: PLT-664).
-    let at = At { k, t_myr: t };
+    let heights = Heights {
+        k,
+        gravity: env.gravity,
+        t_myr: t,
+    };
     let interp = |g: u32, c: &Cover, q: DVec3| {
         let rot = rots[g as usize];
-        interpolate(src, c, rot, nearest_corner(old, c, rot, q), at)
+        interpolate(src, c, rot, nearest_corner(old, c, rot, q), heights)
     };
     let mut samples: Vec<Sample> = found
         .par_iter()
@@ -1758,18 +1818,115 @@ pub fn bury(
 mod tests {
     use super::*;
 
+    /// The height follows the rock (PLT-850): ocean floor at its age's floor, interpolated
+    /// beside a continental corner 2 km over the sea and an island arc's thick crust, stands
+    /// where its own rock and age hold it (`rock_height_m`), not a share of the others' height;
+    /// resampled again and again it does not rise. Until 2026-10-31 the height was blended over
+    /// all three corners: the bare floor took 30 % of the continent's height at each resampling,
+    /// and kept it (the floor's law only sinks it by its age's increments). A floor a trench pulled
+    /// 1 km under its law keeps that departure when its own corners carry it.
+    #[test]
+    fn a_resampled_floor_stands_on_its_own_rock() {
+        let k = &crate::params::TectonicParams::default();
+        let t = 500.0;
+        let h = Heights {
+            k,
+            gravity: 9.81,
+            t_myr: t,
+        };
+        let floor = |age: f64| {
+            let mut s = Sample::blank(0);
+            s.pools = oceanic_column();
+            s.thickness_m = thickness(&s.pools);
+            s.formed_myr = (t - age) as f32;
+            s.elevation_m = rock_height_m(&s, k, 9.81, t) as f32;
+            s
+        };
+        let mut continent = Sample::blank(0);
+        continent.kind = CONTINENTAL;
+        continent.pools = super::super::pools::continental_column();
+        continent.thickness_m = thickness(&continent.pools);
+        continent.elevation_m = 2000.0;
+        let mut arc = floor(60.0);
+        arc.pools[pool::MAFIC_PLUTONIC] += 15_000.0;
+        arc.thickness_m = thickness(&arc.pools);
+        arc.elevation_m = -500.0;
+        let cover = Cover {
+            t: 0,
+            tri: [0, 1, 2],
+            w: [0.4, 0.3, 0.3],
+        };
+        let old = floor(80.0);
+        let own = rock_height_m(&old, k, 9.81, t);
+        // Beside a continent: the height of its own rock to rounding. The loose sediment drapes
+        // across the margin (blended over all three corners, PLT-293), so that rock is the bare
+        // floor's plus a share of the continent's cover: metres over the bare floor, where the
+        // blend of heights lent it 30 % of the 5.5 km between them.
+        let src = [old, continent, floor(80.0)];
+        let s = interpolate(&src, &cover, DQuat::IDENTITY, 0, h);
+        assert_eq!(s.kind, OCEANIC);
+        let rock = h.of(&s);
+        assert!(
+            (f64::from(s.elevation_m) - rock).abs() < 1.0,
+            "{} against its rock's {rock}",
+            s.elevation_m
+        );
+        assert!(
+            (rock - own).abs() < 50.0,
+            "its rock at {rock}, the bare floor's {own}"
+        );
+        // Beside an arc's thick ocean crust (the same class): the arc's departure from its own
+        // rock is blended, not its height.
+        let src = [old, floor(80.0), arc];
+        let s = interpolate(&src, &cover, DQuat::IDENTITY, 0, h);
+        let arc_departure = f64::from(arc.elevation_m) - rock_height_m(&arc, k, 9.81, t);
+        let want = rock_height_m(&s, k, 9.81, t) + 0.3 * arc_departure;
+        assert!(
+            (f64::from(s.elevation_m) - want).abs() < 1.0,
+            "{} against {want}",
+            s.elevation_m
+        );
+        // Resampled ten times beside the continent: no lift builds up.
+        let mut z = old;
+        for _ in 0..10 {
+            let src = [z, continent, z];
+            z = interpolate(&src, &cover, DQuat::IDENTITY, 0, h);
+        }
+        let rock = h.of(&z);
+        assert!(
+            (f64::from(z.elevation_m) - rock).abs() < 1.0,
+            "{} after ten resamplings, its rock's {rock}",
+            z.elevation_m
+        );
+        assert!(
+            (rock - own).abs() < 50.0,
+            "its rock at {rock} after ten resamplings, the bare floor's {own}"
+        );
+        // A trench's pull, 1 km under the law at all three corners, is kept.
+        let mut pulled = old;
+        pulled.elevation_m = (own - 1000.0) as f32;
+        let src = [pulled, pulled, pulled];
+        let s = interpolate(&src, &cover, DQuat::IDENTITY, 0, h);
+        assert!((f64::from(s.elevation_m) - (own - 1000.0)).abs() < 1.0);
+    }
+
     /// PLT-760 through a resampling (PR #53's review): the island-arc class of continental crust
     /// is the nearest corner's, as the kind is, whatever the blend makes of the columns' island-arc
     /// crust and basement. Leak B: a matured arc's edge column (8.5 km of island-arc crust over its
-    /// ocean basement) beside its ocean-floor flank keeps its kind and full basement but blends to
-    /// under the 8 km line, since the arc crust is blended over all three corners. Leak A: a
+    /// ocean basement) beside its ocean-floor flank keeps its kind and full basement; its arc crust
+    /// blended to under the 8 km line while the record was blended over all three corners, and
+    /// since 2026-10-31 it follows its class's rock (PLT-851), the edge's own 8.5 km. Leak A: a
     /// continent's own column beside an accreted arc (40 km of island-arc crust) takes a share of
     /// its basement and enough arc crust to pass the line at a 0.2 weight.
     #[test]
     fn the_island_arc_class_survives_a_resampling_from_the_nearest_corner() {
         let k = &crate::params::TectonicParams::default();
         let mature = super::super::subduction::mature_arc_m(k);
-        let at = At { k, t_myr: 0.0 };
+        let h = Heights {
+            k,
+            gravity: 9.81,
+            t_myr: 0.0,
+        };
         let arc = |crust_m: f32| {
             let mut s = Sample::blank(0);
             s.pools = oceanic_column();
@@ -1799,17 +1956,17 @@ mod tests {
         for w0 in [0.4, 0.6, 0.8] {
             let w1 = 0.5 * (1.0 - w0);
             let src = [edge, floor, floor];
-            let s = interpolate(&src, &cover([w0, w1, w1]), DQuat::IDENTITY, 0, at);
+            let s = interpolate(&src, &cover([w0, w1, w1]), DQuat::IDENTITY, 0, h);
             assert_eq!(s.kind, CONTINENTAL);
             assert!(
-                s.basement() > 0.0 && s.arc_oceanic_m < mature,
+                s.basement() > 0.0 && (s.arc_oceanic_m - 8500.0).abs() < 1.0,
                 "{w0}: {s:?}"
             );
             assert!(island(&s), "the matured arc's edge lost its class at {w0}");
         }
         // Leak A.
         let src = [continent, arc(40_000.0), continent];
-        let s = interpolate(&src, &cover([0.6, 0.2, 0.2]), DQuat::IDENTITY, 0, at);
+        let s = interpolate(&src, &cover([0.6, 0.2, 0.2]), DQuat::IDENTITY, 0, h);
         assert_eq!(s.kind, CONTINENTAL);
         assert!(s.basement() > 0.0 && s.arc_oceanic_m >= mature, "{s:?}");
         assert!(!island(&s), "the continent took the accreted arc's class");
@@ -1858,7 +2015,17 @@ mod tests {
             thermal_state: true,
             ..Default::default()
         };
-        let s = interpolate(&src, &cover, DQuat::IDENTITY, 0, At { k: &on, t_myr: t });
+        let s = interpolate(
+            &src,
+            &cover,
+            DQuat::IDENTITY,
+            0,
+            Heights {
+                k: &on,
+                gravity: 9.81,
+                t_myr: t,
+            },
+        );
         let excess = (f64::from(near_q) - conductive_mw_m2(sample_l_km(&near, t)))
             .clamp(0.0, ARC_HEAT_MW_M2 + HOTSPOT_HEAT_MW_M2);
         let want = conductive_mw_m2(sample_l_km(&s, t)) + excess;
@@ -1869,14 +2036,34 @@ mod tests {
         );
         // The other corners' heat flow does not enter.
         let colder = [near, column(0.2, 20.0, 60.0), column(1.0, 25.0, 50.0)];
-        let s2 = interpolate(&colder, &cover, DQuat::IDENTITY, 0, At { k: &on, t_myr: t });
+        let s2 = interpolate(
+            &colder,
+            &cover,
+            DQuat::IDENTITY,
+            0,
+            Heights {
+                k: &on,
+                gravity: 9.81,
+                t_myr: t,
+            },
+        );
         assert_eq!(s.heat_flow_mw_m2, s2.heat_flow_mw_m2);
         // Without the state: the class's blend, the hyper-extended corner out.
         let off = crate::params::TectonicParams {
             thermal_state: false,
             ..Default::default()
         };
-        let s = interpolate(&src, &cover, DQuat::IDENTITY, 0, At { k: &off, t_myr: t });
+        let s = interpolate(
+            &src,
+            &cover,
+            DQuat::IDENTITY,
+            0,
+            Heights {
+                k: &off,
+                gravity: 9.81,
+                t_myr: t,
+            },
+        );
         let want = (0.5 * f64::from(near_q) + 0.2 * 230.0) / 0.7;
         assert!(
             (f64::from(s.heat_flow_mw_m2) - want).abs() < 1e-3,
