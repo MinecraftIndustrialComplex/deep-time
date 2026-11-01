@@ -176,8 +176,10 @@ WGSL file next to its CPU code and a tolerance test against the CPU path; nothin
   staging copy and the host's words), like the driver's own.
 - **The climate cells (section 14)** keep nothing between snapshots: per call, the row, column
   and coarse tables and one chunk of 2^18 cells (13 input planes plus one per wind regime with a
-  mountain field, 10 output planes and, on the last snapshot, 24 monthly ones, 4 bytes each):
-  about 32.5 MiB on the device (56.5 MiB on the last), with host copies of the same size for the
+  mountain field, 10 output planes and the monthly ones, 4 bytes each: since the runoff law's
+  second and third re-reviews 12 at every snapshot, the months' temperatures, and 24 at the
+  last, their rain too): about 44.5 MiB on the device (56.5 MiB on the last; 32.5 before the
+  months were kept at every snapshot), with host copies of the same size for the
   uploads and downloads. The output fields are the ones the CPU path fills, so they are not
   extra. Freed when the call returns.
 - **The diffusion cycle and the slope failure (sections 15 and 16, Phase 3)** each keep one grid's
@@ -898,8 +900,10 @@ science page is `docs/science/per-cell-climate.md`, "Down to L1 on a GPU".
   everything that reads them: the anomalies, `ice_cover` and `land_terms`, whose sums feed the
   carbon cycle and stay f64 in their present order (section 12). The banded climate, the
   moisture budget and the upwind rain stay on the CPU entirely.
-- **Sizes (read, full 16k).** About 32.5 MiB on the device (56.5 MiB on the last snapshot, which
-  keeps the months); 113 MB up and 54 MB down a call (129 MB more on the last). 103 calls per
+- **Sizes (read, full 16k).** About 32.5 MiB on the device before the months (44.5 MiB with the
+  twelve temperatures every snapshot keeps since the runoff law's re-reviews, 56.5 MiB on the last
+  snapshot, which keeps their rain too); 113 MB up and 54 MB down a call (about 64.5 MB more at
+  every snapshot for the temperatures, 129 MB more on the last). 103 calls per
   1000 Myr at a snapshot every 10 Myr, about 53 at the shipped presets' 20 Myr (master
   fb38204f). The buffers are optional like the relink's (section 4).
 - **Precision and error budget.** `climate::tests::the_gpu_cells_stay_within_their_error_budget_of_the_cpu`

@@ -1615,10 +1615,11 @@ most one block below sea level: their top block is under the sea's; connected, �
 and the cell each land cell was reached from); receivers the steepest strictly lower neighbour on F,
 else that cell; depressions (F > height) of at least `hydro.lake_min_area_km2` and
 `lake_min_depth_blocks` are basins. The liquid runoff of the L1 climate is accumulated as discharge
-(precipitation, the mean temperature and the warmest and coldest month from `climate/month/t_sl_c_*`,
-their departures from the year's mean added to the cell's mean, ± 8 °C without them; a sinusoidal
-year between the two months gives the share of the year above freezing and its mean temperature
-above freezing T⁺; liquid = min(P, P · share + `snow_melt_mm_per_degree_day` · 365.25 · T⁺); runoff
+(precipitation, the mean temperature and the twelve months from `climate/month/t_sl_c_*`, their
+departures from the year's mean added to the cell's mean, ± 8 °C without them; the mean of the
+twelve months with those below freezing counted as 0 °C is the mean temperature above freezing T⁺,
+and the year drawn straight between the months' middles the share of the year above freezing;
+without the months a year of two half-sines about the mean; liquid = min(P, P · share + `snow_melt_mm_per_degree_day` · 365.25 · T⁺); runoff
 = liquid − ET, ET by Fu's Budyko curve on the liquid water with PET = `pet_mm_per_c` (60) · T⁺,
 Holdridge's biotemperature rule, which is the surface stage's 60 mm/°C · T where there is no frost;
 ground whose warmest month is below freezing gives none). **A basin's lake level is its water balance**
