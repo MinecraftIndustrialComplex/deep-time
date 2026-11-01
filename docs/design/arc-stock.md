@@ -67,6 +67,25 @@ Earth's back-arcs stay hot (Hyndman & Currie: 200 to 900 km behind the arc, cool
 subduction stops, to be read again); and what thickens accreted arcs on Earth (collision and magmatic addition) where
 the model's stay at 30 km.
 
+**Back-arc heating is not the lever.** The model already heats every overriding continental sample within the
+subduction margin's band (800 km on quick_16k, HYP-015) towards L_HOT, and Earth's back-arc heat decays over about 300
+Myr after subduction stops (Currie & Hyndman 2006, read 2026-10-23), with regions older than about 300 Ma on 150 to 300
+km of lithosphere (Hyndman, Currie & Mazzotti 2005): the converted crust's 135 km is within Earth's range.
+
+**The continental arcs' rate is a mismatch of measures, not of the law.** `cbread.py`'s arc rate per km divides arc
+magma by the crust it lands on (`ARC_CONTINENTAL_GLOBAL`: on continental samples) by fronts classed by the crust within
+`arc_distance_km` (`ARC_FRONT_CONTINENTAL_GLOBAL`): a continental arc's magma that falls on the ocean fringe in front of
+the coast, or follows the island law on crust an intra-oceanic arc made (PLT-760), books as island-arc magma. The two
+rows together, 2.30 km³/yr on base36, are Stern & Scholl's 2.5.
+
+**So far, then:** the arcs' magma, the arcs standing alone and the explicit losses are Earth's; the continental volume
+is 16.4 km of planet-mean crust against Earth's 14.0 (36.4 km over 0.384 of the planet, sea-level.md), 17 % more, over
+about 24 % more area, so 13 % thinner; the thin converted crust (25 to 33 km) on cold, keelless lithosphere stands
+under the sea. The first lever is what spreads the crust thin (the collapse to its normal column, PLT-412; the
+margin's sediment counted continental, PLT-661, "the rest converted" carries 18 % cover; the transition; erosion and
+redeposition), and the second the extra volume; arc foundering (Jagoutz & Kelemen 2015) would remove volume but is
+not shown to be missing until the arcs' net rates are read as net or gross.
+
 ## Earth's side (sources read by Sonnet lookups, 2026-11-01; bibliography entries to add when used)
 
 - Condie & Aster 2010 (Precambrian Res. 180:227-236): "only 14% during the last 400 My" (the body says 600 My).
