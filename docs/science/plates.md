@@ -12487,6 +12487,30 @@ What is left:
 - Without the steps, the hyper-extended line drifts into the core by about 2.5 samples a resampling on the ratchet planet
   (271 to 331 over 24, the core 9,998 to 9,938). The taper's steps reset it in a run.
 
+On the pool (arm kls-on, key 2ab6f14ad482, 8 runs, seeds 1 to 4 on both starts, against base37-s4; `pool.sh table`, and
+`arcstock.py` against arc-lith, base37-s4's code with the maps). The guard is clean: its worst 10,438 against 10,210 m
+(p 0.51), no step past two Earth reliefs. The V1 census, medians with p in brackets:
+- continental crust under the sea 0.630 against 0.686 (0.065);
+- largest landmass 0.061 against 0.052 (1.0), now at its target;
+- collisions per 100 Myr 4.40 against 5.15 (0.15);
+- the continental crust's net change +0.046 against +0.115 (< 0.001);
+- criteria met a mean of 4.88 against 4.62 (0.60).
+
+At the end of the run:
+
+| | arc-lith | kls-on |
+|---|---|---|
+| continental boundary, raw / smoothed over two spacings | 602,000 / 416,000 km | 484,000 / 378,000 km |
+| hyper-extended crust (PLT-661's margins) | 0.102 of the planet | 0.061 |
+| continental area (Earth 0.41) | 0.537 | 0.469 |
+| ocean floor enclosed by continental crust | 0.095 | 0.023 |
+| continents over 10⁵ km² | 13.5 | 23.5 |
+
+The crust budget (loss-budget.py, km³ a year) is otherwise unchanged. The resampling's part is −11.80 against −11.12.
+Sediment subduction rises to 3.08 against 2.69 (Earth 1.1), because fewer converted margins hold the sediment. The
+boundary is still about three times Earth's passive margins at the lattice's scale: what remains is the continents' shape
+(rifts, arcs), not the walk.
+
 #### The cumulative arm m5-cum (PLT-663 to PLT-667, 2026-10-25)
 
 Branch head f468a76f with the switches off: the class blend (PLT-663), the nearest-old-sample labels
