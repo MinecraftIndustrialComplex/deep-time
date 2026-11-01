@@ -1115,12 +1115,23 @@ fn the_climate_carries_its_twelve_months_between_snapshots() {
     let twelve: Vec<Vec<f32>> = (0..12)
         .map(|m| month(&world, m, false).unwrap_or_else(|| panic!("month {m} after step 2")))
         .collect();
-    assert!((0..12).all(|m| month(&world, m, true).is_none()), "rain after step 2");
     assert!(
-        !world.fields.keys().any(|k| k.starts_with("climate/anomaly/t_sl")),
+        (0..12).all(|m| month(&world, m, true).is_none()),
+        "rain after step 2"
+    );
+    assert!(
+        !world
+            .fields
+            .keys()
+            .any(|k| k.starts_with("climate/anomaly/t_sl")),
         "the months' departures are not kept"
     );
-    assert!(crate::surface::climate::months(&world, n).unwrap().twelve.is_some());
+    assert!(
+        crate::surface::climate::months(&world, n)
+            .unwrap()
+            .twelve
+            .is_some()
+    );
     let d_mean = &world.fields[field::D_MEAN].data;
     let mut worst = 0.0f64;
     let mut moved = 0.0f64;
@@ -1147,12 +1158,20 @@ fn the_climate_carries_its_twelve_months_between_snapshots() {
     eprintln!(
         "after step 2: the rows' month mean less D_MEAN spreads at most {worst:.2e} °C over a row (D_MEAN itself {moved:.1} °C)"
     );
-    assert!(moved > 1.0, "a planet whose mean has no geography tests nothing");
+    assert!(
+        moved > 1.0,
+        "a planet whose mean has no geography tests nothing"
+    );
     assert!(worst < 1.0e-3, "{worst}");
     finish(&s);
     let world = s.checkpoint().unwrap().world;
     assert!((0..12).all(|m| month(&world, m, false).is_some() && month(&world, m, true).is_some()));
-    assert!(!world.fields.keys().any(|k| k.starts_with("climate/anomaly/t_sl")));
+    assert!(
+        !world
+            .fields
+            .keys()
+            .any(|k| k.starts_with("climate/anomaly/t_sl"))
+    );
     let note: serde_json::Value = serde_json::from_str(&world.notes[STAGE_NAME]).unwrap();
     assert_eq!(
         note["snapshots"].as_u64().unwrap(),
