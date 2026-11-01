@@ -37,7 +37,7 @@ import cbread  # noqa: E402
 
 R_KM = 6370.0
 T_MIN = 20.0
-TIMES = [int(x) for x in os.environ.get("TIMES", "-900,-500,-200,0").split(",")]
+TIMES = [int(x) for x in os.environ.get("TIMES", "-1000,-900,-700,-500,-300,-100,0").split(",")]
 LINK = float(os.environ.get("LINK", "1.6"))
 
 
@@ -100,6 +100,12 @@ def run_stats(run):
             "formed0": (cont & (pp[:, 8] == 0.0)).sum() / n0,
             "formed0_conv": (cont & ~start & (pp[:, 8] == 0.0)).sum() / n0,
             "formed0_island": (island & (pp[:, 8] == 0.0)).sum() / n0,
+            # Their volume (km of crust over the planet's mean: thickness summed over the start's visible count) and
+            # mean thickness: an area lost to shortening keeps its volume, one destroyed does not.
+            "formed0_vol": float(T[cont & (pp[:, 8] == 0.0)].sum() / n0),
+            "formed0_T": float(T[cont & (pp[:, 8] == 0.0)].mean()) if (cont & (pp[:, 8] == 0.0)).any() else float("nan"),
+            "cont_vol": float(T[cont].sum() / n0),
+            "arc_vol": float(T[island].sum() / n0),
         }
         if t == 0:
             cell_km2 = 4.0 * np.pi * R_KM**2 / n0
