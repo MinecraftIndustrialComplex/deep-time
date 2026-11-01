@@ -91,6 +91,18 @@ the arc crust standing today over its age (p. 12: "adopted as a useful long-term
 arc productivity"; Izu-Bonin-Mariana's 130 to 135 from its crust's volume): net of whatever foundered. A foundering
 law on top of them would remove rock the rates already left out, so it is not a missing law at these rates.
 
+**The arm msc-off** (2026-11-01; master 2f6cd34c with `tectonics.margin_sediment_continental=false`, PLT-661's margins
+off, 8 runs against base37-s4; a measurement, the switch stays on: it is Ben's decision of PR #49): land 0.202 against
+0.171 (p 0.13), continental crust under the sea 0.385 against 0.686 (p < 0.001), land above 2 km 0.055, coast with
+high ground 0.180 (p 0.038), collisions per 100 Myr 3.45 against 5.15 (p 0.001), the continental crust's net change
+over the run -0.136 against +0.115 (p < 0.001), the criteria a median of 5.5 against 5 (mean 5.38 against 4.62, p
+0.046), the sea at the end -224 against 124 m; the guard clean (11,016 against 10,210 m, p 0.23). The census counts
+the continental label (RLC-030: Earth 0.29 to 0.31 by Marcilly et al.'s continental polygons, which take the margins
+to the continent-ocean boundary), so the margins belong in it on both sides; by our arithmetic (land over one less
+the drowned share) the model's continental crust covers about 0.545 of the planet with PLT-661 on, 0.33 with it off,
+against Earth's 0.41 (210.49 x 10⁶ km² of 510). So PLT-661's margins are most of the drowned share: on, the
+continents' area is too large and thin; off, the continents lose 14 % of their crust over the run.
+
 ## Earth's side (sources read by Sonnet lookups, 2026-11-01; bibliography entries to add when used)
 
 - Condie & Aster 2010 (Precambrian Res. 180:227-236): "only 14% during the last 400 My" (the body says 600 My).
