@@ -9245,7 +9245,7 @@ The sources of the front lane's level-set membership (plates.md "Step 3c").
 - Reference: Osher, S. and Sethian, J. A. (1988). Fronts propagating with curvature-dependent speed: algorithms based on Hamilton-Jacobi formulations. Journal of Computational Physics 79(1):12-49 (the volume and pages from memory; the title and authors read on the copy's first page).
 - DOI or URL: 10.1016/0021-9991(88)90002-2; the authors' copy at https://math.berkeley.edu/~sethian/Papers/sethian.osher.88.pdf
 - Cited as: "Osher & Sethian 1988".
-- Ledger ids: PLT-536
+- Ledger ids: PLT-536, PLT-852
 - Access: an open copy (the author's page).
 - Library (the project's source library, not distributed): fetched 2026-10-24. Files: `OsherSethian1988/os88.pdf`, `os88.txt` (pdftotext -layout).
 - Read so far (by the project): full text, 2026-10-24 (the front lane). Abstract: "We devise new numerical algorithms, called PSC algorithms, for following fronts propagating with curvature-dependent speed ... the front can also be passively advected by an underlying flow ... The algorithms handle topological merging and breaking naturally"; "By viewing the surface as a level set, topological complexities and changes in the moving front are handled naturally"; section III.D: "we initialize ψ by taking ψ(x , 0) = 1 ± d 2, where d is the distance from the point x to the initial surface, and the plus (minus) sign is chosen if x is inside (outside) the initial surface".
@@ -9254,7 +9254,7 @@ The sources of the front lane's level-set membership (plates.md "Step 3c").
 - Reference: Sussman, M., Smereka, P. and Osher, S. (1994). A level set approach for computing solutions to incompressible two-phase flow. Journal of Computational Physics 114(1):146-159 (authors, title, volume and pages from memory).
 - DOI or URL: 10.1006/jcph.1994.1155
 - Cited as: "Sussman, Smereka & Osher 1994".
-- Ledger ids: PLT-536
+- Ledger ids: PLT-536, PLT-852
 - Access: paywalled; the UCLA CAM report copy did not answer (2026-10-24).
 - Library: not kept.
 - Read so far (by the project): abstract only, 2026-10-24 (the OSTI record): "The interface between the two fluids is considered to be sharp and is described as the zero level set of a smooth function." That the level-set function is kept a signed distance by reinitialising it from its zero level set, which PLT-536 does after every resampling, is the paper's method as the lane remembers it (from-memory).
