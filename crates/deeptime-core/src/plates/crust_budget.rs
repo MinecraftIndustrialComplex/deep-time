@@ -34,7 +34,8 @@
 //! front lane's boundary geometry (`tools/review/pool/measure_boundgeom.py`), their sea-floor
 //! ages to `age/t<Myr>.bin` (little-endian f32, one per record, NaN on continental crust;
 //! [`CrustBudget::write_ages`]) for the floor-age lane (`tools/review/floorage/`), and their rock
-//! pools to `pools/t<Myr>.bin` ([`POOL_FIELDS`]). Each snapshot also splits the land by the origin of its
+//! pools to `pools/t<Myr>.bin` ([`POOL_FIELDS`]) and their lithosphere to `lith/t<Myr>.bin`
+//! ([`LITH_FIELDS`]). Each snapshot also splits the land by the origin of its
 //! crust (`cb_origin`: island arc, collision, Andean margin, the rest).
 //!
 //! Off unless [`ON_ENV`] is set; it changes nothing the model does.
@@ -961,6 +962,7 @@ fn write_map(
         eprintln!("crust_budget: cannot write {}: {e}", path.display());
     }
     write_pools(dir, samples, t_myr);
+    write_lith(dir, samples, t_myr);
 }
 
 /// The f32 fields of a pools record (`pools/t<Myr>.bin`, the map's records in order): the rock
@@ -988,6 +990,34 @@ fn write_pools(dir: &std::path::Path, samples: &[Sample], t_myr: f64) {
         }
     }
     let dir = dir.join("pools");
+    let path = dir.join(format!("t{:04.0}.bin", t_myr.round()));
+    if let Err(e) = std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&path, &buf)) {
+        eprintln!("crust_budget: cannot write {}: {e}", path.display());
+    }
+}
+
+/// The f32 fields of a lithosphere record (`lith/t<Myr>.bin`, the map's records in order): the
+/// stored lithosphere and keel (km, 0 where none), the lithosphere the laws read
+/// (`thermal::sample_l_km` on continental crust, the floor's age law's on ocean floor: PLT-820,
+/// PLT-821) and the heat flow (mW/m²).
+pub const LITH_FIELDS: [&str; 4] = ["lithosphere_km", "keel_km", "l_read_km", "heat_flow_mw_m2"];
+
+/// Writes the visible samples' lithosphere to `<dir>/lith/t<Myr>.bin`, little-endian f32 records
+/// of [`LITH_FIELDS`] in the map's order (the arc-stock lane: on what lithosphere the crust
+/// converted on ocean floor stands; measurement only, a failure is reported and ignored).
+fn write_lith(dir: &std::path::Path, samples: &[Sample], t_myr: f64) {
+    let mut buf: Vec<u8> = Vec::with_capacity(samples.len() * 4 * LITH_FIELDS.len());
+    for s in samples.iter().filter(|s| !s.is_hidden()) {
+        let read = if s.is_continental() {
+            super::thermal::sample_l_km(s, t_myr)
+        } else {
+            super::thermal::ocean_km((t_myr - f64::from(s.formed_myr)).max(0.0))
+        };
+        for x in [s.lithosphere_km, s.keel_km, read as f32, s.heat_flow_mw_m2] {
+            buf.extend_from_slice(&x.to_le_bytes());
+        }
+    }
+    let dir = dir.join("lith");
     let path = dir.join(format!("t{:04.0}.bin", t_myr.round()));
     if let Err(e) = std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&path, &buf)) {
         eprintln!("crust_budget: cannot write {}: {e}", path.display());
