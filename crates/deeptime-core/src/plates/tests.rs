@@ -2247,6 +2247,8 @@ fn equator_level_set(st: &mut PlateState, geo: &Geo) {
     st.level_set = Some(level_set::LevelSet {
         phi: geo.points().iter().map(|p| p.z.abs() as f32).collect(),
         member: st.samples.iter().map(|s| s.group).collect(),
+        class_phi: Vec::new(),
+        class_member: Vec::new(),
     });
 }
 
