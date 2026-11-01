@@ -7452,18 +7452,17 @@ fn a_deferred_collision_leaves_both_plates_to_the_balance() {
                 .any(|&(u2, o2, on2, _)| (u, o, on) == (u2, o2, on2))
         };
         let alive: Vec<bool> = st.plates.iter().map(|q| q.alive).collect();
-        // A plate with no visible sample is not in the balance (`forces::Answer::omega` is
-        // `None` for it: a terrane wholly under the other plate) and keeps its rotation by
-        // design (scattered seed 2 on the continental lid's floor branch, 2026-10-31: plate 27
-        // under plate 1 at steps 77 and 78).
-        let mut in_balance = vec![false; st.plates.len()];
-        for (i, s) in st.samples.iter().enumerate() {
-            if !s.is_hidden()
-                && let Some(b) = in_balance.get_mut(st.plate_of(i) as usize)
-            {
-                *b = true;
-            }
-        }
+        // A plate with no visible sample when the balance was solved is not in it
+        // (`forces::Answer::omega` is `None` for it: a terrane wholly under the other plate) and
+        // keeps its rotation by design (scattered seed 2 on the continental lid's floor branch,
+        // 2026-10-31: plate 27 under plate 1 at steps 77 and 78). Exactly the plates the step's
+        // balance left out are skipped, as the dynamics record has them (PR #58's re-review).
+        let out_of_balance: Vec<u32> = st
+            .dynamics
+            .as_ref()
+            .and_then(|d| d.steps.last())
+            .map(|r| r.out_of_balance.clone())
+            .unwrap_or_default();
         // A step that killed a plate (a weld or a healed rift) or left the balance unsolved is
         // not read; nor are the plates of a collision that ended (a transfer kills no plate).
         let died = prev_alive.iter().zip(&alive).any(|(&was, &is)| was && !is);
@@ -7480,7 +7479,7 @@ fn a_deferred_collision_leaves_both_plates_to_the_balance() {
                         || moved.contains(&q)
                         || qi >= prev_omega.len()
                         || !alive[qi]
-                        || !in_balance[qi]
+                        || out_of_balance.contains(&q)
                     {
                         continue;
                     }
@@ -8413,9 +8412,13 @@ fn a_sourced_plume_head_erupts_a_recorded_province() {
 /// most its column's ceiling (its law at its lid's floor with an arc's and a hotspot's terms), and
 /// crust with no state reads its floor's: at least the law over the deeper of 2.32 √(κt) at the
 /// floor's age and its lid's floor, not over the frame's 225 km. The planet (`pipeline_quick_16k`
-/// at 3,000 samples, scattered continents, seed 4) ends with crust with no state and a heated
-/// column within 2 % of its floor, so the test fails with either PLT-820 or PLT-821 reverted
-/// (checked by reverting each, 2026-10-31).
+/// at 3,000 samples, scattered continents, seed 4) ends with columns at their floor (the final
+/// pass stores every column's L at its floor or below), so the run fails with PLT-820 reverted
+/// (checked 2026-10-31: a 57.9 km column at L 62.0, its isotherm at 48.7 km). Whether a run ends
+/// with crust with no state is the seed's (4 of 16 in the lane's sweep), so PLT-821 is checked on
+/// a constructed final pass as well (PR #58's re-review): continental crust spread onto floor
+/// made in the step, one column with no heat flow yet and one with a stale 41 mW/m², which fails
+/// with PLT-821 reverted (the frame's 225 km reads 41 mW/m² there).
 #[test]
 fn the_final_frame_holds_every_continental_column_to_its_lid_floor() {
     use super::thermal::{
@@ -8441,7 +8444,7 @@ fn the_final_frame_holds_every_continental_column_to_its_lid_floor() {
     let world = run_stage(&p, |_, _, _| {});
     let st = world.plates.as_ref().unwrap();
     let t = st.t_myr;
-    let (mut unset, mut near) = (0, 0);
+    let mut near = 0;
     for s in st
         .samples
         .iter()
@@ -8469,7 +8472,6 @@ fn the_final_frame_holds_every_continental_column_to_its_lid_floor() {
                 "{q} under its law at {l} km"
             );
         } else {
-            unset += 1;
             let age = (t - f64::from(s.formed_myr)).max(0.0);
             let own = ocean_km(age).max(lid_floor_km(z));
             assert!(
@@ -8479,11 +8481,39 @@ fn the_final_frame_holds_every_continental_column_to_its_lid_floor() {
         }
     }
     assert!(
-        unset > 0,
-        "no crust with no state at the final frame: PLT-821 unseen"
-    );
-    assert!(
         near > 0,
         "no column near its floor at the final frame: PLT-820 unseen"
     );
+    // PLT-821 on a constructed final pass: 10 km of continental crust spread onto floor made in
+    // the step (the rate guard's spread, `collapse::spread`), with no state.
+    let mut st2 = st.clone();
+    let made: Vec<usize> = st2
+        .samples
+        .iter()
+        .enumerate()
+        .filter(|(_, s)| s.kind == state::OCEANIC && !s.is_hidden())
+        .map(|(i, _)| i)
+        .take(2)
+        .collect();
+    assert_eq!(made.len(), 2);
+    for (n, &i) in made.iter().enumerate() {
+        let s = &mut st2.samples[i];
+        s.formed_myr = t as f32;
+        s.pools = pools::oceanic_column();
+        s.pools[state::pool::FELSIC_PLUTONIC] += 10_000.0;
+        s.thickness_m = pools::thickness(&s.pools);
+        s.lithosphere_km = 0.0;
+        s.make_continental();
+        s.heat_flow_mw_m2 = if n == 0 { 0.0 } else { 41.0 };
+    }
+    thermal::refresh_heat_flow(&mut st2, &p.tectonics, t);
+    for &i in &made {
+        let s = &st2.samples[i];
+        let own = ocean_km(0.0).max(lid_floor_km(moho_km(s)));
+        let q = f64::from(s.heat_flow_mw_m2);
+        assert!(
+            q >= conductive_mw_m2(own) - 1e-2,
+            "{q} mW/m² over crust spread onto new floor, its floor's {own} km"
+        );
+    }
 }

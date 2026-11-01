@@ -65,6 +65,8 @@ use super::normalise::Norm;
 use super::pools::{
     accrete, floor_at, isostatic_change_m, ocean_heat_flow, oceanic_column, thickness,
 };
+use super::thermal::{ARC_HEAT_MW_M2, HOTSPOT_HEAT_MW_M2, conductive_mw_m2, sample_l_km};
+use crate::params::TectonicParams;
 use super::state::{
     CONTINENTAL, FORELAND, Group, OCEANIC, Plate, PlateState, Ridge, Sample, pool, regime,
 };
@@ -171,11 +173,18 @@ fn nearest_corner(geo: &Geo, c: &Cover, rot: DQuat, q: DVec3) -> u32 {
     best
 }
 
+/// What a resampling's interpolation reads of the step: the tectonics and the time.
+#[derive(Clone, Copy)]
+struct At<'a> {
+    k: &'a TectonicParams,
+    t_myr: f64,
+}
+
 /// Interpolates a sample from a cover of the old crust; vectors come out in the mantle frame,
 /// which is the new lattice's frame (every group starts unrotated). `m` is the old sample nearest
 /// the new point (`nearest_corner`): the sample's kind, its class and every other categorical
 /// label are `m`'s, and the blends below run over the corners of `m`'s class (ledger: PLT-664).
-fn interpolate(src: &[Sample], c: &Cover, rot: DQuat, m: u32) -> Sample {
+fn interpolate(src: &[Sample], c: &Cover, rot: DQuat, m: u32, at: At) -> Sample {
     let mut s = src[m as usize];
     let corners = c.tri.map(|v| &src[v as usize]);
     let w = c.w;
@@ -244,16 +253,26 @@ fn interpolate(src: &[Sample], c: &Cover, rot: DQuat, m: u32) -> Sample {
     s.uplift_mm_yr = lerp(&|x| x.uplift_mm_yr);
     s.crust_uplift_mm_yr = lerp(&|x| x.crust_uplift_mm_yr);
     // Heat flow belongs to the column (the sea floor's age law against the continental sum over
-    // the column's own lithosphere and crust), so it is blended over the corners of the sample's
-    // own class, as the pools are: a continental sample on the coast must not take the young
-    // ridge crust's 300 mW/m² from an oceanic corner, nor a thick column a hyper-extended
-    // margin's or crust on young floor's (PLT-821) heat flow from a thin corner (PR #58's review;
-    // until 2026-10-31 over the kind's corners). The final pass then holds each continental
-    // column to its own law's ceiling (`thermal::refresh_heat_flow`, PLT-824). (The next step
-    // sets every sample's heat flow again; this only matters for what is read right after a
-    // resampling, the final snapshot among them: the bake's `meta/heat_flow_mw_m2`.)
+    // the column's own lithosphere and crust). Under the thermal state a continental sample takes
+    // its own law over its own lithosphere (the nearest corner's L, floored for the crust it now
+    // has, `thermal::sample_l_km`) and the nearest corner's magmatic excess over that corner's
+    // law, between 0 and an arc's and a hotspot's terms: no other corner's heat flow enters, a
+    // hotter column of the same class (crust with no state on young floor, PLT-821, or a
+    // magmatic corner) included (PR #58's re-review). Without the state it is blended over the
+    // corners of its class, as the pools are: a continental sample on the coast must not take
+    // the young ridge crust's 300 mW/m² from an oceanic corner, nor a thick column a
+    // hyper-extended margin's (until 2026-10-31 over the kind's corners). The final pass then
+    // holds each continental column to its column's ceiling (`thermal::refresh_heat_flow`). (The
+    // next step sets every sample's heat flow again; this only matters for what is read right
+    // after a resampling, the final snapshot among them: the bake's `meta/heat_flow_mw_m2`.)
     // ledger: PLT-824
-    if class_w > 0.0 {
+    if s.kind == CONTINENTAL && at.k.thermal_state {
+        let near = &src[m as usize];
+        let excess = (f64::from(near.heat_flow_mw_m2)
+            - conductive_mw_m2(sample_l_km(near, at.t_myr)))
+        .clamp(0.0, ARC_HEAT_MW_M2 + HOTSPOT_HEAT_MW_M2);
+        s.heat_flow_mw_m2 = (conductive_mw_m2(sample_l_km(&s, at.t_myr)) + excess) as f32;
+    } else if class_w > 0.0 {
         let blend: f64 = (0..3)
             .filter(|&k| same_class(corners[k]))
             .map(|k| w[k] * f64::from(corners[k].heat_flow_mw_m2))
@@ -873,9 +892,10 @@ pub fn resample(
     let mut limits: Vec<[f32; 3]> = vec![[f32::INFINITY, 0.0, f32::INFINITY]; n];
     // A cover of group `g` interpolated at the new point `q`, its labels from the old sample
     // nearest `q` (ledger: PLT-664).
+    let at = At { k, t_myr: t };
     let interp = |g: u32, c: &Cover, q: DVec3| {
         let rot = rots[g as usize];
-        interpolate(src, c, rot, nearest_corner(old, c, rot, q))
+        interpolate(src, c, rot, nearest_corner(old, c, rot, q), at)
     };
     let mut samples: Vec<Sample> = found
         .par_iter()
@@ -1653,6 +1673,7 @@ mod tests {
     fn the_island_arc_class_survives_a_resampling_from_the_nearest_corner() {
         let k = &crate::params::TectonicParams::default();
         let mature = super::super::subduction::mature_arc_m(k);
+        let at = At { k, t_myr: 0.0 };
         let arc = |crust_m: f32| {
             let mut s = Sample::blank(0);
             s.pools = oceanic_column();
@@ -1682,7 +1703,7 @@ mod tests {
         for w0 in [0.4, 0.6, 0.8] {
             let w1 = 0.5 * (1.0 - w0);
             let src = [edge, floor, floor];
-            let s = interpolate(&src, &cover([w0, w1, w1]), DQuat::IDENTITY, 0);
+            let s = interpolate(&src, &cover([w0, w1, w1]), DQuat::IDENTITY, 0, at);
             assert_eq!(s.kind, CONTINENTAL);
             assert!(
                 s.basement() > 0.0 && s.arc_oceanic_m < mature,
@@ -1692,7 +1713,7 @@ mod tests {
         }
         // Leak A.
         let src = [continent, arc(40_000.0), continent];
-        let s = interpolate(&src, &cover([0.6, 0.2, 0.2]), DQuat::IDENTITY, 0);
+        let s = interpolate(&src, &cover([0.6, 0.2, 0.2]), DQuat::IDENTITY, 0, at);
         assert_eq!(s.kind, CONTINENTAL);
         assert!(s.basement() > 0.0 && s.arc_oceanic_m >= mature, "{s:?}");
         assert!(!island(&s), "the continent took the accreted arc's class");
