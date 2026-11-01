@@ -358,7 +358,9 @@ mod tests {
         }
         for months in [
             [2.0, 2.0, 2.0, 2.0, 3.0, 5.0, 9.0, 10.0, 6.0, 3.0, 2.0, 2.0],
-            [0.0, 0.5, 4.0, 9.0, 14.0, 18.0, 20.0, 19.0, 15.0, 9.0, 4.0, 1.0],
+            [
+                0.0, 0.5, 4.0, 9.0, 14.0, 18.0, 20.0, 19.0, 15.0, 9.0, 4.0, 1.0,
+            ],
         ] {
             let mean = months.iter().sum::<f64>() / 12.0;
             let cl = Climate::of_months(600.0, mean, &months.map(|t| t - mean));
@@ -566,7 +568,10 @@ mod tests {
             }
             let k = STEPS as f64;
             let (above, thawed, sum) = (above / k, thawed / k, sum / k);
-            assert!((sum - mean).abs() < 1.0e-5, "{mean} {warm} {cold}: the year's mean {sum}");
+            assert!(
+                (sum - mean).abs() < 1.0e-5,
+                "{mean} {warm} {cold}: the year's mean {sum}"
+            );
             assert!(
                 (b - above).abs() < 1.0e-4 && (s - thawed).abs() < 2.0e-4,
                 "{mean} {warm} {cold}: closed form ({b}, {s}), integral ({above}, {thawed})"
@@ -598,10 +603,18 @@ mod tests {
             );
         };
         for (mean, warm) in [(4.0, 10.0), (12.0, 30.0), (0.5, 3.0)] {
-            close(f(mean, warm, eps), f(mean, warm, -eps), "coldest month at 0");
+            close(
+                f(mean, warm, eps),
+                f(mean, warm, -eps),
+                "coldest month at 0",
+            );
         }
         for (mean, cold) in [(-4.0, -10.0), (-12.0, -30.0), (-0.5, -3.0)] {
-            close(f(mean, eps, cold), f(mean, -eps, cold), "warmest month at 0");
+            close(
+                f(mean, eps, cold),
+                f(mean, -eps, cold),
+                "warmest month at 0",
+            );
         }
         for (warm, cold) in [(10.0, -10.0), (3.0, -30.0), (25.0, -2.0)] {
             close(f(eps, warm, cold), f(-eps, warm, cold), "mean at 0");
@@ -657,7 +670,10 @@ mod tests {
         let (b0, q0) = at(0.0);
         for cold in [0.01, -0.01] {
             let (b, q) = at(cold);
-            assert!((b - b0).abs() < 1.0e-3 && (q - q0).abs() < 0.5, "{cold}: {b} {q}");
+            assert!(
+                (b - b0).abs() < 1.0e-3 && (q - q0).abs() < 0.5,
+                "{cold}: {b} {q}"
+            );
         }
         let (b6, q6) = at(-6.0);
         let unclamped = crate::hydro::half_sines_thaw(4.0, 10.0, -6.0).0;
