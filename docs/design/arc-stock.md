@@ -103,6 +103,38 @@ the drowned share) the model's continental crust covers about 0.545 of the plane
 against Earth's 0.41 (210.49 x 10⁶ km² of 510). So PLT-661's margins are most of the drowned share: on, the
 continents' area is too large and thin; off, the continents lose 14 % of their crust over the run.
 
+**Why PLT-661's margins cover so much** (Ben, 2026-11-01: "Keep on, find why"; `arcstock.py` on arc-lith, the
+switch on, and msc-off, off; final frames, medians of 8):
+
+| class | on: area, thickness, height over the sea | off |
+|---|---|---|
+| the start's crust | 0.111, 37.4 km, +49 m | 0.067, 37.7 km, +257 m |
+| island-arc crust taken in | 0.153, 30.3 km, -620 m | 0.108, 33.4 km, +67 m |
+| belts on ocean floor | 0.101, 32.0 km, -255 m | 0.044, 36.4 km, +119 m |
+| the rest converted | 0.159, 25.6 km, -1,506 m | 0.044, 34.0 km, +116 m |
+| hyper-extended (under 10 km of its own crystalline crust) | 0.102, 17.7 km, -3,102 m | 0.005, 13.0 km, -2,623 m |
+| all continental crust | 0.537, 30.4 km, -327 m | 0.286, 34.2 km, +180 m |
+
+- The rule's reach is Earth's: the hyper-extended crust lies a median 70 km (p90 104 km) from the continental crust
+  that is not hyper-extended, a ring of 0.8 lattice rows (the ocean side of the 200 km taper, PLT-262; Brune et al.
+  2014's thinned domains 70 to 200 km wide).
+- What it runs along is long: the non-hyper continental crust's edge, measured as its samples within 1.6 spacings of
+  ocean floor or hyper-extended crust times the spacing, is about 896,000 km with the switch on and 587,000 off (a band
+  on the lattice, so over the true perimeter by perhaps two to three times). The ring is 19 % of the continental
+  area.
+- The rule links the crust rather than breaking it up: 13.5 parts over 10⁵ km² with the largest seven holding 0.99 of
+  the area, against 33 parts and 0.93 off.
+- So the margins' area is one Earth-wide ring along every edge of continental crust, the converted crust's included,
+  wherever the floor beside it holds continental rock. Earth's thinned domains are the product of rifting (Brune et al.
+  2014 on rifted margins); PLT-661 stands in for rifting by the sediment on the floor, which comes down from any land
+  beside any margin (sheared, transform, old active ones), and a converted ring never turns back.
+
+Next, sources to read (a Sonnet lookup): the total length of Earth's rifted (passive) margins and of all continental
+margins (Bradley 2008, Earth-Sci. Rev. 91, is the likely source; not yet read), and the area of Earth's necking and
+hyper-extended domains; then the model's ring per km of rifted margin. The physical fix this points to ties the
+thinned crust to the rift that made it (continental crust thinned below 10 km in rifting stays continental) rather
+than to sediment, which is the continental-extension lane's band (Buck's, branch `continental-extension`).
+
 ## Earth's side (sources read by Sonnet lookups, 2026-11-01; bibliography entries to add when used)
 
 - Condie & Aster 2010 (Precambrian Res. 180:227-236): "only 14% during the last 400 My" (the body says 600 My).
