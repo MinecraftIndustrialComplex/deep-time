@@ -192,6 +192,16 @@ def run_stats(run):
         small = size_of[lab[ci]] < 1.0e5
         r["coast_small_km"] = float(small.sum() * spacing / np.sqrt(3.0))
         r["parts_all"] = int(len(np.unique(lab[cont])))
+        # Ocean floor enclosed by continental crust (an ocean component that is not the largest, the world
+        # ocean): the boundary's length against it, its area and its count.
+        olab = components(p, ~cont, LINK * spacing)
+        osz = np.bincount(np.maximum(olab, 0))
+        world = int(np.argmax(osz))
+        oi = np.where(cont[pairs[:, 0]], pairs[:, 1], pairs[:, 0])[diff]
+        enclosed = olab[oi] != world
+        r["coast_enclosed_km"] = float(enclosed.sum() * spacing / np.sqrt(3.0))
+        r["enclosed_area"] = float(((~cont) & (olab != world)).sum() / n0)
+        r["enclosed_parts"] = int(len(np.unique(olab[(~cont) & (olab != world)])))
         out[t] = r
     return out
 
