@@ -45,6 +45,28 @@ felsic rock booked: belts +8.04 km³/yr, the resamplings -11.27 (base37 means).
 1.1), subduction erosion 0.31 (1.4), crust-suturing zones 0.60 (0.7), foundering 0.00 ("Unknown" in the table),
 resampling drops 0.19. Total about 3.4 against Earth's about 3.2.
 
+**The rock and the lithosphere of each class at the end** (`arcstock.py` on the arm arc-lith: base37-s4's code and
+seeds with the crust budget's new `lith/t<Myr>.bin`, a measurement only, its census identical to base37-s4's in every
+column; medians of 8 final frames; the L the laws read, `thermal::sample_l_km`):
+
+| class | thickness, km | felsic and metamorphic share | height over the sea, m | L, km | keel, km | heat flow, mW/m² |
+|---|---|---|---|---|---|---|
+| the start's crust | 37.4 | 0.60 | +49 | 222 | 200 | 41 |
+| island-arc crust taken in | 30.3 | 0.49 | -620 | 135 | 0 | 51 |
+| collision belts on ocean floor | 32.0 | 0.45 | -255 | 137 | 0 | 51 |
+| the rest converted | 25.6 | 0.36 | -1,506 | 136 | 0 | 51 |
+| island-arc crust alone | 20.3 | 0.57 | -1,951 | 81 | 0 | 71 |
+
+The converted crust is half felsic, so its rock is continental enough; it is thin (30 km against Earth's continental
+mean of 36.4 km, sea-level.md) and it stands on a cold mantle lithosphere with no keel, about 135 km deep, where
+Earth's hot back-arcs stand on 50 to 60 km (`thermal::L_HOT_KM`, PLT-461, from Hyndman, Currie & Mazzotti). The thermal
+state heats a continental column only while it carries an arc, subduction-zone or hotspot flag (`thermal::heating`),
+in the arc's band; off it, and after the arc dies, the column cools toward a craton's lithosphere over McKenzie's time
+with no keel to buoy it. Candidates (to read against sources before building): how far behind the arc and for how long
+Earth's back-arcs stay hot (Hyndman & Currie: 200 to 900 km behind the arc, cooling over about 300 Myr after
+subduction stops, to be read again); and what thickens accreted arcs on Earth (collision and magmatic addition) where
+the model's stay at 30 km.
+
 ## Earth's side (sources read by Sonnet lookups, 2026-11-01; bibliography entries to add when used)
 
 - Condie & Aster 2010 (Precambrian Res. 180:227-236): "only 14% during the last 400 My" (the body says 600 My).
