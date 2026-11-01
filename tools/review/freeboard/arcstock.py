@@ -111,6 +111,10 @@ def run_stats(run):
             # Each class's rock at the end: the shares of its column in cover (sediment and sedimentary rock),
             # felsic and metamorphic rock and mafic rock, its ocean basement (km) and its height over the sea (p50).
             # The start column (PLT-834, Rudnick & Gao's layers as Hacker et al. 2015 print them) is 0.05, 0.61, 0.34.
+            # The lithosphere file (crust_budget.rs LITH_FIELDS: stored L, keel, the L the laws read, heat
+            # flow), on runs made since the arc-stock lane added it.
+            lf = run / "maps" / "lith" / th.name_of(t)
+            lith = np.fromfile(lf, "<f4").reshape(-1, 4).astype(np.float64) if lf.exists() else None
             conv = cont & ~start
             belt = conv & ~island & (a[:, 5] > 1.5)
             col = pp[:, 0:7].sum(1)
@@ -126,6 +130,10 @@ def run_stats(run):
                 r[f"{k}_base_km"] = float(np.clip(pp[m, 7], 0.0, None).mean() / 1000.0)
                 r[f"{k}_T"] = float(T[m].mean())
                 r[f"{k}_zs"] = float(np.median(a[m, 2] - sea))
+                if lith is not None:
+                    r[f"{k}_L"] = float(np.median(lith[m, 2]))
+                    r[f"{k}_keel"] = float(np.median(lith[m, 1]))
+                    r[f"{k}_q"] = float(np.median(lith[m, 3]))
             cell_km2 = 4.0 * np.pi * R_KM**2 / n0
             standing = float(a[:, 7].sum() / 1000.0 * cell_km2)
             g = cbread.last_globals(run / "summary.txt") or {}
