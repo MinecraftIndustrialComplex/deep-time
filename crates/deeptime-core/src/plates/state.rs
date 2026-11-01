@@ -341,6 +341,14 @@ impl Sample {
             return;
         }
         self.kind = CONTINENTAL;
+        // The floor's lithosphere goes on as the crust's, never above its lid's floor (only with
+        // the thermal state, which alone sets L; ledger: PLT-820).
+        if self.lithosphere_km > 0.0 {
+            self.lithosphere_km = super::thermal::continental_l_km(
+                f64::from(self.lithosphere_km),
+                super::thermal::moho_km(self),
+            ) as f32;
+        }
         let ocean = super::pools::oceanic_column();
         let own = ocean[pool::MAFIC_VOLCANIC] + ocean[pool::MAFIC_PLUTONIC];
         self.basement_m = own.min(self.mafic_m());
@@ -543,6 +551,17 @@ impl Contact {
     pub fn active(&self, step: u64) -> bool {
         self.last_step == step || self.carried
     }
+}
+
+/// A pair of plates' cumulative convergence across an overlap with no contact (ledger PLT-810):
+/// plates `lo` < `hi`, km (Earth-normalized; the overlap's mean convergence, mm/yr, times each
+/// step's Myr, never below 0), and the steps that added to it (the onset trace's crossing).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct PairConvergence {
+    pub lo: u32,
+    pub hi: u32,
+    pub km: f64,
+    pub steps: u32,
 }
 
 /// A body of continental crust at a collision front judged going down with its slab (ledger
@@ -955,6 +974,13 @@ pub struct PlateState {
     /// PLT-710, PLT-715); empty while `tectonics.backarc_rifting` is off.
     #[serde(default)]
     pub backarcs: Vec<BackArc>,
+    /// Each pair of plates that overlaps with no contact yet: its cumulative convergence across
+    /// the overlap (`subduction::resolve`, ledger PLT-810), dropped when the pair has no overlap
+    /// at all for a step or a contact begins, and copied to the pieces of a split plate that
+    /// border the other plate (`inherit::inherit`, PLT-534). A resampling takes every overlap, so
+    /// a pair keeps its sum through one only if it overlaps again by the next step's resolve.
+    #[serde(default)]
+    pub converging: Vec<PairConvergence>,
     /// The land's gap budget (`gap_budget.rs`): measurement only, absent unless switched on; not
     /// kept in checkpoints.
     #[serde(skip)]

@@ -2,8 +2,8 @@
   "_doc": "An extra registry (pass --registry tools/review/pool/measures_heatflow.json): the `hfcells` measure, the continental heat flow of the final frame (PLT-469's lane), and the heat-flow fields in every run's dump. Runs made without it have no heat flow in their dump, so a comparison against a run made without it needs an arm of the same key with the switch off.",
   "measures": {
     "hfcells": {
-      "version": 1,
-      "doc": "Continental L1 cells under 54.9 mW/m2 and the continental heat flow's minimum, percentile, median, mean and maximum on the final frame; definitions in measure_hfcells.py",
+      "version": 2,
+      "doc": "Continental L1 cells under 54.9 mW/m2 and the continental heat flow's minimum, percentile, median, mean and maximum and its shares over 150 and 200 mW/m2 on the final frame; definitions in measure_hfcells.py",
       "command": ["{py}", "-I", "{tools}/measure_hfcells.py", "{run}"],
       "python": "numpy",
       "needs": ["fields"],
@@ -13,7 +13,11 @@
         {"key": "under55_cells", "label": "continental cells under 54.9 mW/m2", "target": null, "digits": 0},
         {"key": "q_min", "label": "continental heat flow, minimum, mW/m2 (the thermal state's craton floor 41 since 2026-10-23)", "target": [40.9, null], "digits": 1},
         {"key": "q_p01", "label": "1st percentile", "target": null, "digits": 1},
-        {"key": "q_median", "label": "median", "target": null, "digits": 1}
+        {"key": "q_median", "label": "median", "target": null, "digits": 1},
+        {"key": "q_mean", "label": "mean", "target": null, "digits": 1},
+        {"key": "q_max", "label": "maximum", "target": null, "digits": 1},
+        {"key": "over150_share", "label": "share of continental cells over 150 mW/m2 (Earth's regional maxima 100 to 150, PLT-823)", "target": null, "digits": 4},
+        {"key": "over200_share", "label": "share of continental cells over 200 mW/m2 (above it only geothermal fields, PLT-823)", "target": null, "digits": 4}
       ]
     }
   }
