@@ -14293,7 +14293,8 @@ between. A pair is "mixed" with at least 400 km of each.
 | plates with half their outline on one neighbour; that pair mixed | 10/52; 4 | 10/52; 1 | 40/115; 27 | 52/134; 44 |
 
 With the chord at 5 spacings (893 km either side on Earth) the model's mixed boundary is 0.608 and
-0.571 and its convergent near the same pair's divergent 0.266 and 0.301; Earth's 0.091 and 0.104.
+0.571 and its convergent near the same pair's divergent 0.266 and 0.301; Earth's 0.091 and 0.104 (0.139 and 0.120
+with Earth's pairs keyed whichever way Bird names them: "Earth's mixed pairs corrected" below).
 The mixing holds at every relation of the two plates (parent and child 0.59 to 0.64, siblings 0.66
 to 0.74, unrelated 0.62 to 0.64) and every origin of the younger plate (rift 0.63 to 0.66,
 initiation 0.56 to 0.69, margin propagation 0.72 to 0.75, fission 0.60 to 0.62; back-arc 0.23 and
@@ -14461,12 +14462,70 @@ plate corners, the design notes give its numbers.
 moves 8,200 to 12,200 samples a run, about 200 a resampling. Fronts last longer on their rock (the
 look run: the intra-oceanic front still on the same rock after 16 Myr 0.480 and 0.585 against
 0.384 and 0.458); the boundary on pairs that both open and close falls from 0.630 to 0.594 (Earth
-0.09 to 0.135); the census moves towards Earth without significance (continental crust under the
+0.17 to 0.22 at its 52 plates, 0.33 at the model's 16: "Earth's mixed pairs corrected" below); the census moves towards Earth without significance (continental crust under the
 sea 0.585 against 0.630, the largest landmass 0.080 against 0.061, criteria a mean of 5.25 against
 4.88); the guard is clean (10,650 against 10,438 m). The intra-oceanic front's length (26,244
 against 26,240 km) and the crust behind the fronts (0.395 against 0.401 with no 15 km crust within
 200 km) do not move: those are not this mechanism's. On by default since 2026-11-02 (the
 coordinator's call under Ben's rule of 2026-10-23).
+
+### Earth's mixed pairs corrected, and the model's at Earth's plate count (2026-11-02, a read)
+
+**The correction.** `polenear.py` keyed Earth's pairs by the order Bird's step file names them, and the file names
+20 of its 141 pairs both ways (EU-NA 1,559 km and NA-EU 9,208 km; AF-SO and SO-AF; AU-PA and PA-AU; 17 more), so it
+read 161 pairs and split those 20 in two. Keyed by the pair whichever way it is named (the step's velocity turned
+round for the other order, so one rotation fits the pair: the worst residual 1.97 mm/yr against 1.93), Earth's
+references in "Where the pairs' relative poles lie" become:
+
+| Earth, Bird 2003's 52 plates | classed on each step | 446 km chord | 893 km chord |
+|---|---|---|---|
+| pairs; boundary a pair, km | 141; 1,847 | 141; 1,847 | 141; 1,847 |
+| boundary on mixed pairs (was) | 0.216 (0.135) | 0.171 (0.091) | 0.139 (0.091) |
+| convergent within 1,000 km of the same pair's divergent (was) | 0.293 (0.272) | 0.143 (0.125) | 0.120 (0.104) |
+| median pole distance to the pair's boundary, km (was) | 2,980 (3,177) | 2,980 (3,177) | |
+| mixed share of the pairs over 8,000 km (was) | 0.27 (0.00) | 0.27 (0.00) | |
+
+Earth's longest pairs do not all keep one class: one of the six pairs over 8,000 km is mixed. The model side was
+keyed by the sorted pair already, so its numbers stand.
+
+**Earth at the model's plate count.** `tools/review/crustcycle/earthmerge.py` keeps each of Bird's steps with its own
+motion and class and coarsens only the labels: the plate with the shortest outline merges into the neighbour it
+shares the most boundary with, one at a time (this page's procedure, not a source's). Classed on the 446 km chord:
+
+| plates | pairs | boundary a pair, km | mixed | convergent near its own divergent | over 4,000 km (mixed) | half the outline on one neighbour |
+|---|---|---|---|---|---|---|
+| 52 | 141 | 1,847 | 0.171 | 0.143 | 0.400 (0.220) | 11 |
+| 30 | 79 | 3,013 | 0.228 | 0.236 | 0.505 (0.277) | 8 |
+| 20 | 53 | 4,085 | 0.294 | 0.262 | 0.616 (0.331) | 3 |
+| 16 | 42 | 4,824 | 0.333 | 0.250 | 0.712 (0.392) | 1 |
+| 14 | 36 | 5,435 | 0.365 | 0.258 | 0.786 (0.419) | 1 |
+| the model, bg-cum2 (8 runs' ends, 15.9 plates) | 38.0 | 5,866 | 0.594 | 0.446 | 0.838 | 38 of 127 |
+
+So about half the gap the earlier reading saw was the reference and Earth's plate count: like for like, at 16
+plates, the model mixes 1.8 times as much of its boundary as Earth (0.594 against 0.333).
+
+**Where the excess lies.** By the pair's length, at 16 plates on Earth's side (share of the boundary, of it mixed):
+
+| pair length, km | Earth at 16 plates | the model (bg-cum2) |
+|---|---|---|
+| 2,000 to 4,000 | 0.210 (0.26) | 0.126 (0.19) |
+| 4,000 to 8,000 | 0.287 (0.43) | 0.315 (0.49) |
+| over 8,000 | 0.425 (0.37) | 0.523 (0.79) |
+
+Up to 8,000 km the model's pairs mix as Earth's do. The excess is its pairs over 8,000 km, about nine a run of about
+12,600 km each (this page's arithmetic), half its boundary: a third of that is wrapped (one plate has half its
+outline or more on the other) and mixed on 0.96 of it, the rest mixed on 0.71. None of Earth's six is wrapped. The
+younger plate of the model's longest pairs was born a median 84 Myr before the run's end; by its origin, rift 0.57 of
+that boundary (mixed 0.72), subduction initiation 0.24 (mixed 1.00), fission 0.09 (0.78), margin propagation 0.07
+(0.57), back-arc 0.03 (1.00).
+
+**Is a law wrong?** Not named yet. The model's young plates come to share boundaries of over 8,000 km with one
+neighbour, and those turn against the motion; a plate born by an initiation is mixed with its neighbour along all of
+such a boundary. Two readings to test (my own): an initiation's fracture runs across its whole plate at once
+(`rifting::initiate`, the bisector of the seed and the trench, PLT-690), and it leaves the parent's continental crust
+and the ocean floor within `subduction_initiation_offshore`'s margin (PLT-503) with the parent, so the new plate's
+boundary with its parent also runs round those; and a rift's fragments are Voronoi cells of their plate with
+noise-warped edges (Cortial et al. 2019), so a fragment's boundary with its parent turns.
 
 ## Hotspots, plume heads and volcanic margins from sources (2026-10-31)
 
