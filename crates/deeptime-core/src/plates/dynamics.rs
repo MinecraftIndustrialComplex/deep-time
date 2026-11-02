@@ -21,7 +21,7 @@
 //! | `version` | [`VERSION`] |
 //! | `t0_myr`, `dt_myr` | time before the first step, step length |
 //! | `samples` | L0 samples, `n`: every share below is of this unless it says "visible" |
-//! | `steps` | one [`StepRec`] per step: the plates ([`PlateStep`]), land, crust, the sea floor's age percentiles, the largest continental pieces |
+//! | `steps` | one [`StepRec`] per step: the plates ([`PlateStep`]), land, crust, the sea floor's age percentiles, the largest continental pieces, the continental crust's shape on the lattice at the step's end and before its resampling ([`Shape`]) |
 //! | `plates` | one [`PlateLife`] per plate that ever lived: parent, origin, death and its cause |
 //! | `collisions` | one [`CollisionRec`] per terrane transfer, collisions included |
 //! | `partings` | one [`PartingRec`] per collision state that ended with no transfer or weld |
@@ -130,6 +130,111 @@ pub const PIECES_KEPT: usize = 16;
 /// Two continental samples joined by a lattice edge are one piece only while they are closer than
 /// this many sample spacings.
 pub const PIECE_LINK_SPACINGS: f64 = 2.0;
+/// A lattice point whose nearest visible sample is farther than this many sample spacings is a gap
+/// for [`shape`] (measurement only: a reading's threshold, read by no rule). A point a lattice
+/// triangle of visible crust covers is within its circumradius, about 0.6 spacings, of a corner;
+/// a gap that a rift has opened since the last resampling is not, and the next resampling gives it
+/// new ocean floor.
+pub const SHAPE_GAP_SPACINGS: f64 = 1.0;
+/// The continental crust's shape at a moment (measurement only; the per-step watch, the arc-stock
+/// lane, 2026-11-01). Its area on the samples: the visible continental samples and of them the
+/// hyper-extended (`transition::hyper_extended`), a sample being one lattice cell of area between
+/// resamplings. Its outline on the lattice: each lattice point shows the visible sample nearest it,
+/// a gap (no visible sample within [`SHAPE_GAP_SPACINGS`]) shows ocean floor, and all the
+/// lattice's edges join the points: the edges between continental crust and ocean floor, and the
+/// same on the label each point's ring and itself hold by a majority (raggedness at the lattice's
+/// scale falls away, the shape stays); the connected pieces of continental crust of any size; and
+/// the ocean floor outside its largest piece (enclosed by continental crust). The samples' own
+/// links break as plates move apart (by up to 14 spacings in 20 Myr at 50 mm/yr): an outline
+/// joined by them split the ocean floor plate by plate before each resampling and joined it again
+/// after (arm watch, 2026-11-01). The lattice's points are no area: a gap point within the
+/// threshold of a continental sample shows it, so between resamplings the points showing
+/// continental crust grow by the gaps' rims (arm watch2: about 400 points a 20-Myr cycle, taken
+/// back at each resampling). A margin that walks at each resampling (PLT-664 before PLT-852)
+/// shows as edges a resampling adds and the steps between do not take back.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Shape {
+    pub continental: u32,
+    pub hyper: u32,
+    pub edges: u32,
+    pub smooth_edges: u32,
+    pub pieces: u32,
+    pub enclosed: u32,
+}
+
+/// [`Shape`] of the crust on the lattice `geo` (spacing `spacing`, rad). `tree` holds the samples'
+/// positions now; without one, sample `i` stands on point `i` (just after a resampling).
+pub fn shape(st: &PlateState, geo: &Geo, tree: Option<&Tree>, spacing: f64) -> Shape {
+    let samples = &st.samples;
+    let pts = geo.points();
+    let n = pts.len();
+    let visible = |j: usize| j < samples.len() && !samples[j].is_hidden();
+    let gap = 2.0 * (0.5 * SHAPE_GAP_SPACINGS * spacing).sin();
+    let shows: Vec<Option<u32>> = pts
+        .par_iter()
+        .enumerate()
+        .map(|(i, &q)| match tree {
+            None => visible(i).then_some(i as u32),
+            Some(t) => t
+                .nearest_n(q, 8)
+                .into_iter()
+                .find(|&(j, _)| visible(j as usize))
+                .filter(|&(_, d2)| d2 <= gap * gap)
+                .map(|(j, _)| j),
+        })
+        .collect();
+    let cont: Vec<bool> = shows
+        .iter()
+        .map(|s| s.is_some_and(|j| samples[j as usize].kind == CONTINENTAL))
+        .collect();
+    let smooth: Vec<bool> = (0..n)
+        .into_par_iter()
+        .map(|i| {
+            let (mut c, mut all) = (u32::from(cont[i]), 1u32);
+            for (u, _) in geo.edges(i as u32) {
+                all += 1;
+                c += u32::from(cont[u as usize]);
+            }
+            2 * c > all
+        })
+        .collect();
+    let (edges, smooth_edges) = (0..n)
+        .into_par_iter()
+        .map(|i| {
+            let (mut e, mut s) = (0u32, 0u32);
+            for (u, _) in geo.edges(i as u32) {
+                let u = u as usize;
+                if u > i {
+                    e += u32::from(cont[i] != cont[u]);
+                    s += u32::from(smooth[i] != smooth[u]);
+                }
+            }
+            (e, s)
+        })
+        .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
+    let walk = |member: &dyn Fn(usize) -> bool| {
+        piece_sizes(n, member, |i, out| {
+            out.extend(geo.edges(i as u32).map(|(u, _)| u));
+        })
+    };
+    let pieces = walk(&|i| cont[i]).len() as u32;
+    let ocean = walk(&|i| !cont[i]);
+    let enclosed = ocean.iter().sum::<u32>() - ocean.iter().copied().max().unwrap_or(0);
+    let visible_continental = samples
+        .iter()
+        .filter(|s| !s.is_hidden() && s.kind == CONTINENTAL);
+    Shape {
+        continental: visible_continental.clone().count() as u32,
+        hyper: visible_continental
+            .filter(|s| super::transition::hyper_extended(s))
+            .count() as u32,
+        edges,
+        smooth_edges,
+        pieces,
+        enclosed,
+    }
+}
+
 /// Bits of a [`PlateStep`]'s flags in its array form.
 const POLE_INSIDE: u8 = 1;
 const GUARD_BOUND: u8 = 2;
@@ -208,6 +313,10 @@ pub struct Dynamics {
     /// as `onset_overlap` is.
     #[serde(skip)]
     pub onset_crossed: Vec<((u32, u32), u32, f64)>,
+    /// Measurement only: the continental crust's shape just before this step's resampling
+    /// ([`Shape`], set by the plates stage), which the step's record takes as `shape_pre`.
+    #[serde(skip)]
+    pub shape_pre: Option<Shape>,
 }
 
 /// Measurement only (the resampling trace, 2026-10-31): how a resampling made each new sample
@@ -315,6 +424,13 @@ pub struct StepRec {
     /// Sizes of the largest connected pieces of continental crust, in visible samples, largest
     /// first (see the module docs).
     pub pieces: Vec<u32>,
+    /// The continental crust's shape at the step's end ([`Shape`]; measurement only) …
+    #[serde(default)]
+    pub shape: Option<Shape>,
+    /// … and just before the step's resampling, on a step that resamples: what a resampling
+    /// changes is `shape` less `shape_pre`, what the steps between change is the rest.
+    #[serde(default)]
+    pub shape_pre: Option<Shape>,
     /// Per-plate force budget, stress and balance answer (`forces.rs`; version 4), for the plates
     /// in the balance (alive, with visible samples, when the forces were summed).
     pub forces: Vec<PlateForces>,
@@ -2121,6 +2237,8 @@ pub struct Observed<'a> {
     /// The live plates the step's solved balance left out (`forces::Answer::omega` `None`: no
     /// visible sample), which keep their rotation.
     pub out_of_balance: &'a [u32],
+    /// The continental crust's shape at the step's end ([`shape`]), when it was counted.
+    pub shape: Option<Shape>,
 }
 
 /// What [`record_step`] counts over the samples (P1-19: per run of samples, then merged).
@@ -2613,6 +2731,8 @@ pub fn record_step(
         old180: older(OLD_AGES_MYR[0]) as u32,
         old250: older(OLD_AGES_MYR[1]) as u32,
         pieces,
+        shape: seen.shape,
+        shape_pre: d.shape_pre.take(),
         mix_km: seen.mix.km,
         front_bands,
         arc_oceanic: seen.arcs[0],

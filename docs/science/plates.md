@@ -14326,6 +14326,90 @@ resampling's gap fill and have no such reorganization. Fewer, longer boundaries 
 mixing alone: at the same pair length the model's boundaries mix more than four times as often as
 Earth's (4,000 to 8,000 km: 0.56 to 0.63 against 0.13), and over 8,000 km Earth's never do.
 
+### Why the island arcs do not grow: a front's life on its rock (2026-11-01, a read)
+
+The question (Ben's lane of 2026-11-01, "Arc crust and fronts"; docs/design/arc-stock.md, open
+question 4): what crust stands behind the model's subduction fronts against Earth's, and why. Nothing
+is built.
+
+**Tools and runs.** `tools/review/islfront/forecrust.py` on base38 (key d7a4f080dbad, 24 runs, the
+maps at -950 to -50 Myr) against `earthisl.py` on Bird 2003's SUB steps and CRUST1.0 (Laske et al.
+2013), the overriding plate's whole crust. `tools/review/islfront/frontstay.py` on look2 (key
+3eca4323d02d, scattered_continents seed 1, the maps every 2 Myr at -1000 to -890 and -560 to -500
+with each record's sample index, `+DEEPTIME_SNAPSHOT_MYR=2:-1000:-890,2:-560:-500`; its record is
+base38's seed 1 at every step, the changes measurement only). A sample keeps its index and rides its
+plate until the next resampling, so a front can be followed on the rock of its overriding plate.
+
+**The crust behind the fronts.** The share of the subduction front with no crust of T km on its own
+plate within 200 km of the trench:
+
+| T | Earth (51,309 km) | base38, all fronts | intra-oceanic (0.39 of them) | continental |
+|---|---|---|---|---|
+| 10 km | 0.079 | 0.294 | 0.731 | 0.014 |
+| 15 km | 0.165 | 0.399 | 0.952 | 0.047 |
+| 20 km | 0.195 | 0.476 | 0.986 | 0.150 |
+| 25 km | 0.308 | 0.575 | 0.994 | 0.307 |
+
+The intra-oceanic fronts stand on bare ocean floor (the thickest crust within 200 km 8.2 km at the
+median, p90 13.1), though 0.67 of their length belongs to contacts older than 50 Myr (`islrec.py`).
+Their arcs are not there: the most arc magma on a sample of the arc's band (140 to 260 km behind
+the front, PLT-042 and PLT-043) is 2.0 km at the median (p90 9.3; the continental fronts' 19.1). At
+base38's island-arc rate per km of front (61 km³/km/Myr) over the band's Gaussian (about 106 km
+wide), that is about 3.5 Myr of standing (our arithmetic). An island arc turns its column
+continental at 15 km (PLT-047) and its front continental with it (PLT-370), so the intra-oceanic
+front is the front whose arc has not grown. Subduction erosion finds no forearc crust there
+(arc-stock.md: 0.55 of the 0.82 km³ a year its erosive length asks).
+
+**A front's life on its rock.** Of the front at t, the share still a front on the same rock (the
+sample or a neighbour of its plate within 1.5 spacings) after a lag, within a resampling cycle:
+
+| lag | intra-oceanic, -1000 to -890 | intra-oceanic, -560 to -500 | continental, -1000 to -890 | continental, -560 to -500 |
+|---|---|---|---|---|
+| 2 Myr | 0.914 | 0.937 | 0.913 | 0.908 |
+| 10 Myr | 0.579 | 0.661 | 0.573 | 0.630 |
+| 16 Myr | 0.384 | 0.458 | 0.361 | 0.516 |
+
+A front lasts about 20 Myr where it stands (the 20-Myr resampling cycle the same, by chance or not).
+The rest is not a jitter: of the front that ends within 2 Myr, the overriding plate's nearest front
+then is a median 300 to 480 km away. Fronts fixed in their plates (PLT-710) do not wander; they end.
+
+**Why they end.** Each plate's rotation over each 2-Myr interval fitted to its own samples paired by
+index, the subducting plate's motion at each front sample (the boundary's normal as
+`shortening::boundary_normal` takes it):
+
+- The plates' motion turning does a third or less. Of the intra-oceanic front that ends, 0.53 to
+  0.54 still converges at the slab's floor (PLT-682's 10 mm/yr) or faster, more than 20 degrees off
+  the boundary (PLT-311), in the interval after; 0.28 to 0.29 is transform then, 0.04 to 0.08 slow,
+  0.05 to 0.08 diverging. Of the front that stays, 0.89 to 0.90 converges fast (the rest, about a
+  tenth, is the reconstruction's disagreement with the model's own normals). The plates' rotation
+  vectors change by a median 0.13 of themselves a 2-Myr step (area-weighted, base38-s4 after -900
+  Myr: p25 0.07, p75 0.22).
+- Collision (the subducting side's crust continental) and a reversed polarity end almost none; the
+  pair's front gone everywhere (the contact ended, broke off or incipient again) ends 0.13 to 0.15.
+- The pair's front goes on elsewhere for 0.84 to 0.85 of the intra-oceanic front that ends, and
+  most of it still converges fast where it ended. There the subducting plate's crust ran out: one
+  snapshot on, its nearest visible sample is 3.5 to 4.2 spacings away (0.70 to 0.89 beyond PLT-582's
+  row of 2 spacings, where a front stands only while the subducting plate stands beside it), against
+  1.0 at the front that stays (0.027 beyond). Its samples that stood in the row went under as at
+  the front that stays; nothing came behind them. At t, 3 to 5 spacings in front, 0.26 to 0.43 of
+  the probes find no sample of any plate within a spacing (an open gap), against 0.04 or less at
+  the front that stays, and the floor going under is young: 18 to 23 Myr at the median against 45
+  to 68.
+
+So the island arcs do not grow because their fronts end where the subducting plate's own ridge
+reaches them: a strip of young floor 200 to 300 km wide between a trench and a ridge is consumed,
+the trench meets the ridge's gap (between resamplings a ridge holds no floor; the next resampling
+fills it with young floor, PLT-502, and a contact may start on it again: the step-after onsets above
+make about a third of the intra-oceanic front), and the stretch stops being a front. It is the
+boundaries' shape read above: the same two plates spreading along one stretch and converging along
+another a few hundred km away (0.63 to 0.65 of the model's boundary on such pairs, Earth's 0.09 to
+0.135),
+the young-floor excess at the intra-oceanic fronts and their thin arcs one finding. On Earth a ridge
+that reaches a trench ends subduction there too (a slab window); what is the model's is how often a
+ridge stands a few hundred km from a trench of the same two plates. **Is a law wrong?** Not the arcs'
+and not the front's: the boundaries' (the open question at the end of "Where the pairs' relative
+poles lie").
+
 ## Hotspots, plume heads and volcanic margins from sources (2026-10-31)
 
 The coordinator's task after the crust budget's row by row reading: the row "rifts, hotspots,
