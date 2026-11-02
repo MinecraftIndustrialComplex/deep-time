@@ -1676,7 +1676,7 @@ impl Default for TectonicParams {
             split_inheritance: true,           // ledger: PLT-534
             level_set_membership: true,        // ledger: PLT-536
             class_level_set: true,             // ledger: PLT-852
-            remnant_capture: false,            // ledger: PLT-860
+            remnant_capture: true,             // ledger: PLT-860
             hotspots_initial: 8,
             hotspot_births_per_100myr: 3.0,
             hotspot_lifetime_myr: [40.0, 150.0],

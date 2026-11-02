@@ -14414,7 +14414,7 @@ poles lie").
 ### A ridge-trench remnant joins the plate across its ridge (PLT-860, 2026-11-01)
 
 The boundary-geometry lane's rule (Ben, 2026-11-01, "Boundary geometry (Recommended)"; design notes
-docs/design/boundary-geometry.md), behind `tectonics.remnant_capture`.
+docs/design/boundary-geometry.md), `tectonics.remnant_capture`, on by default since 2026-11-02.
 
 **What Earth does.** Where a spreading ridge comes up to a trench, the strip of the subducting plate
 between them breaks up and joins the plate across the ridge. Stock & Lee 1994 (full text): "As a
@@ -14456,6 +14456,17 @@ turns from a trench to a ridge at its two corners keeps every sample within 660 
 supercontinent seed 1: rec.json equal but for the shape fields PR #64 added). The first form, each
 edge's class read on its own way and no side test, moved 68,000 to 80,000 samples a run (bg-cum):
 plate corners, the design notes give its numbers.
+
+**The arm** (bg-cum2, 8 runs against base38-s4; the design notes give the full tables). The rule
+moves 8,200 to 12,200 samples a run, about 200 a resampling. Fronts last longer on their rock (the
+look run: the intra-oceanic front still on the same rock after 16 Myr 0.480 and 0.585 against
+0.384 and 0.458); the boundary on pairs that both open and close falls from 0.630 to 0.594 (Earth
+0.09 to 0.135); the census moves towards Earth without significance (continental crust under the
+sea 0.585 against 0.630, the largest landmass 0.080 against 0.061, criteria a mean of 5.25 against
+4.88); the guard is clean (10,650 against 10,438 m). The intra-oceanic front's length (26,244
+against 26,240 km) and the crust behind the fronts (0.395 against 0.401 with no 15 km crust within
+200 km) do not move: those are not this mechanism's. On by default since 2026-11-02 (the
+coordinator's call under Ben's rule of 2026-10-23).
 
 ## Hotspots, plume heads and volcanic margins from sources (2026-10-31)
 
