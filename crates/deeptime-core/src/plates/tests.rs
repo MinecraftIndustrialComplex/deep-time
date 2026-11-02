@@ -2703,6 +2703,57 @@ fn how_resamplings_roughen_a_margin() {
     }
 }
 
+/// The per-step watch's shape (`dynamics::shape`, measurement only): a continent north of the
+/// equator on one plate, a hole of ocean floor inside it and a lone continental sample out in
+/// the ocean. Its edges are the margin's lattice edges plus the hole's and the fleck's, the
+/// smoothed edges drop the fleck and the hole (each has fewer than half its ring), the pieces are
+/// two and the enclosed ocean floor is the hole; the smoothed edges stay within a quarter of the
+/// margin's.
+#[test]
+fn the_shape_counts_edges_pieces_and_holes() {
+    let p = preset(20_000, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let spacing = env.norm.spacing_rad();
+    let (mut st, geo) = plates_unresolved(&p, &env, glam::DQuat::IDENTITY, |q| q.z > 0.0);
+    for s in &mut st.samples {
+        s.group = 0;
+    }
+    st.groups.truncate(1);
+    st.plates[1].alive = false;
+    let pts = geo.points().to_vec();
+    // The hole: the sample nearest (0, 0.6, 0.8) turned ocean floor; the fleck: the one nearest
+    // (0.6, 0, −0.8) turned continental.
+    let nearest = |q: DVec3| {
+        (0..pts.len())
+            .max_by(|&a, &b| pts[a].dot(q).total_cmp(&pts[b].dot(q)))
+            .unwrap()
+    };
+    let hole = nearest(DVec3::new(0.0, 0.6, 0.8));
+    let fleck = nearest(DVec3::new(0.6, 0.0, -0.8));
+    st.samples[hole].kind = state::OCEANIC;
+    st.samples[fleck].kind = CONTINENTAL;
+    let pos = geometry::positions(&st, &geo);
+    let sh = dynamics::shape(&st, &geo, &pos, spacing);
+    let margin = (0..pts.len())
+        .filter(|&i| st.samples[i].kind == CONTINENTAL && i != fleck)
+        .map(|i| {
+            geo.edges(i as u32)
+                .filter(|&(u, _)| {
+                    let u = u as usize;
+                    st.samples[u].kind != CONTINENTAL && u != hole
+                })
+                .count() as u32
+        })
+        .sum::<u32>();
+    let ring = |i: usize| geo.edges(i as u32).count() as u32;
+    assert_eq!(sh.edges, margin + ring(hole) + ring(fleck), "{sh:?}");
+    assert_eq!(sh.pieces, 2, "{sh:?}");
+    assert_eq!(sh.enclosed, 1, "{sh:?}");
+    let off = (f64::from(sh.smooth_edges) / f64::from(margin) - 1.0).abs();
+    assert!(off < 0.25, "{sh:?} against the margin's {margin}");
+}
+
 /// The level set's cost (PLT-536; the front lane, 2026-10-24): the interpolated distance is exact
 /// for a great circle only. A curved outline's distance is not linear in the position, and its
 /// linear interpolation (and the reinitialisation's chords) moves the outline towards its centre

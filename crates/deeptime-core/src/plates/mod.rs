@@ -1053,6 +1053,14 @@ impl PlatesStage {
             // The subduction zones go on through the new lattice (ledger: PLT-550).
             subduction::carry(st, step, env.k.contact_carry);
             let cycle = step.saturating_sub(st.resample_step);
+            // The per-step watch: the continental crust's shape before the resampling, so the
+            // record shows what the resampling itself changes (measurement only).
+            if st.dynamics.is_some() {
+                let pre = dynamics::shape(st, &cache.geo, &pos, env.norm.spacing_rad());
+                if let Some(d) = st.dynamics.as_mut() {
+                    d.shape_pre = Some(pre);
+                }
+            }
             front_trace::want_resample(ft.borrow().is_some());
             let geo = ridges::resample(st, world, &pos, &tree, &cache.geo, &env)?;
             front_trace::want_resample(false);
