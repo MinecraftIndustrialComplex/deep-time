@@ -30,7 +30,8 @@
 //! fronts as the dynamics record's boundary mix classed them, when the record is on and the
 //! snapshot is not at a resampling) for
 //! `tools/review/continent-budget.py`, and the same samples' plate ids to
-//! `plate/t<Myr>.bin` (little-endian u32, one per record; [`CrustBudget::write_plates`]) for the
+//! `plate/t<Myr>.bin` and their indices to `id/t<Myr>.bin` (little-endian u32, one per record;
+//! [`CrustBudget::write_plates`]) for the
 //! front lane's boundary geometry (`tools/review/pool/measure_boundgeom.py`), their sea-floor
 //! ages to `age/t<Myr>.bin` (little-endian f32, one per record, NaN on continental crust;
 //! [`CrustBudget::write_ages`]) for the floor-age lane (`tools/review/floorage/`), and their rock
@@ -818,20 +819,27 @@ impl CrustBudget {
     }
 
     /// With [`MAPS_ENV`] set, writes the plate of each visible sample (the records of the map the
-    /// snapshot at `t_myr` wrote, in order) to `<dir>/plate/t<Myr>.bin` as little-endian u32
-    /// (measurement only; a failure is reported and ignored).
+    /// snapshot at `t_myr` wrote, in order) to `<dir>/plate/t<Myr>.bin` and its index to
+    /// `<dir>/id/t<Myr>.bin`, both as little-endian u32 (measurement only; a failure is reported
+    /// and ignored). A sample keeps its index and rides its plate until the next resampling, so
+    /// two snapshots of one resampling cycle pair their records by index.
     pub fn write_plates(&self, samples: &[Sample], plate_of: impl Fn(usize) -> u32, t_myr: f64) {
         let Some(dir) = &self.maps else { return };
-        let mut buf: Vec<u8> = Vec::with_capacity(samples.len() * 4);
+        let mut plates: Vec<u8> = Vec::with_capacity(samples.len() * 4);
+        let mut ids: Vec<u8> = Vec::with_capacity(samples.len() * 4);
         for (i, s) in samples.iter().enumerate() {
             if !s.is_hidden() {
-                buf.extend_from_slice(&plate_of(i).to_le_bytes());
+                plates.extend_from_slice(&plate_of(i).to_le_bytes());
+                ids.extend_from_slice(&(i as u32).to_le_bytes());
             }
         }
-        let dir = dir.join("plate");
-        let path = dir.join(format!("t{:04.0}.bin", t_myr.round()));
-        if let Err(e) = std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&path, &buf)) {
-            eprintln!("crust_budget: cannot write {}: {e}", path.display());
+        for (sub, buf) in [("plate", plates), ("id", ids)] {
+            let dir = dir.join(sub);
+            let path = dir.join(format!("t{:04.0}.bin", t_myr.round()));
+            if let Err(e) = std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&path, &buf))
+            {
+                eprintln!("crust_budget: cannot write {}: {e}", path.display());
+            }
         }
     }
 
