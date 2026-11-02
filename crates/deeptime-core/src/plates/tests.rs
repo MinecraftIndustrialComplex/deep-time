@@ -2758,10 +2758,11 @@ fn the_shape_counts_edges_pieces_and_holes() {
 
 /// Remnant capture (PLT-860): a strip of plate 1 between plate 0, which it subducts under (an
 /// active contact), and the plate south of it, from which it spreads at x > 0 (plate 1 turns about
-/// -y, so it moves north at x > 0 and south at x < 0; the others stand still). Where the strip is
-/// about 100 km wide (x > 0, y > 0) it goes to the plate across its ridge; where it is about 950 km
-/// wide (x > 0, y < 0), or closes on both sides (x < 0), it stays. The plate across is a third
-/// plate, then plate 0 itself (the strip between two boundaries of one pair: the boundary closes).
+/// -y, so it moves north at x > 0 and south at x < 0, where its ridge is with plate 0 and it closes
+/// on the plate south of it; the others stand still). Where the strip is about 100 km wide (x > 0,
+/// y > 0) it goes to the plate across its ridge; where it is about 950 km wide (x > 0, y < 0, and
+/// all of x < 0) it stays. The plate across is a third plate, then plate 0 itself (the strip between
+/// two boundaries of one pair: the boundary closes).
 #[test]
 fn a_ridge_trench_remnant_joins_the_plate_across_the_ridge() {
     let p = preset(100_000, 20.0, "supercontinent", 5);
