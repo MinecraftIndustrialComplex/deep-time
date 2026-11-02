@@ -8,7 +8,9 @@ number; the rule goes on by default once it is correct and the pool shows no div
 ## The question
 
 The model's boundaries keep the outline they were made with while the plates' motion changes under them: 0.63 to 0.65
-of its boundary lies on pairs of plates that both open and close against each other, Earth's 0.09 to 0.135 (plates.md
+of its boundary lies on pairs of plates that both open and close against each other, Earth's 0.17 to 0.22 at its 52
+plates and 0.33 at the model's 16 (corrected 2026-11-02 from 0.09 to 0.135: plates.md "Earth's mixed pairs
+corrected"; plates.md
 "Where the pairs' relative poles lie"). Seen from the arcs (plates.md "Why the island arcs do not grow: a front's life
 on its rock"), a subduction front lasts about 20 Myr on its rock and most fronts end where the subducting plate's own
 ridge, 200 to 300 km away, reaches the trench: young floor (18 to 23 Myr at the median) between, an open gap behind it
@@ -115,8 +117,8 @@ seed with the rule off):
 | Measure | bg-cum2 | base38-s4 | Earth |
 |---|---|---|---|
 | Samples captured a run | 8,171 to 12,161 | | |
-| Boundary on pairs that both open and close (`polenear.py`) | 0.594 | 0.630 | 0.09 to 0.135 |
-| Convergent within 1,000 km of the same pair's divergent | 0.446 | 0.456 | 0.125 to 0.272 |
+| Boundary on pairs that both open and close (`polenear.py`) | 0.594 | 0.630 | 0.17 to 0.22; 0.33 at 16 plates |
+| Convergent within 1,000 km of the same pair's divergent | 0.446 | 0.456 | 0.14 to 0.29; 0.25 at 16 plates |
 | Fronts with no 15 km crust within 200 km (`forecrust.py`) | 0.395 | 0.401 | 0.165 |
 | Intra-oceanic front, km (`islrec.py`) | 26,244 | 26,240 | 14,500 |
 | Continental front, km | 27,874 | 26,864 | |
@@ -149,8 +151,19 @@ One cumulative arm of 8 runs against base38-s4 (`pool.sh run bg-cum2 --seeds 1,2
 (`+DEEPTIME_SNAPSHOT_MYR=2:-560:-500`). Read, against base38-s4 and against Earth where Earth has a number:
 
 - the boundary on pairs that both open and close, and the convergent boundary within 1,000 km of the same pair's
-  divergent one (`tools/review/crustcycle/polenear.py`; Earth 0.09 to 0.135 and 0.125 to 0.272);
+  divergent one (`tools/review/crustcycle/polenear.py`; Earth 0.09 to 0.135 and 0.125 to 0.272 as first read, corrected
+  to 0.17 to 0.22 and 0.14 to 0.29 on 2026-11-02);
 - the front's life on its rock (`frontstay.py`: 0.58 to 0.66 after 10 Myr today) and why it ends;
 - the crust behind the fronts (`forecrust.py`: Earth 0.165 with no 15 km crust within 200 km);
 - the young floor at the intra-oceanic fronts and their length (`islrec.py`, `oofronts.py`, `cbread.py`);
 - the census (`--measure v1census`), the guard (`--measure guard`), the shape watch (`shape_jumps.py`).
+
+## What is left: the model's longest boundaries (2026-11-02, a read)
+
+With Earth's pairs keyed whichever way Bird names them, Earth's mixed share is 0.17 to 0.22, and 0.33 with its
+small plates merged down to the model's 16 (`tools/review/crustcycle/earthmerge.py`; plates.md "Earth's mixed pairs
+corrected"). Like for like the model mixes 1.8 times as much (0.594), all of it on its pairs over 8,000 km: up to
+8,000 km its pairs mix as Earth's do. The longest pairs' younger plates are young (born a median 84 Myr before the
+run's end), a third of their boundary wraps one plate, and the pairs a subduction initiation made are mixed along all
+of it. The next read is how a young plate comes to share over 8,000 km with one neighbour: the initiation's fracture
+across its whole plate and round the parent's continents (PLT-690, PLT-503), and the rift's warped Voronoi edges.
