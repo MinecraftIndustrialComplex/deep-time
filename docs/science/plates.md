@@ -14449,7 +14449,7 @@ line, FRC-005, reads it), and the microplates' own motion (the fission gives a c
 rotation, and the force balance moves it from the next step).
 
 **Checked.** Unit tests: a strip about 100 km wide goes to the plate across its ridge, a third plate
-or the overriding plate itself, and about 950 km wide, or closing on both sides, it stays
+or the overriding plate itself, and about 950 km wide it stays, whichever side its front is on
 (`a_ridge_trench_remnant_joins_the_plate_across_the_ridge`); a quarter-sphere plate whose boundary
 turns from a trench to a ridge at its two corners keeps every sample within 660 km of them
 (`remnant_capture_leaves_a_plates_corner`). With the switch off a run equals base38's (bg-off,
