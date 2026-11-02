@@ -21,7 +21,7 @@
 //! | `version` | [`VERSION`] |
 //! | `t0_myr`, `dt_myr` | time before the first step, step length |
 //! | `samples` | L0 samples, `n`: every share below is of this unless it says "visible" |
-//! | `steps` | one [`StepRec`] per step: the plates ([`PlateStep`]), land, crust, the sea floor's age percentiles, the largest continental pieces |
+//! | `steps` | one [`StepRec`] per step: the plates ([`PlateStep`]), land, crust, the sea floor's age percentiles, the largest continental pieces, the continental crust's shape at the step's end and before its resampling ([`Shape`]) |
 //! | `plates` | one [`PlateLife`] per plate that ever lived: parent, origin, death and its cause |
 //! | `collisions` | one [`CollisionRec`] per terrane transfer, collisions included |
 //! | `partings` | one [`PartingRec`] per collision state that ended with no transfer or weld |
@@ -130,6 +130,92 @@ pub const PIECES_KEPT: usize = 16;
 /// Two continental samples joined by a lattice edge are one piece only while they are closer than
 /// this many sample spacings.
 pub const PIECE_LINK_SPACINGS: f64 = 2.0;
+/// The continental crust's shape at a moment (measurement only; the per-step watch, the arc-stock
+/// lane, 2026-11-01): the visible continental samples and of them the hyper-extended
+/// (`transition::hyper_extended`); the lattice edges between visible continental crust and visible
+/// ocean floor whose ends are still close (as the pieces' links, [`PIECE_LINK_SPACINGS`]), and the
+/// same on the label each sample's lattice ring and itself hold by a majority (raggedness at the
+/// lattice's scale falls away, the shape stays); the connected pieces of continental crust of any
+/// size; and the visible ocean floor outside its largest piece (enclosed by continental crust).
+/// A margin that walks at each resampling (PLT-664 before PLT-852) shows as edges a resampling
+/// adds and the steps between do not take back.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Shape {
+    pub continental: u32,
+    pub hyper: u32,
+    pub edges: u32,
+    pub smooth_edges: u32,
+    pub pieces: u32,
+    pub enclosed: u32,
+}
+
+/// [`Shape`] of the visible samples standing at `pos` on the lattice `geo` (spacing `spacing`, rad).
+pub fn shape(st: &PlateState, geo: &Geo, pos: &[DVec3], spacing: f64) -> Shape {
+    let samples = &st.samples;
+    let n = samples.len().min(pos.len());
+    let link = (PIECE_LINK_SPACINGS * spacing).cos();
+    let vis: Vec<bool> = (0..n).map(|i| !samples[i].is_hidden()).collect();
+    let cont: Vec<bool> = (0..n)
+        .map(|i| vis[i] && samples[i].kind == CONTINENTAL)
+        .collect();
+    let close = |i: usize, u: usize| u < n && vis[u] && pos[i].dot(pos[u]) >= link;
+    let smooth: Vec<bool> = (0..n)
+        .into_par_iter()
+        .map(|i| {
+            if !vis[i] {
+                return false;
+            }
+            let (mut c, mut all) = (u32::from(cont[i]), 1u32);
+            for (u, _) in geo.edges(i as u32) {
+                let u = u as usize;
+                if close(i, u) {
+                    all += 1;
+                    c += u32::from(cont[u]);
+                }
+            }
+            2 * c > all
+        })
+        .collect();
+    let (edges, smooth_edges) = (0..n)
+        .into_par_iter()
+        .map(|i| {
+            let (mut e, mut s) = (0u32, 0u32);
+            if vis[i] {
+                for (u, _) in geo.edges(i as u32) {
+                    let u = u as usize;
+                    if u > i && close(i, u) {
+                        e += u32::from(cont[i] != cont[u]);
+                        s += u32::from(smooth[i] != smooth[u]);
+                    }
+                }
+            }
+            (e, s)
+        })
+        .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
+    let walk = |member: &dyn Fn(usize) -> bool| {
+        piece_sizes(n, member, |i, out| {
+            out.extend(
+                geo.edges(i as u32)
+                    .map(|(u, _)| u)
+                    .filter(|&u| close(i, u as usize)),
+            );
+        })
+    };
+    let pieces = walk(&|i| cont[i]).len() as u32;
+    let ocean = walk(&|i| vis[i] && !cont[i]);
+    let enclosed = ocean.iter().sum::<u32>() - ocean.iter().copied().max().unwrap_or(0);
+    Shape {
+        continental: cont.iter().filter(|&&c| c).count() as u32,
+        hyper: (0..n)
+            .filter(|&i| cont[i] && super::transition::hyper_extended(&samples[i]))
+            .count() as u32,
+        edges,
+        smooth_edges,
+        pieces,
+        enclosed,
+    }
+}
+
 /// Bits of a [`PlateStep`]'s flags in its array form.
 const POLE_INSIDE: u8 = 1;
 const GUARD_BOUND: u8 = 2;
@@ -208,6 +294,10 @@ pub struct Dynamics {
     /// as `onset_overlap` is.
     #[serde(skip)]
     pub onset_crossed: Vec<((u32, u32), u32, f64)>,
+    /// Measurement only: the continental crust's shape just before this step's resampling
+    /// ([`Shape`], set by the plates stage), which the step's record takes as `shape_pre`.
+    #[serde(skip)]
+    pub shape_pre: Option<Shape>,
 }
 
 /// Measurement only (the resampling trace, 2026-10-31): how a resampling made each new sample
@@ -315,6 +405,13 @@ pub struct StepRec {
     /// Sizes of the largest connected pieces of continental crust, in visible samples, largest
     /// first (see the module docs).
     pub pieces: Vec<u32>,
+    /// The continental crust's shape at the step's end ([`Shape`]; measurement only) …
+    #[serde(default)]
+    pub shape: Option<Shape>,
+    /// … and just before the step's resampling, on a step that resamples: what a resampling
+    /// changes is `shape` less `shape_pre`, what the steps between change is the rest.
+    #[serde(default)]
+    pub shape_pre: Option<Shape>,
     /// Per-plate force budget, stress and balance answer (`forces.rs`; version 4), for the plates
     /// in the balance (alive, with visible samples, when the forces were summed).
     pub forces: Vec<PlateForces>,
@@ -2613,6 +2710,8 @@ pub fn record_step(
         old180: older(OLD_AGES_MYR[0]) as u32,
         old250: older(OLD_AGES_MYR[1]) as u32,
         pieces,
+        shape: Some(shape(st, geo, pos, env.norm.spacing_rad())),
+        shape_pre: d.shape_pre.take(),
         mix_km: seen.mix.km,
         front_bands,
         arc_oceanic: seen.arcs[0],
