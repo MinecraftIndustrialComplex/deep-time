@@ -106,6 +106,42 @@ same plate within 90 degrees of the edge, from the plate's own samples within tw
 the two sides of a thin strip kept apart) and captures only where the front and the ridge face more than 120 degrees
 apart (`STRIP_COS`, a game-choice with no physical constant). bg-cum2 reads it.
 
+### The second arm: on by default (bg-cum2, 2026-11-02)
+
+bg-cum2 (key 2bf028b87fb3, 8 runs, both starts x seeds 1 to 4, crust-budget maps) and its look run (argkey a81b6c6b,
+scattered_continents seed 1, 2-Myr maps in -1000 to -890 and -560 to -500 Myr) against base38-s4 and look2 (the same
+seed with the rule off):
+
+| Measure | bg-cum2 | base38-s4 | Earth |
+|---|---|---|---|
+| Samples captured a run | 8,171 to 12,161 | | |
+| Boundary on pairs that both open and close (`polenear.py`) | 0.594 | 0.630 | 0.09 to 0.135 |
+| Convergent within 1,000 km of the same pair's divergent | 0.446 | 0.456 | 0.125 to 0.272 |
+| Fronts with no 15 km crust within 200 km (`forecrust.py`) | 0.395 | 0.401 | 0.165 |
+| Intra-oceanic front, km (`islrec.py`) | 26,244 | 26,240 | 14,500 |
+| Continental front, km | 27,874 | 26,864 | |
+| Island arcs' rate per km of front, km³/km/Myr (`cbread.py`) | 71.5 | 70.7 | |
+| Sediment subducted, km³/yr of rock | 3.14 | 3.09 | about 1.0 |
+| Continental crust under the sea (census) | 0.585 (p 0.23) | 0.630 | at most 0.56 |
+| Land, largest landmass | 0.207, 0.080 | 0.178, 0.061 | |
+| Criteria met, mean of runs | 5.25 | 4.88 | of 7 |
+| Guard, m | 10,650 (p 0.80) | 10,438 | |
+| Continental samples added per resampling (`shape_jumps.py`) | +25.5 | +25.6 | |
+
+The front's life on its rock (`frontstay.py`, the look runs), the share of the front still a front on the same rock:
+
+| | look2, off | bg-look2, on |
+|---|---|---|
+| intra-oceanic after 10 Myr, early / mid window | 0.579 / 0.661 | 0.625 / 0.654 |
+| intra-oceanic after 16 Myr | 0.384 / 0.458 | 0.480 / 0.585 |
+| continental after 16 Myr | 0.361 / 0.516 | 0.469 / 0.497 |
+
+About 200 samples a resampling, about 1.0 million km² (this page's arithmetic at 5,100 km² a sample): a 220 km strip
+along about 4,600 km of the 54,000 km of front every 20 Myr. Fronts stay longer on their rock and the mixed pairs' share
+falls a little; the intra-oceanic front's length and the crust behind the fronts do not move, so they are not this
+mechanism's: the strips the rule hands across are a small part of where fronts end. The rule went on by default (the
+coordinator's call, decisions log 2026-11-02): sourced, tested, no divergence or guard failure.
+
 ## How the arm will be read
 
 One cumulative arm of 8 runs against base38-s4 (`pool.sh run bg-cum2 --seeds 1,2,3,4 +DEEPTIME_CRUST_BUDGET=1
