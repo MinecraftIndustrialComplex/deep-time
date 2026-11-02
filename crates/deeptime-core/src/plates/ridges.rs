@@ -59,13 +59,14 @@ use super::events::{self, PLATE_BIRTH, PLATE_DEATH, RIDGE_BIRTH};
 use super::gap_budget;
 use super::geometry::{Cover, Geo, Tree, connect_plates, dijkstra_two, pieces};
 use super::init::random_rotation;
-use super::kinematics::{arr, quat, to_world};
+use super::kinematics::{arr, quat, tangent, to_world};
 use super::level_set;
 use super::normalise::Norm;
 use super::pools::{
     accrete, floor_at, isostatic_change_m, ocean_heat_flow, oceanic_column, thickness,
 };
 use super::settle::{WATER_LOADED, equilibrium_m};
+use super::shortening;
 use super::state::{
     CONTINENTAL, FORELAND, Group, OCEANIC, Plate, PlateState, Ridge, Sample, pool, regime,
 };
@@ -1975,6 +1976,199 @@ fn split_cut_plates(
     Ok((big.len() as u32, moved, captured))
 }
 
+/// The widest remnant of a subducting plate that a ridge-trench encounter hands to the plate
+/// across the ridge (PLT-860), km: the fragment Stock & Lee (1994, p. 1482) measured sutured to the
+/// Pacific plate when its ridge died ("This ridge death caused a 220- x 220-km fragment to become
+/// sutured to the Pacific plate"); the plate between a ridge and a trench breaks "down to linear
+/// dimensions of ~100 km" (p. 1472), under two of the 16k lattice's spacings. ledger: PLT-860
+pub const REMNANT_KM: f64 = 220.0;
+/// A remnant is a strip: its front and its ridge face more than 120 degrees apart (opposite, as
+/// across a strip between a ridge and the trench it has come up to), each row facing its side's
+/// boundary normal. At a plate's corner, where its boundary turns from a trench to a ridge, they
+/// face apart by the turn, 90 degrees at a right-angled corner. The first arm, with each edge's
+/// class read on its own way and no such test (bg-cum, 2026-11-01), moved 68,000 to 80,000
+/// samples a run, about 1,500 at every resampling: plate corners at ridge-trench junctions.
+/// ledger: PLT-860 (game-choice: a geometric test of the strip, no physical constant)
+const STRIP_COS: f64 = -0.5;
+/// World global (measurement; PLT-860, only while `remnant_capture` is on): the samples remnant
+/// capture moved to the plate across their ridge over the run.
+pub const REMNANT_CAPTURED_GLOBAL: &str = "plates/remnant_captured_samples";
+
+/// A ridge-trench encounter's remnant joins the plate across the ridge
+/// (`tectonics.remnant_capture`, the boundary-geometry lane, 2026-11-01; ledger PLT-860). Right
+/// after a resampling (`geo` the lattice every group shares, each group unrotated, `pos` its
+/// points), a subducting plate's ocean floor that lies between a front where it goes down (a
+/// lattice edge to a plate it subducts under, an active contact, the two closing across it) and a
+/// ridge of its own (a lattice edge to another plate's ocean floor moving away from it; neither
+/// within 20 degrees of the boundary, PLT-311's transform line, so that a remnant between two
+/// boundaries of one pair keeps them apart), where front and ridge are at most [`REMNANT_KM`] apart
+/// through it and on opposite sides of it ([`STRIP_COS`]), goes to the plate across that ridge.
+/// Stock & Lee 1994 (Tectonics 13:1472-1487, read in full): "As a spreading center approaches a
+/// trench in a subduction setting, the intervening subducted plate may fragment into smaller pieces
+/// down to linear dimensions of ~100 km (microplates)" (p. 1472); they "became attached to the
+/// Pacific plate when their ridge boundaries with the Pacific plate stopped spreading" (p. 1484),
+/// and "None of these microplates became attached to the North America plate" (p. 1485), the
+/// overriding one; Shuck et al. 2025: microplates "captured by the PAC plate as subduction
+/// terminated". Where the plate across the ridge is the overriding plate itself (the remnant a
+/// strip between two boundaries of one pair), the boundary there closes. The ridge's spreading ends
+/// with it, so the next resampling fills no ridge there and no contact starts on its young floor.
+/// Returns the samples moved.
+pub fn capture_remnants(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> u32 {
+    use std::cmp::Reverse;
+    use std::collections::{BTreeSet, BinaryHeap};
+    let n = state.samples.len().min(pos.len());
+    let plate_of: Vec<u32> = (0..n).map(|i| state.plate_of(i)).collect();
+    let samples = &state.samples;
+    let ocean = |i: usize| !samples[i].is_hidden() && samples[i].kind != CONTINENTAL;
+    let under_over: BTreeSet<(u32, u32)> = state
+        .contacts
+        .iter()
+        .filter(|c| c.active(env.step))
+        .map(|c| (c.under, c.over))
+        .collect();
+    let subducting: BTreeSet<u32> = under_over.iter().map(|&(u, _)| u).collect();
+    let omega: Vec<DVec3> = state
+        .plates
+        .iter()
+        .map(|p| DVec3::from_array(p.omega))
+        .collect();
+    // Each subducting plate's boundary rows: closing on a plate it subducts under (the front) and
+    // opening from another plate's ocean floor (a ridge), each crossing edge's class read on the
+    // boundary's normal there and that normal summed per class; a ridge row keeps the group of the
+    // plate across it. The normal is the chord of the crossings to the same plate on the same side
+    // (within 90 degrees of the edge) from the plate's own samples within two lattice steps, as
+    // `shortening::boundary_normal` takes it (one edge lies about 30 degrees off a straight
+    // boundary's normal, PLT-310), the side kept apart so that a thin strip with the same plate on
+    // both sides has two normals. Classing each edge by its own way's sign would pick the edges
+    // that lean with the motion, the front's one way and the ridge's the other.
+    let mut front_way = vec![DVec3::ZERO; n];
+    let mut ridge_way = vec![DVec3::ZERO; n];
+    let mut across_group = vec![u32::MAX; n];
+    let away = |i: usize, u: usize| tangent(pos[i], pos[u] - pos[i]).normalize_or_zero();
+    let mut near: Vec<u32> = Vec::with_capacity(24);
+    let mut far: Vec<(u32, DVec3)> = Vec::with_capacity(48);
+    for i in 0..n {
+        let p = plate_of[i];
+        if !ocean(i) || !subducting.contains(&p) {
+            continue;
+        }
+        let plate_of = &plate_of;
+        let crosses = |v: u32| {
+            geo.edges(v).filter_map(move |(u, _)| {
+                let u = u as usize;
+                (u < n && plate_of[u] != p && !samples[u].is_hidden()).then_some(u)
+            })
+        };
+        if crosses(i as u32).next().is_none() {
+            continue;
+        }
+        near.clear();
+        near.push(i as u32);
+        let mut ring = 0..1;
+        for _ in 0..2 {
+            for k in ring.clone() {
+                for (w, _) in geo.edges(near[k]) {
+                    let wi = w as usize;
+                    if wi < n && plate_of[wi] == p && !samples[wi].is_hidden() && !near.contains(&w)
+                    {
+                        near.push(w);
+                    }
+                }
+            }
+            ring = ring.end..near.len();
+        }
+        far.clear();
+        for &w in &near {
+            for u in crosses(w) {
+                let len = shortening::voronoi_edge_rad(geo, w, u as u32);
+                far.push((plate_of[u], len * away(w as usize, u)));
+            }
+        }
+        for u in crosses(i as u32) {
+            let (q, way) = (plate_of[u], away(i, u));
+            let side: DVec3 = far
+                .iter()
+                .filter(|(r, f)| *r == q && f.dot(way) > 0.0)
+                .map(|(_, f)| *f)
+                .sum();
+            let normal = tangent(pos[i], side).normalize_or_zero();
+            let rel = env
+                .norm
+                .velocity_mm_yr(omega[q as usize] - omega[p as usize], pos[i]);
+            if shortening::is_transform(rel, normal) {
+                continue;
+            }
+            let across_mm_yr = rel.dot(normal);
+            if across_mm_yr < 0.0 && under_over.contains(&(p, q)) {
+                front_way[i] += normal;
+            } else if across_mm_yr > 0.0 && ocean(u) {
+                ridge_way[i] += normal;
+                if across_group[i] == u32::MAX {
+                    across_group[i] = samples[u].group;
+                }
+            }
+        }
+    }
+    let front: Vec<usize> = (0..n).filter(|&i| front_way[i] != DVec3::ZERO).collect();
+    let ridge: Vec<usize> = (0..n).filter(|&i| ridge_way[i] != DVec3::ZERO).collect();
+    if front.is_empty() || ridge.is_empty() {
+        return 0;
+    }
+    // Distances from each row through the plate's own ocean floor, km, up to the remnant's width,
+    // with the row sample each comes from.
+    let reach = |seeds: &[usize]| -> Vec<(f64, u32)> {
+        let mut d = vec![(f64::INFINITY, u32::MAX); n];
+        let mut heap = BinaryHeap::new();
+        for &i in seeds {
+            d[i] = (0.0, i as u32);
+            heap.push(Reverse((0.0f64.to_bits(), i)));
+        }
+        while let Some(Reverse((bits, v))) = heap.pop() {
+            let dv = f64::from_bits(bits);
+            if dv > d[v].0 {
+                continue;
+            }
+            for (u, rad) in geo.edges(v as u32) {
+                let u = u as usize;
+                if u >= n || plate_of[u] != plate_of[v] || !ocean(u) {
+                    continue;
+                }
+                let du = dv + env.norm.km(f64::from(rad));
+                if du < d[u].0 && du <= REMNANT_KM {
+                    d[u] = (du, d[v].1);
+                    heap.push(Reverse((du.to_bits(), u)));
+                }
+            }
+        }
+        d
+    };
+    let (to_front, to_ridge) = (reach(&front), reach(&ridge));
+    // A row stands for half a spacing beyond its sample on either side.
+    let row_km = env.norm.km(env.norm.spacing_rad());
+    let mut moved = Vec::new();
+    for i in 0..n {
+        let ((df, fs), (dr, rs)) = (to_front[i], to_ridge[i]);
+        if fs == u32::MAX || rs == u32::MAX || df + dr + row_km > REMNANT_KM {
+            continue;
+        }
+        let (fs, rs) = (fs as usize, rs as usize);
+        // A strip: its front and its ridge face opposite ways, as across a ridge that has come up
+        // to a trench; at a corner where a boundary turns from a trench to a ridge they face
+        // apart by the turn.
+        let (a, b) = (
+            front_way[fs].normalize_or_zero(),
+            ridge_way[rs].normalize_or_zero(),
+        );
+        if a.dot(b) < STRIP_COS {
+            moved.push((i, across_group[rs]));
+        }
+    }
+    for &(i, g) in &moved {
+        state.samples[i].group = g;
+    }
+    moved.len() as u32
+}
+
 /// Marks plates without samples dead and, when `geo` is the lattice every group shares (right
 /// after a resampling), absorbs plates below `min_plate_area_frac` into the neighbour they share
 /// most lattice edges with. `pos` are current positions (for centroids). `causes` maps a plate to
@@ -1990,6 +2184,17 @@ pub fn bury(
     let t = env.t_myr;
     state.recount(pos);
     if let Some(geo) = geo {
+        // Before the fission, which splits off what the capture leaves cut (ledger: PLT-860).
+        if env.k.remnant_capture {
+            let moved = capture_remnants(state, geo, pos, env);
+            *world
+                .globals
+                .entry(REMNANT_CAPTURED_GLOBAL.to_owned())
+                .or_insert(0.0) += f64::from(moved);
+            if moved > 0 {
+                state.recount(pos);
+            }
+        }
         if env.k.plate_fission {
             let (born, moved, captured) = split_cut_plates(state, world, geo, pos, env)?;
             for (key, x) in [
