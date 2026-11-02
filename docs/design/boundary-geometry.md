@@ -77,9 +77,38 @@ subduction stopping on buoyant young floor before the ridge arrives (Thorkelson'
 buoyancy line, FRC-005, already reads it), and the microplates' own independent motion (the fission, PLT-532, gives a
 cut piece its parent's rotation and the force balance moves it from the next step).
 
+### The first arm moved plate corners (bg-cum, 2026-11-01)
+
+The first form read each lattice edge's class on that edge's own way and had no test of the strip's shape. bg-cum
+(8 runs) moved 68,000 to 80,000 samples a run, about 1,500 at every resampling (`plates/remnant_captured_samples` in
+each run's `fields/globals.json`), where a 220 km remnant between two 71 km rows is a few dozen samples. Most were
+plate corners: where a subducting plate's boundary turns from a trench to a ridge, every sample within 220 km of the
+corner is within reach of both rows. An edge's own sign also picks the edges that lean with the motion: under a
+motion 45 degrees oblique to a right-angled corner, the front's edges and the ridge's face 132 degrees apart (cosine
+-0.67) where the boundaries do 90 (unit test `remnant_capture_leaves_a_plates_corner`). Its numbers against
+base38-s4 (no census change significant):
+
+| Measure | bg-cum | base38-s4 |
+|---|---|---|
+| Under the sea | 0.593 | 0.630 |
+| Land | 0.193 | 0.178 |
+| Largest landmass | 0.072 | 0.061 |
+| Criteria met (mean of runs) | 5.38 | 4.88 |
+| Guard, m | 10,374 | 10,438 |
+| Boundary on pairs that both open and close | 0.615 | 0.630 |
+| Convergent within 1,000 km of the same pair's divergent | 0.389 | 0.456 |
+| Fronts with no 15 km crust within 200 km | 0.430 | 0.399 |
+| Intra-oceanic front, km | 27,159 | 26,240 |
+| Continental front, km | 23,952 | 26,864 |
+
+The rule now reads each crossing edge's class on the boundary's normal on its side (the chord of the crossings to the
+same plate within 90 degrees of the edge, from the plate's own samples within two lattice steps: PLT-310's normal with
+the two sides of a thin strip kept apart) and captures only where the front and the ridge face more than 120 degrees
+apart (`STRIP_COS`, a game-choice with no physical constant). bg-cum2 reads it.
+
 ## How the arm will be read
 
-One cumulative arm of 8 runs against base38-s4 (`pool.sh run bg-cum --seeds 1,2,3,4 +DEEPTIME_CRUST_BUDGET=1
+One cumulative arm of 8 runs against base38-s4 (`pool.sh run bg-cum2 --seeds 1,2,3,4 +DEEPTIME_CRUST_BUDGET=1
 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps` with the switch), and one 2-Myr look run for `frontstay.py`
 (`+DEEPTIME_SNAPSHOT_MYR=2:-560:-500`). Read, against base38-s4 and against Earth where Earth has a number:
 
