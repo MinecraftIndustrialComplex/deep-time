@@ -14354,8 +14354,9 @@ The intra-oceanic fronts stand on bare ocean floor (the thickest crust within 20
 median, p90 13.1), though 0.67 of their length belongs to contacts older than 50 Myr (`islrec.py`).
 Their arcs are not there: the most arc magma on a sample of the arc's band (140 to 260 km behind
 the front, PLT-042 and PLT-043) is 2.0 km at the median (p90 9.3; the continental fronts' 19.1). At
-base38's island-arc rate per km of front (61 km³/km/Myr) over the band's Gaussian (about 106 km
-wide), that is about 3.5 Myr of standing (our arithmetic). An island arc turns its column
+base38-s4's island-arc rate per km of front (70.7 km³/km/Myr, `cbread.py`'s median; first written
+as 61, corrected 2026-11-01) over the band's Gaussian (about 106 km wide), that is about 3 Myr of
+standing (our arithmetic). An island arc turns its column
 continental at 15 km (PLT-047) and its front continental with it (PLT-370), so the intra-oceanic
 front is the front whose arc has not grown. Subduction erosion finds no forearc crust there
 (arc-stock.md: 0.55 of the 0.82 km³ a year its erosive length asks).

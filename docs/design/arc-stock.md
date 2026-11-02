@@ -280,9 +280,10 @@ quotes it: about 3.37 x 10⁸ km³ over about 3.63 x 10⁸ km², on the margins 
    to contacts older than 50 Myr, 0.36 to contacts older than 100 Myr (`islrec.py`'s contact-age split, base38-s4's
    record). Their arcs are not there. The arc's band is 140 to 260 km behind the front (PLT-042's 200 km, PLT-043's
    60 km); the most arc magma on any sample in it is 2.0 km at the median (p25 0.7, p90 9.3; 8 runs), where the
-   continental fronts carry 19.1. At base38's island-arc rate per km of front (61 km³/km/Myr, `cbread.py`) over the
-   band's Gaussian (about 106 km wide), a front that stood T Myr carries about 0.58 T km at the axis (our arithmetic):
-   2.0 km is about 3.5 Myr of standing, 9.3 km about 16 Myr. An island arc turns its ocean column continental at 15 km
+   continental fronts carry 19.1. At base38-s4's island-arc rate per km of front (70.7 km³/km/Myr, the median of
+   `cbread.py`'s arc_rate_o; first written as 61 from a rough reading, corrected 2026-11-01) over the band's Gaussian
+   (about 106 km wide), a front that stood T Myr carries about 0.66 T km at the axis (our arithmetic): 2.0 km is about
+   3 Myr of standing, 9.3 km about 14 Myr. An island arc turns its ocean column continental at 15 km
    (PLT-047), and the front with it reads continental (PLT-370), so the intra-oceanic front is, by its class, the front
    whose arc has not grown; what is wrong is that it does not grow at fronts that have lasted 50 Myr. The forearc floor
    is younger than those contacts too (median 36 Myr, p10 13). Either the front moves across its overriding plate's rock
