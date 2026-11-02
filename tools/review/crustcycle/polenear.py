@@ -181,6 +181,7 @@ def model_run(run, chord):
         young = max((a, b), key=lambda q: q.get("born_myr", -1e9))
         r["kin"] = kin
         r["origin"] = young.get("origin", "?")
+        r["young_born"] = young.get("born_myr", math.nan)
     return rows, missing, check
 
 
@@ -222,10 +223,11 @@ def along(pts, cum, x):
     return q / np.linalg.norm(q)
 
 
-def earth(path, half_km):
-    """Each pair's steps: half_km 0 classes each step by its own azimuth (Bird's classes); otherwise by the chord of
-    its run from half_km before the step's midpoint to half_km after (clamped to the run's ends), as the model's
-    normal is a chord of about five spacings."""
+def earth_steps(path, half_km):
+    """Bird's steps by pair, each (midpoint, length km, speed mm/yr, across component mm/yr, velocity vector, Bird's
+    class): half_km 0 takes the step's own azimuth for its normal (Bird's classes); otherwise the chord of its run from
+    half_km before the step's midpoint to half_km after (clamped to the run's ends), as the model's normal is a chord
+    of about five spacings. Also the sign check: (steps whose own across component agrees with Bird's, steps read)."""
     steps = {}
     sign_ok, sign_n = 0, 0
     for run in read_runs(path):
@@ -254,7 +256,17 @@ def earth(path, half_km):
                 sign_n += 1
                 sign_ok += int((own > 0) == (s["div"] > 0))
             vn = float(v.dot(np.cross(m, t / nt))) if nt > 0.0 else 0.0
-            steps.setdefault(s["pair"], []).append((m, s["len"], s["vel"], vn, v, s["cls"]))
+            # One pair whichever order Bird names it in (20 pairs appear both ways, EU-NA and NA-EU among them): the
+            # velocity is the second plate's relative to the first, so a step named the other way turns it round to
+            # fit one rotation a pair. Its class does not change: its step runs the other way too.
+            pair = tuple(sorted(s["pair"]))
+            steps.setdefault(pair, []).append((m, s["len"], s["vel"], vn, v if pair == s["pair"] else -v, s["cls"]))
+    return steps, (sign_ok, sign_n)
+
+
+def earth(path, half_km):
+    """Each pair's steps classed as earth_steps reads them, its relative rotation fitted, and its rows."""
+    steps, (sign_ok, sign_n) = earth_steps(path, half_km)
     points_of = {}
     worst = 0.0
     for pair, ss in steps.items():
@@ -373,6 +385,35 @@ def report(name, rows, nruns):
               "of it mixed; of its convergent near its divergent): " + "  ".join(
                   f"{k} {g[0] / max(tot, 1e-9):.3f} ({g[1] / max(g[0], 1e-9):.2f}, {g[3] / max(g[2], 1e-9):.2f})"
                   for k, g in sorted(groups.items(), key=lambda kv: -kv[1][0])))
+    # The longest pairs (the last length band): wrapped (one of the two has half its outline or more on the other) or
+    # not, each with its mixed share; and for the model their relation, the younger plate's origin and birth.
+    whole = {k: sum(x for x, _ in ls) for k, ls in outline.items()}
+    longest = [r for r in rows if r["len"] >= LEN_BANDS[-1]]
+    if longest:
+        lt = sum(r["len"] for r in longest)
+
+        def mixed_share(rs):
+            ln = sum(r["len"] for r in rs)
+            return ln / max(lt, 1e-9), sum(r["len"] for r in rs if r["div"] >= MIXED_KM and r["conv"] >= MIXED_KM) / max(
+                ln, 1e-9)
+
+        wr = [r for r in longest if max(r["len"] / max(whole[(r["snap"], q)], 1e-9) for q in r["pair"]) >= 0.5]
+        nw = [r for r in longest if r not in wr]
+        (sw, mw), (sn, mn) = mixed_share(wr), mixed_share(nw)
+        line = (f"  pairs over {LEN_BANDS[-1]:g} km ({len(longest)}, {lt / nruns:,.0f} km a snapshot): wrapped {sw:.3f} of "
+                f"them (mixed {mw:.2f}), not wrapped {sn:.3f} (mixed {mn:.2f})")
+        if any("kin" in r for r in longest):
+            for field in ("kin", "origin"):
+                groups = {}
+                for r in longest:
+                    groups.setdefault(r.get(field, "?"), []).append(r)
+                line += f"; by {field}: " + ", ".join(
+                    f"{k} {mixed_share(g)[0]:.2f} ({mixed_share(g)[1]:.2f})"
+                    for k, g in sorted(groups.items(), key=lambda kv: -mixed_share(kv[1])[0]))
+            born = [r["young_born"] for r in longest if math.isfinite(r.get("young_born", math.nan))]
+            if born:
+                line += f"; the younger plate born at a median {np.median(born):,.0f} Myr"
+        print(line)
     cells = []
     for lo, hi in zip(LEN_BANDS, LEN_BANDS[1:] + [math.inf]):
         rs = [r for r in rows if lo <= r["len"] < hi]
