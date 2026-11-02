@@ -21,7 +21,7 @@
 //! surfacing; dry continental crust drowned, wet continental crust emerging). The surface stage's
 //! feedback goes to the `erosion` part (all of its change: erosion, deposition, isostasy,
 //! flexure, the sea), a resampling to `resample_blend`. A snapshot every
-//! [`super::GAP_SNAPSHOT_MYR`] and at the end. With [`MAPS_ENV`] set to a folder, every snapshot
+//! [`super::GAP_SNAPSHOT_MYR`] (and in [`super::SNAPSHOT_ENV`]'s window) and at the end. With [`MAPS_ENV`] set to a folder, every snapshot
 //! also writes the visible samples there (`t<Myr>.bin`, little-endian f32 records of
 //! [`MAP_FIELDS`]: latitude and longitude in degrees, elevation (m), thickness (m), kind (0
 //! oceanic, 1 continental), orogeny (0 none, 1 Andean, 2 Himalayan), the orogeny's age (Myr), the

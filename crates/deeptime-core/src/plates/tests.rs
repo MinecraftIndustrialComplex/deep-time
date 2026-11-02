@@ -2708,7 +2708,7 @@ fn how_resamplings_roughen_a_margin() {
 /// the ocean. Its edges are the margin's lattice edges plus the hole's and the fleck's, the
 /// smoothed edges drop the fleck and the hole (each has fewer than half its ring), the pieces are
 /// two and the enclosed ocean floor is the hole; the smoothed edges stay within a quarter of the
-/// margin's.
+/// margin's. With the samples on the lattice, reading them through a tree gives the same shape.
 #[test]
 fn the_shape_counts_edges_pieces_and_holes() {
     let p = preset(20_000, 20.0, "supercontinent", 5);
@@ -2734,7 +2734,9 @@ fn the_shape_counts_edges_pieces_and_holes() {
     st.samples[hole].kind = state::OCEANIC;
     st.samples[fleck].kind = CONTINENTAL;
     let pos = geometry::positions(&st, &geo);
-    let sh = dynamics::shape(&st, &geo, &pos, spacing);
+    let sh = dynamics::shape(&st, &geo, None, spacing);
+    let tree = Tree::over(&pos, |_| true);
+    assert_eq!(dynamics::shape(&st, &geo, Some(&tree), spacing), sh);
     let margin = (0..pts.len())
         .filter(|&i| st.samples[i].kind == CONTINENTAL && i != fleck)
         .map(|i| {
@@ -2752,6 +2754,45 @@ fn the_shape_counts_edges_pieces_and_holes() {
     assert_eq!(sh.enclosed, 1, "{sh:?}");
     let off = (f64::from(sh.smooth_edges) / f64::from(margin) - 1.0).abs();
     assert!(off < 0.25, "{sh:?} against the margin's {margin}");
+}
+
+/// The per-step watch counts on the lattice, not on the samples' own links: two plates split at
+/// x = 0, a continent north of the equator on both, the plate at x > 0 turned 5.3 spacings about
+/// the x axis (it slides along their boundary, a transform; no gap, no overlap). Every link across
+/// the boundary is longer than two spacings now, and a shape joined by the samples' close links
+/// split the southern ocean in two (the enclosed floor was half of it). On the lattice the ocean
+/// floor and the continent stay one piece each, and the continental crust and the margin's edges
+/// stay within the margin's new length (the boundary's two offsets of 5.3 spacings) of the
+/// unturned planet's.
+#[test]
+fn the_shape_holds_through_a_transform() {
+    let p = preset(20_000, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let spacing = env.norm.spacing_rad();
+    let read = |turn: f64| {
+        let q = glam::DQuat::from_rotation_x(turn);
+        let (mut st, geo) = plates_unresolved(&p, &env, q, |q| q.x <= 0.0);
+        let pts = geo.points().to_vec();
+        for (s, q) in st.samples.iter_mut().zip(&pts) {
+            s.kind = if q.z > 0.0 {
+                CONTINENTAL
+            } else {
+                state::OCEANIC
+            };
+        }
+        let pos = geometry::positions(&st, &geo);
+        let tree = Tree::over(&pos, |_| true);
+        dynamics::shape(&st, &geo, Some(&tree), spacing)
+    };
+    let (a, b) = (read(0.0), read(5.3 * spacing));
+    assert_eq!((a.pieces, a.enclosed), (1, 0), "{a:?}");
+    assert_eq!((b.pieces, b.enclosed), (1, 0), "{b:?}");
+    let off = |x: u32, y: u32| (f64::from(x) / f64::from(y) - 1.0).abs();
+    assert!(off(b.continental, a.continental) < 0.01, "{a:?} → {b:?}");
+    for (x, y) in [(b.edges, a.edges), (b.smooth_edges, a.smooth_edges)] {
+        assert!(off(x, y) < 0.15, "{a:?} → {b:?}");
+    }
 }
 
 /// The level set's cost (PLT-536; the front lane, 2026-10-24): the interpolated distance is exact
