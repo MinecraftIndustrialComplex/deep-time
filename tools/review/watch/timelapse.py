@@ -8,7 +8,7 @@ runs while they are going to see if there is anything that looks off?"). Each sn
 depth; continental crust by arcstock.py's classes: the start's crust, island-arc crust, collision belts, the other
 converted crust, hyper-extended crust drawn over them), the height against that step's sea (blue under, green to brown
 to white over), and the plates (one colour each, continental crust brighter). Each pixel shows the visible sample
-nearest it. Needs numpy and scipy; writes PNG with zlib (no imaging library)."""
+nearest it. Prints each snapshot's continental and hyper-extended crust as shares of the planet's samples. Needs numpy and scipy; writes PNG with zlib (no imaging library)."""
 import struct
 import sys
 import zlib
@@ -52,6 +52,9 @@ def main(run, out, w=720):
     px = th.xyz(LAT.ravel(), LON.ravel())
     ser = th.sea_series(run)
     names = sorted((run / "maps").glob("t*.bin"), key=lambda p: int(p.stem[1:]))
+    # The planet's samples: every one is visible at a resampling's snapshot (the run's last); a
+    # share of the visible samples between resamplings rises as floor goes down and gaps open.
+    planet = max(f.stat().st_size for f in names) // (4 * 11)
     for f in names:
         t = int(f.stem[1:])
         a, pp = th.read(run, t)
@@ -87,7 +90,8 @@ def main(run, out, w=720):
             c3 = np.full((len(a), 3), 128.0)
         img = np.concatenate([c[idx].reshape(h, w, 3) for c in (c1, c2, c3)], axis=0)
         png(out / f"t{t:05d}.png" if t >= 0 else out / f"t-{-t:04d}.png", np.clip(img, 0, 255))
-        print(f"{f.name}: cont {cont.mean():.3f} hyper {hyper.mean():.3f} sea {sea:.0f} m")
+        print(f"{f.name}: cont {cont.sum() / planet:.3f} hyper {hyper.sum() / planet:.3f} of the planet, "
+              f"sea {sea:.0f} m")
 
 
 if __name__ == "__main__":

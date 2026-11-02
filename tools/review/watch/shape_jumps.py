@@ -4,10 +4,9 @@
 shape_jumps.py <arm folder>[@N] ...
 
 The per-step watch (dynamics::Shape, 2026-11-01): each step of the record carries the continental crust's shape at the
-step's end (`shape`) and, on a step that resamples, just before the resampling (`shape_pre`), counted on the lattice
-(each point shows its nearest visible sample, a gap shows ocean floor): the points showing continental crust, the
-hyper-extended among them, the margin's lattice edges raw and smoothed, the continental pieces and the enclosed ocean
-floor. A resampling should move none of them on average: it remaps the crust, it is no process. Per
+step's end (`shape`) and, on a step that resamples, just before the resampling (`shape_pre`): the visible continental
+samples and the hyper-extended among them (area), and on the lattice (each point shows its nearest visible sample, a
+gap shows ocean floor) the margin's edges raw and smoothed, the continental pieces and the enclosed ocean floor. A resampling should move none of them on average: it remaps the crust, it is no process. Per
 quantity and run this splits the run's change into the resamplings' part (shape less shape_pre, summed) and the steps'
 part (the rest), and gives the mean change per resampling with its t (mean over its standard error across the run's
 resamplings): a |t| of 3 or more, or a resamplings' part of the same size as the whole change, is a numerical effect

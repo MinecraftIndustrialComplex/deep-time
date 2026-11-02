@@ -263,3 +263,38 @@ quotes it: about 3.37 x 10⁸ km³ over about 3.63 x 10⁸ km², on the margins 
    against Earth's (the forearc and arc crust of Izu-Bonin-Mariana and Tonga in the sources read: Stern & Scholl
    2010's juvenile arcs up to 30 km thick; Bai et al. 2023's Kyushu-Palau remnant arc 8 to 23 km), and the young-floor
    excess the oceanic-fronts lane left (plates.md, "The intra-oceanic fronts' length").
+   The crust behind the fronts (2026-11-01; `tools/review/islfront/forecrust.py` on base38's 24 runs, the maps at -950
+   to -50 Myr, against `earthisl.py` on Bird's SUB steps and CRUST1.0, whole crust on the overriding plate). The share
+   of the subduction front with no crust of T km within 200 km of the trench on its own plate:
+
+   | T | Earth (51,309 km) | base38, all fronts | intra-oceanic (0.39) | continental (0.61) |
+   |---|---|---|---|---|
+   | 10 km | 0.079 | 0.294 | 0.731 | 0.014 |
+   | 15 km | 0.165 | 0.399 | 0.952 | 0.047 |
+   | 20 km | 0.195 | 0.476 | 0.986 | 0.150 |
+   | 25 km | 0.308 | 0.575 | 0.994 | 0.307 |
+
+   (At 77 km, a model spacing: Earth 0.158 at 10 km, the model 0.617.) The intra-oceanic fronts stand on bare ocean
+   floor: the thickest crust within 200 km is 8.2 km at the median (p90 13.1), and within 400 km 0.62 of them have none
+   of 15 km, so the arc is not left behind beyond the reach. They are not young: 0.67 of the intra-oceanic front belongs
+   to contacts older than 50 Myr, 0.36 to contacts older than 100 Myr (`islrec.py`'s contact-age split, base38-s4's
+   record). Their arcs are not there. The arc's band is 140 to 260 km behind the front (PLT-042's 200 km, PLT-043's
+   60 km); the most arc magma on any sample in it is 2.0 km at the median (p25 0.7, p90 9.3; 8 runs), where the
+   continental fronts carry 19.1. At base38's island-arc rate per km of front (61 km³/km/Myr, `cbread.py`) over the
+   band's Gaussian (about 106 km wide), a front that stood T Myr carries about 0.58 T km at the axis (our arithmetic):
+   2.0 km is about 3.5 Myr of standing, 9.3 km about 16 Myr. An island arc turns its ocean column continental at 15 km
+   (PLT-047), and the front with it reads continental (PLT-370), so the intra-oceanic front is, by its class, the front
+   whose arc has not grown; what is wrong is that it does not grow at fronts that have lasted 50 Myr. The forearc floor
+   is younger than those contacts too (median 36 Myr, p10 13). Either the front moves across its overriding plate's rock
+   (the design says it does not: PLT-710, "Fronts are fixed in the plate that holds them"), or the magma reaches those
+   fronts seldom (the map's front flag drops where a sample's convergence falls under the slab's floor, PLT-681). The
+   record's turnover says the front changes fast: of the island subducting front (about 22,300 km) 3,246 km is new each
+   2-Myr step and 3,201 km gone, the continental front alike. `frontstay.py` counts it on the same rock
+   (look2, plates.md "Why the island arcs do not grow: a front's life on its rock"): a front lasts about 20 Myr where
+   it stands (0.58 to 0.66 still a front on its rock after 10 Myr, 0.38 to 0.52 after 16), and it ends, it does not
+   wander. A third or less of the ending is the plates' motion turning; most of it is the subducting plate's crust
+   running out while the plates still converge: its own ridge 200 to 300 km in front of the trench, young floor (18 to
+   23 Myr) between, an open gap behind (no floor until the next resampling). The arcs and the young-floor excess are
+   the boundaries' shape (the same pair spreading and converging a few hundred km apart, plates.md "Where the pairs'
+   relative poles lie"), not the arc law or the front's. Ben's choice of 2026-11-01 left plate-motion design out; the
+   next step is his (STATUS, pending questions).
