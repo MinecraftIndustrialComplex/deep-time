@@ -739,8 +739,7 @@ impl PlatesStage {
         // The boundary mix (measurement only) on the same samples as the fronts, before the
         // collapse below turns any crust over.
         // At a step the crust budget maps, each sample's class too (the maps' front flags).
-        let snapshot_due = step >= self.total
-            || step.is_multiple_of((GAP_SNAPSHOT_MYR / env.dt_myr).round().max(1.0) as u64);
+        let snapshot_due = step >= self.total || snapshot_at(step, env.t_myr, env.dt_myr);
         let classes: Option<Vec<std::sync::atomic::AtomicU8>> =
             (snapshot_due && cb.borrow().as_ref().is_some_and(|b| b.maps_on())).then(|| {
                 (0..st.samples.len())
@@ -1053,6 +1052,14 @@ impl PlatesStage {
             // The subduction zones go on through the new lattice (ledger: PLT-550).
             subduction::carry(st, step, env.k.contact_carry);
             let cycle = step.saturating_sub(st.resample_step);
+            // The per-step watch: the continental crust's shape before the resampling, so the
+            // record shows what the resampling itself changes (measurement only).
+            if st.dynamics.is_some() {
+                let pre = dynamics::shape(st, &cache.geo, Some(&tree), env.norm.spacing_rad());
+                if let Some(d) = st.dynamics.as_mut() {
+                    d.shape_pre = Some(pre);
+                }
+            }
             front_trace::want_resample(ft.borrow().is_some());
             let geo = ridges::resample(st, world, &pos, &tree, &cache.geo, &env)?;
             front_trace::want_resample(false);
@@ -1115,8 +1122,7 @@ impl PlatesStage {
         }
         if let Some(gb) = st.gap_budget.as_mut() {
             gb.end_step(&st.samples, env.t_myr, env.dt_myr);
-            let every = (GAP_SNAPSHOT_MYR / env.dt_myr).round().max(1.0) as u64;
-            if step >= self.total || step.is_multiple_of(every) {
+            if snapshot_due {
                 gb.snapshot(&st.samples, env.t_myr, env.dt_myr);
             }
         }
@@ -1158,6 +1164,12 @@ impl PlatesStage {
             );
         }
         self.front_trace = ft;
+        // The per-step watch at the step's end (measurement only): after a resampling the samples
+        // stand on the new lattice's points; otherwise the step's tree holds where they are.
+        let shape = st.dynamics.is_some().then(|| {
+            let tree = (!resampling).then_some(&tree);
+            dynamics::shape(st, &cache.geo, tree, env.norm.spacing_rad())
+        });
         dynamics::record_step(
             st,
             world,
@@ -1173,6 +1185,7 @@ impl PlatesStage {
                 guarded: &guarded,
                 sea_m: sea,
                 out_of_balance: &out_of_balance,
+                shape,
             },
         );
         lap(&mut clock, "record");
@@ -1640,6 +1653,39 @@ pub const MARGIN_EVERY_MYR: f64 = 10.0;
 /// only).
 // ledger: PLT-283 (game-choice: a reporting interval, read by no rule; agent, 2026-10-17).
 pub const GAP_SNAPSHOT_MYR: f64 = 50.0;
+
+/// Set this environment variable and the snapshots (the gap budget's, the crust budget's maps, the
+/// front trace's) also come every `<every>` Myr between `<from>` and `<to>` on the model's clock
+/// (negative before the present): `<every>:<from>:<to>`, several windows apart by commas, for
+/// example `2:-1000:-890,2:-560:-500` (measurement only; a closer look at a transient the 50-Myr
+/// maps cannot resolve, for `tools/review/watch/timelapse.py`).
+// ledger: PLT-283 (game-choice: a reporting interval, read by no rule; agent, 2026-11-01).
+pub const SNAPSHOT_ENV: &str = "DEEPTIME_SNAPSHOT_MYR";
+
+/// Whether step `step` (of `dt_myr`, ending at `t_myr`) takes a snapshot: every
+/// [`GAP_SNAPSHOT_MYR`], and in [`SNAPSHOT_ENV`]'s window as often as it asks.
+fn snapshot_at(step: u64, t_myr: f64, dt_myr: f64) -> bool {
+    static CLOSE: std::sync::OnceLock<Vec<(f64, f64, f64)>> = std::sync::OnceLock::new();
+    let every = |myr: f64| step.is_multiple_of((myr / dt_myr).round().max(1.0) as u64);
+    let close = CLOSE.get_or_init(|| {
+        let Ok(v) = std::env::var(SNAPSHOT_ENV) else {
+            return Vec::new();
+        };
+        v.split(',')
+            .map(|w| {
+                let x: Vec<f64> = w.split(':').filter_map(|x| x.trim().parse().ok()).collect();
+                match x[..] {
+                    [e, a, b] if e > 0.0 && a <= b => (e, a, b),
+                    _ => panic!("{SNAPSHOT_ENV}={v}: expected <every>:<from>:<to>, Myr"),
+                }
+            })
+            .collect()
+    });
+    every(GAP_SNAPSHOT_MYR)
+        || close
+            .iter()
+            .any(|&(e, a, b)| (a..=b).contains(&t_myr) && every(e))
+}
 
 /// Appends the continental margins of now ([`stats::margins`]) to the run's note
 /// (`notes.plates.margins`, a series the CLI and the manifest report).

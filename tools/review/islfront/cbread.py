@@ -52,22 +52,27 @@ def derived(g):
     return d
 
 
-for arg in sys.argv[1:]:
-    folder, _, top = arg.partition("@")
-    rows = []
-    for run in sorted(p for p in Path(folder).glob("*-*") if (p / "summary.txt").exists()):
-        if top and int(run.name.rsplit("-", 1)[1]) > int(top):
+def main(argv):
+    for arg in argv:
+        folder, _, top = arg.partition("@")
+        rows = []
+        for run in sorted(p for p in Path(folder).glob("*-*") if (p / "summary.txt").exists()):
+            if top and int(run.name.rsplit("-", 1)[1]) > int(top):
+                continue
+            g = last_globals(run / "summary.txt")
+            if g is None:
+                continue
+            rows.append((run.name, derived(g)))
+        print(f"{folder}: {len(rows)} runs")
+        if not rows:
             continue
-        g = last_globals(run / "summary.txt")
-        if g is None:
-            continue
-        rows.append((run.name, derived(g)))
-    print(f"{folder}: {len(rows)} runs")
-    if not rows:
-        continue
-    for k in rows[0][1]:
-        v = [r[1][k] for r in rows if r[1][k] == r[1][k]]
-        if not v:
-            continue
-        print(f"  {k:22} median {statistics.median(v):10.4g}  range {min(v):10.4g} .. {max(v):10.4g}  "
-              f"runs {' '.join(f'{x:.3g}' for x in v)}")
+        for k in rows[0][1]:
+            v = [r[1][k] for r in rows if r[1][k] == r[1][k]]
+            if not v:
+                continue
+            print(f"  {k:22} median {statistics.median(v):10.4g}  range {min(v):10.4g} .. {max(v):10.4g}  "
+                  f"runs {' '.join(f'{x:.3g}' for x in v)}")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
