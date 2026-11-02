@@ -35,12 +35,47 @@ step-after onsets on gap fill, about a third of the intra-oceanic front). That o
 
 ## Sources
 
-(To be filled from what was read: ridge reorganization after a change of spreading direction, the ridge-trench
-encounter and microplate capture, ridge jumps, boundary classes per pair.)
+Read by a Sonnet research sub-agent, 2026-11-01 (14 sources, 12 in full; bibliography.md "The sources of the
+boundary-geometry lane").
 
-## Candidate rules
+- **The ridge-trench encounter.** Stock & Lee 1994 (full text): "As a spreading center approaches a trench in a
+  subduction setting, the intervening subducted plate may fragment into smaller pieces down to linear dimensions of
+  ~100 km (microplates)" (p. 1472); "This ridge death caused a 220- x 220-km fragment to become sutured to the Pacific
+  plate" (p. 1482); the microplates "became attached to the Pacific plate when their ridge boundaries with the Pacific
+  plate stopped spreading" (p. 1484); "None of these microplates became attached to the North America plate" (p. 1485);
+  subduction of two fragments "might have effectively stopped when these microplates were born ..., several millions of
+  years before the microplates actually ceased to exist" (p. 1484); lifetimes of the Californian microplates 2 to 11
+  Myr (p. 1480). Thorkelson 1996: spreading may cease before the ridge meets the trench, the buoyant young plate breaking
+  "into nonsubducting microplates"; in other cases "even the youngest parts of the oceanic plates are drawn into the
+  trench"; floor younger than about 10 Ma is positively buoyant (Cloos 1993). Shuck et al. 2025: subduction "may
+  terminate when a mid-ocean ridge approaches a trench", the microplates "captured by the PAC plate as subduction
+  terminated", gradually along strike. Atwater 1970: "when the Farallon plate ceases to exist, the ridge also ceases".
+- **Ridges and the motion.** Menard & Atwater 1968 (abstract): spreading centres "become uniformly reoriented
+  essentially perpendicular to the faults"; Hey et al. 2010: reorientation by rift propagation at about 110 km/Myr;
+  Harper et al. 2021: seesaw propagation not clustered at reorganizations; van der Linden & van Hinsbergen 2023: pole
+  shifts are taken up by gradual changes of strike, ridge jumps only occasionally. The model already draws its ridges
+  normal to the present motion at each resampling (PLT-502, PLT-507), so nothing is built here.
+- **One class per pair.** Bird 2003 [125]: "a single class cannot always be specified for an entire plate boundary
+  curve, or even for an entire plate boundary segment, because the class may change repeatedly with local changes in
+  the azimuth of the boundary". No source read says why a pair would keep one class; the mixed share is a measurement to
+  move by a law, not a law of its own.
 
-(After the sources.)
+## The rule built: a remnant joins the plate across its ridge (PLT-860)
+
+`tectonics.remnant_capture` (`ridges::capture_remnants`, called in `ridges::bury` right after each resampling, before
+the fission): a subducting plate's ocean floor between a front where it goes down (an active contact, the plates
+closing across the edge) and a ridge of its own (another plate's ocean floor moving away, neither within 20 degrees of
+the boundary), front and ridge at most 220 km apart through it, goes to the plate across the ridge. It answers the
+mechanism frontstay.py found: the front ends where the strip runs out, and the next resampling's gap fill makes new
+floor of the same pair at the trench, where a contact starts again on young floor. With the rule the ridge dies with
+its remnant, as Stock & Lee's did, so the boundary there becomes the overriding plate's against the plate across the
+ridge (a transform or whatever their motion makes), or closes where that plate is the overriding plate itself.
+
+The width is the one measured case the source gives (the 220 km fragment, p. 1482): the fragments go down to ~100 km,
+under two of the 16k lattice's 71 km spacings, where the strip has already gone between resamplings. Not built:
+subduction stopping on buoyant young floor before the ridge arrives (Thorkelson's first case; the force balance's
+buoyancy line, FRC-005, already reads it), and the microplates' own independent motion (the fission, PLT-532, gives a
+cut piece its parent's rotation and the force balance moves it from the next step).
 
 ## How the arm will be read
 

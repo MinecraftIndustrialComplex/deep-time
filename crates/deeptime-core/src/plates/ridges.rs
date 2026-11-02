@@ -59,13 +59,14 @@ use super::events::{self, PLATE_BIRTH, PLATE_DEATH, RIDGE_BIRTH};
 use super::gap_budget;
 use super::geometry::{Cover, Geo, Tree, connect_plates, dijkstra_two, pieces};
 use super::init::random_rotation;
-use super::kinematics::{arr, quat, to_world};
+use super::kinematics::{arr, quat, tangent, to_world};
 use super::level_set;
 use super::normalise::Norm;
 use super::pools::{
     accrete, floor_at, isostatic_change_m, ocean_heat_flow, oceanic_column, thickness,
 };
 use super::settle::{WATER_LOADED, equilibrium_m};
+use super::shortening;
 use super::state::{
     CONTINENTAL, FORELAND, Group, OCEANIC, Plate, PlateState, Ridge, Sample, pool, regime,
 };
@@ -1975,6 +1976,136 @@ fn split_cut_plates(
     Ok((big.len() as u32, moved, captured))
 }
 
+/// The widest remnant of a subducting plate that a ridge-trench encounter hands to the plate
+/// across the ridge (PLT-860), km: the fragment Stock & Lee (1994, p. 1482) measured sutured to the
+/// Pacific plate when its ridge died ("This ridge death caused a 220- x 220-km fragment to become
+/// sutured to the Pacific plate"); the plate between a ridge and a trench breaks "down to linear
+/// dimensions of ~100 km" (p. 1472), under two of the 16k lattice's spacings. ledger: PLT-860
+pub const REMNANT_KM: f64 = 220.0;
+/// World global (measurement; PLT-860, only while `remnant_capture` is on): the samples remnant
+/// capture moved to the plate across their ridge over the run.
+pub const REMNANT_CAPTURED_GLOBAL: &str = "plates/remnant_captured_samples";
+
+/// A ridge-trench encounter's remnant joins the plate across the ridge (`tectonics.remnant_capture`,
+/// the boundary-geometry lane, 2026-11-01; ledger PLT-860). Right after a resampling (`geo` the
+/// lattice every group shares, each group unrotated, `pos` its points), a subducting plate's ocean
+/// floor that lies between a front where it goes down (a lattice edge to a plate it subducts under,
+/// an active contact, the two closing across it) and a ridge of its own (a lattice edge to another
+/// plate's ocean floor moving away from it; neither within 20 degrees of the boundary, PLT-311's
+/// transform line, so that a remnant between two boundaries of one pair keeps them apart), where front and
+/// ridge are at most [`REMNANT_KM`] apart through it, goes to the plate across that ridge. Stock &
+/// Lee 1994 (Tectonics 13:1472-1487, read in full): "As a spreading center approaches a trench in a
+/// subduction setting, the intervening subducted plate may fragment into smaller pieces down to
+/// linear dimensions of ~100 km (microplates)" (p. 1472); they "became attached to the Pacific plate
+/// when their ridge boundaries with the Pacific plate stopped spreading" (p. 1484), and "None of
+/// these microplates became attached to the North America plate" (p. 1485), the overriding one;
+/// Shuck et al. 2025: microplates "captured by the PAC plate as subduction terminated". Where the
+/// plate across the ridge is the overriding plate itself (the remnant a strip between two
+/// boundaries of one pair), the boundary there closes. The ridge's spreading ends with it, so the
+/// next resampling fills no ridge there and no contact starts on its young floor. Returns the
+/// samples moved.
+pub fn capture_remnants(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> u32 {
+    use std::cmp::Reverse;
+    use std::collections::{BTreeSet, BinaryHeap};
+    let n = state.samples.len().min(pos.len());
+    let plate_of: Vec<u32> = (0..n).map(|i| state.plate_of(i)).collect();
+    let samples = &state.samples;
+    let ocean = |i: usize| !samples[i].is_hidden() && samples[i].kind != CONTINENTAL;
+    let under_over: BTreeSet<(u32, u32)> = state
+        .contacts
+        .iter()
+        .filter(|c| c.active(env.step))
+        .map(|c| (c.under, c.over))
+        .collect();
+    let subducting: BTreeSet<u32> = under_over.iter().map(|&(u, _)| u).collect();
+    let omega: Vec<DVec3> = state
+        .plates
+        .iter()
+        .map(|p| DVec3::from_array(p.omega))
+        .collect();
+    // The front's and the ridge's rows on each subducting plate; a ridge row keeps the group of
+    // the plate across it.
+    let mut front: Vec<(usize, u32)> = Vec::new();
+    let mut ridge: Vec<(usize, u32)> = Vec::new();
+    for i in 0..n {
+        let p = plate_of[i];
+        if !ocean(i) || !subducting.contains(&p) {
+            continue;
+        }
+        let x = pos[i];
+        let (mut at_front, mut across) = (false, None);
+        for (u, _) in geo.edges(i as u32) {
+            let u = u as usize;
+            if u >= n || plate_of[u] == p || samples[u].is_hidden() {
+                continue;
+            }
+            let q = plate_of[u];
+            // The other plate's motion across this edge: closing or opening, unless a transform.
+            let normal = tangent(x, pos[u] - x).normalize_or_zero();
+            let rel = env
+                .norm
+                .velocity_mm_yr(omega[q as usize] - omega[p as usize], x);
+            let across_mm_yr = if shortening::is_transform(rel, normal) {
+                0.0
+            } else {
+                rel.dot(normal)
+            };
+            at_front |= across_mm_yr < 0.0 && under_over.contains(&(p, q));
+            if across.is_none() && across_mm_yr > 0.0 && ocean(u) {
+                across = Some(samples[u].group);
+            }
+        }
+        if at_front {
+            front.push((i, u32::MAX));
+        }
+        if let Some(g) = across {
+            ridge.push((i, g));
+        }
+    }
+    if front.is_empty() || ridge.is_empty() {
+        return 0;
+    }
+    // Distances from each row through the plate's own ocean floor, km, up to the remnant's width.
+    let reach = |seeds: &[(usize, u32)]| -> Vec<(f64, u32)> {
+        let mut d = vec![(f64::INFINITY, u32::MAX); n];
+        let mut heap = BinaryHeap::new();
+        for &(i, tag) in seeds {
+            d[i] = (0.0, tag);
+            heap.push(Reverse((0.0f64.to_bits(), i)));
+        }
+        while let Some(Reverse((bits, v))) = heap.pop() {
+            let dv = f64::from_bits(bits);
+            if dv > d[v].0 {
+                continue;
+            }
+            for (u, rad) in geo.edges(v as u32) {
+                let u = u as usize;
+                if u >= n || plate_of[u] != plate_of[v] || !ocean(u) {
+                    continue;
+                }
+                let du = dv + env.norm.km(f64::from(rad));
+                if du < d[u].0 && du <= REMNANT_KM {
+                    d[u] = (du, d[v].1);
+                    heap.push(Reverse((du.to_bits(), u)));
+                }
+            }
+        }
+        d
+    };
+    let (to_front, to_ridge) = (reach(&front), reach(&ridge));
+    // A row stands for half a spacing beyond its sample on either side.
+    let row_km = env.norm.km(env.norm.spacing_rad());
+    let mut moved = 0;
+    for i in 0..n {
+        let (df, (dr, g)) = (to_front[i].0, to_ridge[i]);
+        if g != u32::MAX && df + dr + row_km <= REMNANT_KM {
+            state.samples[i].group = g;
+            moved += 1;
+        }
+    }
+    moved
+}
+
 /// Marks plates without samples dead and, when `geo` is the lattice every group shares (right
 /// after a resampling), absorbs plates below `min_plate_area_frac` into the neighbour they share
 /// most lattice edges with. `pos` are current positions (for centroids). `causes` maps a plate to
@@ -1990,6 +2121,17 @@ pub fn bury(
     let t = env.t_myr;
     state.recount(pos);
     if let Some(geo) = geo {
+        // Before the fission, which splits off what the capture leaves cut (ledger: PLT-860).
+        if env.k.remnant_capture {
+            let moved = capture_remnants(state, geo, pos, env);
+            *world
+                .globals
+                .entry(REMNANT_CAPTURED_GLOBAL.to_owned())
+                .or_insert(0.0) += f64::from(moved);
+            if moved > 0 {
+                state.recount(pos);
+            }
+        }
         if env.k.plate_fission {
             let (born, moved, captured) = split_cut_plates(state, world, geo, pos, env)?;
             for (key, x) in [

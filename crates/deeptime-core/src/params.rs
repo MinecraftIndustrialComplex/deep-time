@@ -1190,6 +1190,14 @@ pub struct TectonicParams {
     /// area on average but walks a margin inside a plate by up to half a spacing at every
     /// resampling (`plates::tests::how_resamplings_roughen_a_margin`). ledger: PLT-852
     pub class_level_set: bool,
+    /// A ridge-trench encounter's remnant joins the plate across the ridge (the boundary-geometry
+    /// lane, 2026-11-01): right after each resampling, a subducting plate's ocean floor between a
+    /// front where it goes down and a spreading ridge of its own, the two at most
+    /// `ridges::REMNANT_KM` apart, goes to the plate across the ridge (`ridges::capture_remnants`;
+    /// Stock & Lee 1994's microplates, captured by the plate across their dead ridge). Off, the
+    /// remnant subducts to the last sample and the resampling's gap fill makes new floor of the
+    /// same pair at the trench, where a contact starts again on it. ledger: PLT-860
+    pub remnant_capture: bool,
     /// Hotspots at the start.
     pub hotspots_initial: u32,
     /// New hotspots per 100 Myr (Poisson).
@@ -1668,6 +1676,7 @@ impl Default for TectonicParams {
             split_inheritance: true,           // ledger: PLT-534
             level_set_membership: true,        // ledger: PLT-536
             class_level_set: true,             // ledger: PLT-852
+            remnant_capture: false,            // ledger: PLT-860
             hotspots_initial: 8,
             hotspot_births_per_100myr: 3.0,
             hotspot_lifetime_myr: [40.0, 150.0],
