@@ -136,20 +136,22 @@ pub const PIECE_LINK_SPACINGS: f64 = 2.0;
 /// a gap that a rift has opened since the last resampling is not, and the next resampling gives it
 /// new ocean floor.
 pub const SHAPE_GAP_SPACINGS: f64 = 1.0;
-/// The continental crust's shape at a moment on the lattice (measurement only; the per-step watch,
-/// the arc-stock lane, 2026-11-01). Each lattice point shows the visible sample nearest it, and a
-/// gap (no visible sample within [`SHAPE_GAP_SPACINGS`]) shows ocean floor. Counted over the
-/// lattice's points and joined along all its edges: the points showing continental crust and of
-/// them the hyper-extended (`transition::hyper_extended`); the lattice edges between continental
-/// crust and ocean floor, and the same on the label each point's ring and itself hold by a majority
-/// (raggedness at the lattice's scale falls away, the shape stays); the connected pieces of
-/// continental crust of any size; and the ocean floor outside its largest piece (enclosed by
-/// continental crust). The fixed lattice keeps the count on one footing through the steps between
-/// resamplings and across a resampling: the samples' own links break as plates move apart (by up
-/// to 14 spacings in 20 Myr at 50 mm/yr), and a shape counted on them split the ocean floor plate
-/// by plate before each resampling and joined it again after (base38, 2026-11-01). A margin that
-/// walks at each resampling (PLT-664 before PLT-852) shows as edges a resampling adds and the
-/// steps between do not take back.
+/// The continental crust's shape at a moment (measurement only; the per-step watch, the arc-stock
+/// lane, 2026-11-01). Its area on the samples: the visible continental samples and of them the
+/// hyper-extended (`transition::hyper_extended`), a sample being one lattice cell of area between
+/// resamplings. Its outline on the lattice: each lattice point shows the visible sample nearest it,
+/// a gap (no visible sample within [`SHAPE_GAP_SPACINGS`]) shows ocean floor, and all the
+/// lattice's edges join the points: the edges between continental crust and ocean floor, and the
+/// same on the label each point's ring and itself hold by a majority (raggedness at the lattice's
+/// scale falls away, the shape stays); the connected pieces of continental crust of any size; and
+/// the ocean floor outside its largest piece (enclosed by continental crust). The samples' own
+/// links break as plates move apart (by up to 14 spacings in 20 Myr at 50 mm/yr): an outline
+/// joined by them split the ocean floor plate by plate before each resampling and joined it again
+/// after (arm watch, 2026-11-01). The lattice's points are no area: a gap point within the
+/// threshold of a continental sample shows it, so between resamplings the points showing
+/// continental crust grow by the gaps' rims (arm watch2: about 400 points a 20-Myr cycle, taken
+/// back at each resampling). A margin that walks at each resampling (PLT-664 before PLT-852)
+/// shows as edges a resampling adds and the steps between do not take back.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Shape {
     pub continental: u32,
@@ -218,13 +220,13 @@ pub fn shape(st: &PlateState, geo: &Geo, tree: Option<&Tree>, spacing: f64) -> S
     let pieces = walk(&|i| cont[i]).len() as u32;
     let ocean = walk(&|i| !cont[i]);
     let enclosed = ocean.iter().sum::<u32>() - ocean.iter().copied().max().unwrap_or(0);
+    let visible_continental = samples
+        .iter()
+        .filter(|s| !s.is_hidden() && s.kind == CONTINENTAL);
     Shape {
-        continental: cont.iter().filter(|&&c| c).count() as u32,
-        hyper: (0..n)
-            .filter(|&i| cont[i])
-            .filter(|&i| {
-                shows[i].is_some_and(|j| super::transition::hyper_extended(&samples[j as usize]))
-            })
+        continental: visible_continental.clone().count() as u32,
+        hyper: visible_continental
+            .filter(|s| super::transition::hyper_extended(s))
             .count() as u32,
         edges,
         smooth_edges,
