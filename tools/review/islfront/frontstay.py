@@ -320,6 +320,20 @@ def why(c, spacing_km, acc):
                             probe[st, 0] += 1
                         else:
                             probe[st, 2] += 1
+                    # Beyond the subducting plate's crust (past its samples and any gap, up to 12 spacings out):
+                    # the first other plate met, the overriding plate itself (the subducting plate a strip
+                    # between two boundaries of one pair), a third plate, or none.
+                    beyond = acc.setdefault((cls, fate, "beyond"), {"over": 0, "third": 0, "none": 0})
+                    met = "none"
+                    for st in range(1, 13):
+                        ang = st * spacing_km / R_KM
+                        y = x * np.cos(ang) + nv * np.sin(ang)
+                        d, kk = tree0.query(y)
+                        if arc_km(d) > spacing_km or s0["plate"][kk] == under[j]:
+                            continue
+                        met = "over" if s0["plate"][kk] == s0["plate"][idx[j]] else "third"
+                        break
+                    beyond[met] += 1
                     d, kk = tree0.query(x, k=12)
                     across = [k2 for k2 in kk if s0["plate"][k2] == under[j]]
                     if across and "age" in s0:
@@ -416,6 +430,14 @@ def main(argv):
             if len(ag):
                 print(f"  {key[0]:<14} {key[1]:<6} the subducting floor's age at the front, Myr: p25"
                       f" {np.percentile(ag, 25):.0f} p50 {np.median(ag):.0f} p75 {np.percentile(ag, 75):.0f}")
+        for key, bz in sorted(causes.items()):
+            if len(key) != 3 or key[2] != "beyond":
+                continue
+            tot = sum(bz.values())
+            if tot:
+                print(f"  {key[0]:<14} {key[1]:<6} beyond the subducting plate's crust, within 12 spacings ({tot}):"
+                      f" the overriding plate itself {bz['over'] / tot:.3f}, a third plate {bz['third'] / tot:.3f},"
+                      f" none {bz['none'] / tot:.3f}")
         for key, fz in sorted(causes.items()):
             if len(key) != 3 or key[2] != "fates":
                 continue

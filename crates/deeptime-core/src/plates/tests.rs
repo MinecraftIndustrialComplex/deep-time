@@ -2756,6 +2756,99 @@ fn the_shape_counts_edges_pieces_and_holes() {
     assert!(off < 0.25, "{sh:?} against the margin's {margin}");
 }
 
+/// Remnant capture (PLT-860): a strip of plate 1 between plate 0, which it subducts under (an
+/// active contact), and the plate south of it, from which it spreads at x > 0 (plate 1 turns about
+/// -y, so it moves north at x > 0 and south at x < 0, where its ridge is with plate 0 and it closes
+/// on the plate south of it; the others stand still). Where the strip is about 100 km wide (x > 0,
+/// y > 0) it goes to the plate across its ridge; where it is about 950 km wide (x > 0, y < 0, and
+/// all of x < 0) it stays. The plate across is a third plate, then plate 0 itself (the strip between
+/// two boundaries of one pair: the boundary closes).
+#[test]
+fn a_ridge_trench_remnant_joins_the_plate_across_the_ridge() {
+    let p = preset(100_000, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let wide = |q: DVec3| if q.x > 0.0 && q.y > 0.0 { 0.015 } else { 0.15 };
+    let strip = |q: DVec3| q.z > 0.0 && q.z <= wide(q);
+    for across in [2u32, 0] {
+        let (mut st, geo) = plates_unresolved(&p, &env, glam::DQuat::IDENTITY, |q| q.z > 0.0);
+        assert!(st.plates.len() > 2);
+        st.plates[2].alive = true;
+        st.groups.push(state::Group {
+            plate: across,
+            rot: [0.0, 0.0, 0.0, 1.0],
+        });
+        let pts = geo.points().to_vec();
+        for (s, &q) in st.samples.iter_mut().zip(&pts) {
+            s.kind = state::OCEANIC;
+            s.group = if q.z <= 0.0 {
+                2
+            } else if strip(q) {
+                1
+            } else {
+                0
+            };
+        }
+        // About 50 mm/yr at the equator.
+        st.plates[1].omega = [0.0, -7.85e-9, 0.0];
+        let mut c = inherit::tests::contact(1, 0, DVec3::X);
+        c.last_step = env.step;
+        st.contacts.push(c);
+        let pos = geometry::positions(&st, &geo);
+        st.recount(&pos);
+        let moved = ridges::capture_remnants(&mut st, &geo, &pos, &env);
+        assert!(moved > 0, "across {across}");
+        for (i, &q) in pts.iter().enumerate() {
+            let plate = st.plate_of(i);
+            let want = if !strip(q) {
+                if q.z <= 0.0 { across } else { 0 }
+            } else if q.x > 0.3 && q.y > 0.3 {
+                across
+            } else if q.x < -0.3 || (q.x > 0.3 && q.y < -0.3) {
+                1
+            } else {
+                continue;
+            };
+            assert_eq!(plate, want, "across {across}, sample {i} at {q}");
+        }
+    }
+}
+
+/// Remnant capture (PLT-860) leaves a plate's corner alone: plate 1 is the quarter sphere y > 0,
+/// z > 0 and turns about (0, -1, -1), so near (1, 0, 0) it closes on plate 0 across y = 0 (a
+/// trench, an active contact) and opens across z = 0 (a ridge), the two boundaries meeting at 90
+/// degrees; near (-1, 0, 0) the other way round. The samples near either corner lie within
+/// `REMNANT_KM` of both rows, but the rows face 90 degrees apart, not opposite ways. The motion is
+/// 45 degrees oblique to both, where reading each lattice edge's class on its own way puts them 132
+/// degrees apart.
+#[test]
+fn remnant_capture_leaves_a_plates_corner() {
+    let p = preset(100_000, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (mut st, geo) = plates_unresolved(&p, &env, glam::DQuat::IDENTITY, |q| q.z > 0.0);
+    let pts = geo.points().to_vec();
+    for (s, &q) in st.samples.iter_mut().zip(&pts) {
+        s.kind = state::OCEANIC;
+        s.group = u32::from(q.y > 0.0 && q.z > 0.0);
+    }
+    // About 50 mm/yr at the corners.
+    let w = 7.85e-9 / std::f64::consts::SQRT_2;
+    st.plates[1].omega = [0.0, -w, -w];
+    let mut c = inherit::tests::contact(1, 0, DVec3::X);
+    c.last_step = env.step;
+    st.contacts.push(c);
+    let pos = geometry::positions(&st, &geo);
+    st.recount(&pos);
+    ridges::capture_remnants(&mut st, &geo, &pos, &env);
+    let reach = (3.0 * ridges::REMNANT_KM / 6371.0).cos();
+    for (i, &q) in pts.iter().enumerate() {
+        if q.y > 0.0 && q.z > 0.0 && q.dot(DVec3::X * q.x.signum()) > reach {
+            assert_eq!(st.plate_of(i), 1, "sample {i} at {q}");
+        }
+    }
+}
+
 /// The per-step watch counts on the lattice, not on the samples' own links: two plates split at
 /// x = 0, a continent north of the equator on both, the plate at x > 0 turned 5.3 spacings about
 /// the x axis (it slides along their boundary, a transform; no gap, no overlap). Every link across

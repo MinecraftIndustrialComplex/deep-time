@@ -41,8 +41,11 @@ base38-s4's on every column):
 So the walk PLT-852 fixed stays fixed (the smoothed margin and the enclosed floor do not move at
 the resamplings), and what still moves at them is the area of continental and hyper-extended
 crust, by about 0.06 % of the continental crust and 0.4 % of the run's final hyper-extended crust
-per resampling. Which part of the resampling's step adds
-it is a read for the crust budget's parts (`tools/review/continent-budget.py`). The record's
+per resampling. The remap is not it: the crust budget's parts (`tools/review/continent-budget.py` on base38's
+supercontinent and scattered_continents seeds 1 and 2) give the resampling's blend −0.011 of the
+planet's visible continental area over a run, about −22 samples a resampling; what the
+resampling's step runs after the remap adds the rest (the rate limit there turns ocean floor
+continental: the `rate` part makes 0.286 of the planet continental over a run, at every step). The record's
 `pieces` (`StepRec::pieces`, the largest continental pieces) still joins by the samples' links and
 splits between resamplings as arm `watch` did.
 

@@ -9113,7 +9113,7 @@ The sources of the front lane's diagnosis (plates.md "The front's length: why th
 - Reference: Stock, J. M. and Lee, J. (1994). Do microplates in subduction zones leave a geological record? Tectonics 13(6):1472-1487 (the title from memory; the running head reads "Microplates in subduction zones").
 - DOI or URL: 10.1029/94TC01808; CaltechAUTHORS https://authors.library.caltech.edu/records/mdth9-4yp93/files/tect936.pdf
 - Cited as: "Stock & Lee 1994".
-- Ledger ids: PLT-532, PLT-534 (2026-10-24: "The fragmentation of a subducting plate creates a new triple junction, two limbs of which are along the trench"; the Cocos-Rivera-North America triple junction "has not moved much with respect to the North America plate since its inception because subduction of both plates has been nearly orthogonal to the trench", both checked in `tect936.txt`)
+- Ledger ids: PLT-860 (2026-11-01, the boundary-geometry lane: p. 1482, "This ridge death caused a 220- x 220-km fragment to become sutured to the Pacific plate"; p. 1484, the microplates "became attached to the Pacific plate when their ridge boundaries with the Pacific plate stopped spreading"; p. 1485, "None of these microplates became attached to the North America plate"; read again by a Sonnet research sub-agent from the Caltech scan, pp. 1472, 1480 and 1484 checked against the page images), PLT-532, PLT-534 (2026-10-24: "The fragmentation of a subducting plate creates a new triple junction, two limbs of which are along the trench"; the Cocos-Rivera-North America triple junction "has not moved much with respect to the North America plate since its inception because subduction of both plates has been nearly orthogonal to the trench", both checked in `tect936.txt`)
 - Access: open copy (the authors' institutional repository).
 - Library (the project's source library, not distributed): fetched 2026-10-24. Files: `StockLee1994/tect936.pdf` (a scan with a text layer), `tect936.txt` (pdftotext -layout).
 - Read so far (by the project): full text, 2026-10-24 (the lane's research agent, then the quotes checked in the library's text). Introduction: "As a spreading center approaches a trench in a subduction setting, the intervening subducted plate may fragment into smaller pieces down to linear dimensions of ~100 km (microplates)"; "However, if a small fragment breaks off a large plate, then it may lose its slab-pull force and become driven entirely by different conditions." "Styles of Microplate Death": the Monterey, Arguello, Guadalupe and Magdalena plates "became attached to the Pacific plate when their ridge boundaries with the Pacific plate stopped spreading"; "None of these microplates became attached to the North America plate." Conclusions: "a very small microplate with insufficient slab-pull force may stagnate or attach itself mainly to the overriding plate".
@@ -10990,3 +10990,48 @@ A continental column's height from its whole buoyancy (`continental-buoyancy.md`
 - Access: author copy, full text.
 - Library: not kept.
 - Read so far (by the project): "Intra-oceanic subduction zones comprise around 17,000 km, or nearly 40%, of the subduction margins of the Earth (Leat and Larter 2003)" (Leat & Larter 2003 itself not read); major parts of the arcs "often located below sea level" (not quantified).
+
+### The sources of the boundary-geometry lane (2026-11-01)
+
+Read by a Sonnet research sub-agent, 2026-11-01, quotes copied as it printed them; files in its scratch folders, not
+kept in the library. Scans were read through their text layer or OCR (marked).
+
+### Thorkelson1996
+- Reference: Thorkelson, D. J. (1996). Subduction of diverging plates and the principles of slab window formation. Tectonophysics 255:47-63.
+- DOI or URL: 10.1016/0040-1951(95)00106-9 (from the printed SSDI); the author's copy at sfu.ca/~dthorkel/linked/.
+- Cited as: "Thorkelson 1996".
+- Ledger ids: PLT-860 (the encounter's two outcomes).
+- Access: author copy, a scan read through OCR.
+- Library: not kept.
+- Read so far (by the project): full text. p. 48: "Relative to the asthenosphere, oceanic lithosphere older than about 10 Ma is negatively buoyant and inherently subductable, whereas lithosphere younger than about 10 Ma is positively buoyant (Cloos, 1993)"; "In some cases, subduction may stop before the ridge intersects the trench, leading to possible cessation of sea-floor spreading ... Instead, spreading ceased and the buoyant parts of the subducting plate broke up into nonsubducting microplates with independent kinematics. In other cases, however, subduction is uninterrupted and even the youngest parts of the oceanic plates are drawn into the trench." Abstract: "If plate divergence and convergence continue after the ridge intersects the subduction zone, a slab window forms between the subducted parts of the diverging oceanic plates".
+
+### Atwater1970
+- Reference: Atwater, T. (1970). Implications of plate tectonics for the Cenozoic tectonic evolution of western North America. Geological Society of America Bulletin 81(12):3513-3536.
+- DOI or URL: 10.1130/0016-7606(1970)81[3513:IOPTFT]2.0.CO;2; a course copy at geology.cwu.edu.
+- Cited as: "Atwater 1970".
+- Ledger ids: none (the encounter's history; docs/design/boundary-geometry.md).
+- Access: course copy, a scan read through its text layer.
+- Library: not kept.
+- Read so far (by the project): full text. p. 3515: "Between the Pioneer and Murray fracture zones, the Farallon plate broke up, and spreading slowed about 32 m.y. ago, so that rapid creation and consumption of crust ceased for this entire segment at that time"; "By the time the trench overruns the ridge, Figure 15C, the Farallon plate has practically ceased to exist"; "when the Farallon plate ceases to exist, the ridge also ceases".
+
+### Shuck2025
+- Reference: Shuck, B. et al. (2025). Science Advances 11(39):eady8347 (the full author list and title as the research sub-agent's report gives them were not copied).
+- DOI or URL: 10.1126/sciadv.ady8347; read through Europe PMC (PMC12459466), open access (CC BY).
+- Cited as: "Shuck et al. 2025".
+- Ledger ids: PLT-860 (the capture by the plate across the ridge).
+- Access: open access, full text.
+- Library: not kept.
+- Read so far (by the project): abstract: "Subduction may terminate when a mid-ocean ridge approaches a trench, introducing buoyant lithosphere that resists subduction, leading to slab detachment and plate boundary reconfiguration"; introduction: "numerous oceanic microplates representing fragmented pieces of the Farallon plate that were captured by the PAC plate as subduction terminated"; discussion: "the along-strike impediment of tear propagation by transform faults may explain why ridge trench-type subduction termination is gradual at the broader tectonic plate scale and does not result in major, prompt shifts in plate motions."
+
+### Read, not used yet (the boundary-geometry lane)
+- Bird 2003 [125] (Bird2003): "a single class cannot always be specified for an entire plate boundary curve, or even for an entire plate boundary segment, because the class may change repeatedly with local changes in the azimuth of the boundary" (so one class per pair is no law); [79]: a microplate is "most often ... a plate of 100-500 km dimensions which appears spontaneously in the center of an ocean spreading system".
+- Menard & Atwater 1968 (Nature 219:463-467, abstract only): "The mode of deformation is such that the spreading centres between transform faults become uniformly reoriented essentially perpendicular to the faults" (the model re-segments its ridges to the present motion at each resampling, PLT-502, PLT-507).
+- Atwater & Macdonald 1977 (opening paragraph only, AtwaterMacdonald1977): eight slow-spreading centres "All were 6-38° oblique"; fast ones "perpendicular within the errors of measurements".
+- Hey, Martinez, Höskuldsson & Benediktsdóttir 2010 (G-cubed 11:Q03011, full text): rift propagation in response to changes in plate motion; propagation rates "~110 km/Myr ± 30 km/Myr".
+- Harper, Tozer, Sandwell & Hey 2021 (JGR Solid Earth, 10.1029/2020JB020017, accepted manuscript): seesaw propagators show "no clustering of these changes around plate reorganization events".
+- van der Linden & van Hinsbergen 2023 (Tektonika 1(2), 10.55575/tektonika2023.1.2.14, full text): Euler pole shifts "typically accommodated by gradual changes in transform fault and spreading centre strike ... rather than by ridge jumps"; ridge jumps "Occasionally".
+- Sandwell & Smith 2009 (JGR 114:B01411, full text): "For rates less than about 60 mm/a the typical ridge segment is 50-80 km long".
+- Madsen, Thorkelson, Friedman & Marshall 2006 (Geosphere 2(1):11-34, full text): a kinematic model; its assumptions, not observations.
+- Atwater & Stock 1998 (Int. Geol. Rev. 40:375-402, preprint, abstract and captions only): the Monterey microplate's "'capture' by the Pacific plate".
+- Matthews et al. 2016 (Matthews2016): plate counts over time, no boundary lengths by type; Cao et al. 2024 (Geoscience Frontiers, 10.1016/j.gsf.2024.101922, pre-proof): modelled ridge length cyclic with the supercontinent cycle, subduction length not.
+- Not obtained: Hey 1977, Hey et al. 1980, Nicholson et al. 1994 (blocked), Bird & Naar 1994, Engeln et al. 1988, Müller et al. 2016, Mittelstaedt et al. 2008 (no open copy reached).

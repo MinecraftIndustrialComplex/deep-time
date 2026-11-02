@@ -14354,8 +14354,9 @@ The intra-oceanic fronts stand on bare ocean floor (the thickest crust within 20
 median, p90 13.1), though 0.67 of their length belongs to contacts older than 50 Myr (`islrec.py`).
 Their arcs are not there: the most arc magma on a sample of the arc's band (140 to 260 km behind
 the front, PLT-042 and PLT-043) is 2.0 km at the median (p90 9.3; the continental fronts' 19.1). At
-base38's island-arc rate per km of front (61 km³/km/Myr) over the band's Gaussian (about 106 km
-wide), that is about 3.5 Myr of standing (our arithmetic). An island arc turns its column
+base38-s4's island-arc rate per km of front (70.7 km³/km/Myr, `cbread.py`'s median; first written
+as 61, corrected 2026-11-01) over the band's Gaussian (about 106 km wide), that is about 3 Myr of
+standing (our arithmetic). An island arc turns its column
 continental at 15 km (PLT-047) and its front continental with it (PLT-370), so the intra-oceanic
 front is the front whose arc has not grown. Subduction erosion finds no forearc crust there
 (arc-stock.md: 0.55 of the 0.82 km³ a year its erosive length asks).
@@ -14409,6 +14410,63 @@ that reaches a trench ends subduction there too (a slab window); what is the mod
 ridge stands a few hundred km from a trench of the same two plates. **Is a law wrong?** Not the arcs'
 and not the front's: the boundaries' (the open question at the end of "Where the pairs' relative
 poles lie").
+
+### A ridge-trench remnant joins the plate across its ridge (PLT-860, 2026-11-01)
+
+The boundary-geometry lane's rule (Ben, 2026-11-01, "Boundary geometry (Recommended)"; design notes
+docs/design/boundary-geometry.md), `tectonics.remnant_capture`, on by default since 2026-11-02.
+
+**What Earth does.** Where a spreading ridge comes up to a trench, the strip of the subducting plate
+between them breaks up and joins the plate across the ridge. Stock & Lee 1994 (full text): "As a
+spreading center approaches a trench in a subduction setting, the intervening subducted plate may
+fragment into smaller pieces down to linear dimensions of ~100 km (microplates)" (p. 1472); "This
+ridge death caused a 220- x 220-km fragment to become sutured to the Pacific plate" (p. 1482); the
+Monterey, Arguello, Guadalupe and Magdalena microplates "became attached to the Pacific plate when
+their ridge boundaries with the Pacific plate stopped spreading" (p. 1484), and "None of these
+microplates became attached to the North America plate" (p. 1485), the overriding plate. Shuck et al.
+2025 (full text): microplates "captured by the PAC plate as subduction terminated". Thorkelson 1996
+(full text): spreading may cease before the ridge meets the trench, the young plate breaking "into
+nonsubducting microplates"; in other cases "even the youngest parts of the oceanic plates are drawn
+into the trench". Atwater 1970: "when the Farallon plate ceases to exist, the ridge also ceases".
+
+**What the model did.** Nothing: the strip was subducted to its last row, the trench met the ridge's
+gap, the next resampling filled the gap with young floor of the same two plates, and a contact often
+started on it again ("Why the island arcs do not grow" above).
+
+**The rule.** Right after each resampling, before the fission, a subducting plate's ocean floor
+between a front where it goes down (an active contact, the two plates closing across the boundary)
+and a ridge of its own (another plate's ocean floor moving away; neither within PLT-311's 20 degrees
+of the boundary), the two rows at most 220 km apart through it (`REMNANT_KM`, the one measured
+fragment, p. 1482) and facing more than 120 degrees apart (`STRIP_COS`, a game-choice: a strip, not a
+plate's corner where its boundary turns from a trench to a ridge), goes to the plate across the
+ridge. Each boundary edge's class is read on the boundary's normal on its side, the chord of the
+crossings to the same plate within 90 degrees of the edge from the plate's samples within two lattice
+steps (PLT-310's normal with the two sides of a thin strip kept apart). The ridge dies with its
+remnant, so no later gap fill makes floor of that pair at the trench. Where the plate across the
+ridge is the overriding plate itself, the boundary there closes. Not built: subduction stopping on
+buoyant young floor before the ridge arrives (Thorkelson's first case; the force balance's buoyancy
+line, FRC-005, reads it), and the microplates' own motion (the fission gives a cut piece its parent's
+rotation, and the force balance moves it from the next step).
+
+**Checked.** Unit tests: a strip about 100 km wide goes to the plate across its ridge, a third plate
+or the overriding plate itself, and about 950 km wide it stays, whichever side its front is on
+(`a_ridge_trench_remnant_joins_the_plate_across_the_ridge`); a quarter-sphere plate whose boundary
+turns from a trench to a ridge at its two corners keeps every sample within 660 km of them
+(`remnant_capture_leaves_a_plates_corner`). With the switch off a run equals base38's (bg-off,
+supercontinent seed 1: rec.json equal but for the shape fields PR #64 added). The first form, each
+edge's class read on its own way and no side test, moved 68,000 to 80,000 samples a run (bg-cum):
+plate corners, the design notes give its numbers.
+
+**The arm** (bg-cum2, 8 runs against base38-s4; the design notes give the full tables). The rule
+moves 8,200 to 12,200 samples a run, about 200 a resampling. Fronts last longer on their rock (the
+look run: the intra-oceanic front still on the same rock after 16 Myr 0.480 and 0.585 against
+0.384 and 0.458); the boundary on pairs that both open and close falls from 0.630 to 0.594 (Earth
+0.09 to 0.135); the census moves towards Earth without significance (continental crust under the
+sea 0.585 against 0.630, the largest landmass 0.080 against 0.061, criteria a mean of 5.25 against
+4.88); the guard is clean (10,650 against 10,438 m). The intra-oceanic front's length (26,244
+against 26,240 km) and the crust behind the fronts (0.395 against 0.401 with no 15 km crust within
+200 km) do not move: those are not this mechanism's. On by default since 2026-11-02 (the
+coordinator's call under Ben's rule of 2026-10-23).
 
 ## Hotspots, plume heads and volcanic margins from sources (2026-10-31)
 
