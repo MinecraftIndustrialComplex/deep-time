@@ -30,5 +30,5 @@ change. The record's `pieces` (`StepRec::pieces`, the largest continental pieces
 the samples' links and splits between resamplings the same way.
 
 Closer snapshots for a transient: `+DEEPTIME_SNAPSHOT_MYR=<every>:<from>:<to>` (Myr, the model's
-clock, for example `2:-1000:-880`) adds snapshots in that window to the 50-Myr ones, for the gap
+clock, for example `2:-1000:-880`; several windows apart by commas) adds snapshots in that window to the 50-Myr ones, for the gap
 budget, the crust budget's maps and the front trace (`plates::SNAPSHOT_ENV`, ledger PLT-283).

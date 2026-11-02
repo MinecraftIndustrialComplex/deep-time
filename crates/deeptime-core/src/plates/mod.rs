@@ -1656,26 +1656,35 @@ pub const GAP_SNAPSHOT_MYR: f64 = 50.0;
 
 /// Set this environment variable and the snapshots (the gap budget's, the crust budget's maps, the
 /// front trace's) also come every `<every>` Myr between `<from>` and `<to>` on the model's clock
-/// (negative before the present): `<every>:<from>:<to>`, for example `2:-1000:-880` (measurement
-/// only; a closer look at a transient the 50-Myr maps cannot resolve, for
-/// `tools/review/watch/timelapse.py`).
+/// (negative before the present): `<every>:<from>:<to>`, several windows apart by commas, for
+/// example `2:-1000:-890,2:-560:-500` (measurement only; a closer look at a transient the 50-Myr
+/// maps cannot resolve, for `tools/review/watch/timelapse.py`).
 // ledger: PLT-283 (game-choice: a reporting interval, read by no rule; agent, 2026-11-01).
 pub const SNAPSHOT_ENV: &str = "DEEPTIME_SNAPSHOT_MYR";
 
 /// Whether step `step` (of `dt_myr`, ending at `t_myr`) takes a snapshot: every
 /// [`GAP_SNAPSHOT_MYR`], and in [`SNAPSHOT_ENV`]'s window as often as it asks.
 fn snapshot_at(step: u64, t_myr: f64, dt_myr: f64) -> bool {
-    static CLOSE: std::sync::OnceLock<Option<(f64, f64, f64)>> = std::sync::OnceLock::new();
+    static CLOSE: std::sync::OnceLock<Vec<(f64, f64, f64)>> = std::sync::OnceLock::new();
     let every = |myr: f64| step.is_multiple_of((myr / dt_myr).round().max(1.0) as u64);
     let close = CLOSE.get_or_init(|| {
-        let v = std::env::var(SNAPSHOT_ENV).ok()?;
-        let x: Vec<f64> = v.split(':').filter_map(|x| x.trim().parse().ok()).collect();
-        match x[..] {
-            [e, a, b] if e > 0.0 && a <= b => Some((e, a, b)),
-            _ => panic!("{SNAPSHOT_ENV}={v}: expected <every>:<from>:<to>, Myr"),
-        }
+        let Ok(v) = std::env::var(SNAPSHOT_ENV) else {
+            return Vec::new();
+        };
+        v.split(',')
+            .map(|w| {
+                let x: Vec<f64> = w.split(':').filter_map(|x| x.trim().parse().ok()).collect();
+                match x[..] {
+                    [e, a, b] if e > 0.0 && a <= b => (e, a, b),
+                    _ => panic!("{SNAPSHOT_ENV}={v}: expected <every>:<from>:<to>, Myr"),
+                }
+            })
+            .collect()
     });
-    every(GAP_SNAPSHOT_MYR) || close.is_some_and(|(e, a, b)| (a..=b).contains(&t_myr) && every(e))
+    every(GAP_SNAPSHOT_MYR)
+        || close
+            .iter()
+            .any(|&(e, a, b)| (a..=b).contains(&t_myr) && every(e))
 }
 
 /// Appends the continental margins of now ([`stats::margins`]) to the run's note
